@@ -91,7 +91,12 @@
 - [x] Implement tests for MainWindow functionality
 - [x] Enhance UI component tests with QtBot
 - [x] Create integration tests for cross-component workflows
-- [ ] Implement end-to-end workflow tests
+- [🔄] Implement end-to-end workflow tests
+  - [x] Create test_workflows.py file structure
+  - [x] Implement basic data model functionality tests
+  - [x] Create simple Qt component tests
+  - [🔄] Develop workflow tests with minimal UI interaction
+  - [ ] Complete full end-to-end testing
 - [ ] Enhance background processing tests for edge cases
 - [ ] Add performance metrics to workflow tests
 
@@ -235,26 +240,37 @@ The Test Coverage Expansion phase focuses on ensuring comprehensive test coverag
 - Overall Completion: 95%
 
 ## In Progress
-- ✅ Integration tests for cross-component workflows
-  - Created test file structure
-  - Implemented tests for key workflows (data loading, validation, correction, filtering)
-  - Fixed test stability issues by focusing on direct model operations
-  - Improved signal handling and Qt event processing 
-  - All integration tests now passing
+- 🔄 End-to-end workflow tests
+  - Created test_workflows.py with TestBasicFunctionality class
+  - Implemented minimal ChestDataModel functionality tests
+  - Created simple Qt component tests
+  - Identified and addressed challenges with UI component testing:
+    - Method name mismatches between tests and implementation
+    - Signal/slot connections causing deadlocks
+    - Issues with QApplication instances between tests
+    - UI components requiring user interaction or file dialogs
+  - Successfully implemented initial tests that avoid UI deadlocks
+  - Developed a simplified approach focusing on core functionality
 
 ## Next Steps
-- ⬜ End-to-end workflow tests
-- ⬜ Performance tests for large datasets
-- ⬜ Additional feature enhancements
+- Enhance end-to-end workflow tests with more scenarios
+- Add tests for specific user workflows without complex UI interaction
+- Implement background processing tests
+- Create performance tests for large datasets
 
-## Test Coverage Expansion Plan
-The test coverage expansion plan is currently in progress, with the following status:
+## Lessons Learned
+- Qt UI components can be challenging to test in automated environments
+- Signal/slot connections can lead to deadlocks in tests
+- Method name consistency is critical between implementation and tests
+- Test fixtures should be designed to avoid complex UI initialization
+- Core functionality should be tested separately from UI when possible
 
-1. ✅ Implement MainWindow tests
-2. ✅ Enhance UI component tests with QtBot
-3. 🔄 Implement integration tests for cross-component workflows
-4. ⬜ Create end-to-end workflow tests
-5. ⬜ Add performance tests for large datasets
+## Test Coverage Expansion Plan Updates
+- Focus on core functionality verification without complex UI interactions
+- Create separate test classes for different testing scopes
+- Avoid testing patterns that lead to deadlocks or brittle tests
+- Use simplified UI component initialization where possible
+- Consider refactoring UI components for better testability
 
 ## Metrics
 - Components implemented: 100%
