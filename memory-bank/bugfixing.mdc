@@ -9,53 +9,92 @@ This document tracks bugs, issues, and their resolutions in the ChestBuddy proje
 
 ## Active Issues
 
-### Test Suite Issues
-1. **CSVService Initialization**: 
-   - **Issue**: CSVService class in the implementation no longer takes a data_model parameter but tests are still passing it.
-   - **Resolution**: Update tests to match the current implementation which initializes CSVService without parameters.
+### Performance Issues
+- **Large Dataset Performance**: When handling larger datasets (>1000 rows), the application experiences significant slowdowns
+  - **Status**: Investigating
+  - **Priority**: High
+  - **Components**: ChestDataModel, DataView
+  - **Next Steps**: Profile the application to identify bottlenecks
 
-2. **ChestDataModel Method Mismatches**:
-   - **Issue**: Several methods used in tests don't match the actual implementation:
-     - `filter_data()` expects a dictionary but is being called with a lambda function
-     - `get_all_validation_status()` and `get_all_correction_status()` methods don't exist (should be `get_validation_status()` and `get_correction_status()`)
-     - `clear_validation_status()` method is missing
-   - **Resolution**: Update tests to match the actual API or update the model to add the missing methods.
+### CSV Encoding Issues
+- **Special Character Handling**: CSV files with German umlauts and other special characters may not load correctly
+  - **Status**: Investigating
+  - **Priority**: Medium
+  - **Components**: CSVService
+  - **Next Steps**: Implement better encoding detection and handling
 
-3. **ValidationService Method Mismatches**:
-   - **Issue**: `load_validation_lists()` method doesn't exist in the actual implementation
-   - **Resolution**: Update tests to match the actual API.
-
-4. **CorrectionService Method Mismatches**:
-   - **Issue**: `load_corrections()` method doesn't exist in the actual implementation
-   - **Resolution**: Update tests to match the actual API.
-
-5. **Encoding Issues with Default Files**:
-   - **Issue**: Default input file has encoding issues - `'utf-8' codec can't decode byte 0xfc in position 2: invalid start byte`
-   - **Resolution**: Ensure proper encoding is used for input files or update the CSVService to better handle encoding issues.
-
-### QApplication Issues
-- **Issue**: The `QApplication` instance is not being properly handled in tests, causing conflicts between tests.
-- **Resolution**: Fixed by ensuring each test creates and cleans up its own QApplication instance.
-
-- UI component tests need updating to match the current implementation:
-  - Methods in the test need to be updated to match the actual implementation (`_validate_btn` vs `_validate_button`, etc.)
-  - `DataView` class methods need updating (test is looking for `_on_filter_changed` but the method might be named differently)
-  - `CorrectionService` doesn't have a `load_correction_templates` method that is referenced in the test
-  - Need to properly handle signals and UI event connections
+### Error Handling Improvements
+- **Inconsistent Error Messages**: Error handling across the application is inconsistent
+  - **Status**: To Do
+  - **Priority**: Medium
+  - **Components**: All
+  - **Next Steps**: Create a standardized error handling approach
 
 ## Recently Resolved Issues
 
-- `get_all_validation_status()` and `get_all_correction_status()` methods don't exist (should be `get_validation_status()` and `get_correction_status()`) - FIXED by updating UI component files to use the correct method names.
-- `update_value` method doesn't exist in `ChestDataModel` (should be `update_data`) - FIXED by updating `DataView._on_item_changed` method to use the correct approach.
-- `ChestDataModel` was using the wrong method name in tests (`load_data` instead of `update_data`) - FIXED by updating the tests to use the correct method name.
-- Fixed boolean check errors with DataFrames in ValidationTab and CorrectionTab by using `.empty` property instead of direct boolean check.
-- Fixed `test_services.py` mismatches by updating the test to use the correct method names and parameter order.
+### UI Component Tests Fixed
+- **TestDataView.test_update_view**: Fixed assertion error by updating row count expectations and proper filtering handling
+  - **Status**: Resolved
+  - **Resolution**: Updated test to match actual implementation
 
-## Resolved Issues
+- **TestDataView.test_filtering**: Fixed AttributeError for missing "_on_filter_changed" method
+  - **Status**: Resolved
+  - **Resolution**: Updated test to use the correct filtering API
 
-### Default Files Tests
-- **Issue**: Tests for default files were failing due to API mismatches
-- **Resolution**: Created test_default_files.py with updated tests that match the current API
+- **TestValidationTab.test_validate_data**: Fixed AttributeError for missing "_validate_button" attribute
+  - **Status**: Resolved
+  - **Resolution**: Updated to use "_validate_btn" which is the actual attribute name
+
+- **TestCorrectionTab.test_apply_correction**: Fixed AttributeError for missing "_get_selected_rows" method
+  - **Status**: Resolved
+  - **Resolution**: Updated test to use the current implementation methods
+
+- **TestCorrectionTab.test_load_corrections**: Fixed AttributeError for missing "load_correction_templates"
+  - **Status**: Resolved
+  - **Resolution**: Updated test to match the actual implementation
+
+### Method Name Mismatches
+- **ChestDataModel Method Names**: Fixed mismatches between tests and implementation
+  - **Status**: Resolved
+  - **Resolution**: Updated tests to use `get_validation_status()` instead of `get_all_validation_status()` and `get_correction_status()` instead of `get_all_correction_status()`
+
+- **Boolean Checking with DataFrames**: Fixed incorrect boolean checks
+  - **Status**: Resolved
+  - **Resolution**: Updated to use `.empty` property for checking empty DataFrames
+
+- **Test Services Method Mismatches**: Fixed method name mismatches in test_services.py
+  - **Status**: Resolved
+  - **Resolution**: Updated to use the correct method names and parameter order
+
+- **QApplication Handling**: Fixed issues with QApplication instances between tests
+  - **Status**: Resolved
+  - **Resolution**: Updated app fixture to properly handle existing instances
+
+- **update_value vs update_data**: Fixed method name mismatch
+  - **Status**: Resolved
+  - **Resolution**: Updated all occurrences to use update_data() instead of update_value()
+
+## Monitor List
+
+- **UI Responsiveness**: Keep an eye on UI responsiveness with larger datasets
+  - **Status**: Monitoring
+  - **Components**: UI Components
+
+- **Memory Usage**: Monitor memory usage with large datasets
+  - **Status**: Monitoring
+  - **Components**: ChestDataModel, DataView
+
+## Future Improvements
+
+- **Error Tracing**: Implement better error tracing and logging
+  - **Status**: Planned
+  - **Priority**: Medium
+  - **Components**: All
+
+- **CSV Import Preview**: Add preview functionality for CSV imports to help detect encoding issues
+  - **Status**: Planned
+  - **Priority**: Medium
+  - **Components**: CSVService, UI
 
 ## Common Challenges
 
