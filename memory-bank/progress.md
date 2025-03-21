@@ -34,14 +34,16 @@
 - [x] Create test data
 - [x] Implement unit tests for core components
 - [x] Implement tests for services
-- [x] Implement tests for UI components
+- [x] Implement basic tests for UI components
 - [x] Create test runner script
 - [x] Add test coverage reporting
+- [ ] Implement comprehensive UI tests
+- [ ] Create integration and workflow tests
 
 ### Phase 6: Error Handling and Optimization
 - [x] Add international character support
 - [x] Implement robust CSV encoding detection
-- [ ] Optimization for large datasets
+- [x] Optimization for large datasets
 - [ ] Documentation improvements
 - [ ] Additional error handling for edge cases
 
@@ -57,11 +59,13 @@
 - Fixed all filtering method tests to work with the current API
 - Created test files with various encodings for comprehensive CSV testing
 - Implemented tests for all CSV encoding scenarios including corrupted files
-- All tests (60 total) are now passing
+- All tests are now passing
 
 #### Next Steps:
-- Implement performance tests for large datasets
-- Add additional test coverage for edge cases
+- Create comprehensive tests for MainWindow functionality
+- Enhance UI component tests with QtBot interactions
+- Implement integration tests for cross-component workflows
+- Create end-to-end workflow tests
 - Address ValidationService date parsing warnings
 
 ### Phase 8: CSV Encoding Enhancement - COMPLETED
@@ -74,26 +78,36 @@
 - [x] Add robust mode for handling corrupted files
 - [x] Create comprehensive tests for encoding functionality
 
-### Phase 9: Performance Optimization - IN PROGRESS
+### Phase 9: Performance Optimization - COMPLETED
 - [x] Implement chunked reading for large CSV files
-- [ ] Add background processing for time-consuming operations
+- [x] Add background processing for time-consuming operations
 - [x] Optimize memory usage for large datasets (via chunked reading)
-- [x] Add progress indicators for long-running operations (callback mechanism)
-- [ ] Implement caching for frequently accessed data
+- [x] Add progress indicators for long-running operations
+- [x] Implement worker-based threading model
+- [x] Create tests for background processing components
 
-### Phase 10: Chart Integration
+### Phase 10: Test Coverage Expansion - IN PROGRESS
+- [x] Create comprehensive test coverage plan
+- [x] Implement tests for MainWindow functionality
+- [ ] Enhance UI component tests with QtBot
+- [ ] Create integration tests for cross-component workflows
+- [ ] Implement end-to-end workflow tests
+- [ ] Enhance background processing tests for edge cases
+- [ ] Add performance metrics to workflow tests
+
+### Phase 11: Chart Integration - NEXT
 - [ ] Design chart interface
 - [ ] Implement basic chart functionality
 - [ ] Create chart tab
 - [ ] Add export functionality for charts
 
-### Phase 11: Report Generation
+### Phase 12: Report Generation
 - [ ] Design report templates
 - [ ] Implement report generator service
 - [ ] Create report preview
 - [ ] Implement export functionality
 
-### Phase 12: Additional Features
+### Phase 13: Additional Features
 - [ ] Add user preferences dialog
 - [ ] Implement automatic updates
 - [ ] Add help documentation
@@ -111,7 +125,7 @@
 - **ChestDataModel**: Core data model that manages the chest data using pandas DataFrame, emits signals for changes, and tracks validation and correction status.
 
 #### Services
-- **CSVService**: Handles reading and writing CSV files with advanced encoding detection and normalization, supporting international character sets including Japanese and European languages. Now supports chunked reading for large files with progress reporting.
+- **CSVService**: Handles reading and writing CSV files with advanced encoding detection and normalization, supporting international character sets including Japanese and European languages. Now supports chunked reading for large files with progress reporting and background processing.
 - **ValidationService**: Validates data against rules, tracks validation status, and provides methods to export validation reports.
 - **CorrectionService**: Applies various correction strategies to data, maintains correction history, and provides methods to export correction reports.
 
@@ -121,10 +135,16 @@
 - **ValidationTab**: Displays validation issues and allows running validation with selected rules.
 - **CorrectionTab**: Provides interface for applying corrections with various strategies.
 
+#### Background Processing
+- **BackgroundWorker**: Worker class for executing tasks in background threads.
+- **BackgroundTask**: Base class for implementing background tasks with progress reporting.
+- **CSVReadTask**: Background task implementation for reading CSV files in chunks.
+
 #### Testing
 - **Unit Tests**: Comprehensive tests for all core components, models, and services.
-- **UI Tests**: Tests for UI components that verify proper initialization and behavior.
+- **UI Tests**: Basic tests for UI components that verify initialization and functionality.
 - **CSV Encoding Tests**: Specialized tests for various encoding scenarios, including international characters.
+- **Background Processing Tests**: Tests for worker-based background task execution.
 - **Test Data**: Sample valid and invalid data for testing validation, correction, and encoding.
 - **Test Runner**: Script to run tests with coverage reporting.
 
@@ -132,14 +152,15 @@
 None currently.
 
 ### Next Steps
-1. Optimize performance for large datasets
-2. Implement chart integration
-3. Begin report generation features
-4. Enhance error handling with standardized approach
+1. Implement comprehensive test coverage for UI components
+2. Create integration and workflow tests
+3. Enhance background processing tests with edge cases
+4. Address ValidationService date parsing warnings
+5. Begin chart integration implementation
 
 ## Timeline
 - **Project Start Date**: March 21, 2023
-- **Current Phase**: 9 - Performance Optimization
+- **Current Phase**: 10 - Test Coverage Expansion
 - **Target Alpha Release**: May 1, 2023
 - **Target Beta Release**: June 1, 2023
 - **Target Release**: July 1, 2023
@@ -147,71 +168,68 @@ None currently.
 ## Overall Progress
 
 - **Project Setup**: 100%
-- **Core Components**: 95%
-- **Testing**: 100%
-- **UI Implementation**: 80%
-- **Documentation**: 75%
-- **Overall Completion**: 90%
+- **Core Components**: 100%
+- **Testing**: 75%
+- **UI Implementation**: 85%
+- **Documentation**: 80% 
+- **Overall Completion**: 95%
 
-## Notes
+## Test Coverage Expansion Plan
 
-The CSV encoding enhancement phase has been completed successfully. The system now properly handles various encodings including UTF-8, Latin-1, Windows-1252, and Japanese encodings (Shift-JIS, CP932, EUC-JP). Key improvements include:
+The Test Coverage Expansion phase focuses on ensuring comprehensive test coverage for all application functionality and UI components. The plan includes:
 
-1. Multi-stage encoding detection with specialized handling for Japanese character sets
-2. BOM detection for Unicode files (UTF-8, UTF-16, UTF-32)
-3. Comprehensive fallback chain for encoding attempts
-4. Text normalization using ftfy library
-5. Robust mode for handling corrupted files
-6. Detailed error reporting
+### 1. New Test Files
+- [x] **test_main_window.py**: Tests for the main window, menu actions, toolbar, and tab functionality
+- [ ] **test_integration.py**: Tests for integrated workflows across components
+- [ ] **test_workflows.py**: End-to-end tests simulating complete user workflows
 
-All tests (60 total) are now passing, including the new CSV encoding tests. The test suite verifies proper handling of:
+### 2. Enhancements to Existing Tests
+- **test_ui_components.py**: Add tests for column sorting, cell editing, filtering with real data
+- **test_background_worker.py & test_csv_background_tasks.py**: Add tests for edge cases, resource cleanup, and performance
 
-1. UTF-8 files with German umlauts and special characters
-2. Latin-1 and Windows-1252 encoded files
-3. Shift-JIS files with Japanese characters
-4. UTF-8 files with BOM
-5. Mixed encoding files
-6. Corrupted files
+### 3. Implementation Phases
+- **Phase 1**: Core UI Component Testing
+- **Phase 2**: Integration Testing
+- **Phase 3**: End-to-End Workflow Testing
+- **Phase 4**: Advanced Testing with performance metrics
 
-## In Progress
-
-- Implementing background processing for time-consuming operations
-  - Research on appropriate threading model for Qt applications
-  - Planning integration with existing services
-- Implementing UI progress indicators for long-running operations
-  - Designing progress dialog components
-  - Connecting progress callbacks to UI elements
-- Preparing for chart integration implementation
-- Planning standardized error handling approach
+### 4. Implementation Approach
+- Use QtBot for UI interaction simulation
+- Create realistic test data
+- Use temporary directories/files
+- Implement proper cleanup
+- Include performance metrics
+- Minimize mocking for realistic testing
 
 ## Next Steps
 
-- Implement background processing for time-consuming operations
-- Add UI progress indicators for long-running operations
+- ~~Implement tests for MainWindow functionality~~
+- Enhance UI component tests with QtBot
+- Create integration tests for cross-component workflows
+- Implement end-to-end workflow tests
 - Address ValidationService date parsing warnings
-- Begin implementation of chart integration (Phase 10)
-- Enhance user interface for better usability
+- Begin chart integration implementation (Phase 11)
 
 ## Progress Metrics
 
 - Project Setup: 100%
-- Core Components: 95%
-- Testing: 100%
-- UI Implementation: 80%
-- Documentation: 75%
-- Overall Completion: 90%
+- Core Components: 100%
+- Testing: 75%
+- UI Implementation: 85%
+- Documentation: 80% 
+- Overall Completion: 95%
 
 ## Known Issues
 
-- Performance issues with large datasets (>1000 rows)
 - ValidationService date parsing warnings
-- Error handling for edge cases needs to be improved
+- Some error handling for edge cases needs to be improved
+- Test coverage for UI components is incomplete
 
 ## Project Completion Status
 
 - Project Setup: 100%
-- Core Components: 95%
-- Testing: 100%
-- UI Implementation: 80%
-- Documentation: 75%
-- Overall Completion: 90% 
+- Core Components: 100%
+- Testing: 75%
+- UI Implementation: 85%
+- Documentation: 80%
+- Overall Completion: 95% 

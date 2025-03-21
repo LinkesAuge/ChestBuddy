@@ -1,4 +1,102 @@
-# Active Context
+## Current Focus
+
+We are currently focused on expanding test coverage for all functionality and UI components of the ChestBuddy application. With the successful implementation of background processing for CSV file operations and the optimization of memory usage for large datasets, we are now working to ensure that all features are thoroughly tested with comprehensive test coverage.
+
+The implementation of MainWindow tests has been completed, providing comprehensive test coverage for menu actions, toolbar actions, tab switching, signal emission, and window state persistence. This represents a significant step forward in our test coverage expansion plan.
+
+The next priorities are enhancing UI component tests, implementing integration tests for cross-component workflows, and creating end-to-end tests for typical user journeys.
+
+## Implementation Plan
+
+### Phase 10: Test Coverage Expansion (Current Phase)
+- [x] Create comprehensive test coverage expansion plan
+- [x] Implement tests for MainWindow functionality
+- [ ] Enhance UI component tests with QtBot
+- [ ] Create integration tests for cross-component workflows
+- [ ] Implement end-to-end workflow tests
+- [ ] Enhance background processing tests for edge cases
+- [ ] Add performance metrics to workflow tests
+
+### Phase 9: Performance Optimization (Completed)
+- [x] Implement chunked reading for large CSV files
+- [x] Add background processing for time-consuming operations
+- [x] Optimize memory usage for large datasets
+- [x] Add progress indicators for long-running operations
+- [x] Implement worker-based threading model
+- [x] Create tests for background processing components
+
+### Phase 8: CSV Encoding Enhancement (Completed)
+- [x] Add configurable encoding parameter to read_csv method
+- [x] Implement robust encoding detection using chardet/charset-normalizer
+- [x] Create a prioritized fallback chain for encoding attempts
+- [x] Add BOM detection for CSV files
+- [x] Implement Japanese character set detection and handling
+- [x] Enhance text normalization for international characters
+- [x] Add robust mode for handling corrupted files
+- [x] Create comprehensive tests for encoding functionality
+
+## Recent Changes
+
+- Created comprehensive test suite for MainWindow functionality, covering:
+  - Initialization and property validation
+  - Menu actions (File, Tools, Help menus)
+  - Toolbar actions
+  - Tab switching
+  - Signal emission and handling
+  - Window state persistence (geometry, title)
+  - Recent files management
+  
+- Implemented a SignalCatcher utility class for testing Qt signals
+- Added tests for window title updates and modified state tracking
+- Created fixtures for QApplication, test data, and mock configuration
+- Developed robust tests for file dialog interactions using patching
+
+- Created comprehensive test coverage expansion plan
+- Identified areas with insufficient test coverage
+- Planned new test files for integration and workflow testing
+- Completed implementation of background processing for CSV file operations
+- Optimized memory usage for large datasets
+
+## Current Status
+
+- All tests are passing
+- CSV encoding detection is robust and handles international character sets
+- Background processing for CSV operations is working efficiently
+- Test coverage for MainWindow functionality is now comprehensive
+- UI component test coverage still needs enhancement with QtBot
+- Integration and workflow tests are still to be implemented
+
+## Key Issues
+
+1. **Test Suite**: Partially resolved - Basic tests are passing, MainWindow tests have been implemented, but comprehensive UI and integration tests are still needed
+2. **UI Component Tests**: Need enhancement with QtBot for more thorough testing
+3. **Integration Tests**: Still to be implemented for cross-component workflows
+4. **Workflow Tests**: End-to-end tests simulating real user workflows need to be created
+5. **Performance**: Large datasets (>100,000 rows) may still experience some performance degradation
+
+## Active Decisions
+
+1. **Test Coverage Strategy**: Focus on completing comprehensive UI tests before moving on to integration tests
+2. **UI Testing Approach**: Use QtBot for simulating user interactions with UI components
+3. **Integration Testing Scope**: Test key workflows that span multiple components
+4. **Performance Testing**: Include tests for large datasets to verify performance optimizations
+5. **Signal Testing**: Continue using the SignalCatcher approach for testing Qt signals
+
+## Critical Path
+
+1. Complete the enhancement of UI component tests with QtBot
+2. Implement integration tests for cross-component workflows
+3. Create end-to-end workflow tests
+4. Enhance background processing tests for edge cases
+5. Begin chart integration implementation (Phase 11)
+
+## Design Considerations
+
+1. **Test Coverage vs. New Features**: We are prioritizing test coverage to ensure stability before moving on to new features like chart integration
+2. **Testing Complexity**: Balancing thorough testing with maintainable test code
+3. **UI Testing Challenges**: Addressing the challenges of testing Qt UI components in an automated way
+4. **Integration Test Design**: Creating realistic test scenarios that verify cross-component functionality
+5. **Performance Testing Metrics**: Defining appropriate metrics for measuring and verifying performance
 
 ## Current Work Focus
 
