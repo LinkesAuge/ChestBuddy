@@ -15,7 +15,13 @@ The Chest Buddy application follows a Model-View-Controller (MVC) architecture w
 ┌────────────────┐                           ┌────────────────┐
 │   Services     │                           │    Config      │
 │  (Utilities)   │                           │   Management   │
-└────────────────┘                           └────────────────┘
+└───────┬────────┘                           └────────────────┘
+        │
+        ▼
+┌────────────────┐
+│  Background    │
+│   Processing   │
+└────────────────┘
 ```
 
 ## Core Components
@@ -47,10 +53,22 @@ The Chest Buddy application follows a Model-View-Controller (MVC) architecture w
 - **ChartService**: Generates chart visualizations
 - **ReportService**: Generates HTML reports
 
-### 5. Configuration Layer
+### 5. Background Processing Layer
+- **BackgroundWorker**: Manages execution of tasks in separate threads
+- **BackgroundTask**: Base class for defining asynchronous operations
+- **CSVReadTask**: Specific implementation for CSV reading operations
+
+### 6. Configuration Layer
 - **ConfigManager**: Manages application settings and user preferences
 - **ValidationConfig**: Manages validation list configuration
 - **CorrectionConfig**: Manages correction rule configuration
+
+### 7. Testing Layer
+- **Unit Tests**: Tests for individual components and functions
+- **UI Component Tests**: Tests for UI components and interactions
+- **Integration Tests**: Tests for cross-component workflows
+- **Workflow Tests**: End-to-end tests for complete user scenarios
+- **Performance Tests**: Tests for measuring performance metrics
 
 ## Key Design Patterns
 
@@ -82,27 +100,80 @@ Used for validation and correction operations:
 - Allows for undo/redo functionality
 - Maintains operation history
 
+### 6. Worker Pattern
+Used for background processing:
+- BackgroundWorker manages thread lifecycle
+- Tasks implement a common interface (BackgroundTask)
+- Signal-based communication between threads
+- Ensures UI responsiveness during heavy operations
+
+### 7. Fixture Pattern
+Used for testing:
+- Common test fixtures for reusable test setup
+- Data fixtures for consistent test data
+- Component fixtures for UI testing
+- Ensures consistent test environments
+
+## Test Architecture
+
+The test architecture follows a layered approach to verify application functionality at multiple levels:
+
+```
+┌────────────────┐
+│  Workflow      │
+│    Tests       │ End-to-end user workflow tests
+└───────┬────────┘
+        │
+        ▼
+┌────────────────┐
+│  Integration   │
+│    Tests       │ Cross-component interaction tests
+└───────┬────────┘
+        │
+        ▼
+┌────────────────┐     ┌────────────────┐
+│  UI Component  │     │  Background    │
+│    Tests       │     │ Process Tests  │
+└───────┬────────┘     └───────┬────────┘
+        │                      │
+        ▼                      ▼
+┌────────────────┐     ┌────────────────┐
+│  Unit Tests    │     │ Performance    │
+│                │     │    Tests       │
+└────────────────┘     └────────────────┘
+```
+
 ## Data Flow
 
 1. **Import Flow**:
    - CSV file → CSVService → ChestDataModel → DataTableView
    - Optional automatic validation and correction
 
-2. **Validation Flow**:
+2. **Background Import Flow**:
+   - CSV file → CSVService → CSVReadTask → BackgroundWorker → ChestDataModel → DataTableView
+   - Progress reporting during import
+   - Non-blocking UI during processing
+
+3. **Validation Flow**:
    - ChestDataModel → ValidationController → ValidationModel → ChestDataModel (updated)
    - UI feedback on validation errors
 
-3. **Correction Flow**:
+4. **Correction Flow**:
    - ChestDataModel → CorrectionController → CorrectionModel → ChestDataModel (corrected)
    - UI updates to show corrections
 
-4. **Analysis Flow**:
+5. **Analysis Flow**:
    - ChestDataModel → AnalysisController → AnalysisService → ChartView
    - User-selected data dimensions determine visualization
 
-5. **Report Flow**:
+6. **Report Flow**:
    - ChestDataModel + Charts → ReportController → ReportService → HTML Output
    - User-customized report elements
+
+7. **Test Flow**:
+   - Test Case → Test Fixtures → Component Under Test → Assertions → Test Results
+   - Mock external dependencies where necessary
+   - Use realistic data for integration and workflow tests
 
 ## Module Organization
 
@@ -119,7 +190,8 @@ chestbuddy/
 ├── utils/
 │   ├── config/
 │   ├── validation/
-│   └── correction/
+│   ├── correction/
+│   └── background_processing.py
 ├── data/
 │   ├── validators/
 │   ├── correction_rules/
@@ -127,6 +199,11 @@ chestbuddy/
 └── tests/
     ├── unit/
     ├── integration/
+    ├── test_background_worker.py
+    ├── test_csv_background_tasks.py
+    ├── test_main_window.py (planned)
+    ├── test_integration.py (planned)
+    ├── test_workflows.py (planned)
     └── resources/
 ```
 
@@ -136,4 +213,26 @@ chestbuddy/
 - Signal-based error reporting to the UI
 - Status bar and dialog-based error notifications
 - Logging of errors with sufficient context for debugging
-- User-friendly error messages with suggested actions 
+- User-friendly error messages with suggested actions
+
+## Testing Strategy
+
+- Unit tests for individual components to ensure correct behavior
+- UI component tests to verify proper UI initialization and interaction
+- Integration tests to verify correct interaction between components
+- Workflow tests to validate end-to-end user scenarios
+- Performance tests to measure and ensure efficiency with large datasets
+- Use of fixtures for consistent test setup and teardown
+- QtBot for simulating user interactions with UI components
+- Mocking external dependencies for isolation and reproducibility
+- Test data generators for various test scenarios
+- Cleanup mechanisms to ensure test isolation
+
+## Background Processing Strategy
+
+- Worker-based threading model for all long-running operations
+- Clear separation between UI thread and worker threads
+- Signal-based communication for progress updates and results
+- Cancellation support for long-running operations
+- Resource cleanup on task completion or cancellation
+- Chunked processing for memory-intensive operations 
