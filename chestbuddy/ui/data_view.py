@@ -172,8 +172,8 @@ class DataView(QWidget):
         data = self._data_model.data
 
         # Get validation and correction status
-        validation_status = self._data_model.get_all_validation_status()
-        correction_status = self._data_model.get_all_correction_status()
+        validation_status = self._data_model.get_validation_status()
+        correction_status = self._data_model.get_correction_status()
 
         # Set headers
         self._table_model.setHorizontalHeaderLabels(self._data_model.column_names)
@@ -188,40 +188,30 @@ class DataView(QWidget):
             self._filter_column.setCurrentText(current_column)
 
         # Add data to the table model
-        for idx, row in data.iterrows():
-            items = []
-            for col, value in row.items():
-                item = QStandardItem(str(value) if pd.notna(value) else "")
+        for row_idx, row in enumerate(data.itertuples()):
+            # Skip the first element (index)
+            row_data = list(row)[1:]
+            for col_idx, value in enumerate(row_data):
+                item = QStandardItem(str(value))
 
-                # Set tooltip based on validation and correction status
-                tooltips = []
+                # Set validation and correction status as user data
+                if validation_status is not None and not validation_status.empty:
+                    val_status = (
+                        validation_status.iloc[row_idx]
+                        if row_idx < len(validation_status)
+                        else None
+                    )
+                    item.setData(val_status, Qt.UserRole + 1)
 
-                # Add validation issues to tooltip
-                if idx in validation_status:
-                    for rule, message in validation_status[idx].items():
-                        tooltips.append(f"Validation: {message}")
+                if correction_status is not None and not correction_status.empty:
+                    corr_status = (
+                        correction_status.iloc[row_idx]
+                        if row_idx < len(correction_status)
+                        else None
+                    )
+                    item.setData(corr_status, Qt.UserRole + 2)
 
-                    # Set background color for validation issues
-                    item.setBackground(QColor(255, 200, 200))  # Light red
-
-                # Add correction history to tooltip
-                if idx in correction_status:
-                    for strategy, message in correction_status[idx].items():
-                        tooltips.append(f"Correction: {message}")
-
-                    # Set background color for corrected cells
-                    if item.background().color() == QColor(255, 200, 200):
-                        # If already has validation issue, use a different color
-                        item.setBackground(QColor(255, 165, 0, 100))  # Orange
-                    else:
-                        item.setBackground(QColor(200, 255, 200))  # Light green
-
-                if tooltips:
-                    item.setToolTip("\n".join(tooltips))
-
-                items.append(item)
-
-            self._table_model.appendRow(items)
+                self._table_model.setItem(row_idx, col_idx, item)
 
         # Resize columns to contents
         self._table_view.resizeColumnsToContents()
@@ -281,8 +271,8 @@ class DataView(QWidget):
         self._table_model.setHorizontalHeaderLabels(self._data_model.column_names)
 
         # Get validation and correction status
-        validation_status = self._data_model.get_all_validation_status()
-        correction_status = self._data_model.get_all_correction_status()
+        validation_status = self._data_model.get_validation_status()
+        correction_status = self._data_model.get_correction_status()
 
         # Store filtered rows for later use
         self._filtered_rows = filtered_data.index.tolist()
@@ -446,34 +436,20 @@ class DataView(QWidget):
         self._on_data_changed(self._data_model.data)
 
     @Slot(QStandardItem)
-    def _on_item_changed(self, item) -> None:
-        """
-        Handle item changed in the table model.
-
-        Args:
-            item: The changed item.
-        """
-        # Get the row and column indices
+    def _on_item_changed(self, item: QStandardItem) -> None:
+        """Handle item changed in the table model."""
+        # Get the row and column of the changed item
         row = item.row()
         col = item.column()
 
-        # Get the data value
-        value = item.text()
-
-        # Get the actual row index in the data model
-        if self._filtered_rows:
-            # If filtered, map to original index
-            if row < len(self._filtered_rows):
-                actual_row = self._filtered_rows[row]
-            else:
-                logger.warning(f"Invalid row index: {row}")
-                return
-        else:
-            # If not filtered, row index is the same
-            actual_row = row
+        # Convert row index to the actual data index
+        actual_row = self._filtered_rows[row] if self._filtered_rows is not None else row
 
         # Get the column name
         column_name = self._data_model.column_names[col]
 
-        # Update the data model
-        self._data_model.update_value(actual_row, column_name, value)
+        # Get the new value
+        value = item.text()
+
+        # Update the model
+        self._data_model.update_data({column_name: value}, [actual_row])

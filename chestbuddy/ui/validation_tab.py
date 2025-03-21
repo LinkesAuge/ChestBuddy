@@ -188,10 +188,10 @@ class ValidationTab(QWidget):
             return
 
         # Get validation status
-        validation_status = self._data_model.get_all_validation_status()
+        validation_status = self._data_model.get_validation_status()
 
-        if not validation_status:
-            self._summary_label.setText("No validation performed")
+        if validation_status.empty:
+            self._summary_label.setText("No validation issues found")
             return
 
         # Add results to tree
@@ -295,7 +295,7 @@ class ValidationTab(QWidget):
     def _clear_validation(self) -> None:
         """Clear all validation status."""
         # Confirm clear
-        if not self._data_model.get_all_validation_status():
+        if self._data_model.get_validation_status().empty:
             return
 
         reply = QMessageBox.question(

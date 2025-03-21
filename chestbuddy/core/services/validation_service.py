@@ -278,7 +278,7 @@ class ValidationService:
         summary = {}
 
         # Get the validation status from the data model
-        validation_status = self._data_model.get_all_validation_status()
+        validation_status = self._data_model.get_validation_status()
 
         # Count issues by rule name
         for rule_name in self._validation_rules.keys():
@@ -303,7 +303,7 @@ class ValidationService:
             path = Path(file_path)
 
             # Get the validation status
-            validation_status = self._data_model.get_all_validation_status()
+            validation_status = self._data_model.get_validation_status()
 
             # Create a DataFrame for the report
             data = self._data_model.data.copy()

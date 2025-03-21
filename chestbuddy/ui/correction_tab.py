@@ -238,8 +238,8 @@ class CorrectionTab(QWidget):
         self._update_history()
 
         # Update status label
-        correction_status = self._data_model.get_all_correction_status()
-        if correction_status:
+        correction_status = self._data_model.get_correction_status()
+        if not correction_status.empty:
             rows_affected = len(correction_status)
             self._status_label.setText(f"Corrections applied to {rows_affected} rows")
         else:
@@ -401,8 +401,11 @@ class CorrectionTab(QWidget):
             return None
         elif button_id == 1:
             # Rows with validation issues
-            validation_status = self._data_model.get_all_validation_status()
-            return list(validation_status.keys())
+            validation_status = self._data_model.get_validation_status()
+            if not validation_status.empty:
+                return list(validation_status.keys())
+            else:
+                return None
         elif button_id == 2:
             # Selected rows
             return self._selected_rows if self._selected_rows else None

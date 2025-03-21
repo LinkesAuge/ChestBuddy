@@ -9,11 +9,53 @@ This document tracks bugs, issues, and their resolutions in the ChestBuddy proje
 
 ## Active Issues
 
-None identified yet as the project is in the initial setup phase.
+### Test Suite Issues
+1. **CSVService Initialization**: 
+   - **Issue**: CSVService class in the implementation no longer takes a data_model parameter but tests are still passing it.
+   - **Resolution**: Update tests to match the current implementation which initializes CSVService without parameters.
+
+2. **ChestDataModel Method Mismatches**:
+   - **Issue**: Several methods used in tests don't match the actual implementation:
+     - `filter_data()` expects a dictionary but is being called with a lambda function
+     - `get_all_validation_status()` and `get_all_correction_status()` methods don't exist (should be `get_validation_status()` and `get_correction_status()`)
+     - `clear_validation_status()` method is missing
+   - **Resolution**: Update tests to match the actual API or update the model to add the missing methods.
+
+3. **ValidationService Method Mismatches**:
+   - **Issue**: `load_validation_lists()` method doesn't exist in the actual implementation
+   - **Resolution**: Update tests to match the actual API.
+
+4. **CorrectionService Method Mismatches**:
+   - **Issue**: `load_corrections()` method doesn't exist in the actual implementation
+   - **Resolution**: Update tests to match the actual API.
+
+5. **Encoding Issues with Default Files**:
+   - **Issue**: Default input file has encoding issues - `'utf-8' codec can't decode byte 0xfc in position 2: invalid start byte`
+   - **Resolution**: Ensure proper encoding is used for input files or update the CSVService to better handle encoding issues.
+
+### QApplication Issues
+- **Issue**: The `QApplication` instance is not being properly handled in tests, causing conflicts between tests.
+- **Resolution**: Fixed by ensuring each test creates and cleans up its own QApplication instance.
+
+- UI component tests need updating to match the current implementation:
+  - Methods in the test need to be updated to match the actual implementation (`_validate_btn` vs `_validate_button`, etc.)
+  - `DataView` class methods need updating (test is looking for `_on_filter_changed` but the method might be named differently)
+  - `CorrectionService` doesn't have a `load_correction_templates` method that is referenced in the test
+  - Need to properly handle signals and UI event connections
+
+## Recently Resolved Issues
+
+- `get_all_validation_status()` and `get_all_correction_status()` methods don't exist (should be `get_validation_status()` and `get_correction_status()`) - FIXED by updating UI component files to use the correct method names.
+- `update_value` method doesn't exist in `ChestDataModel` (should be `update_data`) - FIXED by updating `DataView._on_item_changed` method to use the correct approach.
+- `ChestDataModel` was using the wrong method name in tests (`load_data` instead of `update_data`) - FIXED by updating the tests to use the correct method name.
+- Fixed boolean check errors with DataFrames in ValidationTab and CorrectionTab by using `.empty` property instead of direct boolean check.
+- Fixed `test_services.py` mismatches by updating the test to use the correct method names and parameter order.
 
 ## Resolved Issues
 
-None yet as implementation has not started.
+### Default Files Tests
+- **Issue**: Tests for default files were failing due to API mismatches
+- **Resolution**: Created test_default_files.py with updated tests that match the current API
 
 ## Common Challenges
 
@@ -34,5 +76,12 @@ None yet as implementation has not started.
 5. Use try-except blocks for all file operations
 
 ## Debugging Notes
+
+### Test Failures
+When tests fail, check:
+1. API compatibility between tests and implementation
+2. QApplication instance cleanup
+3. File encoding issues with test data
+4. Mock objects to avoid external dependencies
 
 This section will be updated as development progresses and specific debugging techniques are identified for common issues. 

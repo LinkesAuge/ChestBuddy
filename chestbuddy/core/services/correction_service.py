@@ -206,7 +206,7 @@ class CorrectionService:
             path = Path(file_path)
 
             # Get the correction status
-            correction_status = self._data_model.get_all_correction_status()
+            correction_status = self._data_model.get_correction_status()
 
             # Create a DataFrame for the report
             data = self._data_model.data.copy()
