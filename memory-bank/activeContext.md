@@ -14,7 +14,7 @@ We are following a phase-based implementation approach:
 - 🔄 Phase 6: Test Coverage Expansion
   - ✅ Tests for MainWindow functionality
   - ✅ Enhanced UI component tests with QtBot
-  - ⬜ Integration tests for cross-component workflows
+  - 🔄 Integration tests for cross-component workflows
   - ⬜ End-to-end workflow tests
   - ⬜ Background processing tests
   - ⬜ Performance tests
@@ -80,7 +80,7 @@ We are following a phase-based implementation approach:
 
 1. ✅ Implement MainWindow tests
 2. ✅ Enhance UI component tests with QtBot
-3. ⬜ Implement integration tests for cross-component workflows
+3. 🔄 Implement integration tests for cross-component workflows
 4. ⬜ Create end-to-end workflow tests
 5. ⬜ Add background processing tests
 6. ⬜ Implement performance tests
