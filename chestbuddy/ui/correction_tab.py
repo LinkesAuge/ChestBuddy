@@ -337,9 +337,16 @@ class CorrectionTab(QWidget):
             params["threshold"] = self._threshold_spin.value()
 
         # Apply correction
-        success, error = self._correction_service.apply_correction(
+        result = self._correction_service.apply_correction(
             strategy_name, column=column, rows=rows, **params
         )
+
+        # Handle the result - make sure we have a valid tuple
+        if isinstance(result, tuple) and len(result) == 2:
+            success, error = result
+        else:
+            success = False
+            error = "Unexpected error: Correction service returned invalid result"
 
         if not success:
             QMessageBox.critical(self, "Correction Error", f"Failed to apply correction: {error}")

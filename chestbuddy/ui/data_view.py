@@ -166,10 +166,14 @@ class DataView(QWidget):
         # Check if data is empty
         if self._data_model.is_empty:
             self._status_label.setText("No data loaded")
+            self._filtered_rows = []  # Initialize to empty list when no data
             return
 
         # Get data from model
         data = self._data_model.data
+
+        # Initialize filtered_rows with all row indices
+        self._filtered_rows = data.index.tolist()
 
         # Get validation and correction status
         validation_status = self._data_model.get_validation_status()
@@ -387,13 +391,10 @@ class DataView(QWidget):
         # Set the value
         self._table_model.setData(index, text, Qt.EditRole)
 
-    @Slot(object)
-    def _on_data_changed(self, data) -> None:
+    @Slot()
+    def _on_data_changed(self) -> None:
         """
         Handle data changed signal.
-
-        Args:
-            data: The updated data.
         """
         # Update the view
         if self._current_filter:
@@ -422,7 +423,7 @@ class DataView(QWidget):
             validation_status: The validation status.
         """
         # Update the view to reflect validation changes
-        self._on_data_changed(self._data_model.data)
+        self._on_data_changed()
 
     @Slot(object)
     def _on_correction_applied(self, correction_status) -> None:
@@ -433,7 +434,7 @@ class DataView(QWidget):
             correction_status: The correction status.
         """
         # Update the view to reflect correction changes
-        self._on_data_changed(self._data_model.data)
+        self._on_data_changed()
 
     @Slot(QStandardItem)
     def _on_item_changed(self, item: QStandardItem) -> None:
@@ -443,7 +444,10 @@ class DataView(QWidget):
         col = item.column()
 
         # Convert row index to the actual data index
-        actual_row = self._filtered_rows[row] if self._filtered_rows is not None else row
+        if self._filtered_rows and row < len(self._filtered_rows):
+            actual_row = self._filtered_rows[row]
+        else:
+            actual_row = row
 
         # Get the column name
         column_name = self._data_model.column_names[col]
@@ -451,5 +455,9 @@ class DataView(QWidget):
         # Get the new value
         value = item.text()
 
+        # Create a DataFrame with the updated value
+        update_df = self._data_model.data.copy()
+        update_df.at[actual_row, column_name] = value
+
         # Update the model
-        self._data_model.update_data({column_name: value}, [actual_row])
+        self._data_model.update_data(update_df)

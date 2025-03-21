@@ -16,6 +16,7 @@ from charset_normalizer import detect
 from ftfy import fix_text
 
 from chestbuddy.utils.config import ConfigManager
+from chestbuddy.utils.background_processing import BackgroundWorker, BackgroundTask
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -54,6 +55,82 @@ JAPANESE_CHARS = {
     "katakana": range(0x30A0, 0x30FF),
     "kanji": range(0x4E00, 0x9FBF),
 }
+
+
+class CSVReadTask(BackgroundTask):
+    """
+    Background task for reading CSV files.
+
+    This task wraps the read_csv_chunked method of CSVService to enable
+    reading CSV files in a background thread with progress reporting.
+    """
+
+    def __init__(
+        self,
+        file_path: Union[str, Path],
+        chunk_size: int = 1000,
+        encoding: Optional[str] = None,
+        normalize_text: bool = True,
+        robust_mode: bool = False,
+    ) -> None:
+        """
+        Initialize the CSV read task.
+
+        Args:
+            file_path: Path to the CSV file
+            chunk_size: Number of rows to read in each chunk
+            encoding: Optional encoding to use (auto-detected if None)
+            normalize_text: Whether to normalize text in the CSV
+            robust_mode: Whether to use robust mode for reading
+        """
+        super().__init__()
+        self.file_path = Path(file_path)
+        self.chunk_size = chunk_size
+        self.encoding = encoding
+        self.normalize_text = normalize_text
+        self.robust_mode = robust_mode
+
+    def run(self) -> Tuple[Optional[pd.DataFrame], Optional[str]]:
+        """
+        Run the CSV read task.
+
+        Returns:
+            A tuple containing the DataFrame and error message (if any)
+        """
+        try:
+            if not self.file_path.exists():
+                return None, f"File not found: {self.file_path}"
+
+            # Create a CSV service instance
+            csv_service = CSVService()
+
+            # Define a progress callback that emits our progress signal
+            def progress_callback(current: int, total: int) -> None:
+                self.progress.emit(current, total)
+
+                # Check for cancellation
+                if self.is_cancelled:
+                    raise InterruptedError("CSV read operation cancelled")
+
+            # Read the CSV file with chunking
+            return csv_service.read_csv_chunked(
+                file_path=self.file_path,
+                chunk_size=self.chunk_size,
+                encoding=self.encoding,
+                normalize_text=self.normalize_text,
+                robust_mode=self.robust_mode,
+                progress_callback=progress_callback,
+            )
+
+        except InterruptedError:
+            # Task was cancelled
+            logger.info(f"CSV read task cancelled for file: {self.file_path}")
+            return None, "Operation cancelled"
+
+        except Exception as e:
+            # Log and return the error
+            logger.error(f"Error in CSV read task: {e}")
+            return None, f"Error reading CSV file: {str(e)}"
 
 
 class CSVService:
@@ -756,3 +833,59 @@ class CSVService:
             error_msg = f"Error reading CSV file in chunks: {str(e)}"
             logger.error(error_msg)
             return None, error_msg
+
+    def read_csv_background(
+        self,
+        file_path: Union[str, Path],
+        progress_callback: Optional[Callable[[int, int], None]] = None,
+        finished_callback: Optional[Callable[[Optional[pd.DataFrame], Optional[str]], None]] = None,
+        chunk_size: int = 1000,
+        encoding: Optional[str] = None,
+        normalize_text: bool = True,
+        robust_mode: bool = False,
+    ) -> BackgroundWorker:
+        """
+        Read a CSV file in a background thread.
+
+        This method creates a background task for reading a CSV file and returns
+        the worker that is executing the task. The caller can connect to signals
+        on the worker or use the provided callback functions.
+
+        Args:
+            file_path: Path to the CSV file
+            progress_callback: Optional callback for progress updates
+            finished_callback: Optional callback for completion
+            chunk_size: Number of rows to read in each chunk
+            encoding: Optional encoding to use (auto-detected if None)
+            normalize_text: Whether to normalize text in the CSV
+            robust_mode: Whether to use robust mode for reading
+
+        Returns:
+            The BackgroundWorker instance executing the task
+        """
+        # Create a task
+        task = CSVReadTask(
+            file_path=file_path,
+            chunk_size=chunk_size,
+            encoding=encoding,
+            normalize_text=normalize_text,
+            robust_mode=robust_mode,
+        )
+
+        # Create a worker
+        worker = BackgroundWorker()
+
+        # Connect the task's progress signal to the callback if provided
+        if progress_callback:
+            worker.progress.connect(progress_callback)
+
+        # Connect the finished signal to the callback if provided
+        if finished_callback:
+            worker.finished.connect(lambda result: finished_callback(result[0], result[1]))
+            worker.error.connect(lambda error: finished_callback(None, str(error)))
+
+        # Execute the task
+        worker.execute_task(task)
+
+        # Return the worker so the caller can connect to signals or cancel
+        return worker
