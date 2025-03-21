@@ -11,10 +11,11 @@ This document tracks bugs, issues, and their resolutions in the ChestBuddy proje
 
 ### Performance Issues
 - **Large Dataset Performance**: When handling larger datasets (>1000 rows), the application experiences significant slowdowns
-  - **Status**: Investigating
+  - **Status**: Partially resolved
   - **Priority**: High
   - **Components**: ChestDataModel, DataView
-  - **Next Steps**: Profile the application to identify bottlenecks, implement chunked reading
+  - **Progress**: Implemented chunked reading in CSVService to efficiently handle large files
+  - **Next Steps**: Implement background processing and UI progress indicators
 
 ### Error Handling Improvements
 - **Inconsistent Error Messages**: Error handling across the application is inconsistent
@@ -31,6 +32,14 @@ This document tracks bugs, issues, and their resolutions in the ChestBuddy proje
   - **Next Steps**: Specify date format in pd.to_datetime calls
 
 ## Recently Resolved Issues
+
+### CSV Chunked Reading Implementation
+- **Memory Usage with Large Files**: Loading large CSV files caused high memory usage and UI freezes
+  - **Status**: Resolved
+  - **Priority**: High
+  - **Resolution**: Implemented chunked reading in CSVService with configurable chunk size
+  - **Fixed In**: CSVService.py - Added read_csv_chunked method
+  - **Verification**: All tests passing in test_csv_performance.py
 
 ### CSV Encoding Issues
 - **Japanese Character Encoding**: CSV files with Japanese characters (Shift JIS encoding) not properly detected

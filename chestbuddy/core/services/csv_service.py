@@ -8,7 +8,7 @@ import csv
 import logging
 import io
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union, Any
+from typing import Dict, List, Optional, Tuple, Union, Any, Callable
 
 import pandas as pd
 import chardet
@@ -611,3 +611,148 @@ class CSVService:
         except Exception as e:
             logger.error(f"Error verifying Japanese content: {e}")
             return False
+
+    def read_csv_chunked(
+        self,
+        file_path: Union[str, Path],
+        chunk_size: int = 1000,
+        encoding: Optional[str] = None,
+        normalize_text: bool = True,
+        robust_mode: bool = False,
+        progress_callback: Optional[Callable[[int, int], None]] = None,
+    ) -> Tuple[Optional[pd.DataFrame], Optional[str]]:
+        """
+        Read a CSV file in chunks to minimize memory usage.
+
+        This method processes the file in smaller chunks to reduce memory consumption
+        when dealing with large files. It reports progress via the callback function.
+
+        Args:
+            file_path: Path to the CSV file
+            chunk_size: Number of rows to read in each chunk
+            encoding: File encoding (auto-detected if None)
+            normalize_text: Whether to normalize text data
+            robust_mode: Whether to ignore errors and continue reading
+            progress_callback: Optional callback function for progress reporting
+                               Takes current_rows and total_rows as arguments
+
+        Returns:
+            Tuple containing DataFrame and error message (if any)
+        """
+        try:
+            file_path = Path(file_path)
+            if not file_path.exists():
+                return None, f"File not found: {file_path}"
+
+            # Detect encoding if not provided
+            if encoding is None:
+                # First check for BOM
+                bom_encoding = self._detect_bom(file_path)
+                if bom_encoding:
+                    logger.info(f"BOM detected, using encoding: {bom_encoding}")
+                    encoding = bom_encoding
+                else:
+                    # Then try auto-detection
+                    detected_encoding = self._detect_encoding(file_path)
+                    if detected_encoding:
+                        logger.info(f"Detected encoding: {detected_encoding}")
+                        encoding = detected_encoding
+                    else:
+                        logger.warning("Could not detect encoding, using utf-8")
+                        encoding = "utf-8"
+
+            # First pass: Count rows to enable progress reporting
+            total_rows = 0
+            try:
+                with open(file_path, "r", encoding=encoding, errors="replace") as f:
+                    total_rows = sum(1 for _ in f) - 1  # Subtract 1 for header row
+            except Exception as e:
+                logger.warning(f"Error counting rows: {e}. Progress reporting may be inaccurate.")
+                # If we can't count rows, we'll use a rough estimate based on file size
+                total_rows = int(file_path.stat().st_size / 100)  # Rough estimate
+
+            # Initialize empty DataFrame to store results
+            result_df = None
+
+            # Second pass: Check for malformed lines before processing if not in robust mode
+            if not robust_mode:
+                try:
+                    # First get the header to determine column count
+                    with open(file_path, "r", encoding=encoding, errors="replace") as f:
+                        header = f.readline().strip().split(",")
+                        header_cols = len(header)
+
+                        # Check the rest of the lines
+                        for line_num, line in enumerate(
+                            f, start=2
+                        ):  # Start at 2 because header is line 1
+                            cols = line.strip().split(",")
+                            if len(cols) != header_cols:
+                                error_msg = f"Line {line_num} has {len(cols)} columns, expected {header_cols}: {line.strip()}"
+                                logger.error(error_msg)
+                                return None, error_msg
+                except Exception as e:
+                    error_msg = f"Error pre-checking CSV format: {str(e)}"
+                    logger.error(error_msg)
+                    return None, error_msg
+
+            # Read the file in chunks
+            try:
+                chunks = pd.read_csv(
+                    file_path,
+                    encoding=encoding,
+                    chunksize=chunk_size,
+                    on_bad_lines="skip" if robust_mode else "error",  # 'skip' for pandas 1.3+
+                    low_memory=True,  # Use less memory at the cost of some performance
+                )
+            except Exception as e:
+                error_msg = f"Error initializing CSV reader: {str(e)}"
+                logger.error(error_msg)
+                return None, error_msg
+
+            rows_processed = 0
+            errors = []
+
+            # Process each chunk
+            for i, chunk in enumerate(chunks):
+                try:
+                    # Apply text normalization if requested
+                    if normalize_text:
+                        chunk = self._normalize_dataframe_text(chunk)
+
+                    # Append to result DataFrame
+                    if result_df is None:
+                        result_df = chunk
+                    else:
+                        result_df = pd.concat([result_df, chunk], ignore_index=True)
+
+                    # Update rows processed and report progress
+                    rows_processed += len(chunk)
+                    if progress_callback:
+                        progress_callback(rows_processed, total_rows)
+
+                except Exception as e:
+                    error_msg = f"Error processing chunk {i}: {str(e)}"
+                    logger.error(error_msg)
+                    errors.append(error_msg)
+                    if not robust_mode:
+                        return None, error_msg
+
+            # Final progress report
+            if progress_callback:
+                progress_callback(rows_processed, rows_processed)
+
+            # Check if we got any data
+            if result_df is None or len(result_df) == 0:
+                return None, "No data could be read from the file"
+
+            # Return with warning if there were errors in robust mode
+            if robust_mode and errors:
+                return result_df, f"File read with errors: {'; '.join(errors)}"
+
+            return result_df, None
+
+        except Exception as e:
+            error_msg = f"Error reading CSV file in chunks: {str(e)}"
+            logger.error(error_msg)
+            return None, error_msg

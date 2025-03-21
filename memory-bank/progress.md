@@ -75,10 +75,10 @@
 - [x] Create comprehensive tests for encoding functionality
 
 ### Phase 9: Performance Optimization - IN PROGRESS
-- [ ] Implement chunked reading for large CSV files
+- [x] Implement chunked reading for large CSV files
 - [ ] Add background processing for time-consuming operations
-- [ ] Optimize memory usage for large datasets
-- [ ] Add progress indicators for long-running operations
+- [x] Optimize memory usage for large datasets (via chunked reading)
+- [x] Add progress indicators for long-running operations (callback mechanism)
 - [ ] Implement caching for frequently accessed data
 
 ### Phase 10: Chart Integration
@@ -111,7 +111,7 @@
 - **ChestDataModel**: Core data model that manages the chest data using pandas DataFrame, emits signals for changes, and tracks validation and correction status.
 
 #### Services
-- **CSVService**: Handles reading and writing CSV files with advanced encoding detection and normalization, supporting international character sets including Japanese and European languages.
+- **CSVService**: Handles reading and writing CSV files with advanced encoding detection and normalization, supporting international character sets including Japanese and European languages. Now supports chunked reading for large files with progress reporting.
 - **ValidationService**: Validates data against rules, tracks validation status, and provides methods to export validation reports.
 - **CorrectionService**: Applies various correction strategies to data, maintains correction history, and provides methods to export correction reports.
 
@@ -175,19 +175,19 @@ All tests (60 total) are now passing, including the new CSV encoding tests. The 
 
 ## In Progress
 
-- Optimizing performance for large datasets
-  - Planning implementation of chunked reading for large CSV files
-  - Researching background processing for time-consuming operations
-  - Exploring memory optimization techniques for large datasets
+- Implementing background processing for time-consuming operations
+  - Research on appropriate threading model for Qt applications
+  - Planning integration with existing services
+- Implementing UI progress indicators for long-running operations
+  - Designing progress dialog components
+  - Connecting progress callbacks to UI elements
 - Preparing for chart integration implementation
 - Planning standardized error handling approach
 
 ## Next Steps
 
-- Implement chunked reading for large CSV files
-- Add background processing for time-consuming operations
-- Optimize memory usage for large datasets
-- Add progress indicators for long-running operations
+- Implement background processing for time-consuming operations
+- Add UI progress indicators for long-running operations
 - Address ValidationService date parsing warnings
 - Begin implementation of chart integration (Phase 10)
 - Enhance user interface for better usability
