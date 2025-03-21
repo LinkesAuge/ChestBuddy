@@ -9,32 +9,12 @@ This document tracks bugs, issues, and their resolutions in the ChestBuddy proje
 
 ## Active Issues
 
-### CSV Encoding Issues
-- **Japanese Character Encoding**: CSV files with Japanese characters (Shift JIS encoding) are not properly detected and read
-  - **Status**: Investigating
-  - **Priority**: High
-  - **Components**: CSVService
-  - **Reproduction**: Created test file with Shift JIS encoding containing Japanese characters
-  - **Next Steps**: Enhance encoding detection and handling in CSVService
-
-- **Mixed Encoding Handling**: Files with mixed encoding may cause unpredictable behavior
-  - **Status**: Investigating
-  - **Priority**: Medium
-  - **Components**: CSVService
-  - **Next Steps**: Implement robust fallback mechanisms and better text normalization
-
-- **Special Character Handling**: CSV files with German umlauts and other special characters may not load correctly with certain encodings
-  - **Status**: Investigating
-  - **Priority**: Medium
-  - **Components**: CSVService
-  - **Next Steps**: Implement better encoding detection and handling
-
 ### Performance Issues
 - **Large Dataset Performance**: When handling larger datasets (>1000 rows), the application experiences significant slowdowns
   - **Status**: Investigating
   - **Priority**: High
   - **Components**: ChestDataModel, DataView
-  - **Next Steps**: Profile the application to identify bottlenecks
+  - **Next Steps**: Profile the application to identify bottlenecks, implement chunked reading
 
 ### Error Handling Improvements
 - **Inconsistent Error Messages**: Error handling across the application is inconsistent
@@ -43,7 +23,31 @@ This document tracks bugs, issues, and their resolutions in the ChestBuddy proje
   - **Components**: All
   - **Next Steps**: Create a standardized error handling approach
 
+### ValidationService Warnings
+- **Date Parsing Warnings**: Warnings appear when parsing dates without specified format
+  - **Status**: To Do
+  - **Priority**: Low
+  - **Components**: ValidationService
+  - **Next Steps**: Specify date format in pd.to_datetime calls
+
 ## Recently Resolved Issues
+
+### CSV Encoding Issues
+- **Japanese Character Encoding**: CSV files with Japanese characters (Shift JIS encoding) not properly detected
+  - **Status**: Resolved
+  - **Priority**: High
+  - **Resolution**: Implemented multi-stage encoding detection with Japanese-specific detection patterns, BOM handling, and a comprehensive fallback chain
+  - **Fixed In**: CSVService.py
+
+- **Mixed Encoding Handling**: Files with mixed encoding causing unpredictable behavior
+  - **Status**: Resolved
+  - **Priority**: Medium
+  - **Resolution**: Implemented robust fallback mechanisms and better text normalization
+
+- **Special Character Handling**: CSV files with German umlauts and other special characters not loading correctly
+  - **Status**: Resolved
+  - **Priority**: Medium
+  - **Resolution**: Implemented better encoding detection using chardet/charset-normalizer libraries
 
 ### UI Component Tests Fixed
 - **TestDataView.test_update_view**: Fixed assertion error by updating row count expectations and proper filtering handling
@@ -90,22 +94,29 @@ This document tracks bugs, issues, and their resolutions in the ChestBuddy proje
 ## Test Results
 
 ### CSV Encoding Test Results
-- UTF-8 files with German umlauts: Properly detected and read
-- Latin-1 files with German umlauts: Properly detected and read
-- Windows-1252 files with special characters: Properly detected and read
-- Shift JIS files with Japanese characters: **FAILED** - Characters not properly decoded
-- Mixed encoding files: Handled, but potentially unreliable
-- Corrupted files: Basic handling present, could be improved
+- UTF-8 files with German umlauts: ✅ Properly detected and read
+- Latin-1 files with German umlauts: ✅ Properly detected and read
+- Windows-1252 files with special characters: ✅ Properly detected and read
+- Shift JIS files with Japanese characters: ✅ Properly detected and read
+- UTF-8 files with BOM: ✅ Properly detected and read
+- UTF-16 files with BOM: ✅ Properly detected and read
+- Mixed encoding files: ✅ Successfully handled with fallback mechanisms
+- Corrupted files: ✅ Successfully handled with robust mode
 
 ## Implementation Plan
 
-### CSVService Enhancements
-1. Add configurable encoding parameter to read_csv method
-2. Implement more robust encoding detection using chardet/charset-normalizer
-3. Create a prioritized fallback chain for encoding attempts
-4. Add BOM detection for CSV files
-5. Enhance text normalization for international characters
-6. Add a robust mode for handling severely corrupted files
+### Performance Optimization
+1. Implement chunked reading for large CSV files
+2. Add background processing for time-consuming operations
+3. Optimize memory usage for large datasets
+4. Add progress indicators for long-running operations
+5. Implement caching for frequently accessed data
+
+### Error Handling Standardization
+1. Create unified error handling approach
+2. Implement consistent error logging
+3. Provide user-friendly error messages in the UI
+4. Add context information for debugging
 
 ## Monitor List
 
@@ -116,6 +127,10 @@ This document tracks bugs, issues, and their resolutions in the ChestBuddy proje
 - **Memory Usage**: Monitor memory usage with large datasets
   - **Status**: Monitoring
   - **Components**: ChestDataModel, DataView
+
+- **Encoding Detection Accuracy**: Continue monitoring with real-world files
+  - **Status**: Monitoring
+  - **Components**: CSVService
 
 ## Future Improvements
 
@@ -131,13 +146,9 @@ This document tracks bugs, issues, and their resolutions in the ChestBuddy proje
 
 ## Common Challenges
 
-### Character Encoding
-- **Issue**: German umlauts (ä, ö, ü, ß) often have encoding issues when processing CSV files
-- **Solution**: Will implement special handling using ftfy, charset-normalizer, and unidecode libraries
-
 ### Performance with Large Datasets
-- **Issue**: Potential performance challenges with large CSV files (10,000+ rows)
-- **Solution**: Will implement efficient data structures and background processing
+- **Issue**: Performance challenges with large CSV files (10,000+ rows)
+- **Planned Solution**: Implement chunked reading, background processing, and memory optimization
 
 ## Error Handling Strategy
 
@@ -232,7 +243,7 @@ This section will be updated as development progresses and specific debugging te
    - Added robust mode for handling corrupted files
    - Improved error reporting with detailed messages
 
-2. **Future Optimizations**
+2. **Planned Performance Optimizations**
    - Need to implement chunked reading for large CSV files
    - Consider adding caching for better performance
    - Add progress indicators for long-running operations
