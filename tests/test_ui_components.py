@@ -9,9 +9,11 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
-from PySide6.QtCore import QObject, Signal
-from PySide6.QtWidgets import QApplication
+from PySide6.QtCore import QObject, Signal, Qt, QPoint
+from PySide6.QtWidgets import QApplication, QTableView
+from PySide6.QtGui import QStandardItem
 from unittest.mock import MagicMock, patch
+from pytestqt.qtbot import QtBot
 
 from chestbuddy.core.models.chest_data_model import ChestDataModel
 from chestbuddy.core.services.validation_service import ValidationService
@@ -171,6 +173,85 @@ class TestDataView:
             # The filter clearing resets the _filtered_rows to an empty list
             assert data_view._filtered_rows == []
 
+    def test_filtering_with_qtbot(self, qtbot, app, data_model):
+        """Test filtering the data view using QtBot for UI interaction."""
+        data_view = DataView(data_model)
+        qtbot.addWidget(data_view)
+
+        # Set up the filter to search for 'Player1'
+        index = data_view._filter_column.findText("Player Name")
+        data_view._filter_column.setCurrentIndex(index)
+        qtbot.keyClicks(data_view._filter_text, "Player1")
+
+        # Choose 'Equals' filter mode
+        index = data_view._filter_mode.findText("Equals")
+        data_view._filter_mode.setCurrentIndex(index)
+
+        # Click the apply filter button
+        qtbot.mouseClick(data_view._apply_filter_btn, Qt.LeftButton)
+
+        # Verify that only one row is shown and it contains Player1
+        assert len(data_view._filtered_rows) == 1
+        displayed_data = data_view._table_model.item(0, 1).text()  # Player Name column
+        assert displayed_data == "Player1"
+
+        # Check the status label
+        assert "Showing 1 of 3 rows" in data_view._status_label.text()
+
+    def test_clear_filter_with_qtbot(self, qtbot, app, data_model):
+        """Test clearing filter using QtBot for UI interaction."""
+        data_view = DataView(data_model)
+        qtbot.addWidget(data_view)
+
+        # First, apply a filter
+        data_view._filter_column.setCurrentText("Player Name")
+        qtbot.keyClicks(data_view._filter_text, "Player1")
+        qtbot.mouseClick(data_view._apply_filter_btn, Qt.LeftButton)
+
+        # Now clear the filter
+        qtbot.mouseClick(data_view._clear_filter_btn, Qt.LeftButton)
+
+        # Verify the filter was cleared
+        assert data_view._filter_text.text() == ""
+        assert len(data_view._filtered_rows) == 3  # All rows are shown
+        assert data_view._table_model.rowCount() == 3
+        assert "Loaded 3 rows" in data_view._status_label.text()
+
+    def test_cell_editing_with_qtbot(self, qtbot, app, data_model):
+        """Test editing a cell value using QtBot for UI interaction."""
+        data_view = DataView(data_model)
+        qtbot.addWidget(data_view)
+
+        # Create a signal catcher for data_changed
+        signal_catcher = SignalCatcher()
+        data_model.data_changed.connect(signal_catcher.signal_handler)
+
+        # Get the cell to edit (Player1 -> NewPlayer)
+        index = data_view._table_view.model().index(0, 1)  # Row 0, Column 1 (Player Name)
+
+        # Click to edit the cell and change the value
+        data_view._table_view.edit(index)
+        editor = (
+            data_view._table_view.indexWidget(index)
+            if data_view._table_view.indexWidget(index)
+            else None
+        )
+
+        if editor:
+            # Direct editor interaction if available
+            qtbot.keyClicks(editor, "NewPlayer")
+            qtbot.keyClick(editor, Qt.Key_Return)
+        else:
+            # Otherwise, modify the model directly to simulate editing
+            data_view._table_model.setItem(0, 1, QStandardItem("NewPlayer"))
+
+        # Wait for data changed signal
+        qtbot.wait(100)
+
+        # Verify the data was changed in the model
+        assert signal_catcher.signal_received
+        assert data_model.data.at[0, "Player Name"] == "NewPlayer"
+
 
 class TestValidationTab:
     """Tests for ValidationTab class."""
@@ -201,6 +282,63 @@ class TestValidationTab:
 
             # Check if validation was called
             mock_validate.assert_called_once()
+
+    def test_rule_selection_with_qtbot(self, qtbot, app, data_model, validation_service):
+        """Test validation rule selection using QtBot for UI interaction."""
+        validation_tab = ValidationTab(data_model, validation_service)
+        qtbot.addWidget(validation_tab)
+
+        # All rules are checked by default, so test unchecking one
+        assert "Missing Values" in validation_tab._selected_rules
+
+        # Uncheck the Missing Values rule
+        qtbot.mouseClick(validation_tab._missing_values_check, Qt.LeftButton)
+
+        # Verify the rule was removed from selected rules
+        assert "Missing Values" not in validation_tab._selected_rules
+
+        # Check it again
+        qtbot.mouseClick(validation_tab._missing_values_check, Qt.LeftButton)
+
+        # Verify it's back in the selected rules
+        assert "Missing Values" in validation_tab._selected_rules
+
+    def test_validate_button_with_qtbot(self, qtbot, app, data_model, validation_service):
+        """Test validate button functionality using QtBot for UI interaction."""
+        # Mock the validate_data method to add some validation issues
+        with patch.object(validation_service, "validate_data") as mock_validate:
+            # Setup the mock to actually update validation status
+            def add_validation_issues(*args, **kwargs):
+                # Add a validation issue
+                data_model._validation_status = pd.DataFrame(
+                    {"Missing Values": ["Missing value in column: Value"]}, index=[0]
+                )
+                # Emit validation changed signal
+                data_model.validation_changed.emit(data_model._validation_status)
+
+            mock_validate.side_effect = add_validation_issues
+
+            validation_tab = ValidationTab(data_model, validation_service)
+            qtbot.addWidget(validation_tab)
+
+            # Clear any existing validation status
+            with patch.object(validation_tab, "_update_view"):
+                data_model._validation_status = pd.DataFrame()
+
+            # Click the validate button
+            qtbot.mouseClick(validation_tab._validate_btn, Qt.LeftButton)
+
+            # Wait for UI to update
+            qtbot.wait(100)
+
+            # Verify validation was called
+            mock_validate.assert_called_once()
+
+            # Verify the results tree has at least one item
+            assert validation_tab._results_tree.topLevelItemCount() > 0
+
+            # Verify the summary label mentions validation issues
+            assert "validation issues" in validation_tab._summary_label.text()
 
 
 class TestCorrectionTab:
@@ -254,3 +392,48 @@ class TestCorrectionTab:
             assert tab._column_combo is not None
             assert tab._strategy_combo is not None
             assert tab._apply_btn is not None
+
+    def test_strategy_selection_with_qtbot(self, qtbot, app, data_model, correction_service):
+        """Test correction strategy selection using QtBot for UI interaction."""
+        correction_tab = CorrectionTab(data_model, correction_service)
+        qtbot.addWidget(correction_tab)
+
+        # Test selecting a strategy that requires constant value parameter
+        constant_strategy = "Fill Missing Values (Constant)"
+        index = correction_tab._strategy_combo.findText(constant_strategy)
+        qtbot.mouseClick(correction_tab._strategy_combo, Qt.LeftButton)
+        qtbot.keyClick(correction_tab._strategy_combo, Qt.Key_Down, count=index)
+        qtbot.keyClick(correction_tab._strategy_combo, Qt.Key_Return)
+
+        # Verify that the constant value input is visible
+        assert correction_tab._constant_value.isVisible()
+
+        # Test selecting a strategy that requires threshold parameter
+        outlier_strategy = "Fix Outliers (Winsorize)"
+        index = correction_tab._strategy_combo.findText(outlier_strategy)
+        qtbot.mouseClick(correction_tab._strategy_combo, Qt.LeftButton)
+        qtbot.keyClick(correction_tab._strategy_combo, Qt.Key_Down, count=index)
+        qtbot.keyClick(correction_tab._strategy_combo, Qt.Key_Return)
+
+        # Verify that the threshold spinbox is visible
+        assert correction_tab._threshold_spin.isVisible()
+
+    def test_row_selection_options_with_qtbot(self, qtbot, app, data_model, correction_service):
+        """Test row selection options using QtBot for UI interaction."""
+        correction_tab = CorrectionTab(data_model, correction_service)
+        qtbot.addWidget(correction_tab)
+
+        # By default, "All Rows" should be selected
+        assert correction_tab._all_rows_radio.isChecked()
+
+        # Test selecting "Selected Rows"
+        qtbot.mouseClick(correction_tab._selected_rows_radio, Qt.LeftButton)
+
+        # Verify "Selected Rows" is checked
+        assert correction_tab._selected_rows_radio.isChecked()
+        assert not correction_tab._all_rows_radio.isChecked()
+
+        # Set selected rows and verify _get_rows_to_correct returns them
+        selected_rows = [1, 2]
+        correction_tab.set_selected_rows(selected_rows)
+        assert correction_tab._get_rows_to_correct() == selected_rows

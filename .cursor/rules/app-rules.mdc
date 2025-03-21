@@ -32,6 +32,17 @@ alwaysApply: true
 - Implement custom table delegates for specialized cell rendering/editing
 - Avoid direct manipulation of Qt widgets from non-UI classes
 
+## Background Processing
+
+- Use the BackgroundWorker/BackgroundTask pattern for long-running operations
+- Implement the run() method in subclasses of BackgroundTask
+- Check for cancellation in long-running tasks using is_cancelled property
+- Connect progress signals to update UI during task execution
+- Always clean up worker threads when no longer needed
+- Use read_csv_background for reading large CSV files
+- Ensure proper error handling in background tasks
+- Return clear error messages from background tasks (not just exceptions)
+
 ## pandas Usage
 
 - Create copies of DataFrames before modification (df.copy())
@@ -72,6 +83,8 @@ alwaysApply: true
 - Support various file formats (TXT, CSV)
 - Preserve file format and structure during export
 - Handle file encoding issues gracefully
+- Use chunked reading for large files
+- Process files in the background for UI responsiveness
 
 ## Pattern Catalog
 
@@ -93,26 +106,40 @@ alwaysApply: true
 - Used for user actions that can be undone/redone
 - Key commands: CorrectionCommand, ValidationCommand
 
+### Worker Pattern
+- Used for background processing to keep UI responsive
+- BackgroundWorker manages thread lifecycle and signal handling
+- BackgroundTask defines the interface for asynchronous operations
+- Tasks report progress via signals
+- Example implementation: CSVReadTask for reading CSV files in the background
+
 ## Project-Specific Guidelines
 - Correction lists are always in CSV or TXT format with From,To,Categtory,Enabled columns
 - Validation lists are plain text with one entry per line
 - The main workflow is: Import → Validate → Correct → Export
 - Configuration should persist between application sessions
 - UI updates should be responsive and non-blocking
+- Heavy operations should run in background threads
 
 ## Performance Tips
 
-- Use QThreads for long-running operations
+- Use BackgroundWorker for long-running operations
+- Process large files in chunks
 - Implement signal throttling for frequent updates
 - Use lazy loading for large datasets
 - Cache expensive computation results
 - Implement pagination for large tables
+- Report progress for time-consuming operations
 
 ## Testing Requirements
 
 - Use pytest for all tests
+- Use pytestqt for testing Qt components
 - Create test fixtures for common test data
 - Mock external dependencies
 - Test each service independently
+- Use QtBot for simulating signal interactions
+- Test background processing with appropriate assertions
+- Test cancellation and error handling in background tasks
 - Test critical user workflows
 - Verify performance with larger datasets 
