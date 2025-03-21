@@ -1,0 +1,38 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Bug Tracking and Resolution
+
+This document tracks bugs, issues, and their resolutions in the ChestBuddy project.
+
+## Active Issues
+
+None identified yet as the project is in the initial setup phase.
+
+## Resolved Issues
+
+None yet as implementation has not started.
+
+## Common Challenges
+
+### Character Encoding
+- **Issue**: German umlauts (ä, ö, ü, ß) often have encoding issues when processing CSV files
+- **Solution**: Will implement special handling using ftfy, charset-normalizer, and unidecode libraries
+
+### Performance with Large Datasets
+- **Issue**: Potential performance challenges with large CSV files (10,000+ rows)
+- **Solution**: Will implement efficient data structures and background processing
+
+## Error Handling Strategy
+
+1. Use clear and specific exception types
+2. Implement comprehensive logging
+3. Provide user-friendly error messages in the UI
+4. Include context information for debugging
+5. Use try-except blocks for all file operations
+
+## Debugging Notes
+
+This section will be updated as development progresses and specific debugging techniques are identified for common issues. 
