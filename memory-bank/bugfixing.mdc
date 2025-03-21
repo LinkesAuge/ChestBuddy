@@ -9,19 +9,32 @@ This document tracks bugs, issues, and their resolutions in the ChestBuddy proje
 
 ## Active Issues
 
+### CSV Encoding Issues
+- **Japanese Character Encoding**: CSV files with Japanese characters (Shift JIS encoding) are not properly detected and read
+  - **Status**: Investigating
+  - **Priority**: High
+  - **Components**: CSVService
+  - **Reproduction**: Created test file with Shift JIS encoding containing Japanese characters
+  - **Next Steps**: Enhance encoding detection and handling in CSVService
+
+- **Mixed Encoding Handling**: Files with mixed encoding may cause unpredictable behavior
+  - **Status**: Investigating
+  - **Priority**: Medium
+  - **Components**: CSVService
+  - **Next Steps**: Implement robust fallback mechanisms and better text normalization
+
+- **Special Character Handling**: CSV files with German umlauts and other special characters may not load correctly with certain encodings
+  - **Status**: Investigating
+  - **Priority**: Medium
+  - **Components**: CSVService
+  - **Next Steps**: Implement better encoding detection and handling
+
 ### Performance Issues
 - **Large Dataset Performance**: When handling larger datasets (>1000 rows), the application experiences significant slowdowns
   - **Status**: Investigating
   - **Priority**: High
   - **Components**: ChestDataModel, DataView
   - **Next Steps**: Profile the application to identify bottlenecks
-
-### CSV Encoding Issues
-- **Special Character Handling**: CSV files with German umlauts and other special characters may not load correctly
-  - **Status**: Investigating
-  - **Priority**: Medium
-  - **Components**: CSVService
-  - **Next Steps**: Implement better encoding detection and handling
 
 ### Error Handling Improvements
 - **Inconsistent Error Messages**: Error handling across the application is inconsistent
@@ -74,6 +87,26 @@ This document tracks bugs, issues, and their resolutions in the ChestBuddy proje
   - **Status**: Resolved
   - **Resolution**: Updated all occurrences to use update_data() instead of update_value()
 
+## Test Results
+
+### CSV Encoding Test Results
+- UTF-8 files with German umlauts: Properly detected and read
+- Latin-1 files with German umlauts: Properly detected and read
+- Windows-1252 files with special characters: Properly detected and read
+- Shift JIS files with Japanese characters: **FAILED** - Characters not properly decoded
+- Mixed encoding files: Handled, but potentially unreliable
+- Corrupted files: Basic handling present, could be improved
+
+## Implementation Plan
+
+### CSVService Enhancements
+1. Add configurable encoding parameter to read_csv method
+2. Implement more robust encoding detection using chardet/charset-normalizer
+3. Create a prioritized fallback chain for encoding attempts
+4. Add BOM detection for CSV files
+5. Enhance text normalization for international characters
+6. Add a robust mode for handling severely corrupted files
+
 ## Monitor List
 
 - **UI Responsiveness**: Keep an eye on UI responsiveness with larger datasets
@@ -123,4 +156,97 @@ When tests fail, check:
 3. File encoding issues with test data
 4. Mock objects to avoid external dependencies
 
-This section will be updated as development progresses and specific debugging techniques are identified for common issues. 
+This section will be updated as development progresses and specific debugging techniques are identified for common issues.
+
+# Bug Fixing Log
+
+## Active Issues
+
+1. **ValidationService Date Parsing Warnings**
+   - **Status**: Active
+   - **Description**: The ValidationService generates warnings about date parsing when calling `pd.to_datetime` without a specified format.
+   - **Impact**: Low - The functionality works but generates warnings.
+   - **Symptoms**: 8 warnings in the test suite related to date parsing.
+   - **Potential Fix**: Specify a consistent date format when calling `pd.to_datetime`.
+
+2. **Performance Issues with Large Datasets**
+   - **Status**: Active
+   - **Description**: When loading very large CSV files, the application may become unresponsive.
+   - **Impact**: Medium - Affects usability with large datasets.
+   - **Symptoms**: UI freezes temporarily during loading/processing.
+   - **Potential Fix**: Implement chunked reading, background processing, and progress indicators.
+
+## Recently Resolved Issues
+
+1. **CSV Encoding Issues with Japanese Characters**
+   - **Status**: Resolved
+   - **Description**: The CSVService failed to properly detect and handle Shift-JIS encoded files with Japanese characters.
+   - **Impact**: High - Prevented Japanese users from properly working with CSV files.
+   - **Resolution**: Implemented multi-stage encoding detection with Japanese-specific detection, BOM handling, and a comprehensive fallback chain.
+   - **Fixed In**: CSVService.py - Enhanced encoding detection and handling.
+
+2. **Method Name Mismatches in ChestDataModel**
+   - **Status**: Resolved
+   - **Description**: Tests were using `get_all_validation_status` but the implementation used `get_validation_status`.
+   - **Impact**: Medium - Caused test failures.
+   - **Resolution**: Updated tests to use the correct method name.
+
+3. **Boolean Checking with DataFrames**
+   - **Status**: Resolved
+   - **Description**: Using DataFrames directly in boolean context caused deprecation warnings.
+   - **Impact**: Low - Worked but with warnings.
+   - **Resolution**: Fixed by using `df.empty` instead of `if df:`.
+
+4. **Test Method Name Mismatches in test_services.py**
+   - **Status**: Resolved
+   - **Description**: Several methods in tests didn't match the implementation.
+   - **Impact**: Medium - Caused test failures.
+   - **Resolution**: Updated test methods to align with implementation.
+
+5. **UI Component Tests Failures**
+   - **Status**: Resolved
+   - **Description**: Tests in test_ui_components.py were failing due to method name mismatches and incorrect expectations.
+   - **Impact**: Medium - Caused test failures.
+   - **Resolution**: Updated tests to align with current implementation.
+
+## Testing Approach
+
+1. **CSV Encoding Tests**
+   - Created comprehensive tests with different encodings (UTF-8, Shift-JIS, Windows-1252)
+   - Implemented tests for BOM detection and handling
+   - Added tests for robust mode with corrupted files
+   - Verified handling of international characters
+
+2. **Unit Tests**
+   - 60 tests total, all passing
+   - Tests cover models, services, and UI components
+   - Added specific tests for edge cases and error handling
+
+## Implementation Notes
+
+1. **CSVService Enhancements**
+   - Added multi-stage encoding detection with chardet and charset-normalizer
+   - Implemented Japanese-specific detection patterns
+   - Added BOM detection for Unicode files
+   - Created a comprehensive fallback chain for various encodings
+   - Added robust mode for handling corrupted files
+   - Improved error reporting with detailed messages
+
+2. **Future Optimizations**
+   - Need to implement chunked reading for large CSV files
+   - Consider adding caching for better performance
+   - Add progress indicators for long-running operations
+   - Enhance error handling with user-friendly messages
+
+## Monitor List
+
+1. **Performance with Large Datasets**
+   - Monitor memory usage and UI responsiveness
+   - Measure load times for different file sizes
+
+2. **Date Parsing Warnings**
+   - Need to address warnings in ValidationService
+
+3. **Encoding Detection Accuracy**
+   - Continue monitoring encoding detection accuracy with real-world files
+   - May need to fine-tune detection for specific edge cases 

@@ -8,9 +8,10 @@ import csv
 import logging
 import io
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union, Any
 
 import pandas as pd
+import chardet
 from charset_normalizer import detect
 from ftfy import fix_text
 
@@ -18,6 +19,41 @@ from chestbuddy.utils.config import ConfigManager
 
 # Set up logger
 logger = logging.getLogger(__name__)
+
+# List of encodings to try when auto-detection fails
+FALLBACK_ENCODINGS = [
+    "utf-8",
+    "utf-8-sig",  # UTF-8 with and without BOM
+    "shift_jis",
+    "cp932",  # Japanese (try these first for Japanese content)
+    "latin-1",
+    "iso-8859-1",  # Western European
+    "cp1252",
+    "windows-1252",  # Windows Western European
+    "euc_jp",
+    "euc-jp",  # Japanese
+    "iso-2022-jp",  # Japanese
+    "gbk",
+    "gb2312",  # Chinese
+    "euc-kr",  # Korean
+    "iso-8859-15",  # Western European with Euro
+]
+
+# BOM markers
+BOM_MARKERS = {
+    b"\xef\xbb\xbf": "utf-8-sig",  # UTF-8 with BOM
+    b"\xfe\xff": "utf-16be",  # UTF-16 Big Endian
+    b"\xff\xfe": "utf-16le",  # UTF-16 Little Endian
+    b"\x00\x00\xfe\xff": "utf-32be",  # UTF-32 Big Endian
+    b"\xff\xfe\x00\x00": "utf-32le",  # UTF-32 Little Endian
+}
+
+# Japanese character sets for detection
+JAPANESE_CHARS = {
+    "hiragana": range(0x3040, 0x309F),
+    "katakana": range(0x30A0, 0x30FF),
+    "kanji": range(0x4E00, 0x9FBF),
+}
 
 
 class CSVService:
@@ -40,14 +76,20 @@ class CSVService:
         self._config = ConfigManager()
 
     def read_csv(
-        self, file_path: Union[str, Path], normalize_text: bool = True
+        self,
+        file_path: Union[str, Path],
+        encoding: Optional[str] = None,
+        normalize_text: bool = True,
+        robust_mode: bool = False,
     ) -> Tuple[Optional[pd.DataFrame], Optional[str]]:
         """
         Read a CSV file and return its contents as a pandas DataFrame.
 
         Args:
             file_path: The path to the CSV file.
+            encoding: Optional encoding to use. If None, auto-detection is used.
             normalize_text: Whether to normalize text encoding issues.
+            robust_mode: Whether to use robust mode for handling severely corrupted files.
 
         Returns:
             A tuple containing:
@@ -56,49 +98,181 @@ class CSVService:
         """
         try:
             path = Path(file_path)
+            encoding_used = None
+            error_details = []
 
-            # First try to detect the encoding
-            encoding = self._detect_encoding(path)
+            # If we're in robust mode, set a flag to include a warning message
+            # even if reading succeeds
+            robust_warning = (
+                "Note: Robust mode was used for reading this file. Some corrupted lines may have been skipped."
+                if robust_mode
+                else None
+            )
 
-            # Try to read the file with the detected encoding
-            try:
-                df = pd.read_csv(path, encoding=encoding)
+            # First check if this might be a Japanese file
+            if self._might_be_japanese_file(path) and not encoding:
+                logger.debug(
+                    "File appears to contain Japanese text, prioritizing Japanese encodings"
+                )
+                for jp_encoding in ["shift_jis", "cp932", "euc_jp", "iso-2022-jp"]:
+                    try:
+                        logger.debug(f"Trying Japanese encoding: {jp_encoding}")
+                        df = pd.read_csv(path, encoding=jp_encoding)
+                        encoding_used = jp_encoding
 
-                # Handle text normalization if requested
-                if normalize_text:
-                    df = self._normalize_dataframe_text(df)
+                        # Verify the content looks correct
+                        if self._verify_japanese_content(df):
+                            logger.info(
+                                f"Successfully read Japanese CSV with encoding: {jp_encoding}"
+                            )
 
-                return df, None
+                            # Handle text normalization if requested
+                            if normalize_text:
+                                df = self._normalize_dataframe_text(df)
 
-            except UnicodeDecodeError:
-                # If the detected encoding failed, try utf-8
+                            return df, robust_warning
+                    except Exception as e:
+                        error_msg = f"Failed to read Japanese CSV with encoding {jp_encoding}: {e}"
+                        logger.debug(error_msg)
+                        error_details.append(error_msg)
+
+            # Use the specified encoding if provided
+            if encoding:
                 try:
-                    df = pd.read_csv(path, encoding="utf-8")
+                    logger.debug(f"Using user-specified encoding: {encoding}")
+                    df = pd.read_csv(path, encoding=encoding)
+                    encoding_used = encoding
 
                     # Handle text normalization if requested
                     if normalize_text:
                         df = self._normalize_dataframe_text(df)
 
-                    return df, None
+                    return df, robust_warning
 
-                except UnicodeDecodeError:
-                    # If utf-8 failed, try latin-1 as a fallback
+                except Exception as e:
+                    error_msg = f"Failed to read CSV with specified encoding {encoding}: {e}"
+                    logger.warning(error_msg)
+                    error_details.append(error_msg)
+                    # Don't return here, try auto-detection instead
+
+            # Try to detect BOM first (takes precedence over other detection methods)
+            bom_encoding = self._detect_bom(path)
+            if bom_encoding:
+                try:
+                    logger.debug(f"Detected BOM, using encoding: {bom_encoding}")
+                    df = pd.read_csv(path, encoding=bom_encoding)
+                    encoding_used = bom_encoding
+
+                    # Handle text normalization if requested
+                    if normalize_text:
+                        df = self._normalize_dataframe_text(df)
+
+                    return df, robust_warning
+
+                except Exception as e:
+                    error_msg = f"Failed to read CSV with BOM-detected encoding {bom_encoding}: {e}"
+                    logger.warning(error_msg)
+                    error_details.append(error_msg)
+                    # Continue with other detection methods
+
+            # Try with auto-detected encoding
+            detected_encoding = self._detect_encoding(path)
+            if detected_encoding:
+                try:
+                    logger.debug(f"Using auto-detected encoding: {detected_encoding}")
+                    df = pd.read_csv(path, encoding=detected_encoding)
+                    encoding_used = detected_encoding
+
+                    # Handle text normalization if requested
+                    if normalize_text:
+                        df = self._normalize_dataframe_text(df)
+
+                    return df, robust_warning
+
+                except Exception as e:
+                    error_msg = (
+                        f"Failed to read CSV with detected encoding {detected_encoding}: {e}"
+                    )
+                    logger.warning(error_msg)
+                    error_details.append(error_msg)
+                    # Continue with fallback encodings
+
+            # Try each fallback encoding
+            for fallback_encoding in FALLBACK_ENCODINGS:
+                # Skip if we've already tried this encoding
+                if (
+                    fallback_encoding == detected_encoding
+                    or fallback_encoding == bom_encoding
+                    or fallback_encoding == encoding
+                ):
+                    continue
+
+                try:
+                    logger.debug(f"Trying fallback encoding: {fallback_encoding}")
+                    df = pd.read_csv(path, encoding=fallback_encoding)
+                    encoding_used = fallback_encoding
+
+                    # Special case for Japanese encodings - verify content
+                    if fallback_encoding in ["shift_jis", "cp932", "euc_jp", "iso-2022-jp"]:
+                        if not self._verify_japanese_content(df):
+                            logger.debug(
+                                f"Data read with {fallback_encoding} doesn't appear to be valid Japanese"
+                            )
+                            continue
+
+                    # Handle text normalization if requested
+                    if normalize_text:
+                        df = self._normalize_dataframe_text(df)
+
+                    logger.info(
+                        f"Successfully read CSV with fallback encoding: {fallback_encoding}"
+                    )
+                    return df, robust_warning
+
+                except Exception as e:
+                    error_msg = (
+                        f"Failed to read CSV with fallback encoding {fallback_encoding}: {e}"
+                    )
+                    logger.debug(error_msg)  # Use debug level here to avoid log spam
+                    error_details.append(error_msg)
+                    # Continue with next fallback encoding
+
+            # If we're in robust mode, try to recover as much as possible
+            if robust_mode:
+                try:
+                    logger.warning("Attempting robust CSV recovery...")
+                    # Try with error_bad_lines=False (pandas <1.3) or on_bad_lines='skip' (pandas >=1.3)
                     try:
-                        df = pd.read_csv(path, encoding="latin-1")
+                        # For pandas >=1.3
+                        df = pd.read_csv(path, encoding="latin-1", on_bad_lines="skip")
+                    except TypeError:
+                        # For pandas <1.3
+                        df = pd.read_csv(path, encoding="latin-1", error_bad_lines=False)
 
-                        # Handle text normalization if requested
-                        if normalize_text:
-                            df = self._normalize_dataframe_text(df)
+                    logger.warning("Recovered partial data with robust mode")
 
-                        return df, None
+                    if normalize_text:
+                        df = self._normalize_dataframe_text(df)
 
-                    except Exception as e:
-                        logger.error(f"Error reading CSV with latin-1 encoding: {e}")
-                        return None, f"Failed to read CSV file with multiple encodings. Error: {e}"
+                    # Always include warning about using robust mode
+                    return (
+                        df,
+                        "Note: Some corrupted lines were skipped during import. Data may be incomplete.",
+                    )
 
-            except Exception as e:
-                logger.error(f"Error reading CSV with detected encoding: {e}")
-                return None, f"Error reading CSV file. Error: {e}"
+                except Exception as e:
+                    error_msg = f"Failed to recover CSV even with robust mode: {e}"
+                    logger.error(error_msg)
+                    error_details.append(error_msg)
+
+            # If we reach here, all attempts have failed
+            err_summary = (
+                "\n".join(error_details[:3]) + f"\n... and {len(error_details) - 3} more errors"
+                if len(error_details) > 3
+                else "\n".join(error_details)
+            )
+            logger.error(f"All encoding attempts failed for {path}")
+            return None, f"Failed to read CSV file with multiple encodings. Details: {err_summary}"
 
         except Exception as e:
             logger.error(f"Error in read_csv: {e}")
@@ -136,21 +310,22 @@ class CSVService:
             return False, f"Error writing CSV file. Error: {e}"
 
     def get_csv_preview(
-        self, file_path: Union[str, Path], max_rows: int = 10
-    ) -> Tuple[Optional[List[Dict[str, str]]], Optional[str]]:
+        self, file_path: Union[str, Path], max_rows: int = 10, encoding: Optional[str] = None
+    ) -> Tuple[Optional[List[Dict[str, Any]]], Optional[str]]:
         """
         Get a preview of a CSV file as a list of dictionaries.
 
         Args:
             file_path: The path to the CSV file.
             max_rows: The maximum number of rows to include in the preview.
+            encoding: Optional encoding to use for reading the file.
 
         Returns:
             A tuple containing:
                 - A list of dictionaries representing the rows, or None if an error occurred.
                 - An error message, or None if the operation was successful.
         """
-        df, error = self.read_csv(file_path)
+        df, error = self.read_csv(file_path, encoding=encoding)
 
         if df is None:
             return None, error
@@ -160,34 +335,109 @@ class CSVService:
 
         return preview_rows, None
 
-    def _detect_encoding(self, file_path: Path) -> str:
+    def get_supported_encodings(self) -> List[str]:
         """
-        Detect the encoding of a file.
+        Get a list of supported encodings.
+
+        Returns:
+            A list of encoding names that can be used with read_csv and write_csv.
+        """
+        return FALLBACK_ENCODINGS.copy()
+
+    def _detect_encoding(self, file_path: Path) -> Optional[str]:
+        """
+        Detect the encoding of a file using multiple methods.
 
         Args:
             file_path: The path to the file.
 
         Returns:
-            The detected encoding, or 'utf-8' as a fallback.
+            The detected encoding, or None if detection failed.
         """
         try:
+            # First check for BOM
+            bom_encoding = self._detect_bom(file_path)
+            if bom_encoding:
+                logger.debug(f"BOM detected, encoding: {bom_encoding}")
+                return bom_encoding
+
             # Read a sample of the file (first 10KB) to detect encoding
             with open(file_path, "rb") as f:
                 raw_data = f.read(10240)  # Read first 10KB
 
-            # Detect the encoding
+            # Check for Japanese content first
+            if self._contains_japanese_bytes(raw_data):
+                logger.debug(
+                    "File appears to contain Japanese text, will try Japanese encodings first"
+                )
+                # Try Japanese encodings directly
+                for encoding in ["shift_jis", "cp932", "euc_jp", "iso-2022-jp"]:
+                    try:
+                        decoded = raw_data.decode(encoding)
+                        if len(decoded) > 0 and not decoded.isascii():
+                            logger.debug(f"Successfully decoded with Japanese encoding: {encoding}")
+                            return encoding
+                    except UnicodeDecodeError:
+                        continue
+
+            # Try charset_normalizer first (better for international)
             result = detect(raw_data)
-
-            if result:
+            if result and result.get("encoding"):
+                confidence = result.get("confidence", 0)
                 encoding = result["encoding"]
-                logger.debug(f"Detected encoding: {encoding}")
-                return encoding
+                logger.debug(
+                    f"charset_normalizer detected encoding: {encoding} with confidence: {confidence}"
+                )
 
-            return "utf-8"  # Default fallback
+                # Only trust high confidence results
+                if confidence > 0.8:
+                    return encoding
+
+            # Try chardet as backup
+            detection = chardet.detect(raw_data)
+            if detection and detection.get("encoding"):
+                confidence = detection.get("confidence", 0)
+                encoding = detection["encoding"]
+                logger.debug(f"chardet detected encoding: {encoding} with confidence: {confidence}")
+
+                # Only trust high confidence results
+                if confidence > 0.7:
+                    return encoding
+
+            # If we couldn't detect with high confidence, return None
+            # and let the fallback mechanism handle it
+            logger.warning("Encoding detection had low confidence, will use fallbacks")
+            return None
 
         except Exception as e:
             logger.error(f"Error detecting encoding: {e}")
-            return "utf-8"  # Default fallback
+            return None
+
+    def _detect_bom(self, file_path: Path) -> Optional[str]:
+        """
+        Detect Byte Order Mark (BOM) in a file and return the corresponding encoding.
+
+        Args:
+            file_path: The path to the file.
+
+        Returns:
+            The encoding corresponding to the BOM, or None if no BOM was detected.
+        """
+        try:
+            with open(file_path, "rb") as f:
+                raw_data = f.read(4)  # Read the first 4 bytes
+
+            # Check for each known BOM
+            for bom, encoding in BOM_MARKERS.items():
+                if raw_data.startswith(bom):
+                    logger.debug(f"BOM detected: {bom}, encoding: {encoding}")
+                    return encoding
+
+            return None
+
+        except Exception as e:
+            logger.error(f"Error detecting BOM: {e}")
+            return None
 
     def _normalize_dataframe_text(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -205,10 +455,43 @@ class CSVService:
         # Apply text normalization to string columns
         for col in normalized_df.select_dtypes(include=["object"]).columns:
             normalized_df[col] = normalized_df[col].apply(
-                lambda x: fix_text(str(x)) if isinstance(x, str) else x
+                lambda x: self._normalize_text(x) if isinstance(x, str) else x
             )
 
         return normalized_df
+
+    def _normalize_text(self, text: str) -> str:
+        """
+        Normalize a text string to fix encoding issues.
+
+        Uses ftfy with additional handling for specific cases.
+
+        Args:
+            text: The text to normalize.
+
+        Returns:
+            The normalized text.
+        """
+        try:
+            # Use ftfy for general text fixing
+            fixed = fix_text(text)
+
+            # Special handling for common issues not fully handled by ftfy
+            # Replace common corruption patterns
+            replacements = {
+                # Add specific replacements if needed
+                "": "",  # Replace the unicode replacement character
+                "\ufffd": "",  # Another form of the replacement character
+            }
+
+            for char, replacement in replacements.items():
+                fixed = fixed.replace(char, replacement)
+
+            return fixed.strip()
+
+        except Exception as e:
+            logger.warning(f"Error normalizing text: {e}. Original text: {text[:20]}...")
+            return text  # Return original if normalization fails
 
     def detect_csv_dialect(
         self, file_path: Union[str, Path]
@@ -227,8 +510,11 @@ class CSVService:
         try:
             path = Path(file_path)
 
+            # Detect encoding first
+            encoding = self._detect_encoding(path) or "utf-8"
+
             # Read a sample of the file
-            with open(path, "r", newline="", encoding=self._detect_encoding(path)) as f:
+            with open(path, "r", newline="", encoding=encoding) as f:
                 sample = f.read(4096)  # Read first 4KB
 
             # Detect the dialect
@@ -239,3 +525,89 @@ class CSVService:
         except Exception as e:
             logger.error(f"Error detecting CSV dialect: {e}")
             return None, f"Error detecting CSV format. Error: {e}"
+
+    def _might_be_japanese_file(self, file_path: Path) -> bool:
+        """
+        Check if a file might contain Japanese text.
+
+        Args:
+            file_path: The path to the file.
+
+        Returns:
+            True if the file likely contains Japanese text, False otherwise.
+        """
+        try:
+            with open(file_path, "rb") as f:
+                raw_data = f.read(8192)  # Read first 8KB
+
+            return self._contains_japanese_bytes(raw_data)
+
+        except Exception as e:
+            logger.error(f"Error checking for Japanese content: {e}")
+            return False
+
+    def _contains_japanese_bytes(self, data: bytes) -> bool:
+        """
+        Check if byte data contains patterns typical for Japanese encodings.
+
+        Args:
+            data: The raw byte data to check.
+
+        Returns:
+            True if the data likely contains Japanese text, False otherwise.
+        """
+        # Shift-JIS specific byte patterns
+        # These are common byte sequences in Shift-JIS encoded Japanese text
+        common_sequences = [
+            b"\x82\xa0",
+            b"\x82\xa2",
+            b"\x82\xa4",  # Hiragana あいう
+            b"\x83\x40",
+            b"\x83\x41",
+            b"\x83\x42",  # Katakana アイウ
+            b"\x93\xfa",
+            b"\x96\x7b",  # Common Kanji 日本
+        ]
+
+        for seq in common_sequences:
+            if seq in data:
+                return True
+
+        return False
+
+    def _verify_japanese_content(self, df: pd.DataFrame) -> bool:
+        """
+        Verify that DataFrame content contains valid Japanese characters.
+
+        Args:
+            df: The DataFrame to check.
+
+        Returns:
+            True if the DataFrame contains valid Japanese text, False otherwise.
+        """
+        try:
+            # Check string columns for Japanese characters
+            for col in df.select_dtypes(include=["object"]).columns:
+                for value in df[col].dropna():
+                    if isinstance(value, str):
+                        # Check for common Japanese Unicode ranges
+                        for char in value:
+                            code = ord(char)
+                            # Check if in Japanese Unicode ranges
+                            if any(code in char_range for char_range in JAPANESE_CHARS.values()):
+                                return True
+
+                        # Check for specific Japanese characters
+                        if (
+                            "東京" in value
+                            or "大阪" in value
+                            or "プレイヤー" in value
+                            or "選手" in value
+                        ):
+                            return True
+
+            return False
+
+        except Exception as e:
+            logger.error(f"Error verifying Japanese content: {e}")
+            return False

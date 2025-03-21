@@ -2,90 +2,102 @@
 
 ## Current Focus
 
-### Performance Optimization and Error Handling
+The current focus is on CSV encoding enhancement, particularly for handling international characters such as Japanese and German umlauts. We have implemented a robust CSVService that can handle various encodings and includes fallback mechanisms for problematic files.
 
-Now that the test suite is fully operational with all tests passing, our focus is shifting to performance optimization and comprehensive error handling. Key areas to improve:
+Other focus areas include:
+- Test suite maintenance and improvement
+- Performance optimization for large datasets
+- Error handling enhancements
 
-1. Optimizing data processing for large datasets.
-2. Improving error handling for edge cases.
-3. Enhancing the user interface for better usability.
-4. Addressing the encoding issues with CSV files, especially for German umlauts.
+## Implementation Plan
 
-We've successfully completed the test suite fixes that were previously blocking progress. All test files are now passing, including the UI component tests that required significant updates to match the current implementation.
+We have recently completed the following phases:
 
-**Current status:**
-- All test files are now passing (50 tests total)
-- Fixed API mismatches in test implementations
-- Corrected method naming discrepancies 
-- Improved test approach for UI components with proper mocking
+1. **Test Phase (Completed)**
+   - Created test files with various encodings (UTF-8, Shift-JIS, Windows-1252)
+   - Implemented tests for different encoding scenarios
+   - Identified issues with Japanese character encoding
 
-**Completed test fixes:**
-- Fixed method name mismatches in ChestDataModel and UI components
-- Updated filtering tests to work with the correct API signature
-- Fixed all QApplication handling issues in tests
-- Corrected validation and correction status method calls
+2. **Implementation Phase (Completed)**
+   - Enhanced the CSVService with better encoding detection
+   - Added BOM detection for Unicode files
+   - Implemented Japanese-specific detection and handling
+   - Added robust mode for corrupted files
+   - Created a fallback chain for encoding detection
 
-### Key APIs That Were Refactored
-
-The main components that needed test updates:
-
-1. **ChestDataModel**: 
-   - Method signatures for filtering correctly use a dictionary parameter
-   - Validation and correction status methods use simpler names
-
-2. **UI Components**: 
-   - Button and action names in tests now match implementation
-   - Proper mocking of filter methods and UI updates
-
-### Dependencies/Integration Points
-
-- **Validation and Correction Services**: Tests now properly mock these services when testing UI components
-- **QApplication**: Fixed handling between tests to avoid conflicts
-
-### Next Steps
-
-1. Implement performance optimizations for large datasets:
-   - Improve filtering performance
-   - Add pagination for large tables
-   - Optimize validation and correction operations
-
-2. Enhance error handling:
-   - Implement comprehensive exception handling
-   - Add user-friendly error messages
-   - Improve logging for debugging
-
-3. Address CSV encoding issues:
-   - Add support for detecting and handling different encodings
-   - Implement special handling for German umlauts and other special characters
-
-4. Begin implementation of chart integration (Phase 8)
+3. **Next Phase**
+   - Performance optimization for large datasets
+   - Addressing ValidationService warnings
+   - Enhancing error reporting and user feedback
 
 ## Recent Changes
-- Fixed all test files to match the current API implementation
-- Corrected method naming inconsistencies in tests
-- Improved approach to testing UI components with proper mocking
-- Updated documentation to reflect current project status
+
+- Enhanced `CSVService` to properly handle international characters and various encodings
+- Added support for Japanese character sets (Shift-JIS, CP932, EUC-JP)
+- Implemented BOM detection for Unicode files
+- Added robust mode for handling corrupted CSV files
+- Created a comprehensive test suite for CSV encoding functionality
+- Fixed various method name mismatches in tests and implementation
+- All 60 tests in the test suite now pass
+
+## Current Status
+
+- All tests are passing (60 tests total)
+- CSV encoding detection is robust and handles international characters
+- The core data model and service layer are functioning as expected
+- UI components are working correctly and integrated with the data model
 
 ## Key Issues
-1. **CSV Encoding Issues**: The default input files have encoding issues that need to be resolved
-2. **Performance with Large Datasets**: Need to optimize for better performance with large datasets
-3. **Error Handling Improvements**: Need to enhance error handling for edge cases
+
+1. **CSV Encoding**
+   - Status: **Resolved** - The enhanced CSVService now handles various encodings properly
+   - Solution: Implemented multi-stage encoding detection and fallback mechanisms
+
+2. **Japanese Character Support**
+   - Status: **Resolved** - Added specific detection for Japanese encodings and character sets
+   - Solution: Implemented bytewise detection and character verification
+
+3. **Test Suite**
+   - Status: **Resolved** - All tests are now passing
+   - Solution: Updated tests to match current implementation
+
+4. **Performance with Large Datasets**
+   - Status: **In Progress** - Need to implement caching and streaming for large CSV files
+   - Approach: Will use chunked reading and memory-efficient processing
 
 ## Active Decisions
-- We will focus on performance optimization next, particularly for large datasets
-- CSV encoding issues will be addressed with a more robust encoding detection and conversion mechanism
-- We'll implement more comprehensive error handling across all components
+
+1. **Encoding Detection Approach**
+   - Decision: Use a multi-stage approach with library detection, custom detection, and fallback chain
+   - Rationale: Provides maximum compatibility and robustness
+
+2. **Internationalization**
+   - Decision: Support UTF-8, Western European, and East Asian encodings by default
+   - Rationale: Covers most use cases in target markets (Germany and Japan)
+
+3. **Error Handling**
+   - Decision: Provide detailed error messages and recovery options
+   - Rationale: Improves user experience when dealing with problematic files
 
 ## Critical Path
-1. Implement performance optimizations for large datasets
-2. Address CSV encoding issues
-3. Enhance error handling
-4. Begin chart integration
 
-## Technical Context
-With the test suite now fully functional, we have a solid foundation to build upon for further enhancements. Performance optimization will be particularly important as users may work with large datasets.
+1. ✅ Enhance CSV encoding detection
+2. ✅ Add robust mode for corrupted files
+3. ✅ Create comprehensive tests for encoding handling
+4. 🔄 Optimize performance for large datasets
+5. 🔄 Improve error reporting and user feedback
+6. 🔄 Address validation service warnings
 
 ## Design Considerations
-- Performance optimizations should not sacrifice maintainability
-- Error handling should be user-friendly but also provide detailed information for debugging
-- CSV encoding handling should be robust but also efficient 
+
+1. **Performance vs. Robustness**
+   - The enhanced CSVService prioritizes robustness over performance
+   - For very large files, we will need to implement streaming and chunked processing
+
+2. **User Experience**
+   - Error messages should be clear and actionable
+   - The UI should provide feedback during long operations
+
+3. **Maintainability**
+   - Error handling logic is centralized in service classes
+   - Test coverage is comprehensive to catch regressions 
