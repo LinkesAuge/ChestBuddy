@@ -1076,7 +1076,7 @@ QTimer.singleShot(0, lambda: self._main_window._set_active_view("Data"))
 CSV data was not displaying in the table view despite being properly loaded. The table showed empty cells.
 
 ### Root Cause
-The `ChestDataModel.EXPECTED_COLUMNS` were defined with title case names (e.g., "Player Name"), but the actual CSV file had column names in the format ["DATE", "PLAYER", "SOURCE", "CHEST", "SCORE", "CLAN"]. The case difference and naming conventions prevented the data from being properly mapped and displayed in the table.
+The `ChestDataModel.EXPECTED_COLUMNS` were defined with title case names (e.g., "Player Name"), but the actual CSV file had uppercase column names (e.g., "PLAYER"). This mismatch prevented the data from being properly mapped and displayed in the table.
 
 ### Error Details
 When loading a CSV with uppercase column names, the data model was creating empty columns with the expected names instead of mapping the existing columns, resulting in a table with the correct structure but no data.
@@ -1191,3 +1191,30 @@ The `ChestDataModel.EXPECTED_COLUMNS` were defined with title case names (e.g., 
 - Fixed on: [current date]
 - Related issues: Data not displaying in table, Cell editing errors
 - Affects: DataView, ChestDataModel, DataManager
+
+## Boolean Validation Status Handling Error - 2025-03-22
+
+**Issue**: Application crashes when changing a cell value with the error: "argument of type 'numpy.bool' is not iterable".
+
+**Root Cause**: 
+1. When a cell is edited in the DataView, the ChestDataModel's update_cell method sets the corresponding validation status to False (a boolean value).
+2. The ValidationTab._update_view method gets row validation status using get_row_validation_status.
+3. This method was returning a dictionary that could contain numpy boolean values.
+4. ValidationTab._update_view tried to parse these boolean values as strings (looking for "in column" text), leading to the error.
+
+**Error Details**:
+```
+2025-03-22 22:06:19,214 - chestbuddy.ui.validation_tab - ERROR - Error updating validation view: argument of type 'numpy.bool' is not iterable
+```
+
+**Fix**:
+1. Modified the get_row_validation_status method in ChestDataModel to:
+   - Skip null and falsy values
+   - Convert boolean values to descriptive string messages
+   - Process validation column names to extract the affected data column
+   - Ensure all returned values are strings
+
+**Technical Notes**:
+This is a common issue when pandas DataFrames with boolean columns are processed in UI components that expect string values. The solution ensures type safety by converting all validation status values to strings with meaningful messages before they reach the UI components.
+
+**Status**: FIXED

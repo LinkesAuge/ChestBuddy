@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple, Union
 import time
 import hashlib
 import json
+import numpy as np
 
 import pandas as pd
 from PySide6.QtCore import Signal, QObject
@@ -830,8 +831,26 @@ class ChestDataModel(QObject):
             # Extract rule names and messages
             result = {}
             for column in row.index:
-                if pd.notna(row[column]) and row[column]:
-                    result[column] = row[column]
+                # Skip if the value is nan or falsy values (like False)
+                if pd.isna(row[column]) or not row[column]:
+                    continue
+
+                # Convert boolean values to appropriate message strings
+                if isinstance(row[column], (bool, np.bool_)):
+                    # If it's a validation column (ends with "_valid")
+                    if column.endswith("_valid"):
+                        # Extract the actual column name (remove "_valid" suffix)
+                        col_name = column[:-6]
+                        # Create a descriptive validation message
+                        result[f"validation_{col_name}"] = (
+                            f"Value requires validation in column {col_name}"
+                        )
+                    else:
+                        # For other boolean columns, use a generic message
+                        result[column] = f"Boolean flag set for {column}"
+                else:
+                    # Use the original message for non-boolean values, converting to string
+                    result[column] = str(row[column])
 
             return result if result else None
         except Exception as e:
