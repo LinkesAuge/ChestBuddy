@@ -1218,3 +1218,28 @@ The `ChestDataModel.EXPECTED_COLUMNS` were defined with title case names (e.g., 
 This is a common issue when pandas DataFrames with boolean columns are processed in UI components that expect string values. The solution ensures type safety by converting all validation status values to strings with meaningful messages before they reach the UI components.
 
 **Status**: FIXED
+
+## Table Filtering Error - 2025-03-23
+
+**Issue**: Filters in the table don't work, error when applying filter: `TypeError: ChestDataModel.filter_data() takes 2 positional arguments but 5 were given`
+
+**Root Cause**: 
+There was a mismatch between how the `filter_data` method was defined in `ChestDataModel` and how it was being called in `DataView._apply_filter`.
+
+- `ChestDataModel.filter_data()` was expecting a dictionary of filters
+- `DataView._apply_filter()` was calling it with 4 separate parameters: column name, filter text, filter mode, and case sensitivity setting
+
+**Fix**:
+1. Updated the `filter_data` method in `ChestDataModel` to accept the four parameters that are passed from `DataView`:
+   - column: The column to filter on
+   - filter_text: The text to filter by
+   - filter_mode: The filter mode ('Contains', 'Equals', 'Starts with', 'Ends with')
+   - case_sensitive: Whether the filter is case sensitive
+2. Implemented filtering logic for each mode with case sensitivity support
+3. Added proper error handling for non-existent columns
+4. Added special handling for empty filter text and null values
+
+**Technical Notes**:
+The original dictionary-based method was completely replaced with the new parameter-based implementation. The new method is more flexible and provides better filtering options for the user through the UI, with support for different matching modes and case sensitivity.
+
+**Status**: FIXED

@@ -558,28 +558,70 @@ class ChestDataModel(QObject):
             return True
         return False
 
-    def filter_data(self, filters: Dict[str, Any]) -> pd.DataFrame:
+    def filter_data(
+        self, column: str, filter_text: str, filter_mode: str, case_sensitive: bool
+    ) -> pd.DataFrame:
         """
-        Filter the data based on the provided filters.
+        Filter the data based on the provided criteria.
 
         Args:
-            filters: Dictionary of column names and filter values.
+            column: The column to filter on.
+            filter_text: The text to filter by.
+            filter_mode: The filter mode ('Contains', 'Equals', 'Starts with', 'Ends with').
+            case_sensitive: Whether the filter is case sensitive.
 
         Returns:
             Filtered DataFrame.
         """
+        # Check if column exists
+        if column not in self._data.columns:
+            logger.error(f"Column {column} does not exist in the data")
+            return pd.DataFrame()
+
+        # Create a copy of the data
         df = self._data.copy()
 
-        for col, value in filters.items():
-            if col in df.columns:
-                if isinstance(value, list):
-                    # If the value is a list, filter for rows where the column value is in the list
-                    df = df[df[col].isin(value)]
-                else:
-                    # Otherwise, filter for exact matches
-                    df = df[df[col] == value]
+        # If filter text is empty, return all data
+        if not filter_text:
+            return df
 
-        return df
+        # Convert column to string for text operations
+        df_col = df[column].astype(str)
+
+        # Apply filter based on mode
+        if filter_mode == "Contains":
+            if case_sensitive:
+                mask = df_col.str.contains(filter_text, regex=False)
+            else:
+                mask = df_col.str.contains(filter_text, case=False, regex=False)
+        elif filter_mode == "Equals":
+            if case_sensitive:
+                mask = df_col == filter_text
+            else:
+                mask = df_col.str.lower() == filter_text.lower()
+        elif filter_mode == "Starts with":
+            if case_sensitive:
+                mask = df_col.str.startswith(filter_text)
+            else:
+                mask = df_col.str.lower().str.startswith(filter_text.lower())
+        elif filter_mode == "Ends with":
+            if case_sensitive:
+                mask = df_col.str.endswith(filter_text)
+            else:
+                mask = df_col.str.lower().str.endswith(filter_text.lower())
+        else:
+            # Default to equals if an unknown mode is provided
+            logger.warning(f"Unknown filter mode: {filter_mode}, defaulting to 'Equals'")
+            if case_sensitive:
+                mask = df_col == filter_text
+            else:
+                mask = df_col.str.lower() == filter_text.lower()
+
+        # Handle null/NaN values in mask
+        mask = mask.fillna(False)
+
+        # Return filtered data
+        return df[mask]
 
     def get_unique_values(self, column: str) -> List[str]:
         """
