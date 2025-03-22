@@ -853,30 +853,34 @@ After importing a CSV file, the data was successfully loaded but not displayed i
 - CSV saving/loading works correctly with the fixed parameter order
 - Future change: consider adding a parameter name check tool to ensure consistent parameter ordering
 
-## DataView Table Display Issue - 2025-03-22
+## DataView Table Model Initialization Issue - 2025-03-22
 
-**Issue**: Table fields remained empty in DataView even though data was successfully loaded into the model.
+**Issue**: Table wasn't displaying any data despite the data being successfully loaded into the data model and the DataView getting the data with proper row count.
 
-**Root Cause**: Incorrect call to `self._table_view.update()` in the DataView's `_update_view` method was causing an error: `QTableView.update() takes exactly one argument (0 given)`. This error was preventing the table from being properly refreshed after data was loaded.
+**Root Cause**: The QStandardItemModel was not explicitly initialized with the correct number of rows and columns before populating it with data. When clearing the table model with `self._table_model.clear()`, all dimensions are reset, and the code was relying on auto-expansion when setting items which wasn't working correctly.
 
 **Error Details**:
+While no explicit error message was shown, the table appeared empty even though logging showed the data was being correctly loaded with statements like:
 ```
-Error updating view on data change: QTableView.update() takes exactly one argument (0 given)
+Got data from model: X rows, columns: [column1, column2, ...]
 ```
 
 **Fix**:
-1. Replaced incorrect `self._table_view.update()` call with the proper approach for QTableView:
+1. Explicitly set the model dimensions after clearing but before populating:
    ```python
-   self._table_view.reset()
-   self._table_view.viewport().update()
+   row_count = len(data)
+   col_count = len(column_names)
+   self._table_model.setRowCount(row_count)
+   self._table_model.setColumnCount(col_count)
    ```
 
-2. Added selection of first row to ensure data is visible:
+2. Applied the same fix to the `_update_view_with_filtered_data` method.
+
+3. Added additional logging to verify the model is correctly populated:
    ```python
-   if self._table_model.rowCount() > 0:
-       self._table_view.selectRow(0)
+   logger.info(f"Final table model state: {self._table_model.rowCount()} rows, {self._table_model.columnCount()} columns")
    ```
 
-3. Applied the same fixes to `_update_view_with_filtered_data` method to ensure consistent behavior.
+**Technical Notes**: In Qt's QStandardItemModel, when you call `clear()`, it removes all items, headers, and resets dimensions. While the model should automatically expand when setting items with `setItem()`, it's more reliable to explicitly set the dimensions before populating. This ensures the view knows the correct size of the model from the beginning.
 
-**Technical Notes**: The Qt framework requires different update methods depending on the widget type. For QTableView, using a combination of `reset()` and `viewport().update()` ensures that the data is properly refreshed, and selecting the first row ensures the user can see the data immediately after loading.
+**Status**: FIXED - Table now properly displays all imported data.

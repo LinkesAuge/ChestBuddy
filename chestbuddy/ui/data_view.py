@@ -208,6 +208,15 @@ class DataView(QWidget):
                 range(len(data))
             )  # Use simple range instead of data.index.tolist()
 
+            # Explicitly set model dimensions - important for proper initialization
+            row_count = len(data)
+            col_count = len(column_names)
+            logger.info(
+                f"Setting table model dimensions to {row_count} rows and {col_count} columns"
+            )
+            self._table_model.setRowCount(row_count)
+            self._table_model.setColumnCount(col_count)
+
             # Set headers
             self._table_model.setHorizontalHeaderLabels(column_names)
             logger.info(f"Set horizontal headers with {len(column_names)} columns")
@@ -287,6 +296,16 @@ class DataView(QWidget):
             # Select the first row to ensure data is visible
             if self._table_model.rowCount() > 0:
                 self._table_view.selectRow(0)
+
+            # Add final verification of model state for debugging
+            logger.info(
+                f"Final table model state: {self._table_model.rowCount()} rows, {self._table_model.columnCount()} columns"
+            )
+            if self._table_model.rowCount() > 0 and self._table_model.columnCount() > 0:
+                # Log a sample item to verify content
+                sample_item = self._table_model.item(0, 0)
+                sample_text = sample_item.text() if sample_item else "None"
+                logger.info(f"Sample cell [0,0] content: '{sample_text}'")
         finally:
             self._is_updating = False
 
@@ -357,6 +376,15 @@ class DataView(QWidget):
             # Store the column names to avoid repeated access
             column_names = self._data_model.column_names
 
+            # Explicitly set model dimensions - important for proper initialization
+            row_count = len(filtered_data)
+            col_count = len(column_names)
+            logger.info(
+                f"Setting filtered table model dimensions to {row_count} rows and {col_count} columns"
+            )
+            self._table_model.setRowCount(row_count)
+            self._table_model.setColumnCount(col_count)
+
             # Set headers
             self._table_model.setHorizontalHeaderLabels(column_names)
 
@@ -423,6 +451,16 @@ class DataView(QWidget):
             # Select the first row to ensure data is visible
             if self._table_model.rowCount() > 0:
                 self._table_view.selectRow(0)
+
+            # Add final verification of model state for debugging
+            logger.info(
+                f"Final table model state: {self._table_model.rowCount()} rows, {self._table_model.columnCount()} columns"
+            )
+            if self._table_model.rowCount() > 0 and self._table_model.columnCount() > 0:
+                # Log a sample item to verify content
+                sample_item = self._table_model.item(0, 0)
+                sample_text = sample_item.text() if sample_item else "None"
+                logger.info(f"Sample cell [0,0] content: '{sample_text}'")
         finally:
             self._is_updating = False
 
