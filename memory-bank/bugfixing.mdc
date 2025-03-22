@@ -1102,3 +1102,40 @@ column_mapping = {
 
 ### Status
 Fixed: The table now properly displays data from CSV files with uppercase column names.
+
+## Cell Editing Error
+
+### Issue
+Users encountered an error when trying to edit cell values in the table view. Two related errors occurred:
+1. In the model: "Error updating cell: Incompatible indexer with Series" 
+2. In the view: "'PySide6.QtGui.QStandardItem.setData' called with wrong argument types" error
+
+### Root Cause
+There were two separate issues:
+1. The `ChestDataModel.update_cell()` method was using DataFrame's `.at[]` accessor which can cause compatibility issues with Series objects in some pandas operations
+2. The `DataView._on_item_changed()` method was using `item.data(Qt.EditRole)` and `item.setData(Qt.DisplayRole, value)` with enum values that caused type errors in PySide6
+
+### Error Details
+```
+chestbuddy.core.models.chest_data_model - ERROR - Error updating cell: Incompatible indexer with Series
+chestbuddy.ui.data_view - ERROR - Failed to update cell at [0, Player Name]
+chestbuddy.ui.data_view - ERROR - Error handling item change: 'PySide6.QtGui.QStandardItem.setData' called with wrong argument types
+```
+
+### Fix
+1. In `ChestDataModel.update_cell()`:
+   - Changed the cell update approach to use `iloc[]` to get a copy of the row
+   - Modified the copy and replaced the entire row
+   - Applied the same approach for validation and correction status updates
+
+2. In `DataView._on_item_changed()`:
+   - Changed from `item.data(Qt.EditRole)` to `item.text()` to get the new value
+   - Changed from `item.setData(Qt.DisplayRole, value)` to `item.setText(value)` when restoring values
+
+### Technical Notes
+- The pandas DataFrame `at[]` accessor can cause issues with Series objects in some contexts
+- The PySide6 `QStandardItem.setData()` method expects an integer role, not an enum value like `Qt.EditRole` 
+- The `setText()` and `text()` methods provide a more reliable way to access text content in QStandardItems
+
+### Status
+✅ Fixed - Cell editing now works correctly

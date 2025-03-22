@@ -693,8 +693,9 @@ class DataView(QWidget):
 
             # If we have a valid row and column
             if row >= 0 and column >= 0 and column < len(self._data_model.column_names):
-                # Get the new value from the item
-                new_value = item.data(Qt.EditRole)
+                # Get the new value from the item - use item.text() instead of item.data()
+                # This avoids the Qt.EditRole vs int role issue
+                new_value = item.text()
 
                 # Get the column name for this column index
                 column_name = self._data_model.column_names[column]
@@ -725,7 +726,8 @@ class DataView(QWidget):
                     # Reload the item to show the original value
                     self._is_updating = True
                     try:
-                        item.setData(Qt.DisplayRole, str(current_value))
+                        # Use setText instead of setData to avoid the role issue
+                        item.setText(str(current_value))
                     finally:
                         self._is_updating = False
 
