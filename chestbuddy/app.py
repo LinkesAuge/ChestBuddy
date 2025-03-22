@@ -227,6 +227,25 @@ class ChestBuddyApp(QObject):
         try:
             df, error = result
             if df is not None:
+                # Map CSV column names to expected column names in the data model
+                column_mapping = {
+                    "DATE": "Date",
+                    "PLAYER": "Player Name",
+                    "SOURCE": "Source/Location",
+                    "CHEST": "Chest Type",
+                    "SCORE": "Value",
+                    "CLAN": "Clan",
+                }
+
+                # Rename columns if they exist in the DataFrame
+                for csv_col, model_col in column_mapping.items():
+                    if csv_col in df.columns:
+                        df.rename(columns={csv_col: model_col}, inplace=True)
+                        logger.info(f"Mapped column {csv_col} to {model_col}")
+
+                # Log mapped columns for debugging
+                logger.info(f"DataFrame columns after mapping: {df.columns.tolist()}")
+
                 # Update the data model with signals blocked
                 self._data_model.update_data(df)
                 logger.info(f"CSV file loaded successfully with {len(df)} rows")
