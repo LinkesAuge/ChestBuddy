@@ -906,3 +906,47 @@ Two primary issues:
 
 ### Status
 - Fixed and verified that cell values are now visible in the table
+
+## Data View Recursion and Empty Table Issue - 2025-03-22
+
+### Issue
+The DataView component was experiencing two critical issues:
+1. Severe recursion problem resulting in repeated log entries (124 iterations of "Added 12387 rows to table model")
+2. Empty cells in the table despite successful data loading, with logs showing "Sample cell [0,0] content: ''"
+
+### Root Cause
+Multiple interrelated issues:
+1. The table population code in `_update_view` was using batched processing with excessive pandas DataFrame access operations (`data.iloc[row_idx][column_name]` for every cell), leading to recursion.
+2. The approach for handling validation and correction status was causing further recursion by making repeated method calls.
+3. Using a complex nested loop structure with repeated DataFrame access created excessive function call depth.
+4. Inefficient string conversion handling for cell values possibly causing empty strings to be displayed.
+
+### Error Details
+- Log showed 124 repetitions of "Added 12387 rows to table model" indicating a severe recursion issue in the table population code.
+- Even though the table model was correctly dimensioned (12387 rows, 6 columns), the cells were empty as verified by log: "Sample cell [0,0] content: ''".
+- The application was loading the data correctly, but unable to display it properly.
+
+### Fix
+1. Completely rewrote the table population code to eliminate recursion:
+   - First convert the entire DataFrame to a simple list of lists using `data.values.tolist()` to avoid repeated DataFrame access
+   - Process all rows at once rather than in batches
+   - Use direct indexing into the array instead of repeated DataFrame operations
+   - Improved string conversion with explicit NaN/None handling
+
+2. Optimized validation and correction status handling:
+   - Pre-fetch all status data once before starting cell population
+   - Use try/except blocks to prevent validation/correction errors from blocking display
+   - For filtered views, fixed a bug to use the correct actual row index from source data
+
+3. Improved error reporting with full stack traces using `exc_info=True`
+
+4. Added detailed logging of actual row values for debugging
+
+### Technical Notes
+- Pandas DataFrame access operations can be expensive when performed repeatedly in tight loops
+- Converting the DataFrame to a list of lists first dramatically reduces the call stack depth
+- Direct array indexing (`data_array[row_idx][col_idx]`) is much more efficient than pandas methods (`data.iloc[row_idx][column_name]`)
+- For filtered views, it's crucial to maintain the mapping between display indices and actual data indices
+
+### Status
+- Fixed. Table now properly displays data values and no longer experiences recursion issues.

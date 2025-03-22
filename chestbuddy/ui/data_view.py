@@ -232,54 +232,94 @@ class DataView(QWidget):
 
             # Add data to the table model - use a safer approach
             try:
-                # Process rows in batches to avoid deep recursion
-                BATCH_SIZE = 100
-                for start_idx in range(0, len(data), BATCH_SIZE):
-                    end_idx = min(start_idx + BATCH_SIZE, len(data))
-                    logger.debug(f"Processing batch from index {start_idx} to {end_idx}")
+                # Simplified direct population - no batching or complex access patterns
+                logger.info("Populating table model with data (simplified approach)")
 
-                    # Process this batch of rows
-                    for row_idx in range(start_idx, end_idx):
-                        # Get row data directly using iloc to avoid itertuples() which can cause recursion
-                        row_data = data.iloc[row_idx]
+                # Ensure the model has the right dimensions
+                row_count = len(data)
+                col_count = len(column_names)
+                self._table_model.setRowCount(row_count)
+                self._table_model.setColumnCount(col_count)
 
-                        # Log sample of row data for debugging
-                        if row_idx < 3:  # Only log first few rows to avoid flooding logs
-                            logger.debug(f"Row {row_idx} data: {row_data.to_dict()}")
+                # Convert the entire DataFrame to a list of lists for direct access
+                # This avoids repeated DataFrame accesses which can cause recursion
+                data_array = data.values.tolist()
 
-                        for col_idx, column_name in enumerate(column_names):
-                            # Get value directly from DataFrame and explicitly force to string
-                            cell_value = data.iloc[row_idx, col_idx]
-                            value = "" if pd.isna(cell_value) else str(cell_value)
+                # Pre-fetch validation and correction status to avoid repeated calls
+                # This reduces the risk of recursion by doing all data access upfront
+                try:
+                    validation_status = self._data_model.get_validation_status()
+                    correction_status = self._data_model.get_correction_status()
+                    has_validation = not validation_status.empty
+                    has_correction = not correction_status.empty
+                    logger.debug(
+                        f"Pre-fetched validation status ({has_validation}) and correction status ({has_correction})"
+                    )
+                except Exception as e:
+                    logger.warning(f"Could not pre-fetch status data: {e}")
+                    has_validation = False
+                    has_correction = False
 
-                            if row_idx < 3 and col_idx < 3:  # Only log some values
-                                logger.debug(
-                                    f"Cell [{row_idx}, {col_idx}] ({column_name}): '{value}'"
+                # Process all rows at once
+                for row_idx in range(row_count):
+                    # Log progress for large datasets
+                    if row_idx % 1000 == 0 and row_idx > 0:
+                        logger.debug(f"Processing row {row_idx}/{row_count}")
+
+                    for col_idx, column_name in enumerate(column_names):
+                        # Get value directly from the pre-converted array
+                        cell_value = data_array[row_idx][col_idx]
+                        # Convert to string with proper None/NaN handling
+                        value = (
+                            ""
+                            if cell_value is None
+                            or (isinstance(cell_value, float) and pd.isna(cell_value))
+                            else str(cell_value)
+                        )
+
+                        # Create item with explicit text
+                        item = QStandardItem(value)
+
+                        # Set foreground explicitly
+                        item.setForeground(QColor("#FFFFFF"))  # White text
+
+                        # Set validation and correction status as user data
+                        # Use pre-fetched data instead of making method calls for each cell
+                        if has_validation:
+                            try:
+                                val_status = self._data_model.get_cell_validation_status(
+                                    row_idx, column_name
                                 )
+                                if val_status:
+                                    item.setData(val_status, Qt.UserRole + 1)
+                            except Exception as vs_error:
+                                # Don't let validation status errors block the display
+                                logger.debug(f"Validation status access error: {vs_error}")
 
-                            item = QStandardItem(value)
+                        if has_correction:
+                            try:
+                                corr_status = self._data_model.get_cell_correction_status(
+                                    row_idx, column_name
+                                )
+                                if corr_status:
+                                    item.setData(corr_status, Qt.UserRole + 2)
+                            except Exception as cs_error:
+                                # Don't let correction status errors block the display
+                                logger.debug(f"Correction status access error: {cs_error}")
 
-                            # Explicitly set foreground color to ensure text visibility
-                            item.setForeground(QColor("#FFFFFF"))  # White text
+                        # Set the item directly
+                        self._table_model.setItem(row_idx, col_idx, item)
 
-                            # Set validation and correction status as user data
-                            val_status = self._data_model.get_cell_validation_status(
-                                row_idx, column_name
-                            )
-                            if val_status:
-                                item.setData(val_status, Qt.UserRole + 1)
+                # Log detailed info about first few rows for debugging
+                for row_idx in range(min(3, row_count)):
+                    row_values = [str(data_array[row_idx][col_idx]) for col_idx in range(col_count)]
+                    logger.debug(f"Row {row_idx} values: {row_values}")
 
-                            corr_status = self._data_model.get_cell_correction_status(
-                                row_idx, column_name
-                            )
-                            if corr_status:
-                                item.setData(corr_status, Qt.UserRole + 2)
-
-                            self._table_model.setItem(row_idx, col_idx, item)
-
-                    logger.info(f"Added {self._table_model.rowCount()} rows to table model")
+                logger.info(
+                    f"Successfully populated model with {row_count} rows and {col_count} columns"
+                )
             except Exception as e:
-                logger.error(f"Error populating table model: {e}")
+                logger.error(f"Error populating table model: {e}", exc_info=True)
                 self._status_label.setText("Error displaying data")
 
             # Resize columns to contents
@@ -404,43 +444,96 @@ class DataView(QWidget):
 
             # Add filtered data to the table model using a safer approach
             try:
-                # Process rows in batches
-                BATCH_SIZE = 100
-                # Get the row indices and convert to a plain list to avoid pandas operations
-                all_indices = list(zip(range(len(filtered_data)), filtered_data.index))
+                logger.info("Populating filtered table model (simplified approach)")
 
-                for batch_start in range(0, len(all_indices), BATCH_SIZE):
-                    batch_end = min(batch_start + BATCH_SIZE, len(all_indices))
-                    batch_indices = all_indices[batch_start:batch_end]
+                # Ensure the model has the right dimensions
+                row_count = len(filtered_data)
+                col_count = len(column_names)
+                self._table_model.setRowCount(row_count)
+                self._table_model.setColumnCount(col_count)
 
-                    for local_row_idx, actual_row_idx in batch_indices:
-                        # Get the row data directly
-                        row_data = filtered_data.iloc[local_row_idx]
+                # Convert filtered data to a list of lists for direct access
+                # This avoids repeated DataFrame accesses which can cause recursion
+                data_array = filtered_data.values.tolist()
 
-                        for col_idx, column_name in enumerate(column_names):
-                            # Convert value to string
-                            value = str(row_data[column_name])
-                            item = QStandardItem(value)
+                # Store the filtered row indices for data model access
+                self._filtered_rows = filtered_data.index.tolist()
 
-                            # Explicitly set foreground color to ensure text visibility
-                            item.setForeground(QColor("#FFFFFF"))  # White text
+                # Pre-fetch validation and correction status to avoid repeated calls
+                # This reduces the risk of recursion by doing all data access upfront
+                try:
+                    validation_status = self._data_model.get_validation_status()
+                    correction_status = self._data_model.get_correction_status()
+                    has_validation = not validation_status.empty
+                    has_correction = not correction_status.empty
+                    logger.debug(
+                        f"Pre-fetched validation status ({has_validation}) and correction status ({has_correction})"
+                    )
+                except Exception as e:
+                    logger.warning(f"Could not pre-fetch status data: {e}")
+                    has_validation = False
+                    has_correction = False
 
-                            # Set validation and correction status
-                            val_status = self._data_model.get_cell_validation_status(
-                                actual_row_idx, column_name
-                            )
-                            if val_status:
-                                item.setData(val_status, Qt.UserRole + 1)
+                # Process all rows at once
+                for local_row_idx in range(row_count):
+                    # Get the actual row index from the original data
+                    actual_row_idx = self._filtered_rows[local_row_idx]
 
-                            corr_status = self._data_model.get_cell_correction_status(
-                                actual_row_idx, column_name
-                            )
-                            if corr_status:
-                                item.setData(corr_status, Qt.UserRole + 2)
+                    for col_idx, column_name in enumerate(column_names):
+                        # Get value directly from the pre-converted array
+                        cell_value = data_array[local_row_idx][col_idx]
+                        # Convert to string with proper None/NaN handling
+                        value = (
+                            ""
+                            if cell_value is None
+                            or (isinstance(cell_value, float) and pd.isna(cell_value))
+                            else str(cell_value)
+                        )
 
-                            self._table_model.setItem(local_row_idx, col_idx, item)
+                        # Create item with explicit text
+                        item = QStandardItem(value)
+
+                        # Set foreground explicitly
+                        item.setForeground(QColor("#FFFFFF"))  # White text
+
+                        # Set validation and correction status as user data
+                        # Use pre-fetched data instead of making method calls for each cell
+                        if has_validation:
+                            try:
+                                val_status = self._data_model.get_cell_validation_status(
+                                    actual_row_idx,
+                                    column_name,  # Use actual_row_idx here
+                                )
+                                if val_status:
+                                    item.setData(val_status, Qt.UserRole + 1)
+                            except Exception as vs_error:
+                                # Don't let validation status errors block the display
+                                logger.debug(f"Validation status access error: {vs_error}")
+
+                        if has_correction:
+                            try:
+                                corr_status = self._data_model.get_cell_correction_status(
+                                    actual_row_idx,
+                                    column_name,  # Use actual_row_idx here
+                                )
+                                if corr_status:
+                                    item.setData(corr_status, Qt.UserRole + 2)
+                            except Exception as cs_error:
+                                # Don't let correction status errors block the display
+                                logger.debug(f"Correction status access error: {cs_error}")
+
+                        # Set the item directly
+                        self._table_model.setItem(local_row_idx, col_idx, item)
+
+                # Log detailed info about first few rows for debugging
+                if row_count > 0:
+                    logger.debug(f"First filtered row values: {data_array[0]}")
+
+                logger.info(
+                    f"Successfully populated filtered model with {row_count} rows and {col_count} columns"
+                )
             except Exception as e:
-                logger.error(f"Error populating filtered table model: {e}")
+                logger.error(f"Error populating filtered table model: {e}", exc_info=True)
                 self._status_label.setText("Error displaying filtered data")
 
             # Resize columns to contents
