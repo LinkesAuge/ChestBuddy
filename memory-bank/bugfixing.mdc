@@ -950,3 +950,51 @@ Multiple interrelated issues:
 
 ### Status
 - Fixed. Table now properly displays data values and no longer experiences recursion issues.
+
+## Thread Safety Issue with CSV Import - 2025-03-22
+
+### Issue
+Application crashes with Qt threading errors when importing CSV files, showing errors like:
+```
+QObject::setParent: Cannot set parent, new parent is in a different thread
+QBasicTimer::start: Timers cannot be started from another thread
+```
+
+### Root Cause
+The application was attempting to update UI elements directly from a background thread, which violates Qt's threading rules. Specifically, in the `_on_csv_load_success` callback method, the code was trying to switch to the Data view directly from the worker thread:
+```python
+# Switch to the Data view in the main window
+if self._main_window:
+    self._main_window._set_active_view("Data")
+```
+
+In Qt, all UI operations must be performed on the main (GUI) thread, not background worker threads.
+
+### Error Details
+- The errors occurred immediately after successfully loading 12387 rows of data
+- The application attempted to switch to the Data view but did so from the wrong thread
+- This caused timers and parent-child relationships to be created across thread boundaries
+- Qt strictly enforces thread affinity for QObjects, causing the application to crash or show errors
+
+### Fix
+1. Modified `_on_csv_load_success` method in `app.py` to use `QMetaObject.invokeMethod` for thread-safe UI updates:
+```python
+# Switch to the Data view in the main window using a thread-safe approach
+if self._main_window:
+    # Use invokeMethod to ensure UI updates happen on the main thread
+    QMetaObject.invokeMethod(self._main_window, "_set_active_view",
+                            Qt.QueuedConnection,
+                            Qt.Q_ARG(str, "Data"))
+```
+
+2. Added proper `@Slot(str)` decorator to `_set_active_view` method in `main_window.py`
+3. Enhanced error handling in `_set_active_view` to better handle potential issues
+
+### Technical Notes
+- `QMetaObject.invokeMethod` with `Qt.QueuedConnection` safely dispatches method calls across thread boundaries
+- This ensures that any UI updates are performed on the main Qt event loop thread
+- The `@Slot(str)` decorator is necessary for the method to be invokable via the meta-object system
+- This pattern should be applied to all UI updates triggered from background worker threads
+
+### Status
+- Fixed. CSV files now load without threading errors, and the UI properly switches to the Data view.

@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from PySide6.QtWidgets import QApplication
-from PySide6.QtCore import QTimer, QObject, Signal, Slot, Qt
+from PySide6.QtCore import QTimer, QObject, Signal, Slot, Qt, QMetaObject
 
 from chestbuddy.core.models import ChestDataModel
 from chestbuddy.core.services import CSVService, ValidationService, CorrectionService, ChartService
@@ -231,10 +231,16 @@ class ChestBuddyApp(QObject):
                 self._data_model.update_data(df)
                 logger.info(f"CSV file loaded successfully with {len(df)} rows")
 
-                # Switch to the Data view in the main window
+                # Switch to the Data view in the main window using a thread-safe approach
                 if self._main_window:
-                    self._main_window._set_active_view("Data")
-                    logger.info("Switched to Data view")
+                    # Use invokeMethod to ensure UI updates happen on the main thread
+                    QMetaObject.invokeMethod(
+                        self._main_window,
+                        "_set_active_view",
+                        Qt.QueuedConnection,
+                        Qt.Q_ARG(str, "Data"),
+                    )
+                    logger.info("Requested switch to Data view (thread-safe)")
             else:
                 self._show_error(f"Error loading file: {error}")
         finally:

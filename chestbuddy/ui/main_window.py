@@ -401,6 +401,7 @@ class MainWindow(QMainWindow):
             self._status_bar.clear_all()
             self._status_bar.set_status("No data loaded")
 
+    @Slot(str)
     def _set_active_view(self, view_name: str) -> None:
         """
         Set the active view.
@@ -408,10 +409,17 @@ class MainWindow(QMainWindow):
         Args:
             view_name: The name of the view to activate.
         """
-        view = self._views.get(view_name)
-        if view:
-            self._content_stack.setCurrentWidget(view)
-            self._sidebar.set_active_item(view_name)
+        try:
+            logger.info(f"Setting active view to: {view_name}")
+            view = self._views.get(view_name)
+            if view:
+                self._content_stack.setCurrentWidget(view)
+                self._sidebar.set_active_item(view_name)
+                logger.info(f"View '{view_name}' activated successfully")
+            else:
+                logger.warning(f"View '{view_name}' not found in available views")
+        except Exception as e:
+            logger.error(f"Error setting active view to {view_name}: {e}")
 
     # ===== Slots =====
 
@@ -707,9 +715,9 @@ class MainWindow(QMainWindow):
         """Refresh all UI components."""
         try:
             # Refresh the current tab if it exists
-            if hasattr(self, "_tab_widget") and self._tab_widget is not None:
-                current_index = self._tab_widget.currentIndex()
-                current_widget = self._tab_widget.widget(current_index)
+            if hasattr(self, "_content_stack") and self._content_stack is not None:
+                current_index = self._content_stack.currentIndex()
+                current_widget = self._content_stack.widget(current_index)
 
                 # Call refresh or update method if available
                 if hasattr(current_widget, "refresh"):
