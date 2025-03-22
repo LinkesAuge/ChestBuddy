@@ -173,6 +173,8 @@ class CSVService:
                 - The DataFrame containing the CSV data, or None if an error occurred.
                 - An error message, or None if the operation was successful.
         """
+        logger.info(f"Reading CSV file: {file_path}")
+
         try:
             path = Path(file_path)
             encoding_used = None
@@ -699,19 +701,15 @@ class CSVService:
         progress_callback: Optional[Callable[[int, int], None]] = None,
     ) -> Tuple[Optional[pd.DataFrame], Optional[str]]:
         """
-        Read a CSV file in chunks to minimize memory usage.
-
-        This method processes the file in smaller chunks to reduce memory consumption
-        when dealing with large files. It reports progress via the callback function.
+        Read a CSV file in chunks to avoid memory issues with large files.
 
         Args:
             file_path: Path to the CSV file
             chunk_size: Number of rows to read in each chunk
-            encoding: File encoding (auto-detected if None)
-            normalize_text: Whether to normalize text data
-            robust_mode: Whether to ignore errors and continue reading
-            progress_callback: Optional callback function for progress reporting
-                               Takes current_rows and total_rows as arguments
+            encoding: Optional encoding to use (auto-detected if None)
+            normalize_text: Whether to normalize text in the CSV
+            robust_mode: Whether to use robust mode for reading
+            progress_callback: Optional callback for progress reporting
 
         Returns:
             Tuple containing DataFrame and error message (if any)
@@ -748,91 +746,62 @@ class CSVService:
                 # If we can't count rows, we'll use a rough estimate based on file size
                 total_rows = int(file_path.stat().st_size / 100)  # Rough estimate
 
-            # Initialize empty DataFrame to store results
-            result_df = None
+            # Read the file in chunks using pandas
+            logger.info(f"Reading CSV file in chunks: {file_path}, chunk size: {chunk_size}")
 
-            # Second pass: Check for malformed lines before processing if not in robust mode
-            if not robust_mode:
-                try:
-                    # First get the header to determine column count
-                    with open(file_path, "r", encoding=encoding, errors="replace") as f:
-                        header = f.readline().strip().split(",")
-                        header_cols = len(header)
+            # Use dtype=str for all columns to avoid pandas type inference
+            # which can cause recursion issues
+            chunks = pd.read_csv(
+                file_path,
+                encoding=encoding,
+                chunksize=chunk_size,
+                dtype=str,  # Force all columns to be strings to avoid type inference
+                engine="python",  # Use the Python engine for more robust parsing
+                on_bad_lines="skip" if robust_mode else None,
+            )
 
-                        # Check the rest of the lines
-                        for line_num, line in enumerate(
-                            f, start=2
-                        ):  # Start at 2 because header is line 1
-                            cols = line.strip().split(",")
-                            if len(cols) != header_cols:
-                                error_msg = f"Line {line_num} has {len(cols)} columns, expected {header_cols}: {line.strip()}"
-                                logger.error(error_msg)
-                                return None, error_msg
-                except Exception as e:
-                    error_msg = f"Error pre-checking CSV format: {str(e)}"
-                    logger.error(error_msg)
-                    return None, error_msg
-
-            # Read the file in chunks
-            try:
-                chunks = pd.read_csv(
-                    file_path,
-                    encoding=encoding,
-                    chunksize=chunk_size,
-                    on_bad_lines="skip" if robust_mode else "error",  # 'skip' for pandas 1.3+
-                    low_memory=True,  # Use less memory at the cost of some performance
-                )
-            except Exception as e:
-                error_msg = f"Error initializing CSV reader: {str(e)}"
-                logger.error(error_msg)
-                return None, error_msg
-
+            all_chunks = []
             rows_processed = 0
-            errors = []
 
-            # Process each chunk
-            for i, chunk in enumerate(chunks):
-                try:
-                    # Apply text normalization if requested
-                    if normalize_text:
-                        chunk = self._normalize_dataframe_text(chunk)
+            for chunk_idx, chunk in enumerate(chunks):
+                # Force all data to be processed as strings to avoid type inference issues
+                for col in chunk.columns:
+                    # Convert all values to string to ensure consistent handling
+                    chunk[col] = chunk[col].astype(str)
 
-                    # Append to result DataFrame
-                    if result_df is None:
-                        result_df = chunk
-                    else:
-                        result_df = pd.concat([result_df, chunk], ignore_index=True)
+                # Add processed chunk to the list
+                all_chunks.append(chunk)
 
-                    # Update rows processed and report progress
-                    rows_processed += len(chunk)
-                    if progress_callback:
+                # Update progress counter
+                rows_processed += len(chunk)
+
+                # Call progress callback if provided
+                if progress_callback and total_rows > 0:
+                    # Prevent division by zero and progress > 100%
+                    progress_pct = min(100, int((rows_processed / total_rows) * 100))
+                    try:
                         progress_callback(rows_processed, total_rows)
+                    except Exception as e:
+                        logger.error(f"Error in progress callback: {e}")
 
-                except Exception as e:
-                    error_msg = f"Error processing chunk {i}: {str(e)}"
-                    logger.error(error_msg)
-                    errors.append(error_msg)
-                    if not robust_mode:
-                        return None, error_msg
+            # Combine all chunks into a single DataFrame
+            if all_chunks:
+                # Concatenate all chunks, but avoid type inference again
+                final_df = pd.concat(all_chunks, ignore_index=True)
 
-            # Final progress report
-            if progress_callback:
-                progress_callback(rows_processed, rows_processed)
+                # To further avoid recursion issues, ensure all column data is string
+                # This is especially important for date columns
+                for col in final_df.columns:
+                    final_df[col] = final_df[col].astype(str)
 
-            # Check if we got any data
-            if result_df is None or len(result_df) == 0:
-                return None, "No data could be read from the file"
-
-            # Return with warning if there were errors in robust mode
-            if robust_mode and errors:
-                return result_df, f"File read with errors: {'; '.join(errors)}"
-
-            return result_df, None
+                logger.info(f"Successfully read CSV file with {len(final_df)} rows")
+                return final_df, None
+            else:
+                return None, "No data read from CSV file"
 
         except Exception as e:
-            error_msg = f"Error reading CSV file in chunks: {str(e)}"
-            logger.error(error_msg)
-            return None, error_msg
+            logger.error(f"Error reading CSV file: {e}")
+            return None, f"Error reading CSV file: {str(e)}"
 
     def read_csv_background(
         self,

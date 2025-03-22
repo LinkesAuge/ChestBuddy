@@ -74,9 +74,15 @@ class ChestDataModel(BaseModel):
         self._notify_change()
 
     def _notify_change(self) -> None:
-        """Emit the model_changed and data_changed signals."""
-        super()._notify_change()
-        self.data_changed.emit()
+        """Emit the data changed signal."""
+        # Only emit if not explicitly blocked
+        if not hasattr(self, "_block_signals") or not self._block_signals:
+            # Add protection against cyclic emissions
+            try:
+                # Use a careful approach to emit the signal
+                self.data_changed.emit()
+            except Exception as e:
+                logger.error(f"Error in _notify_change: {e}")
 
     @property
     def data(self) -> pd.DataFrame:
@@ -214,19 +220,43 @@ class ChestDataModel(BaseModel):
         Args:
             df: The new DataFrame to use.
         """
-        # Ensure all expected columns are present
-        for col in self.EXPECTED_COLUMNS:
-            if col not in df.columns:
-                df[col] = ""
+        # Track whether we were already blocking signals
+        already_blocking = self.signalsBlocked()
 
-        # Keep only the expected columns in the specified order
-        self._data = df[self.EXPECTED_COLUMNS].copy()
+        # If signals weren't already blocked, block them now
+        if not already_blocking:
+            self.blockSignals(True)
 
-        # Initialize validation and correction status DataFrames
-        self._init_status_dataframes()
+        try:
+            # Cancel any current operations to prevent signal cascades
+            self._block_signals = True
 
-        # Emit the data changed signal
-        self._notify_change()
+            try:
+                # Ensure all expected columns are present
+                for col in self.EXPECTED_COLUMNS:
+                    if col not in df.columns:
+                        df[col] = ""
+
+                # Keep only the expected columns in the specified order
+                self._data = df[self.EXPECTED_COLUMNS].copy()
+
+                # Initialize validation and correction status DataFrames
+                self._init_status_dataframes()
+            finally:
+                # Always unblock internal signals
+                self._block_signals = False
+
+            # Only notify change if we weren't already blocking signals
+            if not already_blocking:
+                # Unblock signals before emitting
+                self.blockSignals(False)
+                self._notify_change()
+        except Exception as e:
+            # Ensure signals are unblocked on exception
+            if not already_blocking:
+                self.blockSignals(False)
+            logger.error(f"Error updating data: {e}")
+            raise
 
     def get_row(self, index: int) -> pd.Series:
         """
@@ -425,23 +455,29 @@ class ChestDataModel(BaseModel):
             The validation status DataFrame.
         """
         if self._validation_status.empty:
+            # Return a completely empty DataFrame with no columns to avoid pandas operations
             return pd.DataFrame()
 
-        # Avoid recursion by not using .copy() directly
-        # Instead create a new DataFrame from scratch
+        # Avoid recursion by creating a completely new DataFrame manually
         try:
-            # Create a new DataFrame with the same data but avoid pandas consolidation
-            if hasattr(self._validation_status, "to_dict"):
-                data_dict = self._validation_status.to_dict("records")
-                return pd.DataFrame(data_dict)
-            else:
-                # Fallback in case to_dict is not available
-                return pd.DataFrame()
+            # Construct the DataFrame manually without using to_dict or copy operations
+            new_df = pd.DataFrame()
+
+            # Copy basic data without any inference or complex operations
+            for col in self._validation_status.columns:
+                # Convert values to simple Python objects to avoid pandas complexity
+                values = [
+                    str(x) if col.endswith("_original") else bool(x)
+                    for x in self._validation_status[col].values
+                ]
+                new_df[col] = values
+
+            return new_df
         except RecursionError:
-            # If recursion still happens, return empty DataFrame
+            logger.warning("Recursion detected in get_validation_status, returning empty DataFrame")
             return pd.DataFrame()
         except Exception as e:
-            logger.error(f"Error getting validation status: {e}")
+            logger.error(f"Error in get_validation_status: {e}")
             return pd.DataFrame()
 
     def set_validation_status(self, status_df: pd.DataFrame) -> None:
@@ -462,23 +498,29 @@ class ChestDataModel(BaseModel):
             The correction status DataFrame.
         """
         if self._correction_status.empty:
+            # Return a completely empty DataFrame with no columns to avoid pandas operations
             return pd.DataFrame()
 
-        # Avoid recursion by not using .copy() directly
-        # Instead create a new DataFrame from scratch
+        # Avoid recursion by creating a completely new DataFrame manually
         try:
-            # Create a new DataFrame with the same data but avoid pandas consolidation
-            if hasattr(self._correction_status, "to_dict"):
-                data_dict = self._correction_status.to_dict("records")
-                return pd.DataFrame(data_dict)
-            else:
-                # Fallback in case to_dict is not available
-                return pd.DataFrame()
+            # Construct the DataFrame manually without using to_dict or copy operations
+            new_df = pd.DataFrame()
+
+            # Copy basic data without any inference or complex operations
+            for col in self._correction_status.columns:
+                # Convert values to simple Python objects to avoid pandas complexity
+                values = [
+                    str(x) if col.endswith("_original") else bool(x)
+                    for x in self._correction_status[col].values
+                ]
+                new_df[col] = values
+
+            return new_df
         except RecursionError:
-            # If recursion still happens, return empty DataFrame
+            logger.warning("Recursion detected in get_correction_status, returning empty DataFrame")
             return pd.DataFrame()
         except Exception as e:
-            logger.error(f"Error getting correction status: {e}")
+            logger.error(f"Error in get_correction_status: {e}")
             return pd.DataFrame()
 
     def set_correction_status(self, status_df: pd.DataFrame) -> None:
@@ -586,35 +628,79 @@ class ChestDataModel(BaseModel):
 
         return result
 
-    def get_row_validation_status(self, row_idx: int) -> Dict[str, Any]:
+    def get_row_validation_status(self, row_idx: int) -> Optional[Dict[str, str]]:
         """
-        Get validation status for a specific row without returning a DataFrame.
+        Get the validation status for a specific row.
 
         Args:
-            row_idx: The row index.
+            row_idx: The row index to get the validation status for.
 
         Returns:
-            A dictionary containing validation status for the row.
+            A dictionary mapping rule names to error messages, or None if there are no issues.
         """
-        if self._validation_status.empty or row_idx >= len(self._validation_status):
-            return {}
-
         try:
+            if self._validation_status is None or row_idx >= len(self._validation_status):
+                return None
+
+            # Check if the row exists in the validation status
+            if row_idx not in self._validation_status.index:
+                return None
+
+            # Get the row from the validation status
+            row = self._validation_status.loc[row_idx]
+
+            # Extract rule names and messages
             result = {}
-            row = self._validation_status.iloc[row_idx]
+            for column in row.index:
+                if pd.notna(row[column]) and row[column]:
+                    result[column] = row[column]
 
-            # Process columns directly to avoid DataFrame operations
-            for col in self.column_names:
-                status_col = f"{col}_valid"
-                if status_col in row.index:
-                    valid = bool(row[status_col])
-                    if not valid:
-                        result[col] = "Invalid value"
-
-            return result
+            return result if result else None
         except Exception as e:
             logger.error(f"Error getting row validation status: {e}")
-            return {}
+            return None
+
+    def get_row_correction_status(self, row_idx: int) -> Optional[Dict[str, Tuple[Any, Any]]]:
+        """
+        Get the correction status for a specific row.
+
+        Args:
+            row_idx: The row index to get the correction status for.
+
+        Returns:
+            A dictionary mapping column names to tuples of (original, corrected) values,
+            or None if there are no corrections.
+        """
+        try:
+            if self._correction_status is None or row_idx >= len(self._correction_status):
+                return None
+
+            # Check if the row exists in the correction status
+            if row_idx not in self._correction_status.index:
+                return None
+
+            # Get the row from the correction status
+            row = self._correction_status.loc[row_idx]
+
+            # Extract column names and correction information
+            result = {}
+            for column in row.index:
+                if pd.notna(row[column]) and row[column]:
+                    # Parse the correction info from the string
+                    try:
+                        parts = row[column].split(" -> ")
+                        if len(parts) == 2:
+                            original = parts[0]
+                            corrected = parts[1]
+                            result[column] = (original, corrected)
+                    except Exception:
+                        # If parsing fails, just use the raw string
+                        result[column] = (row[column], row[column])
+
+            return result if result else None
+        except Exception as e:
+            logger.error(f"Error getting row correction status: {e}")
+            return None
 
     def get_correction_row_count(self) -> int:
         """

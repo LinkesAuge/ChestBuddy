@@ -693,3 +693,45 @@ After implementing granular access methods in ChestDataModel, UI components were
 - The try-finally block ensures the `_is_updating` flag is always reset, even if exceptions occur.
 - Initializing UI elements to None and checking for None before access prevents errors during component initialization.
 - Combined with the cell and row-specific access methods added earlier, these changes create a complete solution to the recursion issues.
+
+## CSV Import Recursion Fix
+- Issue ID: REC-004
+- Status: FIXED
+- Date: 2025-03-22
+- Affected components: CSVService, ChestDataModel, APP
+
+### Description
+During CSV import, the application was getting stuck in a recursion loop with rapid data_model_changed events being fired in sequence, causing the application to become unresponsive. The log showed continuous firing of the "Data model changed" event at regular intervals (~200ms).
+
+### Root Cause Analysis
+1. Signal cascade issue: When updating the data model during CSV import, each update was triggering multiple signals that cascaded through the UI components
+2. Missing signal blocking during import: The CSV import process wasn't blocking signals, allowing them to cascade during the initial data loading
+3. Type inference in pandas: During CSV reading, pandas was attempting to infer data types for each column, which could trigger recursion loops, especially with date columns
+
+### Comprehensive Fix
+1. Added signal blocking during CSV import:
+   - Modified `_load_csv` method in `app.py` to block signals during the entire import process
+   - Created a dedicated `_on_csv_load_success` callback to handle completion and unblock signals
+
+2. Improved CSV reading to avoid type inference:
+   - Updated `read_csv_chunked` method to use `dtype=str` for all columns
+   - Explicitly converted all column values to strings to prevent pandas type inference
+   - Processed chunks with additional safeguards
+
+3. Enhanced the ChestDataModel's update_data method:
+   - Added signal state tracking to prevent unintended signal emissions
+   - Properly handled signal blocking and unblocking
+   - Added exception handling to ensure signals are always unblocked
+
+4. Added additional guards to prevent cascading signals:
+   - Enhanced `_on_data_changed` method in UI components to ignore changes when already updating
+   - Added extra error handling around signal emissions
+   - Used a more reliable method to emit controlled signals
+
+### Technical Notes
+- The key insight was recognizing that the CSV import process needed explicit signal control to prevent cascading updates
+- The solution maintains type consistency by forcing all imported data to be string type initially
+- The fix ensures that only a single controlled data_changed signal is emitted after the import completes
+- The approach is more robust to different CSV file formats and encoding issues
+
+This fix complements the previous recursion fixes (REC-002 and REC-003) by addressing the specific recursion issues that occur during file import, completing the comprehensive fix for all pandas/UI recursion issues.

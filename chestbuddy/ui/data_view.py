@@ -64,6 +64,7 @@ class DataView(QWidget):
         self._table_model = QStandardItemModel()
         self._filtered_rows: List[int] = []
         self._current_filter: Dict[str, str] = {}
+        self._is_updating = False  # Guard against recursive updates
 
         # Set up UI
         self._init_ui()
@@ -160,62 +161,93 @@ class DataView(QWidget):
 
     def _update_view(self) -> None:
         """Update the view with current data."""
-        # Clear the table model
-        self._table_model.clear()
-
-        # Check if data is empty
-        if self._data_model.is_empty:
-            self._status_label.setText("No data loaded")
-            self._filtered_rows = []  # Initialize to empty list when no data
+        # Guard against recursive calls
+        if self._is_updating:
+            logger.debug("Skipping recursive _update_view call")
             return
 
-        # Get data from model
-        data = self._data_model.data
+        try:
+            self._is_updating = True
 
-        # Initialize filtered_rows with all row indices
-        self._filtered_rows = data.index.tolist()
+            # Clear the table model
+            self._table_model.clear()
 
-        # Set headers
-        self._table_model.setHorizontalHeaderLabels(self._data_model.column_names)
+            # Check if data is empty
+            if self._data_model.is_empty:
+                self._status_label.setText("No data loaded")
+                self._filtered_rows = []  # Initialize to empty list when no data
+                return
 
-        # Populate filter column combo box
-        current_column = self._filter_column.currentText()
-        self._filter_column.clear()
-        self._filter_column.addItems(self._data_model.column_names)
+            # Get data from model - get a shallow copy to avoid modifying original
+            try:
+                data = self._data_model.data
+                # Store the column names separately to avoid repeated access
+                column_names = self._data_model.column_names
+            except Exception as e:
+                logger.error(f"Error getting data: {e}")
+                self._status_label.setText("Error loading data")
+                return
 
-        # Restore selected column if it exists
-        if current_column in self._data_model.column_names:
-            self._filter_column.setCurrentText(current_column)
+            # Initialize filtered_rows with all row indices
+            self._filtered_rows = list(
+                range(len(data))
+            )  # Use simple range instead of data.index.tolist()
 
-        # Add data to the table model
-        for row_idx, row in enumerate(data.itertuples()):
-            # Skip the first element (index)
-            row_data = list(row)[1:]
-            for col_idx, value in enumerate(row_data):
-                item = QStandardItem(str(value))
+            # Set headers
+            self._table_model.setHorizontalHeaderLabels(column_names)
 
-                # Get column name
-                column_name = self._data_model.column_names[col_idx]
+            # Populate filter column combo box
+            current_column = self._filter_column.currentText()
+            self._filter_column.clear()
+            self._filter_column.addItems(column_names)
 
-                # Set validation and correction status as user data
-                # Use cell-specific methods to avoid getting entire DataFrames
-                # This prevents recursion issues
-                val_status = self._data_model.get_cell_validation_status(row_idx, column_name)
-                if val_status:
-                    item.setData(val_status, Qt.UserRole + 1)
+            # Restore selected column if it exists
+            if current_column in column_names:
+                self._filter_column.setCurrentText(current_column)
 
-                corr_status = self._data_model.get_cell_correction_status(row_idx, column_name)
-                if corr_status:
-                    item.setData(corr_status, Qt.UserRole + 2)
+            # Add data to the table model - use a safer approach
+            try:
+                # Process rows in batches to avoid deep recursion
+                BATCH_SIZE = 100
+                for start_idx in range(0, len(data), BATCH_SIZE):
+                    end_idx = min(start_idx + BATCH_SIZE, len(data))
 
-                self._table_model.setItem(row_idx, col_idx, item)
+                    # Process this batch of rows
+                    for row_idx in range(start_idx, end_idx):
+                        # Get row data directly using iloc to avoid itertuples() which can cause recursion
+                        row_data = data.iloc[row_idx]
 
-        # Resize columns to contents
-        self._table_view.resizeColumnsToContents()
+                        for col_idx, column_name in enumerate(column_names):
+                            # Get value directly and convert to string
+                            value = str(row_data[column_name])
+                            item = QStandardItem(value)
 
-        # Update status label
-        row_count = len(data)
-        self._status_label.setText(f"Loaded {row_count} rows")
+                            # Set validation and correction status as user data
+                            val_status = self._data_model.get_cell_validation_status(
+                                row_idx, column_name
+                            )
+                            if val_status:
+                                item.setData(val_status, Qt.UserRole + 1)
+
+                            corr_status = self._data_model.get_cell_correction_status(
+                                row_idx, column_name
+                            )
+                            if corr_status:
+                                item.setData(corr_status, Qt.UserRole + 2)
+
+                            self._table_model.setItem(row_idx, col_idx, item)
+            except Exception as e:
+                logger.error(f"Error populating table model: {e}")
+                self._status_label.setText("Error displaying data")
+
+            # Resize columns to contents
+            self._table_view.resizeColumnsToContents()
+
+            # Update status label
+            row_count = len(data)
+            self._status_label.setText(f"Loaded {row_count} rows")
+        finally:
+            self._is_updating = False
 
     def _apply_filter(self) -> None:
         """Apply the current filter to the data."""
@@ -261,63 +293,86 @@ class DataView(QWidget):
         Args:
             filtered_data: The filtered data to display.
         """
-        # Store filtered data
-        self._filtered_data = filtered_data
-
-        # Clear the table model
-        self._table_model.clear()
-
-        # Check if filtered data is empty
-        if filtered_data.empty:
-            self._status_label.setText("No data matches the filter")
-            self._filtered_rows = []
+        # Guard against recursive calls
+        if self._is_updating:
+            logger.debug("Skipping recursive _update_view_with_filtered_data call")
             return
 
-        # Set headers
-        self._table_model.setHorizontalHeaderLabels(self._data_model.column_names)
+        try:
+            self._is_updating = True
 
-        # Store the filtered row indices
-        self._filtered_rows = filtered_data.index.tolist()
+            # Store filtered data
+            self._filtered_data = filtered_data
 
-        # Show filter status
-        filter_text = self._filter_text.text()
-        if filter_text:
-            filter_count = len(filtered_data)
-            total_count = len(self._data_model.data)
-            self._status_label.setText(
-                f"Showing {filter_count} of {total_count} records matching '{filter_text}'"
-            )
+            # Clear the table model
+            self._table_model.clear()
 
-        # Add filtered data to the table model
-        for local_row_idx, (actual_row_idx, row) in enumerate(
-            zip(filtered_data.index, filtered_data.itertuples())
-        ):
-            # Skip the first element (index)
-            row_data = list(row)[1:]
-            for col_idx, value in enumerate(row_data):
-                item = QStandardItem(str(value))
+            # Check if filtered data is empty
+            if filtered_data.empty:
+                self._status_label.setText("No data matches the filter")
+                self._filtered_rows = []
+                return
 
-                # Get column name
-                column_name = self._data_model.column_names[col_idx]
+            # Store the column names to avoid repeated access
+            column_names = self._data_model.column_names
 
-                # Set validation and correction status as user data
-                # Use cell-specific methods to avoid getting entire DataFrames
-                val_status = self._data_model.get_cell_validation_status(
-                    actual_row_idx, column_name
+            # Set headers
+            self._table_model.setHorizontalHeaderLabels(column_names)
+
+            # Store the filtered row indices - convert to plain Python list to avoid DataFrame operations
+            self._filtered_rows = list(filtered_data.index)
+
+            # Show filter status
+            filter_text = self._filter_text.text()
+            if filter_text:
+                filter_count = len(filtered_data)
+                total_count = len(self._data_model.data)
+                self._status_label.setText(
+                    f"Showing {filter_count} of {total_count} records matching '{filter_text}'"
                 )
-                if val_status:
-                    item.setData(val_status, Qt.UserRole + 1)
 
-                corr_status = self._data_model.get_cell_correction_status(
-                    actual_row_idx, column_name
-                )
-                if corr_status:
-                    item.setData(corr_status, Qt.UserRole + 2)
+            # Add filtered data to the table model using a safer approach
+            try:
+                # Process rows in batches
+                BATCH_SIZE = 100
+                # Get the row indices and convert to a plain list to avoid pandas operations
+                all_indices = list(zip(range(len(filtered_data)), filtered_data.index))
 
-                self._table_model.setItem(local_row_idx, col_idx, item)
+                for batch_start in range(0, len(all_indices), BATCH_SIZE):
+                    batch_end = min(batch_start + BATCH_SIZE, len(all_indices))
+                    batch_indices = all_indices[batch_start:batch_end]
 
-        # Resize columns to contents
-        self._table_view.resizeColumnsToContents()
+                    for local_row_idx, actual_row_idx in batch_indices:
+                        # Get the row data directly
+                        row_data = filtered_data.iloc[local_row_idx]
+
+                        for col_idx, column_name in enumerate(column_names):
+                            # Convert value to string
+                            value = str(row_data[column_name])
+                            item = QStandardItem(value)
+
+                            # Set validation and correction status
+                            val_status = self._data_model.get_cell_validation_status(
+                                actual_row_idx, column_name
+                            )
+                            if val_status:
+                                item.setData(val_status, Qt.UserRole + 1)
+
+                            corr_status = self._data_model.get_cell_correction_status(
+                                actual_row_idx, column_name
+                            )
+                            if corr_status:
+                                item.setData(corr_status, Qt.UserRole + 2)
+
+                            self._table_model.setItem(local_row_idx, col_idx, item)
+            except Exception as e:
+                logger.error(f"Error populating filtered table model: {e}")
+                self._status_label.setText("Error displaying filtered data")
+
+            # Resize columns to contents
+            self._table_view.resizeColumnsToContents()
+        finally:
+            self._is_updating = False
 
     def _clear_filter(self) -> None:
         """Clear the current filter."""
@@ -395,23 +450,34 @@ class DataView(QWidget):
         """
         Handle data changed signal.
         """
-        # Update the view
-        if self._current_filter:
-            # Reapply filter
-            column = self._current_filter.get("column", "")
-            filter_text = self._current_filter.get("text", "")
-            filter_mode = self._current_filter.get("mode", "Contains")
-            case_sensitive = self._current_filter.get("case_sensitive", False)
+        # Ignore the signal if we're already updating to avoid cascading updates
+        if self._is_updating:
+            logger.debug("Ignoring data_changed signal during update")
+            return
 
-            filtered_data = self._data_model.filter_data(
-                column, filter_text, filter_mode, case_sensitive
-            )
+        # Track if there are active filters
+        has_filter = bool(self._current_filter)
 
-            if filtered_data is not None:
-                self._update_view_with_filtered_data(filtered_data)
-        else:
-            # Update with all data
-            self._update_view()
+        try:
+            if has_filter:
+                # Reapply filter
+                column = self._current_filter.get("column", "")
+                filter_text = self._current_filter.get("text", "")
+                filter_mode = self._current_filter.get("mode", "Contains")
+                case_sensitive = self._current_filter.get("case_sensitive", False)
+
+                filtered_data = self._data_model.filter_data(
+                    column, filter_text, filter_mode, case_sensitive
+                )
+
+                if filtered_data is not None:
+                    self._update_view_with_filtered_data(filtered_data)
+            else:
+                # Update with all data
+                self._update_view()
+        except Exception as e:
+            # Catch exceptions to prevent recursion
+            logger.error(f"Error handling data_changed: {e}")
 
     @Slot(object)
     def _on_validation_changed(self, validation_status) -> None:
