@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QApplication,
     QStackedWidget,
+    QProgressDialog,
 )
 from PySide6.QtGui import QAction, QIcon, QKeySequence
 
@@ -139,6 +140,9 @@ class MainWindow(QMainWindow):
         # Initialize recent files
         self._recent_files: List[str] = []
         self._load_recent_files()
+
+        # Setup progress dialog for file operations
+        self._setup_progress_dialog()
 
         # Update UI
         self._update_ui()
@@ -283,6 +287,14 @@ class MainWindow(QMainWindow):
         self._data_model.data_changed.connect(self._on_data_changed)
         self._data_model.validation_changed.connect(self._on_validation_changed)
         self._data_model.correction_applied.connect(self._on_correction_applied)
+
+        # Connect data manager signals for progress reporting
+        if hasattr(self, "_data_manager"):
+            self._data_manager.load_started.connect(self._on_load_started)
+            self._data_manager.load_progress.connect(self._on_load_progress)
+            self._data_manager.load_finished.connect(self._on_load_finished)
+            self._data_manager.load_success.connect(self._on_load_finished)
+            self._data_manager.load_error.connect(self._on_load_finished)
 
     def _load_settings(self) -> None:
         """Load application settings."""
@@ -517,6 +529,45 @@ class MainWindow(QMainWindow):
         else:
             self._status_bar.set_status("No corrections were applied")
 
+    @Slot()
+    def _on_load_started(self) -> None:
+        """Handle the start of a loading operation."""
+        # Show the progress dialog
+        self._progress_dialog.setValue(0)
+        self._progress_dialog.setLabelText("Loading files...")
+        self._progress_dialog.show()
+
+    def _on_load_progress(self, file_path: str, current: int, total: int) -> None:
+        """
+        Handle progress updates during loading.
+
+        Args:
+            file_path: Path of the file being processed (empty for overall progress)
+            current: Current progress value
+            total: Total progress value
+        """
+        # Update the progress dialog
+        percentage = int(current * 100 / total) if total > 0 else 0
+
+        if file_path:
+            import os
+
+            filename = os.path.basename(file_path)
+            self._progress_dialog.setLabelText(f"Loading {filename}... ({percentage}%)")
+
+        self._progress_dialog.setValue(percentage)
+
+    def _on_load_finished(self) -> None:
+        """Handle the completion of a loading operation."""
+        # Close the progress dialog
+        self._progress_dialog.close()
+
+    def _cancel_loading(self) -> None:
+        """Cancel the current loading operation."""
+        # Tell the data manager to cancel the operation
+        if hasattr(self, "_data_manager"):
+            self._data_manager.cancel_loading()
+
     # ===== Actions =====
 
     def _open_file(self) -> None:
@@ -736,3 +787,16 @@ class MainWindow(QMainWindow):
             import logging
 
             logging.getLogger(__name__).error(f"Error updating status bar: {e}")
+
+    def _setup_progress_dialog(self) -> None:
+        """Set up the progress dialog for file loading operations."""
+        # Create progress dialog
+        self._progress_dialog = QProgressDialog("Loading files...", "Cancel", 0, 100, self)
+        self._progress_dialog.setWindowTitle("Loading CSV Files")
+        self._progress_dialog.setWindowModality(Qt.WindowModal)
+        self._progress_dialog.setAutoClose(True)
+        self._progress_dialog.setAutoReset(True)
+        self._progress_dialog.setMinimumDuration(500)  # Show only for operations > 500ms
+
+        # Connect cancel button
+        self._progress_dialog.canceled.connect(self._cancel_loading)

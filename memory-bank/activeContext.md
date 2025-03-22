@@ -144,32 +144,118 @@ The new architecture makes it easier to add new data import/export formats in th
 ## Current Focus
 
 - **COMPLETED**: Integration tests for chart functionality (Phase 12)
-- **UPCOMING**: Planning and preparation for report generation (Phase 13)
+- **IN PROGRESS**: CSV Loading Improvements (Phase 13)
+- **UPCOMING**: Planning and preparation for report generation (Phase 14)
 
-## Implementation Plan
+We are implementing improvements to the CSV loading functionality to enhance the user experience and performance when loading large or multiple files. This includes:
 
-### Recently Completed:
-- ✅ Created and fixed chart integration tests between MainWindow and ChartTab
-- ✅ Implemented performance tests for chart rendering with different dataset sizes
-- ✅ Created end-to-end workflow tests for chart functionality
-- ✅ Fixed all test issues including access violations in UI tests
-- ✅ Verified all tests are passing successfully
+1. Creating a MultiCSVLoadTask class to handle loading multiple files with progress reporting
+2. Adding a progress dialog to provide visual feedback during file loading
+3. Implementing chunked reading for better memory efficiency
+4. Adding cancellation support for long-running operations
+5. Testing the new functionality thoroughly
 
-### Next Steps:
-- Plan report generation features and requirements
-- Design report templates and output formats
-- Create the ReportService for generating reports
-- Implement UI components for report configuration
-- Add export options for different report formats
+### Implementation Plan for CSV Loading Improvements
+
+1. **Create MultiCSVLoadTask Class**
+   - Create a new class extending BackgroundTask
+   - Handle loading multiple files with progress reporting
+   - Use chunked reading for better memory efficiency
+
+2. **Update DataManager**
+   - Add new signals:
+     - `load_progress(str, int, int)` for file name, current progress, total
+     - `load_started()` and `load_finished()` for UI feedback
+   - Modify `load_csv` to use the new task
+   - Implement cancellation support
+
+3. **Add Progress Dialog in MainWindow**
+   - Create QProgressDialog when loading starts
+   - Update the dialog as loading progresses
+   - Support cancellation with proper cleanup
+   - Close dialog when loading completes
+
+4. **Use Efficient File Processing**
+   - Switch from `read_csv` to `read_csv_chunked` or `read_csv_background`
+   - Process files in manageable chunks
+   - Report progress based on chunks processed
+
+5. **Implement Proper Cancellation**
+   - Allow users to cancel long-running operations
+   - Clean up resources when canceled
+   - Update UI appropriately after cancellation
+
+### Expected Benefits
+- UI remains responsive during file loading
+- Users see visual progress indication
+- Users can cancel operations if needed
+- Better memory management with chunked reading
+- Improved performance for large files
+
+### Current Tasks
+- [x] Create MultiCSVLoadTask class
+- [x] Update DataManager with new signals and methods
+- [x] Add progress dialog to MainWindow
+- [x] Implement proper chunked file loading
+- [x] Add cancellation support
+- [x] Create tests for new functionality
 
 ## Recent Changes
 
-- Fixed import issue in app.py (background_worker → background_processing)
-- Modified test_chart_tab.py to avoid UI access violations:
-  - Properly mocked UI components and methods
-  - Used safer approaches for handling chart selection and data updates
-  - Implemented proper cleanup in tests
-- All chart-related tests now pass successfully
+- Enhanced MultiCSVLoadTask to track progress more effectively
+- Added a get_progress() method to MultiCSVLoadTask for better state monitoring
+- Created comprehensive tests for the DataManager's progress reporting capabilities
+- Updated tests for MultiCSVLoadTask to verify the new features
+- Improved cancellation handling with more frequent checks during file processing
+
+## Current Implementation Status
+
+We are currently implementing CSV Loading Improvements to enhance the user experience when loading CSV files in the application. The improvements focus on providing progress feedback, supporting cancellation, and handling multiple files more efficiently.
+
+### CSV Loading Improvements 
+
+1. **MultiCSVLoadTask Class**
+   - ✅ Created a new class extending BackgroundTask
+   - ✅ Implemented loading multiple files with progress reporting
+   - ✅ Added chunked reading for better memory efficiency
+   - ✅ Added progress tracking and reporting for individual files
+   - ✅ Enhanced cancellation support with more frequent checks
+
+2. **DataManager Updates**
+   - ✅ Added new signals:
+     - `load_progress(str, int, int)` for file name, current progress, total
+     - `load_started()` and `load_finished()` for UI feedback
+   - ✅ Modified `load_csv` to use the new task
+   - ✅ Implemented cancellation support with proper cleanup
+
+3. **Progress Dialog in MainWindow**
+   - ✅ Added QProgressDialog for file loading operations
+   - ✅ Connected dialog to data manager signals
+   - ✅ Implemented updating the dialog as loading progresses
+   - ✅ Added support for cancellation with proper cleanup
+
+4. **Testing Coverage**
+   - ✅ Created tests for MultiCSVLoadTask functionality
+   - ✅ Implemented tests for progress reporting
+   - ✅ Added tests for cancellation support
+   - ✅ Created tests for DataManager progress reporting
+   - ✅ Added edge case tests for error handling
+
+### Current Tasks
+- [x] Create MultiCSVLoadTask class
+- [x] Update DataManager with new signals and methods
+- [x] Add progress dialog to MainWindow
+- [x] Implement proper chunked file loading
+- [x] Add cancellation support
+- [x] Create tests for new functionality
+
+## Recent Changes
+
+- Enhanced MultiCSVLoadTask to track progress more effectively
+- Added a get_progress() method to MultiCSVLoadTask for better state monitoring
+- Created comprehensive tests for the DataManager's progress reporting capabilities
+- Updated tests for MultiCSVLoadTask to verify the new features
+- Improved cancellation handling with more frequent checks during file processing
 
 ## Current Status
 
@@ -274,3 +360,56 @@ This enhancement allows for more efficient data entry and editing, especially wh
 3. See immediate feedback as all selected cells are updated simultaneously
 
 ### Column Name Standardization 
+
+## Current Focus: CSV Loading Improvements
+
+We are implementing enhancements to the CSV file loading process to improve performance and user experience with large files. The current implementation causes the application to freeze during loading with no visual feedback.
+
+### Implementation Plan for CSV Loading Improvements
+
+1. **Create MultiCSVLoadTask Class**
+   - Create a new class extending BackgroundTask
+   - Handle loading multiple files with progress reporting
+   - Use chunked reading for better memory efficiency
+
+2. **Update DataManager**
+   - Add new signals:
+     - `load_progress(str, int, int)` for file name, current progress, total
+     - `load_started()` and `load_finished()` for UI feedback
+   - Modify `load_csv` to use the new task
+   - Implement cancellation support
+
+3. **Add Progress Dialog in MainWindow**
+   - Create QProgressDialog when loading starts
+   - Update the dialog as loading progresses
+   - Support cancellation with proper cleanup
+   - Close dialog when loading completes
+
+4. **Use Efficient File Processing**
+   - Switch from `read_csv` to `read_csv_chunked` or `read_csv_background`
+   - Process files in manageable chunks
+   - Report progress based on chunks processed
+
+5. **Implement Proper Cancellation**
+   - Allow users to cancel long-running operations
+   - Clean up resources when canceled
+   - Update UI appropriately after cancellation
+
+### Expected Benefits
+- UI remains responsive during file loading
+- Users see visual progress indication
+- Users can cancel operations if needed
+- Better memory management with chunked reading
+- Improved performance for large files
+
+### Current Tasks
+- [ ] Create MultiCSVLoadTask class
+- [ ] Update DataManager with new signals and methods
+- [ ] Add progress dialog to MainWindow
+- [ ] Implement proper chunked file loading
+- [ ] Add cancellation support
+- [ ] Create tests for new functionality
+
+## Recent Changes
+
+// ... existing content continues 
