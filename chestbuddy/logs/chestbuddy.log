@@ -1,0 +1,43 @@
+2025-03-22 23:01:34,236 - root - INFO - Logging initialized to D:\Projekte\ChestBuddy\chestbuddy\logs\chestbuddy.log
+2025-03-22 23:01:34,684 - __main__ - INFO - Logging initialized at level INFO to d:\Projekte\ChestBuddy\chestbuddy\logs\chestbuddy.log
+2025-03-22 23:01:34,729 - chestbuddy.ui.data_view - INFO - Registered Ctrl+C shortcut for copying
+2025-03-22 23:01:34,729 - chestbuddy.ui.data_view - INFO - Registered Ctrl+V shortcut for pasting
+2025-03-22 23:01:34,729 - chestbuddy.ui.data_view - INFO - Registered widget-level Ctrl+V shortcut for pasting
+2025-03-22 23:01:34,731 - chestbuddy.ui.data_view - INFO - Starting _update_view method
+2025-03-22 23:01:34,731 - chestbuddy.ui.data_view - WARNING - Data model is empty, no data to display
+2025-03-22 23:01:34,737 - chestbuddy.ui.main_window - INFO - Setting active view to: Dashboard
+2025-03-22 23:01:34,737 - chestbuddy.ui.main_window - INFO - View 'Dashboard' activated successfully
+2025-03-22 23:01:34,739 - __main__ - INFO - Autosave enabled with interval of 5 minutes
+2025-03-22 23:01:34,739 - chestbuddy.ui.resources.resource_manager - WARNING - Failed to load Qt resources. Using file-based resources.
+2025-03-22 23:01:34,763 - __main__ - INFO - ChestBuddy application initialized
+2025-03-22 23:01:34,819 - __main__ - INFO - Starting application main event loop
+2025-03-22 23:01:40,637 - chestbuddy.core.services.csv_service - INFO - Reading CSV file: D:/Projekte/ChestBuddy/chestbuddy/data/input/Chests_input_test.csv
+2025-03-22 23:01:41,432 - chestbuddy.core.services.data_manager - INFO - Loading CSV file: D:/Projekte/ChestBuddy/chestbuddy/data/input/Chests_input_test.csv
+2025-03-22 23:01:41,433 - chestbuddy.core.services.csv_service - INFO - Reading CSV file: D:/Projekte/ChestBuddy/chestbuddy/data/input/Chests_input_test.csv
+2025-03-22 23:01:42,071 - chestbuddy.core.services.data_manager - INFO - CSV loaded successfully with 12387 rows
+2025-03-22 23:01:42,072 - chestbuddy.core.services.data_manager - INFO - Background task completed: load_csv
+2025-03-22 23:01:42,073 - chestbuddy.core.services.data_manager - INFO - No column mapping found in config, using default mapping
+2025-03-22 23:01:42,074 - chestbuddy.core.services.data_manager - INFO - Mapped columns: ['DATE', 'PLAYER', 'SOURCE', 'CHEST', 'SCORE', 'CLAN']
+2025-03-22 23:01:42,080 - __main__ - INFO - Data loaded successfully with CSV loaded successfully rows
+2025-03-22 23:01:42,080 - __main__ - INFO - Requested switch to Data view (thread-safe)
+2025-03-22 23:01:42,080 - chestbuddy.ui.data_view - INFO - Processing data_changed signal - updating view
+2025-03-22 23:01:42,080 - chestbuddy.ui.data_view - INFO - Starting _update_view method
+2025-03-22 23:01:42,081 - chestbuddy.ui.data_view - INFO - Got data from model: 12387 rows, columns: ['DATE', 'PLAYER', 'SOURCE', 'CHEST', 'SCORE', 'CLAN']
+2025-03-22 23:01:42,081 - chestbuddy.ui.data_view - INFO - Column names: ['DATE', 'PLAYER', 'SOURCE', 'CHEST', 'SCORE', 'CLAN']
+2025-03-22 23:01:42,081 - chestbuddy.ui.data_view - INFO - Setting table model dimensions to 12387 rows and 6 columns
+2025-03-22 23:01:42,083 - chestbuddy.ui.data_view - INFO - Set horizontal headers with 6 columns
+2025-03-22 23:01:42,083 - chestbuddy.ui.data_view - INFO - Populating table model with data (simplified approach)
+2025-03-22 23:01:50,511 - chestbuddy.ui.data_view - INFO - Successfully populated model with 12387 rows and 6 columns
+2025-03-22 23:01:50,556 - chestbuddy.ui.data_view - INFO - Resized columns to contents
+2025-03-22 23:01:50,556 - chestbuddy.ui.data_view - INFO - View update complete, loaded 12387 rows
+2025-03-22 23:01:50,560 - chestbuddy.ui.data_view - INFO - Final table model state: 12387 rows, 6 columns
+2025-03-22 23:01:50,560 - chestbuddy.ui.data_view - INFO - Sample cell [0,0] content: '2025-03-11'
+2025-03-22 23:01:50,764 - __main__ - INFO - Data model changed
+2025-03-22 23:01:50,764 - chestbuddy.ui.main_window - INFO - Setting active view to: Data
+2025-03-22 23:01:50,769 - chestbuddy.ui.main_window - INFO - View 'Data' activated successfully
+2025-03-22 23:02:19,568 - chestbuddy.ui.data_view - INFO - Pasted value to 4 selected cells
+2025-03-22 23:02:34,979 - chestbuddy.ui.data_view - INFO - Clipboard text: 'Feldjäger'
+2025-03-22 23:02:34,982 - chestbuddy.ui.data_view - INFO - Pasted value to 4 selected cells
+2025-03-22 23:02:36,907 - chestbuddy.core.services.data_manager - INFO - Saving CSV file: data\autosave.csv
+2025-03-22 23:02:36,909 - __main__ - INFO - Application shutdown
+2025-03-22 23:02:37,032 - chestbuddy.core.services.data_manager - ERROR - CSV load did not return valid DataFrame: <class 'bool'>

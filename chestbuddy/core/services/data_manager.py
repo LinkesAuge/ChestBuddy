@@ -191,11 +191,30 @@ class DataManager(QObject):
                 logger.error(f"Cannot map columns - invalid data type: {type(data)}")
                 return pd.DataFrame()  # Return empty DataFrame as fallback
 
-            # Get column mapping from config
+            # Define default mapping for backward compatibility
+            # This maps older column names to the new expected format
+            default_mapping = {
+                # Old format to new format
+                "Date": "DATE",
+                "Player Name": "PLAYER",
+                "Source/Location": "SOURCE",
+                "Chest Type": "CHEST",
+                "Value": "SCORE",
+                "Clan": "CLAN",
+                # Already in the new format - identity mapping
+                "DATE": "DATE",
+                "PLAYER": "PLAYER",
+                "SOURCE": "SOURCE",
+                "CHEST": "CHEST",
+                "SCORE": "SCORE",
+                "CLAN": "CLAN",
+            }
+
+            # Get column mapping from config, fall back to default if not found
             column_mapping = self._config.get("column_mapping", {})
             if not column_mapping:
-                logger.info("No column mapping found, using original columns")
-                return data
+                logger.info("No column mapping found in config, using default mapping")
+                column_mapping = default_mapping
 
             # Check if the mapping applies to this data
             csv_columns = set(data.columns)
@@ -214,11 +233,13 @@ class DataManager(QObject):
             for csv_col, model_col in column_mapping.items():
                 if csv_col in data.columns:
                     mapped_data[model_col] = data[csv_col]
+                    logger.debug(f"Mapped column {csv_col} to {model_col}")
 
             # Copy over any unmapped columns
             for col in data.columns:
                 if col not in column_mapping:
                     mapped_data[col] = data[col]
+                    logger.debug(f"Copied unmapped column: {col}")
 
             logger.info(f"Mapped columns: {list(mapped_data.columns)}")
             return mapped_data
