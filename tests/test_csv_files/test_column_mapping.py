@@ -10,7 +10,7 @@ from pathlib import Path
 
 from chestbuddy.core.services.data_manager import DataManager
 from chestbuddy.core.models.chest_data_model import ChestDataModel
-from chestbuddy.core.services.config_manager import ConfigManager
+from chestbuddy.utils.config import ConfigManager
 
 
 @pytest.fixture
