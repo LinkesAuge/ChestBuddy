@@ -453,48 +453,44 @@ class DataView(QWidget):
     @Slot()
     def _on_data_changed(self) -> None:
         """
-        Handle data changed signal.
+        Update the view when the data model changes.
+
+        This method uses debouncing to prevent rapid successive updates
+        and checks if data has actually changed before updating.
         """
-        # Ignore the signal if we're already updating to avoid cascading updates
-        if self._is_updating:
-            logger.debug("Ignoring data_changed signal during update")
-            return
-
-        # Add debouncing to prevent too frequent updates
-        current_time = time.time()
-        elapsed_ms = (current_time - DataView._last_update_time) * 1000
-        if elapsed_ms < DataView._update_debounce_ms:
-            logger.debug(
-                f"Debouncing data_changed event (elapsed: {elapsed_ms:.1f}ms < {DataView._update_debounce_ms}ms)"
-            )
-            return
-
-        # Update the last update time
-        DataView._last_update_time = current_time
-
-        # Track if there are active filters
-        has_filter = bool(self._current_filter)
-
         try:
-            if has_filter:
-                # Reapply filter
-                column = self._current_filter.get("column", "")
-                filter_text = self._current_filter.get("text", "")
-                filter_mode = self._current_filter.get("mode", "Contains")
-                case_sensitive = self._current_filter.get("case_sensitive", False)
+            # Ignore the signal if we're already updating to avoid recursion
+            if self._is_updating:
+                logger.debug("Ignoring data_changed signal - UI already updating")
+                return
 
-                filtered_data = self._data_model.filter_data(
-                    column, filter_text, filter_mode, case_sensitive
-                )
+            # Add debouncing to prevent rapid updates
+            current_time = int(time.time() * 1000)  # Current time in milliseconds
 
-                if filtered_data is not None:
-                    self._update_view_with_filtered_data(filtered_data)
-            else:
-                # Update with all data
-                self._update_view()
+            # Initialize last update time if not set
+            if not hasattr(self, "_last_update_time"):
+                self._last_update_time = 0
+
+            # Define minimum time between updates (500ms)
+            min_update_interval = 500  # milliseconds
+
+            # Calculate time elapsed since last update
+            elapsed = current_time - self._last_update_time
+
+            # Skip update if it's too soon after the previous one
+            if elapsed < min_update_interval:
+                logger.debug(f"Debouncing update - only {elapsed}ms since last update")
+                return
+
+            # Update the last update time
+            self._last_update_time = current_time
+
+            # Now proceed with the update
+            logger.debug("Processing data_changed signal")
+            self._update_view()
+
         except Exception as e:
-            # Catch exceptions to prevent recursion
-            logger.error(f"Error handling data_changed: {e}")
+            logger.error(f"Error updating view on data change: {str(e)}")
 
     @Slot(object)
     def _on_validation_changed(self, validation_status) -> None:
@@ -521,29 +517,58 @@ class DataView(QWidget):
     @Slot(QStandardItem)
     def _on_item_changed(self, item: QStandardItem) -> None:
         """
-        Handle changes to items in the table.
+        Update the data model when an item in the view changes.
 
         Args:
-            item: The changed item.
+            item: The item that changed.
         """
-        # Get the row and column index
-        row = item.row()
-        col = item.column()
+        try:
+            # Ignore item changes if we're currently updating
+            if self._is_updating:
+                logger.debug("Ignoring item change during view update")
+                return
 
-        # If we're using a filtered view, we need to map the row to the actual row
-        actual_row = row
-        if hasattr(self, "_filtered_data") and self._filtered_data is not None:
-            # Map from visible row to actual row
-            actual_row = self._filtered_data.index[row]
-        else:
-            actual_row = row
+            # Get the row and column of the changed item
+            row = item.row()
+            column = item.column()
 
-        # Get the column name
-        column_name = self._data_model.column_names[col]
+            # If we have a valid row and column
+            if row >= 0 and column >= 0 and column < len(self._data_model.column_names):
+                # Get the new value from the item
+                new_value = item.data(Qt.EditRole)
 
-        # Get the new value
-        value = item.text()
+                # Get the column name for this column index
+                column_name = self._data_model.column_names[column]
 
-        # Use the more efficient update_cell method instead of creating a whole new DataFrame
-        # This prevents the pandas recursion issue by avoiding full DataFrame recreation
-        self._data_model.update_cell(actual_row, column_name, value)
+                # Get the current value from the model first
+                try:
+                    current_value = self._data_model.get_cell_value(row, column_name)
+                except Exception as e:
+                    logger.error(f"Error getting current cell value: {str(e)}")
+                    return
+
+                # Check if the value has actually changed
+                if str(current_value) == str(new_value):
+                    logger.debug(
+                        f"Skipping cell update at [{row}, {column_name}] - value unchanged"
+                    )
+                    return
+
+                logger.debug(
+                    f"Updating cell at [{row}, {column_name}] from '{current_value}' to '{new_value}'"
+                )
+
+                # Use a more efficient update method that doesn't recreate the DataFrame
+                success = self._data_model.update_cell(row, column_name, new_value)
+
+                if not success:
+                    logger.error(f"Failed to update cell at [{row}, {column_name}]")
+                    # Reload the item to show the original value
+                    self._is_updating = True
+                    try:
+                        item.setData(Qt.DisplayRole, str(current_value))
+                    finally:
+                        self._is_updating = False
+
+        except Exception as e:
+            logger.error(f"Error handling item change: {str(e)}")

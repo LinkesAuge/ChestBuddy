@@ -8,6 +8,7 @@ all services and UI components.
 import logging
 import os
 import sys
+import time
 from pathlib import Path
 from typing import List, Optional
 
@@ -295,17 +296,30 @@ class ChestBuddyApp(QObject):
             task_id="export_issues",
         )
 
-    def _on_data_changed(self):
-        """Handle data changed events from the model."""
+    def _on_data_changed(self) -> None:
+        """Handle data changed event from the data model."""
         try:
-            # Use simple string without formatting to avoid potential recursion
-            logging.getLogger("chestbuddy.app").info("Data model changed")
+            # Implement a rate limiter for logging
+            current_time = time.time()
+
+            # Initialize class variable if it doesn't exist
+            if not hasattr(ChestBuddyApp, "_last_log_time"):
+                ChestBuddyApp._last_log_time = 0
+
+            # Log data changes at most once per second
+            if current_time - ChestBuddyApp._last_log_time >= 1.0:
+                logger.info("Data model changed")
+                ChestBuddyApp._last_log_time = current_time
+
+            # Update the UI as needed
+            self._update_ui()
+
         except RecursionError:
-            # If we encounter a recursion error in logging, silently ignore it
+            # Silently handle recursion errors to prevent application crashes
             pass
-        except Exception:
-            # For any other exception, also silently continue
-            pass
+        except Exception as e:
+            # Log other errors but don't let them crash the application
+            logger.error(f"Error handling data changed event: {str(e)}")
 
     def _on_background_task_completed(self, task_id, result):
         """Handle background task completion."""

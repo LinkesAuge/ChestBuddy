@@ -773,3 +773,41 @@ Even after previous recursion fixes, the application was still experiencing a si
 - The solution is non-intrusive and works well with our existing recursion protections
 
 This fix complements our previous recursion fixes by addressing the signal cascade problem at a higher level, ensuring stable application performance regardless of how signals propagate between components.
+
+## Optimized State-Based Signal Emission Fix
+- Issue ID: REC-006
+- Status: FIXED
+- Date: 2025-03-23
+- Affected components: ChestDataModel, DataView, App
+
+### Description
+Even after implementing rate limiting for signal cascades (REC-005), the application was still experiencing constant "Data model changed" events occurring approximately every 500ms. These unnecessary update cycles were consuming resources and potentially causing UI responsiveness issues.
+
+### Root Cause Analysis
+1. The data model was emitting change signals regardless of whether the underlying data had actually changed
+2. UI components were triggering updates even when no visual changes were needed
+3. No detection mechanism was in place to identify "meaningful" changes vs. no-op changes
+4. The logging system was amplifying the issue by recording every signal emission
+
+### Comprehensive Fix
+1. Added state tracking to ChestDataModel:
+   - Implemented a `_calculate_data_hash()` method to detect actual data changes
+   - Added comparison logic to only emit signals when data actually changes
+   - Created a deferred notification system that combines state tracking with rate limiting
+
+2. Enhanced cell update logic:
+   - Added comparison to verify cell values actually changed before triggering updates
+   - Implemented logging to track when and why updates occur
+   - Added protection to prevent updates during view refreshes
+
+3. Optimized application logging:
+   - Limited "Data model changed" log entries to once per second
+   - Added more detailed debug logging to help identify update patterns
+
+### Technical Notes
+- The hash-based approach provides a lightweight way to detect meaningful changes
+- The combination of state tracking and rate limiting provides two layers of protection
+- By skipping no-op updates, we avoid unnecessary UI refreshes
+- The changes are fully backward compatible with existing code
+
+This fix complements our previous solutions by addressing the root cause - unnecessary signal emissions when no actual changes occur. The application now maintains a responsive UI while only performing updates when truly needed.

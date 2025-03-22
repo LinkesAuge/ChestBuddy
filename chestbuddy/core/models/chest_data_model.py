@@ -8,9 +8,11 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 import time
+import hashlib
+import json
 
 import pandas as pd
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Signal, QObject
 
 from chestbuddy.core.models.base_model import BaseModel
 from chestbuddy.utils.config import ConfigManager
@@ -19,7 +21,7 @@ from chestbuddy.utils.config import ConfigManager
 logger = logging.getLogger(__name__)
 
 
-class ChestDataModel(BaseModel):
+class ChestDataModel(QObject):
     """
     Manages the chest data using pandas DataFrames.
 
@@ -47,18 +49,86 @@ class ChestDataModel(BaseModel):
     EXPECTED_COLUMNS = ["Date", "Player Name", "Source/Location", "Chest Type", "Value", "Clan"]
 
     def __init__(self) -> None:
-        """Initialize the ChestDataModel with an empty DataFrame."""
+        """Initialize the ChestDataModel."""
         super().__init__()
 
-        # Initialize the data DataFrame
+        # Initialize empty DataFrames
         self._data = pd.DataFrame(columns=self.EXPECTED_COLUMNS)
-
-        # Initialize validation and correction status DataFrames
         self._validation_status = pd.DataFrame()
         self._correction_status = pd.DataFrame()
 
-        # Get the config manager
+        # Initialize config manager
         self._config = ConfigManager()
+
+        # Track update time to limit emission frequency
+        self._last_emission_time = 0
+        self._emission_rate_limit_ms = 500
+
+        # Track the data state via hash for meaningful change detection
+        self._current_data_hash = None
+        self._update_data_hash()
+
+        # Track whether signals are already blocked
+        self._signals_already_blocked = False
+
+        # Track whether we're in the process of an update
+        self._updating = False
+
+    def _update_data_hash(self) -> None:
+        """Update the hash of the current data state."""
+        try:
+            self._current_data_hash = self._calculate_data_hash()
+            logger.debug(f"Updated data hash to: {self._current_data_hash}")
+        except Exception as e:
+            logger.error(f"Error calculating data hash: {str(e)}")
+
+    def _calculate_data_hash(self) -> str:
+        """
+        Calculate a hash of the current data state.
+
+        This provides a lightweight way to detect meaningful changes in the data.
+
+        Returns:
+            str: A hash string representing the current data state
+        """
+        try:
+            # For performance, we'll use a sample of the data rather than the entire DataFrame
+            if self._data.empty:
+                return "empty_dataframe"
+
+            # Take a sample of rows (first, middle, last) to represent the data
+            row_count = len(self._data)
+            sample_indices = [0]
+
+            if row_count > 1:
+                sample_indices.append(row_count - 1)
+
+            if row_count > 2:
+                sample_indices.append(row_count // 2)
+
+            # Create a dictionary with key metadata
+            hash_data = {
+                "row_count": row_count,
+                "column_count": len(self._data.columns),
+                "columns": list(self._data.columns),
+                "sample_data": {},
+            }
+
+            # Add sample rows
+            for idx in sample_indices:
+                row_data = {}
+                for col in self._data.columns:
+                    val = self._data.iloc[idx][col]
+                    # Convert values to strings to ensure hashability
+                    row_data[col] = str(val)
+                hash_data["sample_data"][idx] = row_data
+
+            # Convert to JSON string and hash
+            json_data = json.dumps(hash_data, sort_keys=True)
+            return hashlib.md5(json_data.encode()).hexdigest()
+        except Exception as e:
+            logger.error(f"Error in _calculate_data_hash: {str(e)}")
+            return f"error_{time.time()}"  # Return a unique value in case of error
 
     def initialize(self) -> None:
         """Initialize the model with an empty DataFrame."""
@@ -75,29 +145,41 @@ class ChestDataModel(BaseModel):
         self._notify_change()
 
     def _notify_change(self) -> None:
-        """Emit the data changed signal."""
-        # Only emit if not explicitly blocked
-        if not hasattr(self, "_block_signals") or not self._block_signals:
-            # Add protection against cyclic emissions
-            try:
-                # Use a signal rate limiter to prevent rapid repeated emissions
-                current_time = time.time()
+        """Emit a data changed signal."""
+        try:
+            # Skip emission if signals are blocked
+            if self.signalsBlocked():
+                logger.debug("Signals blocked, skipping emission.")
+                return
 
-                # Initialize last emit time if it doesn't exist
-                if not hasattr(self, "_last_notify_time"):
-                    self._last_notify_time = 0.0
+            # Check if we're updating too frequently
+            current_time = int(time.time() * 1000)  # Current time in milliseconds
+            elapsed_ms = current_time - self._last_emission_time
 
-                # Only emit if sufficient time has passed since last emission (500ms minimum)
-                if current_time - self._last_notify_time > 0.5:
-                    # Use a careful approach to emit the signal
-                    self.data_changed.emit()
-                    self._last_notify_time = current_time
-                else:
-                    logger.debug(
-                        f"Skipping rapid data_changed signal emission (elapsed: {current_time - self._last_notify_time:.3f}s)"
-                    )
-            except Exception as e:
-                logger.error(f"Error in _notify_change: {e}")
+            if elapsed_ms < self._emission_rate_limit_ms:
+                logger.debug(
+                    f"Skipping emission, occurred too soon after previous ({elapsed_ms}ms)."
+                )
+                return
+
+            # Calculate a new hash to detect actual changes
+            new_hash = self._calculate_data_hash()
+
+            # Only emit if the data has actually changed
+            if new_hash == self._current_data_hash:
+                logger.debug("Skipping emission, no actual data change detected.")
+                return
+
+            # Update the data hash and time tracking
+            self._current_data_hash = new_hash
+            self._last_emission_time = current_time
+
+            # Emit the signal
+            logger.debug("Emitting data_changed signal.")
+            self.data_changed.emit()
+
+        except Exception as e:
+            logger.error(f"Error emitting data_changed signal: {str(e)}")
 
     @property
     def data(self) -> pd.DataFrame:
@@ -228,50 +310,82 @@ class ChestDataModel(BaseModel):
             logger.error(f"Error saving CSV file: {e}")
             return False
 
-    def update_data(self, df: pd.DataFrame) -> None:
+    def update_data(self, new_data: pd.DataFrame) -> None:
         """
         Update the chest data with a new DataFrame.
 
         Args:
-            df: The new DataFrame to use.
+            new_data: The new DataFrame to use as the chest data.
         """
-        # Track whether we were already blocking signals
-        already_blocking = self.signalsBlocked()
-
-        # If signals weren't already blocked, block them now
-        if not already_blocking:
-            self.blockSignals(True)
-
         try:
-            # Cancel any current operations to prevent signal cascades
-            self._block_signals = True
+            # Prevent recursive updates
+            if self._updating:
+                logger.debug("Canceling update as another update is in progress.")
+                return
+
+            self._updating = True
+
+            # Check if this is an actual data change
+            if not self._data.empty and new_data is not None and not new_data.empty:
+                temp_current_hash = self._calculate_data_hash()
+
+                # Calculate what the hash would be with the new data
+                orig_data = self._data
+                self._data = new_data
+                temp_new_hash = self._calculate_data_hash()
+                self._data = orig_data
+
+                # If the hashes match, this is a no-op update - skip it
+                if temp_current_hash == temp_new_hash:
+                    logger.debug("Skipping update as data is identical")
+                    self._updating = False
+                    return
+
+            # Track if signals were already blocked
+            self._signals_already_blocked = self.signalsBlocked()
+
+            # Block signals if not already blocked
+            if not self._signals_already_blocked:
+                self.blockSignals(True)
 
             try:
                 # Ensure all expected columns are present
                 for col in self.EXPECTED_COLUMNS:
-                    if col not in df.columns:
-                        df[col] = ""
+                    if col not in new_data.columns:
+                        new_data[col] = ""
 
                 # Keep only the expected columns in the specified order
-                self._data = df[self.EXPECTED_COLUMNS].copy()
+                self._data = new_data[self.EXPECTED_COLUMNS].copy()
 
                 # Initialize validation and correction status DataFrames
                 self._init_status_dataframes()
             finally:
                 # Always unblock internal signals
-                self._block_signals = False
+                self._signals_already_blocked = False
 
             # Only notify change if we weren't already blocking signals
-            if not already_blocking:
+            if not self._signals_already_blocked:
                 # Unblock signals before emitting
                 self.blockSignals(False)
-                self._notify_change()
+
+            # Update the current hash before notifying
+            self._update_data_hash()
         except Exception as e:
             # Ensure signals are unblocked on exception
-            if not already_blocking:
+            if not self._signals_already_blocked:
                 self.blockSignals(False)
             logger.error(f"Error updating data: {e}")
             raise
+        finally:
+            # Ensure signals are unblocked if we blocked them
+            if not self._signals_already_blocked:
+                self.blockSignals(False)
+
+            # Notify of changes
+            self._notify_change()
+
+            # Mark update as complete and notify if needed
+            self._updating = False
 
     def get_row(self, index: int) -> pd.Series:
         """
@@ -308,37 +422,75 @@ class ChestDataModel(BaseModel):
             return True
         return False
 
-    def update_cell(self, row_index: int, column_name: str, value: Any) -> None:
+    def update_cell(self, row_idx: int, column_name: str, value: Any) -> bool:
         """
         Update a single cell in the data.
 
         Args:
-            row_index: The row index
-            column_name: The column name
-            value: The new value
-        """
-        if 0 <= row_index < len(self._data) and column_name in self._data.columns:
-            # Handle date columns specifically
-            if column_name == "Date" and not isinstance(value, str):
-                value = str(value)  # Convert to string to avoid type inference issues
+            row_idx: The row index of the cell to update.
+            column_name: The column name of the cell to update.
+            value: The new value for the cell.
 
-            # Update the main data
-            self._data.at[row_index, column_name] = value
+        Returns:
+            bool: True if the update was successful, False otherwise.
+        """
+        try:
+            # Check if this is an actual change
+            if row_idx < len(self._data) and column_name in self._data.columns:
+                current_value = self._data.loc[row_idx, column_name]
+
+                # Convert both to string for comparison if needed
+                str_current = str(current_value)
+                str_new = str(value)
+
+                # Skip the update if the values are identical
+                if str_current == str_new:
+                    logger.debug(
+                        f"Skipping cell update at [{row_idx}, {column_name}] - value unchanged"
+                    )
+                    return True
+
+                logger.debug(
+                    f"Updating cell at [{row_idx}, {column_name}] from '{current_value}' to '{value}'"
+                )
+
+            # Track if signals were already blocked
+            self._signals_already_blocked = self.signalsBlocked()
+
+            # Block signals if not already blocked
+            if not self._signals_already_blocked:
+                self.blockSignals(True)
+
+            # Update the cell value
+            self._data.at[row_idx, column_name] = value
 
             # Update validation status - mark as needing revalidation
             if (
                 not self._validation_status.empty
                 and f"{column_name}_valid" in self._validation_status.columns
             ):
-                self._validation_status.at[row_index, f"{column_name}_valid"] = True
+                self._validation_status.at[row_idx, f"{column_name}_valid"] = True
 
             # Update correction status - track the change
             if not self._correction_status.empty:
                 if f"{column_name}_corrected" in self._correction_status.columns:
-                    self._correction_status.at[row_index, f"{column_name}_corrected"] = True
+                    self._correction_status.at[row_idx, f"{column_name}_corrected"] = True
 
-            # Emit the data changed signal
+        except Exception as e:
+            logger.error(f"Error updating cell: {str(e)}")
+            return False
+        finally:
+            # Ensure signals are unblocked if we blocked them
+            if not self._signals_already_blocked:
+                self.blockSignals(False)
+
+            # Update the data hash
+            self._update_data_hash()
+
+            # Notify of changes
             self._notify_change()
+
+        return True
 
     def add_row(self, row_data: Dict[str, Any]) -> int:
         """
