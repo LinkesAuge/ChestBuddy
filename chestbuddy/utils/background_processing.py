@@ -76,6 +76,48 @@ class BackgroundTask(QObject, Generic[T]):
         raise NotImplementedError("Subclasses must implement run() method")
 
 
+class FunctionTask(BackgroundTask):
+    """
+    A task that wraps a function to be executed in a background thread.
+
+    This task takes a function and its arguments, and executes the function
+    when the task is run. It provides progress reporting if the function
+    supports it.
+    """
+
+    def __init__(
+        self, func: Callable, args: Tuple = None, kwargs: Dict = None, task_id: str = None
+    ) -> None:
+        """
+        Initialize the function task.
+
+        Args:
+            func: The function to execute
+            args: Positional arguments for the function
+            kwargs: Keyword arguments for the function
+            task_id: Optional identifier for the task
+        """
+        super().__init__()
+        self.func = func
+        self.args = args or ()
+        self.kwargs = kwargs or {}
+        self.task_id = task_id or str(id(self))
+
+    def run(self) -> Any:
+        """
+        Run the wrapped function.
+
+        Returns:
+            The result of the function call.
+        """
+        try:
+            # Execute the function with its arguments
+            return self.func(*self.args, **self.kwargs)
+        except Exception as e:
+            logger.error(f"Error in function task {self.task_id}: {e}")
+            raise
+
+
 class BackgroundWorker(QObject):
     """
     Worker for executing background tasks in a separate thread.
@@ -90,6 +132,8 @@ class BackgroundWorker(QObject):
     finished = Signal(object)  # result
     error = Signal(Exception)  # error
     cancelled = Signal()
+    task_completed = Signal(str, object)  # task_id, result
+    task_failed = Signal(str, Exception)  # task_id, error
 
     def __init__(self) -> None:
         """Initialize the background worker."""
@@ -208,3 +252,40 @@ class BackgroundWorker(QObject):
         if self._thread.isRunning():
             self._thread.quit()
             self._thread.wait()
+
+    def run_task(self, func, *args, task_id=None, on_success=None, on_error=None, **kwargs):
+        """
+        Run a function as a background task.
+
+        This is a convenience method that creates a FunctionTask and executes it.
+
+        Args:
+            func: The function to execute
+            *args: Positional arguments for the function
+            task_id: Optional identifier for the task
+            on_success: Optional callback to be called with the result
+            on_error: Optional callback to be called with the error
+            **kwargs: Keyword arguments for the function
+
+        Returns:
+            The created FunctionTask
+        """
+        # Create a task
+        task = FunctionTask(func, args, kwargs, task_id)
+
+        # Connect success/error callbacks if provided
+        if on_success:
+            self.task_completed.connect(
+                lambda tid, result: on_success(result) if tid == task_id else None
+            )
+        if on_error:
+            self.task_failed.connect(lambda tid, error: on_error(error) if tid == task_id else None)
+
+        # Connect task completion/failure signals
+        self.finished.connect(lambda result: self.task_completed.emit(task_id, result))
+        self.error.connect(lambda error: self.task_failed.emit(task_id, error))
+
+        # Execute the task
+        self.execute_task(task)
+
+        return task

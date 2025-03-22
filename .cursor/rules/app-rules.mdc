@@ -142,4 +142,174 @@ alwaysApply: true
 - Test background processing with appropriate assertions
 - Test cancellation and error handling in background tasks
 - Test critical user workflows
-- Verify performance with larger datasets 
+- Verify performance with larger datasets
+
+# ChestBuddy App Rules
+
+## UI Architecture Patterns
+
+### UI Component Structure
+- All content views inherit from `BaseView`
+- BaseView provides standardized header and content areas
+- Each view is self-contained with its own layout
+- New components should follow existing patterns
+
+### Adapter Pattern Usage
+- Existing components are wrapped with adapter classes
+- Adapters inherit from BaseView
+- Adapters redirect signals to maintain compatibility
+- Original components are embedded in the adapter's content area
+
+### Navigation Flow
+- MainWindow manages view switching through _set_active_view method
+- SidebarNavigation signals view changes through navigation_changed signal
+- Views are stored in a dictionary keyed by their identifier
+- Active view is tracked in MainWindow
+
+### Signal-Slot Architecture
+- Components communicate through signals and slots
+- Signals should be clearly named with their purpose
+- MainWindow emits application-level signals to app.py
+- Signal connections should be set up in _setup_connections methods
+
+## UI Styling Conventions
+
+### Color System
+- Use `Colors` class constants for all colors
+- Primary: #1E3A5F (dark blue)
+- Secondary: #2C5282 (medium blue)
+- Accent: #F0B429 (gold)
+- Background: #F7FAFC (light gray)
+- Text colors: #FFFFFF (light) and #2D3748 (dark)
+- Never hardcode color values in component code
+
+### Component Styling
+- Use QSS (Qt Style Sheets) for styling
+- Centralize style definitions in style.py
+- Custom styling functions should be named get_X_style()
+- Apply consistent border-radius (4-6px) for components
+- Use consistent padding and margins (8-16px)
+
+### Icon Usage
+- Use the IconProvider for all icons
+- SVG icons are preferred for scalability
+- Use consistent icon sizes (16px, 24px, 32px)
+- Dark icons on light backgrounds, light icons on dark backgrounds
+
+## Layout Standards
+
+### General Layout Rules
+- Use layouts (QVBoxLayout, QHBoxLayout, QGridLayout) instead of fixed positioning
+- Standardized margins: 16px outer, 8px inner
+- Content alignment: Left-aligned text, centered buttons
+- Consistent spacing: 8px between related elements, 16px between sections
+
+### Header Formatting
+- Headers use a QHBoxLayout with title on left, actions on right
+- Standard height: 48px
+- Title font: Bold, 16px
+- Include a bottom border: 1px solid Colors.BORDER
+
+### Content Area
+- Content areas should be scrollable for overflow content
+- Main sections separated by 24px vertical spacing
+- Related controls grouped with 8px spacing
+- Action buttons aligned to the bottom right
+
+## User Interaction Patterns
+
+### Button Standards
+- Primary actions: Gold accent color (#F0B429)
+- Secondary actions: Medium blue (#2C5282)
+- Destructive actions: Red (#E53E3E)
+- Standard button height: 32px
+- Use icons+text for important actions
+
+### Input Controls
+- Input field height: 32px
+- Dropdown height: 32px
+- Consistent focus indication
+- Validation feedback next to fields
+- Input masks for formatted fields
+
+### Error Handling
+- Validation errors shown in-line when possible
+- Error notifications use a consistent format
+- Critical errors displayed in modal dialogs
+- Errors should provide clear resolution steps
+
+## Implementation Guidelines
+
+### New View Creation Process
+1. Create a new class inheriting from BaseView
+2. Implement _setup_ui method calling super()._setup_ui() first
+3. Add content widgets to self.content_layout
+4. Create and connect signals in _setup_connections
+5. Add the view to MainWindow's _setup_views method
+
+### Adapter Creation Process
+1. Create a new class inheriting from BaseView
+2. Initialize the original component in _setup_ui
+3. Add the original component to content_layout
+4. Connect the original component's signals
+5. Implement methods to expose needed functionality
+
+### Component Integration Checklist
+- View added to MainWindow._views dictionary
+- Navigation item added to SidebarNavigation
+- View shown/hidden based on navigation state
+- Signals properly connected
+- Error states handled
+- Resources properly managed
+
+## Code Structure Conventions
+
+### File Organization
+- UI component files named with snake_case
+- Class names use PascalCase
+- One primary class per file
+- Related utility classes can be in the same file
+- Private methods prefixed with underscore
+
+### Import Order
+1. Standard library imports
+2. Third-party imports (PySide6)
+3. Application imports
+4. Relative imports
+5. Type annotations
+
+### Documentation Standards
+- Docstrings for all classes and public methods
+- Type hints for all parameters and return types
+- Comments explaining complex logic
+- Signal documentation in class docstring
+
+## Key UI Implementation Notes
+
+### MainWindow Structure
+- Central widget: Splitter between sidebar and content
+- Content uses QStackedWidget for view switching
+- Menu structure follows standard application patterns
+- Toolbar contains frequently used actions
+- Status bar shows application state
+
+### View Switching Flow
+1. User clicks sidebar item
+2. SidebarNavigation.navigation_changed signal emits
+3. MainWindow._on_navigation_changed called
+4. MainWindow._set_active_view changes current widget
+5. Current view handles its initialization
+
+### Dashboard Design
+- 3-column grid for statistics cards
+- Recent files list with double-click to open
+- Quick actions section with common tasks
+- Welcome message for first-time users
+- Status summary for current project
+
+### BaseView Functionality
+- Standard header with title
+- Optional action buttons in header
+- Content area with vertical layout
+- Methods for adding action buttons
+- Signal for action button clicks 

@@ -249,13 +249,15 @@ class ValidationService:
                     continue
 
                 # If not all numeric, check for datetime
-                datetime_col = pd.to_datetime(non_null_values, errors="coerce")
+                datetime_col = pd.to_datetime(non_null_values, errors="coerce", format="mixed")
                 if datetime_col.notna().all():
                     # All values can be converted to datetime, so check each row
                     for idx, val in data[col].items():
                         if pd.notna(val):
                             try:
-                                pd.to_datetime(val)  # Test if convertible to datetime
+                                pd.to_datetime(
+                                    val, format="mixed"
+                                )  # Test if convertible to datetime
                             except (ValueError, TypeError):
                                 issues[idx] = (
                                     f"Type mismatch in {col}: expected datetime, got {type(val).__name__}"

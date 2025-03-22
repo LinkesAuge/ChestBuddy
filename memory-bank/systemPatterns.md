@@ -235,4 +235,279 @@ chestbuddy/
 - Signal-based communication for progress updates and results
 - Cancellation support for long-running operations
 - Resource cleanup on task completion or cancellation
-- Chunked processing for memory-intensive operations 
+- Chunked processing for memory-intensive operations
+
+## UI Architecture
+
+The UI architecture of ChestBuddy follows a component-based design with clear separation of concerns and standardized patterns for consistency.
+
+### UI Component Hierarchy
+
+```mermaid
+classDiagram
+    class MainWindow {
+        -SidebarNavigation _sidebar
+        -QStackedWidget _content_stack
+        -StatusBar _status_bar
+        -Dict[str, BaseView] _views
+        +_create_views()
+        +_set_active_view(view_name)
+    }
+    
+    class BaseView {
+        -String _title
+        -ViewHeader _header
+        -QWidget _content
+        -QVBoxLayout _content_layout
+        +_setup_ui()
+        +_connect_signals()
+        +_add_action_buttons()
+        +get_content_widget()
+        +get_content_layout()
+    }
+    
+    class ViewHeader {
+        -String _title
+        -QLabel _title_label
+        -Dict _action_buttons
+        +add_action_button(name, text, button_type)
+        +get_action_button(name)
+    }
+    
+    class SidebarNavigation {
+        -List _sections
+        -String _active_item
+        +navigation_changed signal
+        +set_active_item(item_name)
+    }
+    
+    class DashboardView {
+        -StatsCard _dataset_card
+        -StatsCard _validation_card
+        -StatsCard _correction_card
+        -RecentFilesWidget _recent_files
+        -QuickActionsWidget _quick_actions
+        +action_triggered signal
+        +file_selected signal
+    }
+    
+    class AdapterView {
+        -OriginalComponent _component
+        +_setup_ui()
+        +_connect_signals()
+    }
+    
+    MainWindow *-- SidebarNavigation
+    MainWindow *-- "many" BaseView
+    BaseView <|-- DashboardView
+    BaseView <|-- AdapterView
+    BaseView *-- ViewHeader
+    
+    note for AdapterView "Abstract representation of all adapter views:\n- DataViewAdapter\n- ValidationViewAdapter\n- CorrectionViewAdapter\n- ChartViewAdapter"
+```
+
+### Key UI Patterns
+
+#### 1. Adapter Pattern
+
+For integrating existing UI components with the new UI structure, we use the adapter pattern:
+
+```mermaid
+graph TD
+    BV[BaseView] --> Adapter[AdapterView]
+    Adapter --> OC[Original Component]
+    
+    style BV fill:#1a3055,color:#fff
+    style Adapter fill:#234a87,color:#fff
+    style OC fill:#2e62b5,color:#fff
+```
+
+**Implementation Example:**
+```python
+class DataViewAdapter(BaseView):
+    def __init__(self, data_model, parent=None):
+        # Store references
+        self._data_model = data_model
+        
+        # Create the original component
+        self._data_view = DataView(data_model)
+        
+        # Initialize the base view
+        super().__init__("Data View", parent)
+        
+    def _setup_ui(self):
+        # First call the parent class's _setup_ui method
+        super()._setup_ui()
+        
+        # Add the original component to the content widget
+        self.get_content_layout().addWidget(self._data_view)
+```
+
+#### 2. Content View Pattern
+
+For consistent UI components with standardized structure:
+
+```mermaid
+graph TD
+    BV[BaseView] --> H[Header]
+    BV --> C[Content]
+    H --> T[Title]
+    H --> A[Action Buttons]
+    
+    style BV fill:#1a3055,color:#fff
+    style H fill:#234a87,color:#fff
+    style C fill:#234a87,color:#fff
+    style T fill:#2e62b5,color:#fff
+    style A fill:#2e62b5,color:#fff
+```
+
+#### 3. Navigation Pattern
+
+For consistent and organized application navigation:
+
+```mermaid
+graph LR
+    MW[MainWindow] --> SN[SidebarNavigation]
+    SN -- navigation_changed --> MW
+    MW -- set_active_item --> SN
+    MW -- setCurrentWidget --> CS[ContentStack]
+    
+    style MW fill:#1a3055,color:#fff
+    style SN fill:#234a87,color:#fff
+    style CS fill:#234a87,color:#fff
+```
+
+#### 4. Dashboard Pattern
+
+```mermaid
+graph TD
+    DB[DashboardView] --> SC[Stats Cards]
+    DB --> RF[Recent Files]
+    DB --> QA[Quick Actions]
+    DB --> CH[Charts]
+    QA -- action_triggered --> MW[MainWindow]
+    RF -- file_selected --> MW
+    
+    style DB fill:#1a3055,color:#fff
+    style SC fill:#234a87,color:#fff
+    style RF fill:#234a87,color:#fff
+    style QA fill:#234a87,color:#fff
+    style CH fill:#234a87,color:#fff
+    style MW fill:#2e62b5,color:#fff
+```
+
+## UI Component Interactions
+
+### Signal-Slot Mechanism
+
+The UI components communicate primarily through the Qt Signal-Slot mechanism:
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant SidebarNav
+    participant MainWindow
+    participant ContentViews
+    
+    User->>SidebarNav: Click navigation item
+    SidebarNav->>MainWindow: navigation_changed signal
+    MainWindow->>ContentViews: Switch active view
+    ContentViews-->>User: Display view
+```
+
+### UI Update Flow
+
+```mermaid
+sequenceDiagram
+    participant DM as DataModel
+    participant MW as MainWindow
+    participant SB as StatusBar
+    participant DV as DataView
+    
+    DM->>DM: Data changes
+    DM->>MW: data_changed signal
+    MW->>SB: Update status
+    MW->>DV: Reflect changes
+    DV-->>User: Display updated data
+```
+
+## UI Visual Style
+
+### Color Scheme
+
+We've selected a professional dark blue theme with gold accents:
+
+```
+PRIMARY: #1a3055 (Dark Blue)
+SECONDARY: #ffc107 (Gold)
+ACCENT: #f8c760 (Light Gold)
+BACKGROUND: #141e30 (Darker Blue)
+TEXT_LIGHT: #ffffff (White)
+TEXT_MUTED: #a0aec0 (Light Gray)
+BORDER: #2d4a77 (Medium Blue)
+```
+
+### Visual Mockup
+
+```
+┌────────────────────────────────────────────────────────────────────┐
+│ ChestBuddy - Chest Data Analysis Tool                         _ □ X │
+├────────┬───────────────────────────────────────────────────────────┤
+│        │ ┌─────────────────────────────────────────────────────┐   │
+│        │ │ Dashboard                                           │   │
+│        │ ├─────────────────────────────────────────────────────┤   │
+│        │ │                                                     │   │
+│        │ │ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐     │   │
+│        │ │ │Current  │ │Validation│ │Correction│ │Last    │     │   │
+│Dashboard│ │ │Dataset │ │Status   │ │Status   │ │Import  │     │   │
+│        │ │ │0 rows   │ │N/A      │ │0 corrected│ │Never   │     │   │
+│  Data  │ │ └─────────┘ └─────────┘ └─────────┘ └─────────┘     │   │
+│        │ │                                                     │   │
+│Validation│ │ ┌─────────────────┐ ┌─────────────────┐           │   │
+│        │ │ │                 │ │                 │           │   │
+│Correction│ │ │  Recent Files    │ │  Top Players     │           │   │
+│        │ │ │                 │ │                 │           │   │
+│ Charts │ │ │                 │ │                 │           │   │
+│        │ │ └─────────────────┘ └─────────────────┘           │   │
+│ Reports│ │                                                     │   │
+│        │ │ ┌─────────────────┐ ┌─────────────────┐           │   │
+│Settings│ │ │                 │ │ ┌────┐  ┌────┐  │           │   │
+│        │ │ │ Top Chest       │ │ │Imp.│  │Val.│  │           │   │
+│  Help  │ │ │ Sources         │ │ └────┘  └────┘  │           │   │
+│        │ │ │                 │ │ ┌────┐  ┌────┐  │           │   │
+│        │ │ │                 │ │ │Ana.│  │Rep.│  │           │   │
+│        │ │ └─────────────────┘ └─────────────────┘           │   │
+│        │ │                                                     │   │
+│        │ └─────────────────────────────────────────────────────┘   │
+├────────┴───────────────────────────────────────────────────────────┤
+│ 0 records | No data loaded                                          │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+### Component Styling
+
+Each component is styled with consistent properties:
+
+```css
+/* Example styling for cards */
+{
+    background-color: #1a3055;
+    border-radius: 6px;
+    border: 1px solid #2d4a77;
+}
+
+/* Text styling for headers */
+{
+    color: #ffffff;
+    font-size: 22px;
+    font-weight: 500;
+}
+
+/* Action buttons */
+{
+    background-color: #ffc107;
+    color: #1a3055;
+    border-radius: 4px;
+    padding: 6px 12px;
+}
+``` 

@@ -236,6 +236,71 @@ class TestValidationService:
         type_issues = service._check_data_types()
         assert isinstance(type_issues, dict)
 
+    def test_date_parsing_warnings(self, model):
+        """Test date parsing functionality in ValidationService."""
+        # Create data with dates in different formats and some non-numeric, non-date values
+        # to ensure we trigger the datetime parsing branch
+        data = pd.DataFrame(
+            {
+                "numeric_col": [1, 2, 3, 4],  # Numeric column
+                "mixed_col": [
+                    "text",
+                    "1",
+                    "2",
+                    "3",
+                ],  # Mixed types (will not be identified as dates)
+                "date_col": [
+                    "2023-01-01",
+                    "2023/02/02",
+                    "01.03.2023",
+                    "04/05/2023",
+                ],  # Various date formats
+                "timestamp_col": [
+                    "2023-01-01 10:30:00",
+                    "2023-01-02 11:45:00",
+                    "2023-01-03 12:15:00",
+                    "2023-01-04 14:20:00",
+                ],
+            }
+        )
+
+        # Update model with sample data
+        model.update_data(data)
+
+        # Create service
+        service = ValidationService(model)
+
+        # Run the method that validates data types
+        issues = service._check_data_types()
+
+        # Verify functionality is working correctly for date columns
+        # The mixed_col will likely have issues because it contains non-numeric text
+        # but date_col and timestamp_col should be recognized as valid dates
+
+        # Check that none of the date rows have issues
+        for row_idx in range(4):
+            assert (
+                row_idx not in issues
+                or "date_col" not in issues.get(row_idx, "")
+                and "timestamp_col" not in issues.get(row_idx, "")
+            )
+
+        # Directly test pd.to_datetime with format='mixed' to ensure it works with our test data
+        try:
+            result = pd.to_datetime(data["date_col"], format="mixed")
+            # Verify all dates were parsed correctly (no NaT values)
+            assert not result.isna().any()
+        except ValueError as e:
+            pytest.fail(f"Failed to parse dates with format='mixed': {e}")
+
+        # Test with dayfirst parameter for format flexibility
+        try:
+            result = pd.to_datetime(data["date_col"], format="mixed", dayfirst=True)
+            # Verify all dates were parsed correctly (no NaT values)
+            assert not result.isna().any()
+        except ValueError as e:
+            pytest.fail(f"Failed to parse dates with format='mixed' and dayfirst=True: {e}")
+
 
 # Correction Service Tests
 class TestCorrectionService:

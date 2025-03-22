@@ -268,3 +268,226 @@ Date,Player Name,Source/Location,Chest Type,Value,Clan
 - test_workflows.py: End-to-end workflow tests
 - test_performance.py: Performance and memory usage tests
 - Enhancements to existing test files for more comprehensive coverage 
+
+## UI Technologies and Framework
+
+### UI Framework: PySide6
+
+The ChestBuddy application uses PySide6 as its primary UI framework, which provides Qt6 bindings for Python. This modern framework offers:
+
+- Native-looking widgets across platforms
+- Rich set of UI components
+- Style customization capabilities
+- Signal-slot mechanism for event handling
+- Efficient rendering with hardware acceleration
+
+Key PySide6 components we use:
+
+| Component | Usage in ChestBuddy |
+|-----------|---------------------|
+| `QMainWindow` | Main application window structure |
+| `QWidget` | Base for all custom UI components |
+| `QVBoxLayout`/`QHBoxLayout` | Layout management for components |
+| `QStackedWidget` | Content view switching mechanism |
+| `QTableView` | Display of tabular data |
+| `QListWidget` | Lists in sidebar navigation |
+| `QPushButton` | Action buttons throughout the UI |
+| `QLabel` | Text and image display |
+| `QComboBox` | Dropdown selections |
+| `QScrollArea` | Scrollable content containers |
+| `QSplitter` | Resizable panel divisions |
+
+### Styling System
+
+The UI employs a custom styling system with:
+
+1. **CSS-like Styling**: PySide6's QSS (Qt Style Sheets) for visual styling
+2. **Custom Style Class**: Central management of colors and styles
+3. **Theme Variables**: Consistent color definitions for UI components
+4. **Icon System**: SVG icons with color customization
+
+Example QSS usage:
+```python
+def get_sidebar_style():
+    return f"""
+        QListWidget {{
+            background-color: {Colors.PRIMARY_DARK};
+            border: none;
+            border-radius: 0px;
+            outline: 0;
+            padding: 5px;
+        }}
+        QListWidget::item {{
+            color: {Colors.TEXT_LIGHT};
+            border-radius: 4px;
+            padding: 8px;
+            margin: 2px 5px;
+        }}
+        QListWidget::item:selected {{
+            background-color: {Colors.ACCENT};
+            color: {Colors.TEXT_DARK};
+        }}
+    """
+```
+
+### Resource Management
+
+Resources are managed through:
+
+1. **ResourceManager Class**: Central handler for loading and caching resources
+2. **File-based Resources**: Icons and images stored as files in the resource directory
+3. **Qt Resource System**: For compiled resources (optional)
+
+```python
+class ResourceManager:
+    def __init__(self):
+        self._resource_cache = {}
+        self._resource_dir = Path(__file__).parent.parent / "resources"
+        
+    def get_icon(self, name):
+        # Implementation for getting icons with caching
+```
+
+## UI Architecture Implementation
+
+### Component Structure
+
+The UI components are organized in a hierarchical structure:
+
+```
+chestbuddy/ui/
+├── base_view.py            # Base class for content views
+├── chart_tab.py            # Original chart component
+├── colors.py               # Color definitions
+├── correction_tab.py       # Original correction component
+├── dashboard_view.py       # Dashboard landing page
+├── data_view.py            # Original data component
+├── icons.py                # Icon provider
+├── main_window.py          # Main application window
+├── resource_manager.py     # Resource loading and caching
+├── sidebar_navigation.py   # Sidebar navigation
+├── status_bar.py           # Enhanced status bar
+├── style.py                # Style definitions and helpers
+├── validation_tab.py       # Original validation component
+└── views/                  # Adapter views for existing components
+    ├── chart_view_adapter.py
+    ├── correction_view_adapter.py
+    ├── data_view_adapter.py
+    └── validation_view_adapter.py
+```
+
+### Adapter Pattern Implementation
+
+The adapter pattern is used to integrate existing components with the new UI structure:
+
+```python
+class DataViewAdapter(BaseView):
+    """
+    Adapter for the DataView component to integrate with the new UI structure.
+    """
+    def __init__(self, parent=None):
+        super().__init__(title="Data View", parent=parent)
+        self._data_view = None
+        self._setup_ui()
+        
+    def _setup_ui(self):
+        super()._setup_ui()
+        self._data_view = DataView(self)
+        self.content_layout.addWidget(self._data_view)
+        
+        # Set up connection to the DataView's signals
+        self._setup_connections()
+        
+    def _setup_connections(self):
+        # Connect DataView signals to adapter methods
+        pass
+```
+
+### Signal-Slot Communication
+
+The UI components communicate through Qt's signal-slot mechanism:
+
+```python
+# Signal definitions in MainWindow
+class MainWindow(QMainWindow):
+    # Signals that will be connected to app.py
+    file_opened = Signal(str)
+    load_csv_triggered = Signal(str)
+    file_saved = Signal(str)
+    save_csv_triggered = Signal(str)
+    validation_requested = Signal()
+    validate_data_triggered = Signal()
+    correction_requested = Signal()
+    apply_corrections_triggered = Signal()
+    export_validation_issues_triggered = Signal(str)
+```
+
+## Development Tools
+
+| Tool | Purpose | Usage |
+|------|---------|-------|
+| Visual Studio Code | Primary IDE | Code editing, debugging |
+| Qt Designer | UI Layout Design | Layout design for complex widgets |
+| Git | Version Control | Track changes to UI components |
+| PyTest | Testing | UI component testing |
+| Python Type Hints | Code Assistance | Type annotations for UI classes |
+
+## UI Technical Decisions
+
+### 1. Adapter Pattern Choice
+
+**Decision**: Use adapter pattern rather than rewriting existing components
+
+**Rationale**:
+- Minimizes changes to existing code
+- Reduces risk of introducing bugs
+- Allows incremental UI improvements
+- Maintains compatibility with existing functionality
+
+### 2. CSS-based Styling
+
+**Decision**: Use QSS (Qt Style Sheets) for styling rather than hard-coded properties
+
+**Rationale**:
+- Centralizes styling in one place
+- Makes theme changes easier
+- Consistent appearance across components
+- Familiar syntax for web developers
+
+### 3. Dashboard-centric Navigation
+
+**Decision**: Implement a dashboard as the main landing page
+
+**Rationale**:
+- Provides quick access to common functions
+- Shows application status at a glance
+- Offers shortcuts to recent files
+- Improves user experience with visual guidance
+
+### 4. Icon System Implementation
+
+**Decision**: Use SVG icons with dynamic coloring
+
+**Rationale**:
+- Scales cleanly at any resolution
+- Allows color changes for themes
+- Reduces file size compared to bitmap formats
+- Supports accessibility features
+
+## UI Technical Dependencies
+
+| Dependency | Version | Purpose |
+|------------|---------|---------|
+| PySide6 | 6.5.2+ | UI framework |
+| Python | 3.10+ | Core language |
+| Qt | 6.5+ | Underlying UI framework |
+| matplotlib | 3.7+ | Charts and visualizations |
+| pandas | 2.0+ | Data manipulation |
+
+## UI Performance Considerations
+
+1. **Resource Caching**: Icons and styles are cached to reduce loading times
+2. **Lazy Loading**: Views are created only when needed
+3. **Efficient Updates**: Only changed parts of the UI are redrawn
+4. **Memory Management**: Resources are freed when no longer needed
+5. **Responsive Design**: UI remains responsive during long operations 
