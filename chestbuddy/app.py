@@ -165,8 +165,15 @@ class ChestBuddyApp(QObject):
         autosave_path.parent.mkdir(exist_ok=True)
 
         # Save the data
-        self._csv_service.save_csv(autosave_path)
-        logger.info(f"Autosave completed to {autosave_path}")
+        try:
+            # Correct parameter order: data first, then path
+            result, error = self._csv_service.write_csv(autosave_path, self._data_model.data)
+            if result:
+                logger.info(f"Autosave completed to {autosave_path}")
+            else:
+                logger.error(f"Error during autosave: {error}")
+        except Exception as e:
+            logger.error(f"Error during autosave: {str(e)}")
 
     def _on_shutdown(self) -> None:
         """Handle application shutdown."""
@@ -244,7 +251,12 @@ class ChestBuddyApp(QObject):
         df = self._data_model.data
 
         # Use the background worker to save the file
-        self._worker.run_task(self._csv_service.save_csv, df, file_path, task_id="save_csv")
+        self._worker.run_task(
+            self._csv_service.write_csv,
+            file_path,
+            df,
+            task_id="save_csv",
+        )
 
     def _validate_data(self):
         """Validate the data in the model."""
@@ -320,6 +332,17 @@ class ChestBuddyApp(QObject):
         except Exception as e:
             # Log other errors but don't let them crash the application
             logger.error(f"Error handling data changed event: {str(e)}")
+
+    def _update_ui(self) -> None:
+        """Update UI components after data model changes."""
+        try:
+            # No need to explicitly update UI components as they are connected
+            # to the data_changed signal and will update themselves
+            # Just refresh the main window if needed
+            if hasattr(self, "_main_window") and self._main_window is not None:
+                self._main_window.refresh_ui()
+        except Exception as e:
+            logger.error(f"Error updating UI: {str(e)}")
 
     def _on_background_task_completed(self, task_id, result):
         """Handle background task completion."""
