@@ -1243,3 +1243,22 @@ There was a mismatch between how the `filter_data` method was defined in `ChestD
 The original dictionary-based method was completely replaced with the new parameter-based implementation. The new method is more flexible and provides better filtering options for the user through the UI, with support for different matching modes and case sensitivity.
 
 **Status**: FIXED
+
+## Context Menu Paste Options UI Enhancement - 2025-03-23
+
+**Issue**: Context menu showed both "Paste" and "Paste to all X selected cells" options when multiple cells were selected, creating redundancy in the UI.
+
+**Root Cause**: 
+The context menu was always creating a standard "Paste" action, then conditionally adding an additional "Paste to all X selected cells" action when multiple cells were selected. Both actions actually performed the same function.
+
+**Fix**:
+Modified the `_show_context_menu` method in `DataView` class to:
+1. Check if multiple cells are selected
+2. When multiple cells are selected, use "Paste to all X selected cells" as the text for the single paste action
+3. When only one cell is selected, use the standard "Paste" text
+4. Removed the redundant second paste action
+
+**Technical Notes**:
+This is a pure UI improvement that makes the context menu cleaner and less confusing for users. The actual functionality (pasting to all selected cells) already worked correctly in both cases.
+
+**Status**: FIXED

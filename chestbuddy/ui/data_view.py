@@ -614,16 +614,14 @@ class DataView(QWidget):
         # Get selected cells to determine context menu options
         selected_indexes = self._table_view.selectedIndexes()
 
-        # Standard paste option (always available)
-        paste_action = QAction("Paste", self)
+        # Add paste option with appropriate text based on selection
+        if len(selected_indexes) > 1:
+            paste_action = QAction(f"Paste to all {len(selected_indexes)} selected cells", self)
+        else:
+            paste_action = QAction("Paste", self)
+
         paste_action.triggered.connect(lambda: self._paste_cell(index))
         context_menu.addAction(paste_action)
-
-        # Add special paste option when multiple cells are selected
-        if len(selected_indexes) > 1:
-            paste_all_action = QAction(f"Paste to all {len(selected_indexes)} selected cells", self)
-            paste_all_action.triggered.connect(lambda: self._paste_cell(index))
-            context_menu.addAction(paste_all_action)
 
         # Show the menu
         context_menu.exec_(self._table_view.viewport().mapToGlobal(position))
