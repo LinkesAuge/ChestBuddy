@@ -811,3 +811,44 @@ Even after implementing rate limiting for signal cascades (REC-005), the applica
 - The changes are fully backward compatible with existing code
 
 This fix complements our previous solutions by addressing the root cause - unnecessary signal emissions when no actual changes occur. The application now maintains a responsive UI while only performing updates when truly needed.
+
+## CSV Method Name and Parameter Order Fix
+- Issue ID: CSV-001
+- Status: FIXED
+- Date: 2025-03-22
+- Affected components: ChestBuddyApp, MainWindow, CSVService
+
+### Description
+After importing a CSV file, the data was successfully loaded but not displayed in the UI. Additionally, an error occurred during application shutdown: `'CSVService' object has no attribute 'save_csv'` and `'ChestBuddyApp' object has no attribute '_update_ui'`.
+
+### Root Cause Analysis
+1. Method name inconsistencies: 
+   - The code used `save_csv` in multiple places, but the actual method in CSVService is named `write_csv`
+   - The method `_update_ui` was referenced in `_on_data_changed` but wasn't implemented
+
+2. Parameter order inconsistencies:
+   - The parameters for `write_csv` were being passed in the wrong order in some places
+   - Some methods were expecting `(data, file_path)` while others expected `(file_path, data)`
+
+### Comprehensive Fix
+1. Added the missing `_update_ui` method to `ChestBuddyApp` class:
+   - Method now refreshes the UI through the `MainWindow.refresh_ui()` method
+   - Added proper error handling and checks for null/undefined UI components
+
+2. Updated all method calls to use consistent naming:
+   - Changed `save_csv` to `write_csv` in all locations
+   - Updated parameter order to match the API documentation: `(file_path, data, encoding)`
+
+3. Added the missing `refresh_ui` method to `MainWindow` class:
+   - Method refreshes the current tab and updates the status bar
+   - Added support for different update methods (`refresh` or `_update_view`)
+
+4. Fixed parameter handling in `_on_autosave`:
+   - Now correctly passes file_path first, then data
+   - Added proper handling of the result tuple
+
+### Technical Notes
+- This fix highlights the importance of consistent method naming and parameter ordering
+- The UI now properly refreshes after data model changes
+- CSV saving/loading works correctly with the fixed parameter order
+- Future change: consider adding a parameter name check tool to ensure consistent parameter ordering
