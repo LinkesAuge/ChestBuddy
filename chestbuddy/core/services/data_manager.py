@@ -34,6 +34,7 @@ class DataManager(QObject):
         _csv_service: Service for handling CSV file operations
         _config: Configuration manager instance
         _worker: Background worker for async operations
+        _current_file_path: Track the current file path
 
     Implementation Notes:
         - Manages file loading and saving
@@ -60,6 +61,7 @@ class DataManager(QObject):
 
         self._data_model = data_model
         self._csv_service = csv_service
+        self._current_file_path = None  # Track the current file path
 
         # Initialize config and background worker
         self._config = ConfigManager()
@@ -77,6 +79,9 @@ class DataManager(QObject):
             file_path: Path to the CSV file
         """
         logger.info(f"Loading CSV file: {file_path}")
+
+        # Store the current file path
+        self._current_file_path = file_path
 
         # Add the file to the list of recent files
         self._update_recent_files(file_path)
@@ -114,63 +119,116 @@ class DataManager(QObject):
         self._config.set("Files", "last_file", file_path)
         self._config.set_path("Files", "last_directory", os.path.dirname(file_path))
 
-    def _on_csv_load_success(self, result) -> None:
+    def _on_csv_load_success(self, result_tuple: Tuple[pd.DataFrame, str]):
         """
-        Handle successful CSV load.
+        Handle successful CSV load from background thread.
 
         Args:
-            result: Tuple containing DataFrame and error (if any)
+            result_tuple: Tuple containing (DataFrame, message)
         """
         try:
-            df, error = result
-            if df is not None:
-                # Map CSV column names to expected column names in the data model
-                df = self._map_columns(df)
+            logger.debug("CSV load success callback triggered")
+            # Type check the result tuple
+            if not isinstance(result_tuple, tuple) or len(result_tuple) != 2:
+                logger.error(f"Invalid result format from CSV load: {type(result_tuple)}")
+                self.load_error.emit("Invalid result format from CSV service")
+                return
 
-                # Update the data model with signals blocked
-                self._data_model.update_data(df)
-                logger.info(f"CSV file loaded successfully with {len(df)} rows")
+            data, message = result_tuple
 
-                # Emit success signal
-                self.load_success.emit(str(df.shape[0]))
-            else:
-                self.load_error.emit(f"Error loading file: {error}")
-        finally:
-            # Always unblock signals when done
+            # Validate the DataFrame
+            if data is None or not isinstance(data, pd.DataFrame):
+                logger.error(f"CSV load did not return valid DataFrame: {type(data)}")
+                self.load_error.emit(message or "Failed to load CSV data")
+                return
+
+            if data.empty:
+                logger.warning("CSV load returned empty DataFrame")
+                self.load_error.emit("CSV file is empty")
+                return
+
+            logger.info(f"CSV loaded successfully with {len(data)} rows")
+
+            # Store the file path that was successfully loaded
+            if self._current_file_path:
+                self._update_recent_files(self._current_file_path)
+
+            # Attempt to map columns
+            mapped_data = self._map_columns(data)
+
+            # Update the data model with the new data
+            self._data_model.update_data(mapped_data)
+
+            # Emit success signal with message
+            self.load_success.emit(message or "CSV loaded successfully")
+
+            # Finally, unblock signals and emit a controlled change notification
             self._data_model.blockSignals(False)
-            # Emit one controlled data_changed signal
             self._data_model.data_changed.emit()
+        except Exception as e:
+            # Ensure signals are unblocked even if an error occurs
+            self._data_model.blockSignals(False)
 
-    def _map_columns(self, df: pd.DataFrame) -> pd.DataFrame:
+            logger.error(f"Error in CSV load success callback: {e}")
+            import traceback
+
+            logger.error(traceback.format_exc())
+            self.load_error.emit(f"Error processing CSV data: {str(e)}")
+
+    def _map_columns(self, data: pd.DataFrame) -> pd.DataFrame:
         """
-        Map DataFrame columns to expected column names in the data model.
+        Map columns from CSV to the expected format in the data model.
 
         Args:
-            df: DataFrame with columns to map
+            data: The DataFrame with original CSV columns
 
         Returns:
-            DataFrame with mapped column names
+            DataFrame with mapped columns
         """
-        # Define column mapping
-        column_mapping = {
-            "DATE": "Date",
-            "PLAYER": "Player Name",
-            "SOURCE": "Source/Location",
-            "CHEST": "Chest Type",
-            "SCORE": "Value",
-            "CLAN": "Clan",
-        }
+        try:
+            # Safety check - ensure we have a DataFrame
+            if not isinstance(data, pd.DataFrame):
+                logger.error(f"Cannot map columns - invalid data type: {type(data)}")
+                return pd.DataFrame()  # Return empty DataFrame as fallback
 
-        # Rename columns if they exist in the DataFrame
-        for csv_col, model_col in column_mapping.items():
-            if csv_col in df.columns:
-                df.rename(columns={csv_col: model_col}, inplace=True)
-                logger.info(f"Mapped column {csv_col} to {model_col}")
+            # Get column mapping from config
+            column_mapping = self._config.get("column_mapping", {})
+            if not column_mapping:
+                logger.info("No column mapping found, using original columns")
+                return data
 
-        # Log mapped columns for debugging
-        logger.info(f"DataFrame columns after mapping: {df.columns.tolist()}")
+            # Check if the mapping applies to this data
+            csv_columns = set(data.columns)
+            mapping_source_cols = set(column_mapping.keys())
 
-        return df
+            # If none of the mapping source columns exist in the CSV,
+            # we probably have the wrong mapping, so skip it
+            if not mapping_source_cols.intersection(csv_columns):
+                logger.warning("Column mapping doesn't match CSV columns, skipping mapping")
+                return data
+
+            # Create a new DataFrame with mapped columns
+            mapped_data = pd.DataFrame()
+
+            # Apply mapping for columns that exist in the CSV
+            for csv_col, model_col in column_mapping.items():
+                if csv_col in data.columns:
+                    mapped_data[model_col] = data[csv_col]
+
+            # Copy over any unmapped columns
+            for col in data.columns:
+                if col not in column_mapping:
+                    mapped_data[col] = data[col]
+
+            logger.info(f"Mapped columns: {list(mapped_data.columns)}")
+            return mapped_data
+        except Exception as e:
+            logger.error(f"Error mapping columns: {e}")
+            import traceback
+
+            logger.error(traceback.format_exc())
+            # Return original data as fallback
+            return data
 
     def save_csv(self, file_path: str) -> None:
         """

@@ -450,30 +450,27 @@ class ChestDataModel(QObject):
                 )
                 return True
 
-            # Update the cell using iloc which is more reliable than at[]
-            # First make a copy of the row
-            row = self._data.iloc[row_idx].copy()
-            # Update the value in the copy
-            row[column_name] = value
-            # Replace the entire row
-            self._data.iloc[row_idx] = row
+            # Update the cell directly using loc instead of copying and replacing rows
+            # This is safer and avoids the "equal len keys and value" error
+            self._data.loc[row_idx, column_name] = value
 
-            # Update validation and correction status for this cell
+            # Update validation status for this cell
             val_status = self.get_cell_validation_status(row_idx, column_name)
             if val_status:
                 val_status["checked"] = False
-                # Use the same approach for validation status
-                validation_row = self._validation_status.iloc[row_idx].copy()
-                validation_row[column_name] = val_status
-                self._validation_status.iloc[row_idx] = validation_row
+                # Similarly use loc for validation status
+                validation_col = f"{column_name}_valid"
+                if validation_col in self._validation_status.columns:
+                    self._validation_status.loc[row_idx, validation_col] = False
 
+            # Update correction status for this cell
             corr_status = self.get_cell_correction_status(row_idx, column_name)
             if corr_status:
                 corr_status["applied"] = False
-                # Use the same approach for correction status
-                correction_row = self._correction_status.iloc[row_idx].copy()
-                correction_row[column_name] = corr_status
-                self._correction_status.iloc[row_idx] = correction_row
+                # Similarly use loc for correction status
+                correction_col = f"{column_name}_corrected"
+                if correction_col in self._correction_status.columns:
+                    self._correction_status.loc[row_idx, correction_col] = False
 
             # Notify of the change
             self._notify_change()

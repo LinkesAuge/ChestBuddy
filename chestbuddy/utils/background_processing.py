@@ -248,10 +248,27 @@ class BackgroundWorker(QObject):
 
     def __del__(self) -> None:
         """Clean up resources when the worker is deleted."""
-        # Make sure the thread is properly cleaned up
-        if self._thread.isRunning():
-            self._thread.quit()
-            self._thread.wait()
+        try:
+            # Check if thread still exists and is running
+            if hasattr(self, "_thread") and self._thread is not None:
+                logger.debug("Cleaning up BackgroundWorker thread")
+                if self._thread.isRunning():
+                    # Cancel any running task
+                    if hasattr(self, "_task") and self._task is not None:
+                        self._task.cancel()
+
+                    # Try to quit the thread gracefully first
+                    self._thread.quit()
+
+                    # Wait for thread to finish with a timeout
+                    if not self._thread.wait(1000):  # 1 second timeout
+                        logger.warning("Thread did not quit gracefully, forcing termination")
+                        self._thread.terminate()
+                        self._thread.wait(500)  # Give it a bit more time
+        except Exception as e:
+            # Just log any errors during cleanup, don't raise
+            logger.error(f"Error cleaning up BackgroundWorker: {e}")
+            logger.debug(traceback.format_exc())
 
     def run_task(self, func, *args, task_id=None, on_success=None, on_error=None, **kwargs):
         """

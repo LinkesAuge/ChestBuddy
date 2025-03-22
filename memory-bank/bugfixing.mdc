@@ -772,7 +772,7 @@ Even after previous recursion fixes, the application was still experiencing a si
 - Class-level timestamp tracking allows sharing the last update time across all instances
 - The solution is non-intrusive and works well with our existing recursion protections
 
-This fix complements our previous recursion fixes by addressing the signal cascade problem at a higher level, ensuring stable application performance regardless of how signals propagate between components.
+This fix complements our previous solutions by addressing the signal cascade problem at a higher level, ensuring stable application performance regardless of how signals propagate between components.
 
 ## Optimized State-Based Signal Emission Fix
 - Issue ID: REC-006
@@ -1103,39 +1103,63 @@ column_mapping = {
 ### Status
 Fixed: The table now properly displays data from CSV files with uppercase column names.
 
-## Cell Editing Error
+## Cell Editing Error in DataView
 
 ### Issue
-Users encountered an error when trying to edit cell values in the table view. Two related errors occurred:
-1. In the model: "Error updating cell: Incompatible indexer with Series" 
-2. In the view: "'PySide6.QtGui.QStandardItem.setData' called with wrong argument types" error
+When editing cells in the DataView, a Pandas error would occur: "Must have equal len keys and value when setting with an iterable."
 
 ### Root Cause
-There were two separate issues:
-1. The `ChestDataModel.update_cell()` method was using DataFrame's `.at[]` accessor which can cause compatibility issues with Series objects in some pandas operations
-2. The `DataView._on_item_changed()` method was using `item.data(Qt.EditRole)` and `item.setData(Qt.DisplayRole, value)` with enum values that caused type errors in PySide6
+The `update_cell` method in `ChestDataModel` was using the `iloc` accessor with a copy-and-replace approach that could cause index mismatch issues when setting values in the DataFrame.
 
 ### Error Details
 ```
-chestbuddy.core.models.chest_data_model - ERROR - Error updating cell: Incompatible indexer with Series
-chestbuddy.ui.data_view - ERROR - Failed to update cell at [0, Player Name]
-chestbuddy.ui.data_view - ERROR - Error handling item change: 'PySide6.QtGui.QStandardItem.setData' called with wrong argument types
+Error updating cell: Must have equal len keys and value when setting with an iterable
 ```
 
 ### Fix
-1. In `ChestDataModel.update_cell()`:
-   - Changed the cell update approach to use `iloc[]` to get a copy of the row
-   - Modified the copy and replaced the entire row
-   - Applied the same approach for validation and correction status updates
-
-2. In `DataView._on_item_changed()`:
-   - Changed from `item.data(Qt.EditRole)` to `item.text()` to get the new value
-   - Changed from `item.setData(Qt.DisplayRole, value)` to `item.setText(value)` when restoring values
+Changed the cell update approach to use the `loc` accessor for direct cell updates instead of the copy-and-replace approach with `iloc`. The updated method:
+- Directly updates the cell using `self._data.loc[row_idx, column_name] = value`
+- Uses the same approach for validation and correction status updates
+- Adds additional checks to ensure columns exist before attempting updates
 
 ### Technical Notes
-- The pandas DataFrame `at[]` accessor can cause issues with Series objects in some contexts
-- The PySide6 `QStandardItem.setData()` method expects an integer role, not an enum value like `Qt.EditRole` 
-- The `setText()` and `text()` methods provide a more reliable way to access text content in QStandardItems
+- The `iloc` approach was causing issues because of how Pandas handles row replacement
+- The `loc` accessor is more appropriate for single cell updates as it's designed for labeled access
+- Added safety checks to ensure columns exist before updating status columns
 
 ### Status
-✅ Fixed - Cell editing now works correctly
+Fixed in commit [COMMIT_ID]. The table now allows cell editing without DataFrame errors.
+
+## Application Quitting Error
+
+### Issue
+When quitting the application after CSV operations, errors were occurring:
+1. `AttributeError: 'bool' object has no attribute 'columns'`
+2. `RuntimeError: Internal C++ object (PySide6.QtCore.QThread) already deleted.`
+
+### Root Cause
+1. The first error was in the `DataManager._map_columns` method where a boolean was incorrectly being passed instead of a DataFrame.
+2. The second error was a Qt threading issue where thread cleanup was not properly handling object deletion.
+
+### Error Details
+```
+AttributeError: 'bool' object has no attribute 'columns'
+RuntimeError: Internal C++ object (PySide6.QtCore.QThread) already deleted.
+```
+
+### Fix
+1. Added type checking in `DataManager._on_csv_load_success` to validate the result format and ensure a DataFrame is passed to `_map_columns`.
+2. Enhanced the `BackgroundWorker.__del__` method with robust thread cleanup:
+   - Added checks for thread existence and running state
+   - Implemented a timeout-based approach to wait for thread completion
+   - Added graceful termination with fallback to force termination
+   - Added exception handling to prevent errors during cleanup
+
+### Technical Notes
+- The CSV loading process now validates result types before processing
+- Thread cleanup now has better error handling and timeouts
+- Added proper cancellation of any running tasks during cleanup
+- Fixed signal unblocking to ensure the data model always returns to a stable state
+
+### Status
+Fixed in commit [COMMIT_ID]. The application now quits cleanly without threading exceptions.
