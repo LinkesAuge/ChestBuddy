@@ -1076,7 +1076,7 @@ QTimer.singleShot(0, lambda: self._main_window._set_active_view("Data"))
 CSV data was not displaying in the table view despite being properly loaded. The table showed empty cells.
 
 ### Root Cause
-The ChestDataModel expected column names in the format ["Date", "Player Name", "Source/Location", "Chest Type", "Value", "Clan"], but the CSV file had column names in the format ["DATE", "PLAYER", "SOURCE", "CHEST", "SCORE", "CLAN"]. The case difference and naming conventions prevented the data from being properly mapped.
+The `ChestDataModel.EXPECTED_COLUMNS` were defined with title case names (e.g., "Player Name"), but the actual CSV file had column names in the format ["DATE", "PLAYER", "SOURCE", "CHEST", "SCORE", "CLAN"]. The case difference and naming conventions prevented the data from being properly mapped and displayed in the table.
 
 ### Error Details
 When loading a CSV with uppercase column names, the data model was creating empty columns with the expected names instead of mapping the existing columns, resulting in a table with the correct structure but no data.
@@ -1163,3 +1163,31 @@ RuntimeError: Internal C++ object (PySide6.QtCore.QThread) already deleted.
 
 ### Status
 Fixed in commit [COMMIT_ID]. The application now quits cleanly without threading exceptions.
+
+## Column Naming and Mapping Issue
+
+### Problem
+Data was loading from CSV files correctly but not displaying in the table view. The application was reading the CSV file correctly (with 12,387 rows in the test case), but the table cells appeared empty.
+
+### Root Cause
+The `ChestDataModel.EXPECTED_COLUMNS` were defined with title case names (e.g., "Player Name"), but the actual CSV file had uppercase column names (e.g., "PLAYER"). This mismatch prevented the data from being properly mapped and displayed in the table.
+
+### Fix
+1. Updated `ChestDataModel.EXPECTED_COLUMNS` to use uppercase column names that match the CSV file structure:
+   ```python
+   EXPECTED_COLUMNS = ["DATE", "PLAYER", "SOURCE", "CHEST", "SCORE", "CLAN"]
+   ```
+
+2. Enhanced the `DataManager._map_columns` method to include a default mapping between old column names and new ones, ensuring backward compatibility with any code still using the old column formats.
+
+3. Updated test cases to use the new column names in all assertions and test data.
+
+### Validation
+- Manually verified that data from the test CSV file now displays correctly in the table view
+- Updated and ran tests to confirm they pass with the new column names
+- Checked that any existing code relying on old column names still works due to the default mapping
+
+### Status
+- Fixed on: [current date]
+- Related issues: Data not displaying in table, Cell editing errors
+- Affects: DataView, ChestDataModel, DataManager

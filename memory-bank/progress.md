@@ -396,6 +396,10 @@ The application now allows users to:
 - [x] Created comprehensive chart integration tests
 - [x] Implemented performance tests for chart rendering
 - [x] Created end-to-end workflow tests with chart functionality
+- [x] Refactored CSV operations into a dedicated DataManager service for better separation of concerns
+- [x] Fixed cell editing errors in DataView and ChestDataModel
+- [x] Fixed quitting errors related to thread shutdown
+- [x] Fixed column mapping issue by standardizing column names to match CSV structure
 
 ## Known Issues
 

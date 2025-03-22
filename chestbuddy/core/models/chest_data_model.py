@@ -46,7 +46,7 @@ class ChestDataModel(QObject):
     correction_applied = Signal()
 
     # Define expected columns
-    EXPECTED_COLUMNS = ["Date", "Player Name", "Source/Location", "Chest Type", "Value", "Clan"]
+    EXPECTED_COLUMNS = ["DATE", "PLAYER", "SOURCE", "CHEST", "SCORE", "CLAN"]
 
     def __init__(self) -> None:
         """Initialize the ChestDataModel."""

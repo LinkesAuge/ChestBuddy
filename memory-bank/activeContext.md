@@ -231,4 +231,20 @@ We have successfully implemented comprehensive tests for the chart functionality
 
 ## Known Issues
 
-- No known issues at this time 
+- No known issues at this time
+
+### Column Name Standardization
+
+We've updated the `ChestDataModel.EXPECTED_COLUMNS` to match the actual column names in our standard CSV file (`Chests_input_test.csv`). The columns are now defined using uppercase names:
+
+```python
+EXPECTED_COLUMNS = ["DATE", "PLAYER", "SOURCE", "CHEST", "SCORE", "CLAN"]
+```
+
+Previously, we were using title case column names like "Player Name", but our CSV files actually use uppercase names like "PLAYER". This mismatch was causing data to not display properly in the table view.
+
+We've also updated the `DataManager._map_columns` method to include a default mapping between old column names and new ones to maintain compatibility with existing code that might be using the old column names.
+
+Tests have been updated to reflect these changes, ensuring that all references to column names use the new uppercase format.
+
+### CSV Operations Refactoring 

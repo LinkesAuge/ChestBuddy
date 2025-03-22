@@ -52,27 +52,16 @@ def model():
 
 @pytest.fixture
 def sample_data():
-    """Create sample data for testing that matches our input file structure."""
-    return pd.DataFrame(
-        {
-            "Date": ["2025-03-11", "2025-03-11", "2025-03-11", "2025-03-12"],
-            "Player Name": ["Feldjäger", "Krümelmonster", "OsmanlıTorunu", "D4rkBlizZ4rD"],
-            "Source/Location": [
-                "Level 25 Crypt",
-                "Level 20 Crypt",
-                "Level 15 rare Crypt",
-                "Level 30 rare Crypt",
-            ],
-            "Chest Type": [
-                "Fire Chest",
-                "Infernal Chest",
-                "Rare Dragon Chest",
-                "Ancient Bastion Chest",
-            ],
-            "Value": [275, 84, 350, 550],
-            "Clan": ["MY_CLAN", "MY_CLAN", "MY_CLAN", "MY_CLAN"],
-        }
-    )
+    """Create sample data for testing."""
+    data = {
+        "DATE": ["2023-05-15", "2023-05-16"],
+        "PLAYER": ["Feldjäger", "Burgmeister"],
+        "SOURCE": ["Clan", "Tour"],
+        "CHEST": ["Gold Chest", "Silver Chest"],
+        "SCORE": [1000, 500],
+        "CLAN": ["TestClan1", "TestClan2"],
+    }
+    return pd.DataFrame(data)
 
 
 @pytest.fixture
@@ -127,41 +116,57 @@ class TestChestDataModel:
         row = model.get_row(0)
         assert row is not None
         assert isinstance(row, pd.Series)
-        assert row["Player Name"] == "Feldjäger"
+        assert row["PLAYER"] == "Feldjäger"
 
     def test_add_row(self, model):
-        """Test adding a row to the model."""
-        # Create new row
-        new_row = {
-            "Date": "2025-03-13",
-            "Player Name": "New Player",
-            "Source/Location": "New Location",
-            "Chest Type": "New Chest",
-            "Value": 999,
-            "Clan": "MY_CLAN",
-        }
+        """Test adding a new row to the model."""
+        # Create initial empty model with columns
+        model.init_model()
 
-        # Add row
+        # Add a new row
+        new_row = {
+            "DATE": "2023-05-20",
+            "PLAYER": "TestPlayer",
+            "SOURCE": "Somewhere",
+            "CHEST": "Wooden Chest",
+            "SCORE": 500,
+            "CLAN": "TestClan",
+        }
         model.add_row(new_row)
 
-        # Verify row was added
-        assert model.row_count == 1
-        assert model.get_row(0)["Player Name"] == "New Player"
+        # Check model was updated
+        assert model.rowCount() == 1
+        assert model.get_row(0)["PLAYER"] == "TestPlayer"
 
-    def test_filtering(self, model, sample_data):
-        """Test filtering the data."""
+    def test_update_cell(self, model, sample_data):
+        """Test updating a specific cell in the model."""
         # Update model with sample data
         model.update_data(sample_data)
 
-        # Create a filter using a dictionary (current API)
-        filtered_data = model.filter_data(
-            {"Value": [350, 550]}
-        )  # Value range filter for values greater than 300
+        # Initial state
+        start_value = model.get_row(0)["PLAYER"]
 
-        # Verify filtering worked
-        assert filtered_data is not None
-        assert len(filtered_data) == 2  # Two rows where Value is in range [350, 550]
-        assert all(filtered_data["Value"].between(350, 550))
+        # Update a cell
+        model.update_cell(0, 1, "NewPlayer")  # Assuming column 1 is "PLAYER"
+
+        # Verify cell was updated
+        assert model.get_row(0)["PLAYER"] == "NewPlayer"
+        assert model.get_row(0)["PLAYER"] != start_value
+
+    def test_filter_data(self, model, sample_data):
+        """Test filtering data in the model."""
+        # Update model with sample data
+        model.update_data(sample_data)
+
+        # Apply filter to Player column
+        model.filter_data("PLAYER", "Feldjäger")
+
+        # Check filtered data
+        assert model.filtered_rowCount() > 0
+        for i in range(model.filtered_rowCount()):
+            row_idx = model.mapToSource(model.index(i, 0)).row()
+            row = model.get_row(row_idx)
+            assert "Feldjäger" in row["PLAYER"]
 
     def test_validation_status(self, model, sample_data):
         """Test setting and getting validation status."""
