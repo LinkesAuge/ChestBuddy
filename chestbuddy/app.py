@@ -107,8 +107,8 @@ class ChestBuddyApp(QObject):
 
     def _init_logging(self) -> None:
         """Initialize the logging system."""
-        # Create logs directory if it doesn't exist
-        logs_dir = Path("logs")
+        # Use logs directory inside the chestbuddy package
+        logs_dir = Path(__file__).parent / "logs"
         logs_dir.mkdir(exist_ok=True)
 
         # Set up logging configuration
@@ -122,7 +122,7 @@ class ChestBuddyApp(QObject):
             handlers=[logging.FileHandler(log_file), logging.StreamHandler()],
         )
 
-        logger.info(f"Logging initialized at level {log_level}")
+        logger.info(f"Logging initialized at level {log_level} to {log_file}")
 
     def _connect_signals(self) -> None:
         """Connect signals between services and UI components."""

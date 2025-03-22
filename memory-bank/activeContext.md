@@ -88,6 +88,14 @@ graph LR
 5. Developed dashboard view as main landing page
 6. Ensured all existing functionality works with the new UI
 
+### Refactoring and Enhancements
+
+1. **Created DataManager Service**: Moved CSV operations from MainWindow to a dedicated DataManager service, improving separation of concerns.
+
+2. **Column Mapping Enhancement**: Updated the column mapping functionality to handle both uppercase and title case column names, making the application more robust against different CSV formats.
+
+3. **Consolidated Logging Configuration**: Consolidated logging directories from having two separate logs folders (root and chestbuddy/) to a single location at `chestbuddy/logs`. This ensures all logs are stored in one consistent location regardless of where the application is launched from.
+
 ### Code Refactoring: DataManager Service
 
 I've implemented a significant architecture improvement by creating a new `DataManager` service that handles all file operations, particularly CSV loading and saving. The key changes include:

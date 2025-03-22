@@ -491,3 +491,13 @@ class MainWindow(QMainWindow):
 3. **Efficient Updates**: Only changed parts of the UI are redrawn
 4. **Memory Management**: Resources are freed when no longer needed
 5. **Responsive Design**: UI remains responsive during long operations 
+
+## Logging
+
+The application uses Python's built-in logging module for logging messages. Logs are written to both the console and a log file.
+
+- Log files are stored in `chestbuddy/logs/chestbuddy.log`
+- The default log level is INFO, but can be configured in the application settings
+- Each log message includes a timestamp, the module name, the log level, and the message
+- The logs directory is automatically created if it doesn't exist
+- The log path is determined relative to the app.py file location, ensuring consistency regardless of where the application is launched from 
