@@ -424,73 +424,76 @@ class ChestDataModel(QObject):
 
     def update_cell(self, row_idx: int, column_name: str, value: Any) -> bool:
         """
-        Update a single cell in the data.
+        Update a specific cell in the data.
 
         Args:
-            row_idx: The row index of the cell to update.
-            column_name: The column name of the cell to update.
-            value: The new value for the cell.
+            row_idx: The row index.
+            column_name: The column name.
+            value: The new value.
 
         Returns:
-            bool: True if the update was successful, False otherwise.
+            True if the cell was updated successfully, False otherwise.
         """
         try:
-            # Check if this is an actual change
-            if row_idx < len(self._data) and column_name in self._data.columns:
-                current_value = self._data.loc[row_idx, column_name]
+            # Check if row and column exist
+            if not (0 <= row_idx < len(self._data)) or column_name not in self._data.columns:
+                logger.error(f"Invalid row or column: {row_idx}, {column_name}")
+                return False
 
-                # Convert both to string for comparison if needed
-                str_current = str(current_value)
-                str_new = str(value)
+            # Get current value
+            current_value = self.get_cell_value(row_idx, column_name)
 
-                # Skip the update if the values are identical
-                if str_current == str_new:
-                    logger.debug(
-                        f"Skipping cell update at [{row_idx}, {column_name}] - value unchanged"
-                    )
-                    return True
-
+            # Skip update if value hasn't changed
+            if str(current_value) == str(value):
                 logger.debug(
-                    f"Updating cell at [{row_idx}, {column_name}] from '{current_value}' to '{value}'"
+                    f"Skipping cell update as value is identical: {row_idx}, {column_name}"
                 )
+                return True
 
-            # Track if signals were already blocked
-            self._signals_already_blocked = self.signalsBlocked()
-
-            # Block signals if not already blocked
-            if not self._signals_already_blocked:
-                self.blockSignals(True)
-
-            # Update the cell value
+            # Update the cell
             self._data.at[row_idx, column_name] = value
 
-            # Update validation status - mark as needing revalidation
-            if (
-                not self._validation_status.empty
-                and f"{column_name}_valid" in self._validation_status.columns
-            ):
-                self._validation_status.at[row_idx, f"{column_name}_valid"] = True
+            # Update validation and correction status for this cell
+            val_status = self.get_cell_validation_status(row_idx, column_name)
+            if val_status:
+                val_status["checked"] = False
+                self._validation_status.at[row_idx, column_name] = val_status
 
-            # Update correction status - track the change
-            if not self._correction_status.empty:
-                if f"{column_name}_corrected" in self._correction_status.columns:
-                    self._correction_status.at[row_idx, f"{column_name}_corrected"] = True
+            corr_status = self.get_cell_correction_status(row_idx, column_name)
+            if corr_status:
+                corr_status["applied"] = False
+                self._correction_status.at[row_idx, column_name] = corr_status
 
-        except Exception as e:
-            logger.error(f"Error updating cell: {str(e)}")
-            return False
-        finally:
-            # Ensure signals are unblocked if we blocked them
-            if not self._signals_already_blocked:
-                self.blockSignals(False)
-
-            # Update the data hash
-            self._update_data_hash()
-
-            # Notify of changes
+            # Notify of the change
             self._notify_change()
 
-        return True
+            return True
+        except Exception as e:
+            logger.error(f"Error updating cell: {e}")
+            return False
+
+    def get_cell_value(self, row_idx: int, column_name: str) -> Any:
+        """
+        Get the value of a specific cell in the data.
+
+        Args:
+            row_idx: The row index.
+            column_name: The column name.
+
+        Returns:
+            The cell value, or None if the cell doesn't exist.
+        """
+        try:
+            # Check if row and column exist
+            if not (0 <= row_idx < len(self._data)) or column_name not in self._data.columns:
+                logger.error(f"Invalid row or column: {row_idx}, {column_name}")
+                return None
+
+            # Return the cell value
+            return self._data.iloc[row_idx][column_name]
+        except Exception as e:
+            logger.error(f"Error getting cell value: {e}")
+            return None
 
     def add_row(self, row_data: Dict[str, Any]) -> int:
         """

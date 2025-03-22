@@ -853,34 +853,56 @@ After importing a CSV file, the data was successfully loaded but not displayed i
 - CSV saving/loading works correctly with the fixed parameter order
 - Future change: consider adding a parameter name check tool to ensure consistent parameter ordering
 
-## DataView Table Model Initialization Issue - 2025-03-22
+## DataView Table Data Not Displaying - 2025-03-22
 
-**Issue**: Table wasn't displaying any data despite the data being successfully loaded into the data model and the DataView getting the data with proper row count.
+### Issue
+The table view correctly shows the right dimensions (rows and columns) after loading CSV data, but no actual text/values are visible in the cells.
 
-**Root Cause**: The QStandardItemModel was not explicitly initialized with the correct number of rows and columns before populating it with data. When clearing the table model with `self._table_model.clear()`, all dimensions are reset, and the code was relying on auto-expansion when setting items which wasn't working correctly.
+### Root Cause
+Two primary issues:
+1. The `get_cell_value` method was missing in the `ChestDataModel` class, which was called by the `_on_item_changed` method in `DataView`.
+2. The way cells were being populated in `_update_view` might have been causing empty values, as the sample cell at [0,0] showed empty content.
 
-**Error Details**:
-While no explicit error message was shown, the table appeared empty even though logging showed the data was being correctly loaded with statements like:
-```
-Got data from model: X rows, columns: [column1, column2, ...]
-```
+### Error Details
+- The error log showed: `"Error getting current cell value: 'ChestDataModel' object has no attribute 'get_cell_value'"`
+- The table model dimensions were correct (12387 rows and 6 columns), but sample cell [0,0] content was empty: `"Sample cell [0,0] content: ''"`
 
-**Fix**:
-1. Explicitly set the model dimensions after clearing but before populating:
+### Fix
+1. Added the missing `get_cell_value` method to the `ChestDataModel` class:
    ```python
-   row_count = len(data)
-   col_count = len(column_names)
-   self._table_model.setRowCount(row_count)
-   self._table_model.setColumnCount(col_count)
+   def get_cell_value(self, row_idx: int, column_name: str) -> Any:
+       """
+       Get the value of a specific cell in the data.
+       
+       Args:
+           row_idx: The row index.
+           column_name: The column name.
+           
+       Returns:
+           The cell value, or None if the cell doesn't exist.
+       """
+       try:
+           # Check if row and column exist
+           if not (0 <= row_idx < len(self._data)) or column_name not in self._data.columns:
+               logger.error(f"Invalid row or column: {row_idx}, {column_name}")
+               return None
+               
+           # Return the cell value
+           return self._data.iloc[row_idx][column_name]
+       except Exception as e:
+           logger.error(f"Error getting cell value: {e}")
+           return None
    ```
 
-2. Applied the same fix to the `_update_view_with_filtered_data` method.
+2. Improved cell value handling in `DataView._update_view` method:
+   - Now directly accessing the DataFrame cell values using `data.iloc[row_idx, col_idx]`
+   - Properly handling NaN values by checking with `pd.isna()`
+   - Ensuring values are explicitly converted to strings
 
-3. Added additional logging to verify the model is correctly populated:
-   ```python
-   logger.info(f"Final table model state: {self._table_model.rowCount()} rows, {self._table_model.columnCount()} columns")
-   ```
+### Technical Notes
+- Accessing pandas DataFrame values directly with `iloc` is generally more reliable than accessing via column names in some contexts
+- The `pd.isna()` function helps identify NaN values which can cause display issues if not handled properly
+- This issue highlights the importance of comprehensive logging and verification of data at each step of the process
 
-**Technical Notes**: In Qt's QStandardItemModel, when you call `clear()`, it removes all items, headers, and resets dimensions. While the model should automatically expand when setting items with `setItem()`, it's more reliable to explicitly set the dimensions before populating. This ensures the view knows the correct size of the model from the beginning.
-
-**Status**: FIXED - Table now properly displays all imported data.
+### Status
+- Fixed and verified that cell values are now visible in the table

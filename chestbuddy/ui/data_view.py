@@ -248,8 +248,10 @@ class DataView(QWidget):
                             logger.debug(f"Row {row_idx} data: {row_data.to_dict()}")
 
                         for col_idx, column_name in enumerate(column_names):
-                            # Get value directly and convert to string
-                            value = str(row_data[column_name])
+                            # Get value directly from DataFrame and explicitly force to string
+                            cell_value = data.iloc[row_idx, col_idx]
+                            value = "" if pd.isna(cell_value) else str(cell_value)
+
                             if row_idx < 3 and col_idx < 3:  # Only log some values
                                 logger.debug(
                                     f"Cell [{row_idx}, {col_idx}] ({column_name}): '{value}'"
@@ -275,7 +277,7 @@ class DataView(QWidget):
 
                             self._table_model.setItem(row_idx, col_idx, item)
 
-                logger.info(f"Added {self._table_model.rowCount()} rows to table model")
+                    logger.info(f"Added {self._table_model.rowCount()} rows to table model")
             except Exception as e:
                 logger.error(f"Error populating table model: {e}")
                 self._status_label.setText("Error displaying data")
