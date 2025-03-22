@@ -237,10 +237,9 @@ class CorrectionTab(QWidget):
         # Update correction history
         self._update_history()
 
-        # Update status label
-        correction_status = self._data_model.get_correction_status()
-        if not correction_status.empty:
-            rows_affected = len(correction_status)
+        # Update status label - use non-recursive method to get correction row count
+        rows_affected = self._data_model.get_correction_row_count()
+        if rows_affected > 0:
             self._status_label.setText(f"Corrections applied to {rows_affected} rows")
         else:
             self._status_label.setText("No corrections applied")
@@ -407,12 +406,9 @@ class CorrectionTab(QWidget):
             # All rows
             return None
         elif button_id == 1:
-            # Rows with validation issues
-            validation_status = self._data_model.get_validation_status()
-            if not validation_status.empty:
-                return list(validation_status.keys())
-            else:
-                return None
+            # Rows with validation issues - use non-recursive method
+            invalid_rows = self._data_model.get_invalid_rows()
+            return invalid_rows if invalid_rows else None
         elif button_id == 2:
             # Selected rows
             return self._selected_rows if self._selected_rows else None
@@ -502,12 +498,9 @@ class CorrectionTab(QWidget):
         msg_box.exec_()
 
     @Slot(object)
-    def _on_data_changed(self, data) -> None:
+    def _on_data_changed(self) -> None:
         """
         Handle data changed signal.
-
-        Args:
-            data: The updated data.
         """
         # Update view to reflect data changes
         self._update_view()

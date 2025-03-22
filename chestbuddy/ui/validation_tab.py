@@ -352,8 +352,8 @@ class ValidationTab(QWidget):
         for col, value in row_data.items():
             message += f"<b>{col}:</b> {value}<br>"
 
-        # Get validation status for the row
-        validation_status = self._data_model.get_validation_status(row_idx)
+        # Get validation status for the row using the non-recursive method
+        validation_status = self._data_model.get_row_validation_status(row_idx)
 
         if validation_status:
             message += "<br><b>Validation Issues:</b><br>"
@@ -369,12 +369,9 @@ class ValidationTab(QWidget):
         msg_box.exec_()
 
     @Slot(object)
-    def _on_data_changed(self, data) -> None:
+    def _on_data_changed(self) -> None:
         """
         Handle data changed signal.
-
-        Args:
-            data: The updated data.
         """
         # Update view to reflect data changes
         self._update_view()

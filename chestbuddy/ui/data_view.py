@@ -175,10 +175,6 @@ class DataView(QWidget):
         # Initialize filtered_rows with all row indices
         self._filtered_rows = data.index.tolist()
 
-        # Get validation and correction status
-        validation_status = self._data_model.get_validation_status()
-        correction_status = self._data_model.get_correction_status()
-
         # Set headers
         self._table_model.setHorizontalHeaderLabels(self._data_model.column_names)
 
@@ -198,21 +194,18 @@ class DataView(QWidget):
             for col_idx, value in enumerate(row_data):
                 item = QStandardItem(str(value))
 
+                # Get column name
+                column_name = self._data_model.column_names[col_idx]
+
                 # Set validation and correction status as user data
-                if validation_status is not None and not validation_status.empty:
-                    val_status = (
-                        validation_status.iloc[row_idx]
-                        if row_idx < len(validation_status)
-                        else None
-                    )
+                # Use cell-specific methods to avoid getting entire DataFrames
+                # This prevents recursion issues
+                val_status = self._data_model.get_cell_validation_status(row_idx, column_name)
+                if val_status:
                     item.setData(val_status, Qt.UserRole + 1)
 
-                if correction_status is not None and not correction_status.empty:
-                    corr_status = (
-                        correction_status.iloc[row_idx]
-                        if row_idx < len(correction_status)
-                        else None
-                    )
+                corr_status = self._data_model.get_cell_correction_status(row_idx, column_name)
+                if corr_status:
                     item.setData(corr_status, Qt.UserRole + 2)
 
                 self._table_model.setItem(row_idx, col_idx, item)
@@ -261,61 +254,67 @@ class DataView(QWidget):
         total_count = len(self._data_model.data)
         self._status_label.setText(f"Showing {row_count} of {total_count} rows")
 
-    def _update_view_with_filtered_data(self, filtered_data) -> None:
+    def _update_view_with_filtered_data(self, filtered_data: pd.DataFrame) -> None:
         """
         Update the view with filtered data.
 
         Args:
-            filtered_data: The filtered DataFrame.
+            filtered_data: The filtered data to display.
         """
+        # Store filtered data
+        self._filtered_data = filtered_data
+
         # Clear the table model
         self._table_model.clear()
+
+        # Check if filtered data is empty
+        if filtered_data.empty:
+            self._status_label.setText("No data matches the filter")
+            self._filtered_rows = []
+            return
 
         # Set headers
         self._table_model.setHorizontalHeaderLabels(self._data_model.column_names)
 
-        # Get validation and correction status
-        validation_status = self._data_model.get_validation_status()
-        correction_status = self._data_model.get_correction_status()
-
-        # Store filtered rows for later use
+        # Store the filtered row indices
         self._filtered_rows = filtered_data.index.tolist()
 
-        # Add data to the table model
-        for idx, row in filtered_data.iterrows():
-            items = []
-            for col, value in row.items():
-                item = QStandardItem(str(value) if pd.notna(value) else "")
+        # Show filter status
+        filter_text = self._filter_text.text()
+        if filter_text:
+            filter_count = len(filtered_data)
+            total_count = len(self._data_model.data)
+            self._status_label.setText(
+                f"Showing {filter_count} of {total_count} records matching '{filter_text}'"
+            )
 
-                # Set tooltip based on validation and correction status
-                tooltips = []
+        # Add filtered data to the table model
+        for local_row_idx, (actual_row_idx, row) in enumerate(
+            zip(filtered_data.index, filtered_data.itertuples())
+        ):
+            # Skip the first element (index)
+            row_data = list(row)[1:]
+            for col_idx, value in enumerate(row_data):
+                item = QStandardItem(str(value))
 
-                # Add validation issues to tooltip
-                if idx in validation_status:
-                    for rule, message in validation_status[idx].items():
-                        tooltips.append(f"Validation: {message}")
+                # Get column name
+                column_name = self._data_model.column_names[col_idx]
 
-                    # Set background color for validation issues
-                    item.setBackground(QColor(255, 200, 200))  # Light red
+                # Set validation and correction status as user data
+                # Use cell-specific methods to avoid getting entire DataFrames
+                val_status = self._data_model.get_cell_validation_status(
+                    actual_row_idx, column_name
+                )
+                if val_status:
+                    item.setData(val_status, Qt.UserRole + 1)
 
-                # Add correction history to tooltip
-                if idx in correction_status:
-                    for strategy, message in correction_status[idx].items():
-                        tooltips.append(f"Correction: {message}")
+                corr_status = self._data_model.get_cell_correction_status(
+                    actual_row_idx, column_name
+                )
+                if corr_status:
+                    item.setData(corr_status, Qt.UserRole + 2)
 
-                    # Set background color for corrected cells
-                    if item.background().color() == QColor(255, 200, 200):
-                        # If already has validation issue, use a different color
-                        item.setBackground(QColor(255, 165, 0, 100))  # Orange
-                    else:
-                        item.setBackground(QColor(200, 255, 200))  # Light green
-
-                if tooltips:
-                    item.setToolTip("\n".join(tooltips))
-
-                items.append(item)
-
-            self._table_model.appendRow(items)
+                self._table_model.setItem(local_row_idx, col_idx, item)
 
         # Resize columns to contents
         self._table_view.resizeColumnsToContents()
@@ -438,14 +437,21 @@ class DataView(QWidget):
 
     @Slot(QStandardItem)
     def _on_item_changed(self, item: QStandardItem) -> None:
-        """Handle item changed in the table model."""
-        # Get the row and column of the changed item
+        """
+        Handle changes to items in the table.
+
+        Args:
+            item: The changed item.
+        """
+        # Get the row and column index
         row = item.row()
         col = item.column()
 
-        # Convert row index to the actual data index
-        if self._filtered_rows and row < len(self._filtered_rows):
-            actual_row = self._filtered_rows[row]
+        # If we're using a filtered view, we need to map the row to the actual row
+        actual_row = row
+        if hasattr(self, "_filtered_data") and self._filtered_data is not None:
+            # Map from visible row to actual row
+            actual_row = self._filtered_data.index[row]
         else:
             actual_row = row
 
@@ -455,9 +461,6 @@ class DataView(QWidget):
         # Get the new value
         value = item.text()
 
-        # Create a DataFrame with the updated value
-        update_df = self._data_model.data.copy()
-        update_df.at[actual_row, column_name] = value
-
-        # Update the model
-        self._data_model.update_data(update_df)
+        # Use the more efficient update_cell method instead of creating a whole new DataFrame
+        # This prevents the pandas recursion issue by avoiding full DataFrame recreation
+        self._data_model.update_cell(actual_row, column_name, value)
