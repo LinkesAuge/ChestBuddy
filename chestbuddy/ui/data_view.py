@@ -166,10 +166,17 @@ class DataView(QWidget):
         # Copy shortcut (Ctrl+C)
         copy_shortcut = QShortcut(QKeySequence.Copy, self._table_view)
         copy_shortcut.activated.connect(self._copy_selected_cells)
+        logger.info("Registered Ctrl+C shortcut for copying")
 
         # Paste shortcut (Ctrl+V)
         paste_shortcut = QShortcut(QKeySequence.Paste, self._table_view)
         paste_shortcut.activated.connect(self._paste_to_selected_cells)
+        logger.info("Registered Ctrl+V shortcut for pasting")
+
+        # Add an additional paste shortcut for the entire widget to catch it regardless of focus
+        widget_paste_shortcut = QShortcut(QKeySequence.Paste, self)
+        widget_paste_shortcut.activated.connect(self._paste_to_selected_cells)
+        logger.info("Registered widget-level Ctrl+V shortcut for pasting")
 
     def _connect_signals(self) -> None:
         """Connect signals and slots."""
@@ -653,6 +660,7 @@ class DataView(QWidget):
         """
         # Get the text from clipboard
         text = QApplication.clipboard().text()
+        logger.info(f"Clipboard text: '{text[:20]}{'...' if len(text) > 20 else ''}'")
 
         # Check if there are multiple cells selected
         selected_indexes = self._table_view.selectedIndexes()
@@ -663,10 +671,47 @@ class DataView(QWidget):
                 # Set the value for each selected cell
                 self._table_model.setData(sel_index, text, Qt.EditRole)
 
+                # Also update the data model directly to ensure it's updated properly
+                try:
+                    row = sel_index.row()
+                    col = sel_index.column()
+                    if (
+                        0 <= row < self._table_model.rowCount()
+                        and 0 <= col < self._table_model.columnCount()
+                    ):
+                        # Get the actual row index if we're using filtered data
+                        actual_row = row
+                        if self._filtered_rows and row < len(self._filtered_rows):
+                            actual_row = self._filtered_rows[row]
+
+                        column_name = self._data_model.column_names[col]
+                        self._data_model.update_cell(actual_row, column_name, text)
+                except Exception as e:
+                    logger.error(f"Error updating data model directly: {e}")
+
             logger.info(f"Pasted value to {len(selected_indexes)} selected cells")
         elif index.isValid():
             # Single cell via context menu, just paste to that
             self._table_model.setData(index, text, Qt.EditRole)
+
+            # Also update the data model directly
+            try:
+                row = index.row()
+                col = index.column()
+                if (
+                    0 <= row < self._table_model.rowCount()
+                    and 0 <= col < self._table_model.columnCount()
+                ):
+                    # Get the actual row index if we're using filtered data
+                    actual_row = row
+                    if self._filtered_rows and row < len(self._filtered_rows):
+                        actual_row = self._filtered_rows[row]
+
+                    column_name = self._data_model.column_names[col]
+                    self._data_model.update_cell(actual_row, column_name, text)
+            except Exception as e:
+                logger.error(f"Error updating data model directly: {e}")
+
             logger.info(
                 f"Pasted value to single cell at row {index.row()}, column {index.column()}"
             )
@@ -826,11 +871,35 @@ class DataView(QWidget):
 
     def _paste_to_selected_cells(self) -> None:
         """Paste clipboard content to the currently selected cell(s)."""
+        logger.info("Paste shortcut activated")
+
+        # Ensure table has focus
+        self._table_view.setFocus()
+
+        # Get currently selected cells
         selected_indexes = self._table_view.selectedIndexes()
+
         if not selected_indexes:
             logger.warning("Paste operation failed: No cells selected")
+            # If no selection, try to paste to the current cell
+            current_index = self._table_view.currentIndex()
+            if current_index.isValid():
+                logger.info(
+                    f"Using current cell at [{current_index.row()}, {current_index.column()}]"
+                )
+                self._paste_cell(current_index)
+            else:
+                # If still no valid cell, select the first cell if data exists
+                if self._table_model.rowCount() > 0 and self._table_model.columnCount() > 0:
+                    logger.info("Selecting first cell for paste operation")
+                    first_index = self._table_model.index(0, 0)
+                    self._table_view.setCurrentIndex(first_index)
+                    self._paste_cell(first_index)
+                else:
+                    logger.warning("No data in table - cannot paste")
             return
 
+        logger.info(f"Pasting to {len(selected_indexes)} selected cells")
         # Use an empty QModelIndex for the first parameter because we're not
         # responding to a context menu click but to a keyboard shortcut
         self._paste_cell(QModelIndex())

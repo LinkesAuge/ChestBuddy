@@ -1262,3 +1262,28 @@ Modified the `_show_context_menu` method in `DataView` class to:
 This is a pure UI improvement that makes the context menu cleaner and less confusing for users. The actual functionality (pasting to all selected cells) already worked correctly in both cases.
 
 **Status**: FIXED
+
+## Enhanced Ctrl+V Paste Functionality - 2025-03-23
+
+**Issue**: Ctrl+V shortcut for pasting in the table wasn't working consistently, especially with focus issues.
+
+**Root Cause**: 
+1. The Ctrl+V shortcut was only registered for the table view, so if the focus was elsewhere, it wouldn't trigger.
+2. If no cells were selected, the paste operation would fail without attempting to find a valid target cell.
+3. The paste operation wasn't consistently updating both the UI model and the data model.
+
+**Fix**:
+1. Added a widget-level Ctrl+V shortcut that works regardless of which component has focus
+2. Enhanced the `_paste_to_selected_cells` method to:
+   - Ensure the table has focus
+   - Try using the current cell if no cells are explicitly selected
+   - Fall back to the first cell in the table if needed
+3. Improved the `_paste_cell` method to:
+   - Always update both the UI model and the underlying data model
+   - Handle filtered data correctly by mapping view row indices to actual data row indices
+   - Add better logging for debugging
+
+**Technical Notes**:
+This improves the user experience by making paste operations more forgiving and consistent. The keyboard shortcut now works in more situations and provides better feedback when issues occur.
+
+**Status**: FIXED
