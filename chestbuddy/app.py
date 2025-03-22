@@ -230,6 +230,11 @@ class ChestBuddyApp(QObject):
                 # Update the data model with signals blocked
                 self._data_model.update_data(df)
                 logger.info(f"CSV file loaded successfully with {len(df)} rows")
+
+                # Switch to the Data view in the main window
+                if self._main_window:
+                    self._main_window._set_active_view("Data")
+                    logger.info("Switched to Data view")
             else:
                 self._show_error(f"Error loading file: {error}")
         finally:

@@ -173,12 +173,14 @@ class DataView(QWidget):
 
         try:
             self._is_updating = True
+            logger.info("Starting _update_view method")
 
             # Clear the table model
             self._table_model.clear()
 
             # Check if data is empty
             if self._data_model.is_empty:
+                logger.warning("Data model is empty, no data to display")
                 self._status_label.setText("No data loaded")
                 self._filtered_rows = []  # Initialize to empty list when no data
                 return
@@ -186,8 +188,13 @@ class DataView(QWidget):
             # Get data from model - get a shallow copy to avoid modifying original
             try:
                 data = self._data_model.data
+                logger.info(
+                    f"Got data from model: {len(data)} rows, columns: {data.columns.tolist()}"
+                )
+
                 # Store the column names separately to avoid repeated access
                 column_names = self._data_model.column_names
+                logger.info(f"Column names: {column_names}")
             except Exception as e:
                 logger.error(f"Error getting data: {e}")
                 self._status_label.setText("Error loading data")
@@ -200,6 +207,7 @@ class DataView(QWidget):
 
             # Set headers
             self._table_model.setHorizontalHeaderLabels(column_names)
+            logger.info(f"Set horizontal headers with {len(column_names)} columns")
 
             # Populate filter column combo box
             current_column = self._filter_column.currentText()
@@ -216,6 +224,7 @@ class DataView(QWidget):
                 BATCH_SIZE = 100
                 for start_idx in range(0, len(data), BATCH_SIZE):
                     end_idx = min(start_idx + BATCH_SIZE, len(data))
+                    logger.debug(f"Processing batch from index {start_idx} to {end_idx}")
 
                     # Process this batch of rows
                     for row_idx in range(start_idx, end_idx):
@@ -241,16 +250,23 @@ class DataView(QWidget):
                                 item.setData(corr_status, Qt.UserRole + 2)
 
                             self._table_model.setItem(row_idx, col_idx, item)
+
+                logger.info(f"Added {self._table_model.rowCount()} rows to table model")
             except Exception as e:
                 logger.error(f"Error populating table model: {e}")
                 self._status_label.setText("Error displaying data")
 
             # Resize columns to contents
             self._table_view.resizeColumnsToContents()
+            logger.info("Resized columns to contents")
 
             # Update status label
             row_count = len(data)
             self._status_label.setText(f"Loaded {row_count} rows")
+            logger.info(f"View update complete, loaded {row_count} rows")
+
+            # Force the table to refresh
+            self._table_view.update()
         finally:
             self._is_updating = False
 
@@ -455,8 +471,8 @@ class DataView(QWidget):
         """
         Update the view when the data model changes.
 
-        This method uses debouncing to prevent rapid successive updates
-        and checks if data has actually changed before updating.
+        This method ensures the view is always updated when the data model changes,
+        with protections against recursive updates.
         """
         try:
             # Ignore the signal if we're already updating to avoid recursion
@@ -464,29 +480,8 @@ class DataView(QWidget):
                 logger.debug("Ignoring data_changed signal - UI already updating")
                 return
 
-            # Add debouncing to prevent rapid updates
-            current_time = int(time.time() * 1000)  # Current time in milliseconds
-
-            # Initialize last update time if not set
-            if not hasattr(self, "_last_update_time"):
-                self._last_update_time = 0
-
-            # Define minimum time between updates (500ms)
-            min_update_interval = 500  # milliseconds
-
-            # Calculate time elapsed since last update
-            elapsed = current_time - self._last_update_time
-
-            # Skip update if it's too soon after the previous one
-            if elapsed < min_update_interval:
-                logger.debug(f"Debouncing update - only {elapsed}ms since last update")
-                return
-
-            # Update the last update time
-            self._last_update_time = current_time
-
-            # Now proceed with the update
-            logger.debug("Processing data_changed signal")
+            # Force view update on data change - remove debouncing for initial load
+            logger.info("Processing data_changed signal - updating view")
             self._update_view()
 
         except Exception as e:
