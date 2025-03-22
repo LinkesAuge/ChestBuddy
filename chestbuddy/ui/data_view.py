@@ -265,8 +265,13 @@ class DataView(QWidget):
             self._status_label.setText(f"Loaded {row_count} rows")
             logger.info(f"View update complete, loaded {row_count} rows")
 
-            # Force the table to refresh
-            self._table_view.update()
+            # Force the table to refresh - use the correct approach for QTableView
+            self._table_view.reset()
+            self._table_view.viewport().update()
+
+            # Select the first row to ensure data is visible
+            if self._table_model.rowCount() > 0:
+                self._table_view.selectRow(0)
         finally:
             self._is_updating = False
 
@@ -392,6 +397,14 @@ class DataView(QWidget):
 
             # Resize columns to contents
             self._table_view.resizeColumnsToContents()
+
+            # Force the table to refresh - use the correct approach for QTableView
+            self._table_view.reset()
+            self._table_view.viewport().update()
+
+            # Select the first row to ensure data is visible
+            if self._table_model.rowCount() > 0:
+                self._table_view.selectRow(0)
         finally:
             self._is_updating = False
 

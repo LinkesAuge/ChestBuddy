@@ -853,43 +853,30 @@ After importing a CSV file, the data was successfully loaded but not displayed i
 - CSV saving/loading works correctly with the fixed parameter order
 - Future change: consider adding a parameter name check tool to ensure consistent parameter ordering
 
-## DataView Display Issue Fix
-- Issue ID: UI-001
-- Status: FIXED
-- Date: 2025-03-22
-- Affected components: DataView, ChestBuddyApp
+## DataView Table Display Issue - 2025-03-22
 
-### Description
-After importing a CSV file, the application would report that the file was successfully loaded, but the data would not be displayed in the Data tab unless the user manually navigated to that tab.
+**Issue**: Table fields remained empty in DataView even though data was successfully loaded into the model.
 
-### Root Cause Analysis
-1. Debouncing logic in the DataView's `_on_data_changed` method:
-   - The DataView had debouncing logic that could prevent updates if they occurred within 500ms of a previous update
-   - This could cause the initial data load to be ignored if there were any UI updates shortly before
+**Root Cause**: Incorrect call to `self._table_view.update()` in the DataView's `_update_view` method was causing an error: `QTableView.update() takes exactly one argument (0 given)`. This error was preventing the table from being properly refreshed after data was loaded.
 
-2. No automatic navigation to the Data view:
-   - After loading data, the application didn't automatically switch to the Data tab
-   - Users had to manually click on the Data tab to see the loaded data
+**Error Details**:
+```
+Error updating view on data change: QTableView.update() takes exactly one argument (0 given)
+```
 
-### Comprehensive Fix
-1. Removed debouncing logic from DataView's `_on_data_changed` method:
-   - The method now always updates the view when the data model changes
-   - Added protection against recursive updates while ensuring the update happens
+**Fix**:
+1. Replaced incorrect `self._table_view.update()` call with the proper approach for QTableView:
+   ```python
+   self._table_view.reset()
+   self._table_view.viewport().update()
+   ```
 
-2. Added automatic navigation to the Data view:
-   - Modified the `_on_csv_load_success` method in ChestBuddyApp
-   - After successfully loading data, it now automatically switches to the Data view
-   - Added code to call `_main_window._set_active_view("Data")` after loading
+2. Added selection of first row to ensure data is visible:
+   ```python
+   if self._table_model.rowCount() > 0:
+       self._table_view.selectRow(0)
+   ```
 
-3. Enhanced logging:
-   - Added detailed logging throughout the DataView update process
-   - This helps track the flow and diagnose any issues with data display
+3. Applied the same fixes to `_update_view_with_filtered_data` method to ensure consistent behavior.
 
-4. Improved UI refresh:
-   - Added a call to `self._table_view.update()` to force a UI refresh
-   - This ensures the table is visually updated after loading data
-
-### Technical Notes
-- The debouncing was originally added to prevent excessive UI updates, but it was causing more problems than it solved for initial data load
-- For future consideration: implement smarter debouncing that doesn't affect the initial load but still prevents rapid successive updates
-- The automatic navigation to the Data view provides a better user experience by showing the data immediately after loading
+**Technical Notes**: The Qt framework requires different update methods depending on the widget type. For QTableView, using a combination of `reset()` and `viewport().update()` ensures that the data is properly refreshed, and selecting the first row ensures the user can see the data immediately after loading.
