@@ -637,3 +637,59 @@ These changes completely avoid the need to return full DataFrame objects, which 
 - Default values are returned when exceptions occur, ensuring UI functions properly
 
 This is a complete solution that should prevent all recursion issues related to validation and correction DataFrames.
+
+## Further recursion fixes
+- Issue ID: REC-003
+- Status: FIXED
+- Date: 2025-03-22
+- Affected components: ValidationTab, CorrectionTab, DataView
+
+### Description
+After implementing granular access methods in ChestDataModel, UI components were still experiencing recursion issues during view updates. These were triggered by UI components (particularly ValidationTab and CorrectionTab) when initializing and updating their UI, causing nested calls to `_update_view()` methods.
+
+### Root Cause Analysis
+1. UI components were still susceptible to recursion when updating their views due to signals triggering multiple updates.
+2. The UI components lacked protection against reentrance in their view update methods.
+3. Some components were accessing UI elements before they were fully initialized.
+4. The validation and correction tabs were retrieving entire rows or DataFrames without proper protection.
+
+### Comprehensive Fix
+1. Added reentrance protection to all view update methods in:
+   - ValidationTab._update_view()
+   - CorrectionTab._update_view()
+   - DataView._update_view()
+   - DataView._update_view_with_filtered_data()
+
+2. Each of these methods now includes a guard pattern:
+   ```python
+   def _update_view(self):
+       if self._is_updating:
+           # Skip recursive calls
+           return
+           
+       try:
+           self._is_updating = True
+           # View update logic here
+       finally:
+           self._is_updating = False
+   ```
+
+3. Updated UI component initialization:
+   - Ensure UI elements are initialized to None first
+   - Added checks to prevent accessing UI elements before initialization
+   - Made UI update methods safer by checking for None references
+
+4. Enhanced error handling:
+   - Added more robust exception handling in UI update methods
+   - Introduced more specific error logging for tracking when recursive calls are avoided
+
+5. Further improved the ValidationTab and CorrectionTab:
+   - Implemented a new get_row_correction_status() method for safer row-level access
+   - Added a MAX_DISPLAY_ROWS constant to limit the number of rows processed
+   - Simplified the _get_rows_to_correct() method to avoid DataFrame operations
+
+### Technical Notes
+- The reentrance protection using the `_is_updating` flag prevents infinite recursion by blocking nested calls to the same update method.
+- The try-finally block ensures the `_is_updating` flag is always reset, even if exceptions occur.
+- Initializing UI elements to None and checking for None before access prevents errors during component initialization.
+- Combined with the cell and row-specific access methods added earlier, these changes create a complete solution to the recursion issues.

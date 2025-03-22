@@ -77,7 +77,13 @@ class CorrectionTab(QWidget):
         # Initialize class variables
         self._data_model = data_model
         self._correction_service = correction_service
+        self._is_updating = False  # Guard against recursive updates
         self._selected_rows: List[int] = []
+        self._MAX_DISPLAY_ROWS = 1000  # Maximum number of rows to display in the correction view
+
+        # Initialize UI elements to None first to avoid access before creation
+        self._table_view = None
+        self._summary_label = None
 
         # Set up UI
         self._init_ui()
@@ -85,7 +91,7 @@ class CorrectionTab(QWidget):
         # Connect signals
         self._connect_signals()
 
-        # Initial update
+        # Initial update - only after UI is set up
         self._update_view()
 
     def _init_ui(self) -> None:
@@ -215,34 +221,61 @@ class CorrectionTab(QWidget):
         self._history_tree.itemDoubleClicked.connect(self._on_history_double_clicked)
 
     def _update_view(self) -> None:
-        """Update the view with current data and correction status."""
-        # Check if data is empty
-        if self._data_model.is_empty:
-            self._column_combo.clear()
-            self._status_label.setText("No data loaded")
+        """Update the view with current correction status."""
+        # Guard against recursive calls or uninitialized UI
+        if self._is_updating or self._table_view is None or self._summary_label is None:
+            logger.debug("Skipping CorrectionTab._update_view call - recursive or uninitialized UI")
             return
 
-        # Get data from model
-        data = self._data_model.data
+        try:
+            self._is_updating = True
 
-        # Update column combo box
-        current_column = self._column_combo.currentText()
-        self._column_combo.clear()
-        self._column_combo.addItems(self._data_model.column_names)
+            # Clear
+            self._table_view.setModel(None)
 
-        # Restore selected column if it exists
-        if current_column in self._data_model.column_names:
-            self._column_combo.setCurrentText(current_column)
+            # Check if data is empty
+            if self._data_model.is_empty:
+                self._summary_label.setText("No data loaded")
+                return
 
-        # Update correction history
-        self._update_history()
+            try:
+                # Get rows to correct using the safer method that doesn't return full DataFrames
+                rows_to_correct = self._get_rows_to_correct()
 
-        # Update status label - use non-recursive method to get correction row count
-        rows_affected = self._data_model.get_correction_row_count()
-        if rows_affected > 0:
-            self._status_label.setText(f"Corrections applied to {rows_affected} rows")
-        else:
-            self._status_label.setText("No corrections applied")
+                if not rows_to_correct:
+                    self._summary_label.setText("No corrections needed")
+                    return
+
+                # Create model
+                columns = self._data_model.columns
+                model = QStandardItemModel(len(rows_to_correct), len(columns))
+
+                # Set headers
+                for i, column in enumerate(columns):
+                    model.setHeaderData(i, Qt.Horizontal, column)
+
+                # Add data
+                for i, row_idx in enumerate(rows_to_correct):
+                    row_data = self._data_model.get_row(row_idx)
+
+                    for j, column in enumerate(columns):
+                        if column in row_data:
+                            value = str(row_data[column]) if row_data[column] is not None else ""
+                            item = QStandardItem(value)
+                            item.setData(row_idx, Qt.UserRole)  # Store row index
+                            model.setItem(i, j, item)
+
+                # Set model
+                self._table_view.setModel(model)
+
+                # Update summary label
+                self._summary_label.setText(f"Found {len(rows_to_correct)} rows to correct")
+            except Exception as e:
+                logger.error(f"Error updating correction view: {e}")
+                if self._summary_label is not None:
+                    self._summary_label.setText("Error displaying correction results")
+        finally:
+            self._is_updating = False
 
     def _update_history(self) -> None:
         """Update the correction history tree."""
@@ -392,28 +425,34 @@ class CorrectionTab(QWidget):
         else:
             return ""
 
-    def _get_rows_to_correct(self) -> Optional[List[int]]:
-        """
-        Get the rows to apply the correction to.
+    def _get_rows_to_correct(self) -> List[int]:
+        """Get a list of row indices that need correction."""
+        # Get the number of rows that need correction from the data model
+        try:
+            # Instead of getting the full correction status DataFrame, get just the count
+            total_rows = self._data_model.get_correction_row_count()
 
-        Returns:
-            A list of row indices, or None for all rows.
-        """
-        # Get selected radio button
-        button_id = self._rows_button_group.checkedId()
+            if total_rows == 0:
+                return []
 
-        if button_id == 0:
-            # All rows
-            return None
-        elif button_id == 1:
-            # Rows with validation issues - use non-recursive method
-            invalid_rows = self._data_model.get_invalid_rows()
-            return invalid_rows if invalid_rows else None
-        elif button_id == 2:
-            # Selected rows
-            return self._selected_rows if self._selected_rows else None
-        else:
-            return None
+            # Get list of row indices with corrections
+            rows_to_correct = []
+
+            # Get rows from data model
+            for row_idx in range(self._data_model.row_count):
+                # Check if this row has any corrections using the row-specific method
+                correction_info = self._data_model.get_row_correction_status(row_idx)
+                if correction_info:
+                    rows_to_correct.append(row_idx)
+
+                    # Limit to reasonable number of rows for display
+                    if len(rows_to_correct) >= self._MAX_DISPLAY_ROWS:
+                        break
+
+            return rows_to_correct
+        except Exception as e:
+            logger.error(f"Error getting rows to correct: {e}")
+            return []
 
     def set_selected_rows(self, rows: List[int]) -> None:
         """
