@@ -735,3 +735,41 @@ During CSV import, the application was getting stuck in a recursion loop with ra
 - The approach is more robust to different CSV file formats and encoding issues
 
 This fix complements the previous recursion fixes (REC-002 and REC-003) by addressing the specific recursion issues that occur during file import, completing the comprehensive fix for all pandas/UI recursion issues.
+
+## Signal Cascade Rate Limiting Fix
+- Issue ID: REC-005
+- Status: FIXED
+- Date: 2025-03-22
+- Affected components: ChestDataModel, DataView, ValidationTab, CorrectionTab
+
+### Description
+Even after previous recursion fixes, the application was still experiencing a signal cascade problem where "Data model changed" events were being fired too frequently (every ~200ms). This rapid succession of signals was causing the UI to continuously update, leading to performance issues and making the application feel unresponsive.
+
+### Root Cause Analysis
+1. Despite the signal blocking and reentrance protection we added, there was still a circular chain of updates happening between components
+2. When multiple components respond to data changes by updating themselves and possibly triggering more data changes, it can create a feedback loop
+3. Even with guards against reentrance within each component, the components could still trigger each other in a cycle
+
+### Comprehensive Fix
+1. Added rate limiting (debouncing) to the ChestDataModel's signal emission:
+   - Implemented a time-based rate limiter in `_notify_change()` method
+   - Ensured signals can't be emitted more frequently than once every 500ms
+   - Added timestamp tracking to prevent rapid successive emissions
+
+2. Added debouncing to UI component update methods:
+   - Implemented time-based debouncing in DataView's `_on_data_changed()` method
+   - Added similar debouncing to ValidationTab and CorrectionTab
+   - Set a minimum time between updates (500ms) to prevent UI thrashing
+
+3. Enhanced error handling and logging:
+   - Added more detailed debug logging to track skipped update attempts
+   - Improved exception handling in update methods
+   - Made UI updates more fault-tolerant
+
+### Technical Notes
+- The time-based rate limiting (debouncing) ensures that no component can trigger updates too frequently
+- This approach preserves the data change signals but controls their frequency
+- Class-level timestamp tracking allows sharing the last update time across all instances
+- The solution is non-intrusive and works well with our existing recursion protections
+
+This fix complements our previous recursion fixes by addressing the signal cascade problem at a higher level, ensuring stable application performance regardless of how signals propagate between components.

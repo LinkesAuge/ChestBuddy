@@ -6,6 +6,7 @@ This module provides the DataView class for displaying and editing CSV data.
 
 import logging
 from typing import Dict, List, Optional, Any
+import time
 
 import pandas as pd
 from PySide6.QtCore import Qt, Signal, Slot
@@ -48,6 +49,10 @@ class DataView(QWidget):
         - Highlights validation issues and corrections
         - Allows editing of cell values
     """
+
+    # Add class variable to track last update time
+    _last_update_time = 0.0
+    _update_debounce_ms = 500  # Minimum time between updates in milliseconds
 
     def __init__(self, data_model: ChestDataModel, parent: Optional[QWidget] = None) -> None:
         """
@@ -454,6 +459,18 @@ class DataView(QWidget):
         if self._is_updating:
             logger.debug("Ignoring data_changed signal during update")
             return
+
+        # Add debouncing to prevent too frequent updates
+        current_time = time.time()
+        elapsed_ms = (current_time - DataView._last_update_time) * 1000
+        if elapsed_ms < DataView._update_debounce_ms:
+            logger.debug(
+                f"Debouncing data_changed event (elapsed: {elapsed_ms:.1f}ms < {DataView._update_debounce_ms}ms)"
+            )
+            return
+
+        # Update the last update time
+        DataView._last_update_time = current_time
 
         # Track if there are active filters
         has_filter = bool(self._current_filter)

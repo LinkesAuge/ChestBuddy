@@ -7,6 +7,7 @@ This module provides the ChestDataModel class for managing chest data.
 import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
+import time
 
 import pandas as pd
 from PySide6.QtCore import Signal
@@ -79,8 +80,22 @@ class ChestDataModel(BaseModel):
         if not hasattr(self, "_block_signals") or not self._block_signals:
             # Add protection against cyclic emissions
             try:
-                # Use a careful approach to emit the signal
-                self.data_changed.emit()
+                # Use a signal rate limiter to prevent rapid repeated emissions
+                current_time = time.time()
+
+                # Initialize last emit time if it doesn't exist
+                if not hasattr(self, "_last_notify_time"):
+                    self._last_notify_time = 0.0
+
+                # Only emit if sufficient time has passed since last emission (500ms minimum)
+                if current_time - self._last_notify_time > 0.5:
+                    # Use a careful approach to emit the signal
+                    self.data_changed.emit()
+                    self._last_notify_time = current_time
+                else:
+                    logger.debug(
+                        f"Skipping rapid data_changed signal emission (elapsed: {current_time - self._last_notify_time:.3f}s)"
+                    )
             except Exception as e:
                 logger.error(f"Error in _notify_change: {e}")
 

@@ -6,6 +6,7 @@ This module provides the CorrectionTab class for applying corrections to data.
 
 import logging
 from typing import Dict, List, Optional, Set, Any
+import time
 
 import pandas as pd
 from PySide6.QtCore import Qt, Signal, Slot
@@ -57,6 +58,10 @@ class CorrectionTab(QWidget):
         - Provides parameters for correction strategies
         - Tracks correction history
     """
+
+    # Add class variable to track last update time
+    _last_update_time = 0.0
+    _update_debounce_ms = 500  # Minimum time between updates in milliseconds
 
     def __init__(
         self,
@@ -536,13 +541,30 @@ class CorrectionTab(QWidget):
         msg_box.setStandardButtons(QMessageBox.Ok)
         msg_box.exec_()
 
-    @Slot(object)
+    @Slot()
     def _on_data_changed(self) -> None:
-        """
-        Handle data changed signal.
-        """
-        # Update view to reflect data changes
-        self._update_view()
+        """Handle data changed events."""
+        # Ignore if updating to avoid recursion
+        if self._is_updating:
+            logger.debug("Ignoring data_changed signal during correction tab update")
+            return
+
+        # Add debouncing to prevent too frequent updates
+        current_time = time.time()
+        elapsed_ms = (current_time - CorrectionTab._last_update_time) * 1000
+        if elapsed_ms < CorrectionTab._update_debounce_ms:
+            logger.debug(
+                f"Debouncing correction tab update (elapsed: {elapsed_ms:.1f}ms < {CorrectionTab._update_debounce_ms}ms)"
+            )
+            return
+
+        # Update the last update time
+        CorrectionTab._last_update_time = current_time
+
+        try:
+            self._update_view()
+        except Exception as e:
+            logger.error(f"Error updating correction tab: {e}")
 
     @Slot(object)
     def _on_correction_applied(self, correction_status) -> None:

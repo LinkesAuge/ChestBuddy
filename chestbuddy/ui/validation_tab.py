@@ -6,6 +6,7 @@ This module provides the ValidationTab class for displaying validation results.
 
 import logging
 from typing import Dict, List, Optional, Set
+import time
 
 from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtWidgets import (
@@ -50,6 +51,10 @@ class ValidationTab(QWidget):
         - Integrates with the ValidationService
     """
 
+    # Add class variable to track last update time
+    _last_update_time = 0.0
+    _update_debounce_ms = 500  # Minimum time between updates in milliseconds
+
     def __init__(
         self,
         data_model: ChestDataModel,
@@ -71,7 +76,7 @@ class ValidationTab(QWidget):
         self._validation_service = validation_service
         self._selected_rules: Set[str] = set()
         self._is_updating = False  # Guard against recursive updates
-        
+
         # Initialize UI elements to None first to avoid access before creation
         self._results_tree = None
         self._summary_label = None
@@ -188,57 +193,57 @@ class ValidationTab(QWidget):
         if self._is_updating or self._results_tree is None or self._summary_label is None:
             logger.debug("Skipping ValidationTab._update_view call - recursive or uninitialized UI")
             return
-            
+
         try:
             self._is_updating = True
-            
+
             # Clear the results tree
             self._results_tree.clear()
-    
+
             # Check if data is empty
             if self._data_model.is_empty:
                 self._summary_label.setText("No data loaded")
                 return
-                
+
             try:
                 # Use invalid rows count instead of full DataFrame to avoid recursion
                 invalid_rows = self._data_model.get_invalid_rows()
-                
+
                 if not invalid_rows:
                     self._summary_label.setText("No validation issues found")
                     return
-                    
+
                 # Add results to tree
                 issue_count = 0
                 rule_counts = {}
-        
+
                 for row_idx in invalid_rows:
                     # Get row validation status using the non-recursive method
                     val_status = self._data_model.get_row_validation_status(row_idx)
-                    
+
                     if not val_status:
                         continue
-                        
+
                     for rule_name, message in val_status.items():
                         # Skip rules that are not selected
                         if self._selected_rules and rule_name not in self._selected_rules:
                             continue
-        
+
                         # Increment issue count
                         issue_count += 1
-        
+
                         # Increment rule count
                         rule_counts[rule_name] = rule_counts.get(rule_name, 0) + 1
-        
+
                         # Get row data
                         row_data = self._data_model.get_row(row_idx)
-        
+
                         # Create tree item
                         item = QTreeWidgetItem()
-        
+
                         # Set row index
                         item.setText(0, str(row_idx))
-        
+
                         # Set column (if applicable to a specific column)
                         if "in column" in message:
                             column = message.split("in column")[1].split(":")[0].strip()
@@ -246,30 +251,34 @@ class ValidationTab(QWidget):
                         elif "in" in message and ":" in message:
                             column = message.split("in")[1].split(":")[0].strip()
                             item.setText(1, column)
-        
+
                         # Set rule name
                         item.setText(2, rule_name)
-        
+
                         # Set message
                         item.setText(3, message)
-        
+
                         # Set data for row index
                         item.setData(0, Qt.UserRole, row_idx)
-        
+
                         # Add to tree
                         self._results_tree.addTopLevelItem(item)
-        
+
                 # Update summary label
                 if issue_count > 0:
-                    rule_summary = ", ".join([f"{rule}: {count}" for rule, count in rule_counts.items()])
-                    self._summary_label.setText(f"Found {issue_count} validation issues: {rule_summary}")
+                    rule_summary = ", ".join(
+                        [f"{rule}: {count}" for rule, count in rule_counts.items()]
+                    )
+                    self._summary_label.setText(
+                        f"Found {issue_count} validation issues: {rule_summary}"
+                    )
                 else:
                     self._summary_label.setText("No validation issues found")
             except Exception as e:
                 logger.error(f"Error updating validation view: {e}")
                 if self._summary_label is not None:
                     self._summary_label.setText("Error displaying validation results")
-    
+
             # Resize columns to contents
             if self._results_tree is not None:
                 for i in range(4):
@@ -395,13 +404,30 @@ class ValidationTab(QWidget):
         msg_box.setStandardButtons(QMessageBox.Ok)
         msg_box.exec_()
 
-    @Slot(object)
+    @Slot()
     def _on_data_changed(self) -> None:
-        """
-        Handle data changed signal.
-        """
-        # Update view to reflect data changes
-        self._update_view()
+        """Handle data changed events."""
+        # Ignore if updating to avoid recursion
+        if self._is_updating:
+            logger.debug("Ignoring data_changed signal during validation tab update")
+            return
+
+        # Add debouncing to prevent too frequent updates
+        current_time = time.time()
+        elapsed_ms = (current_time - ValidationTab._last_update_time) * 1000
+        if elapsed_ms < ValidationTab._update_debounce_ms:
+            logger.debug(
+                f"Debouncing validation tab update (elapsed: {elapsed_ms:.1f}ms < {ValidationTab._update_debounce_ms}ms)"
+            )
+            return
+
+        # Update the last update time
+        ValidationTab._last_update_time = current_time
+
+        try:
+            self._update_view()
+        except Exception as e:
+            logger.error(f"Error updating validation tab: {e}")
 
     @Slot(object)
     def _on_validation_changed(self, validation_status) -> None:
