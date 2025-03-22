@@ -19,7 +19,6 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QSplitter,
     QTabWidget,
-    QToolBar,
     QMenuBar,
     QStatusBar,
     QMenu,
@@ -57,7 +56,7 @@ class MainWindow(QMainWindow):
         file_saved (str): Signal emitted when a file is saved, with the file path.
         validation_requested (): Signal emitted when data validation is requested.
         correction_requested (): Signal emitted when data correction is requested.
-        load_csv_triggered (str): Signal emitted when a CSV file load is triggered.
+        load_csv_triggered (list): Signal emitted when a CSV file load is triggered.
         save_csv_triggered (str): Signal emitted when a CSV file save is triggered.
         validate_data_triggered (): Signal emitted when data validation is triggered.
         apply_corrections_triggered (): Signal emitted when corrections should be applied.
@@ -83,7 +82,7 @@ class MainWindow(QMainWindow):
     file_saved = Signal(str)
     validation_requested = Signal()
     correction_requested = Signal()
-    load_csv_triggered = Signal(str)
+    load_csv_triggered = Signal(list)
     save_csv_triggered = Signal(str)
     validate_data_triggered = Signal()
     apply_corrections_triggered = Signal()
@@ -128,7 +127,7 @@ class MainWindow(QMainWindow):
         # Initialize UI
         self._init_ui()
 
-        # Create menus and toolbars
+        # Create menus
         self._init_menus()
 
         # Connect signals
@@ -521,25 +520,23 @@ class MainWindow(QMainWindow):
     # ===== Actions =====
 
     def _open_file(self) -> None:
-        """Open a CSV file."""
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, "Open CSV File", "", "CSV Files (*.csv);;All Files (*)"
+        """Open one or more CSV files."""
+        file_paths, _ = QFileDialog.getOpenFileNames(
+            self, "Open CSV Files", "", "CSV Files (*.csv);;All Files (*)"
         )
 
-        if file_path:
+        if file_paths:
             try:
-                self._csv_service.read_csv(file_path)
-                self._add_recent_file(file_path)
-                self.file_opened.emit(file_path)
-                self.load_csv_triggered.emit(file_path)
-                self._status_bar.set_status(f"Loaded: {os.path.basename(file_path)}")
+                for file_path in file_paths:
+                    self._add_recent_file(file_path)
+                    self.file_opened.emit(file_path)
 
-                # Update last modified timestamp
-                modified_time = os.path.getmtime(file_path)
-                self._status_bar.set_last_modified(modified_time)
+                # Emit signal with all selected files
+                self.load_csv_triggered.emit(file_paths)
+                self._status_bar.set_status(f"Loaded: {len(file_paths)} files")
             except Exception as e:
-                logger.error(f"Error opening file: {e}")
-                QMessageBox.critical(self, "Error", f"Error opening file: {str(e)}")
+                logger.error(f"Error opening files: {e}")
+                QMessageBox.critical(self, "Error", f"Error opening files: {str(e)}")
 
     def _open_recent_file(self, file_path: str) -> None:
         """
@@ -558,9 +555,14 @@ class MainWindow(QMainWindow):
             return
 
         try:
-            self._csv_service.read_csv(file_path)
-            self._add_recent_file(file_path)  # This will move it to the top
+            # Add to recent files (will move to top of list)
+            self._add_recent_file(file_path)
+
+            # Emit signals
             self.file_opened.emit(file_path)
+            self.load_csv_triggered.emit([file_path])
+
+            # Update status
             self._status_bar.set_status(f"Loaded: {os.path.basename(file_path)}")
 
             # Update last modified timestamp

@@ -479,3 +479,83 @@ class TestQtInteractions:
 
         # This test passes if we get here
         assert True
+
+
+@pytest.mark.integration
+def test_load_multiple_csv_files_integration(
+    app_with_config, data_model, main_window, csv_service, sample_csv_file, tmp_path
+):
+    """Test loading multiple CSV files."""
+    # Create a second test file
+    second_csv_path = tmp_path / "test_second.csv"
+    with open(second_csv_file, "w", encoding="utf-8") as f:
+        f.write("Date,Player Name,Source/Location,Chest Type,Value,Clan\n")
+        f.write("2023-02-02,Player2,Location2,Epic,200,Clan2\n")
+        f.write("2023-02-03,Player3,Location3,Legendary,300,Clan3\n")
+
+    # Get DataManager from app
+    data_manager = app_with_config._data_manager
+
+    # Mock the calls to load CSV to avoid file IO in tests
+    def mock_load_multiple(file_paths):
+        # Create two different DataFrames
+        df1 = pd.DataFrame(
+            {
+                "DATE": ["2023-01-01"],
+                "PLAYER": ["Player1"],
+                "SOURCE": ["Location1"],
+                "CHEST": ["Common"],
+                "SCORE": [100],
+                "CLAN": ["Clan1"],
+            }
+        )
+
+        df2 = pd.DataFrame(
+            {
+                "DATE": ["2023-02-02", "2023-02-03"],
+                "PLAYER": ["Player2", "Player3"],
+                "SOURCE": ["Location2", "Location3"],
+                "CHEST": ["Epic", "Legendary"],
+                "SCORE": [200, 300],
+                "CLAN": ["Clan2", "Clan3"],
+            }
+        )
+
+        # Combine them
+        combined = pd.concat([df1, df2], ignore_index=True)
+        return combined, f"Successfully loaded {len(file_paths)} files"
+
+    # Replace the actual function with our mock
+    with patch.object(data_manager, "_load_multiple_files", side_effect=mock_load_multiple):
+        # Load multiple files
+        file_paths = [str(sample_csv_file), str(second_csv_path)]
+        data_manager.load_csv(file_paths)
+
+        # Get the on_success callback
+        callback = data_manager._worker.run_task.call_args[1]["on_success"]
+
+        # Simulate a successful load
+        combined_df = pd.DataFrame(
+            {
+                "DATE": ["2023-01-01", "2023-02-02", "2023-02-03"],
+                "PLAYER": ["Player1", "Player2", "Player3"],
+                "SOURCE": ["Location1", "Location2", "Location3"],
+                "CHEST": ["Common", "Epic", "Legendary"],
+                "SCORE": [100, 200, 300],
+                "CLAN": ["Clan1", "Clan2", "Clan3"],
+            }
+        )
+
+        # Call the callback
+        callback((combined_df, "Successfully loaded 2 files"))
+
+        # Verify data was updated in the model
+        assert data_model.update_data.called
+
+        # Get the DataFrame that was passed to update_data
+        updated_df = data_model.update_data.call_args[0][0]
+
+        # Verify it has the expected content
+        assert len(updated_df) == 3
+        assert "Player1" in str(updated_df["PLAYER"].values)
+        assert "Player3" in str(updated_df["PLAYER"].values)

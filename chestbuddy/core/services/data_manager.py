@@ -10,7 +10,7 @@ Usage:
 import logging
 import os
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Tuple, Any
+from typing import Callable, Dict, List, Optional, Tuple, Any, Union
 
 import pandas as pd
 from PySide6.QtCore import QObject, Signal
@@ -71,28 +71,37 @@ class DataManager(QObject):
         self._worker.task_completed.connect(self._on_background_task_completed)
         self._worker.task_failed.connect(self._on_background_task_failed)
 
-    def load_csv(self, file_path: str) -> None:
+    def load_csv(self, file_paths: Union[str, List[str]]) -> None:
         """
-        Load a CSV file and update the data model.
+        Load one or more CSV files and update the data model.
 
         Args:
-            file_path: Path to the CSV file
+            file_paths: Path to single CSV file or list of paths
         """
-        logger.info(f"Loading CSV file: {file_path}")
+        # Convert single file path to list for consistent handling
+        if isinstance(file_paths, str):
+            file_paths = [file_paths]
 
-        # Store the current file path
-        self._current_file_path = file_path
+        if not file_paths:
+            logger.warning("No files provided to load")
+            return
 
-        # Add the file to the list of recent files
-        self._update_recent_files(file_path)
+        logger.info(f"Loading {len(file_paths)} CSV file(s)")
+
+        # Store the most recent file path
+        self._current_file_path = file_paths[0]
+
+        # Add files to the list of recent files
+        for file_path in file_paths:
+            self._update_recent_files(file_path)
 
         # Temporarily disconnect data_changed signals during import to prevent cascading updates
         self._data_model.blockSignals(True)
         try:
-            # Use the background worker to load the file
+            # Use the background worker to load the files
             self._worker.run_task(
-                self._csv_service.read_csv,
-                file_path,
+                self._load_multiple_files,
+                file_paths,
                 task_id="load_csv",
                 on_success=self._on_csv_load_success,
             )
@@ -100,7 +109,57 @@ class DataManager(QObject):
             # Ensure signals are unblocked even if an error occurs
             self._data_model.blockSignals(False)
             logger.error(f"Error during CSV import: {e}")
-            self.load_error.emit(f"Error loading file: {str(e)}")
+            self.load_error.emit(f"Error loading files: {str(e)}")
+
+    def _load_multiple_files(self, file_paths: List[str]) -> Tuple[pd.DataFrame, str]:
+        """
+        Load multiple CSV files and combine them into a single DataFrame.
+
+        Args:
+            file_paths: List of paths to CSV files
+
+        Returns:
+            Tuple containing combined DataFrame and success message
+        """
+        dfs = []
+        error_files = []
+
+        # Process each file
+        for file_path in file_paths:
+            try:
+                logger.info(f"Processing file: {file_path}")
+                df, message = self._csv_service.read_csv(file_path)
+
+                if df is not None and not df.empty:
+                    # Map columns before combining
+                    mapped_df = self._map_columns(df)
+                    dfs.append(mapped_df)
+                else:
+                    logger.warning(f"File {file_path} returned empty DataFrame or error: {message}")
+                    error_files.append(f"{os.path.basename(file_path)}: {message}")
+            except Exception as e:
+                logger.error(f"Error processing file {file_path}: {e}")
+                error_files.append(f"{os.path.basename(file_path)}: {str(e)}")
+
+        # Check if we have any valid DataFrames
+        if not dfs:
+            error_message = "No valid data found in the selected files"
+            if error_files:
+                error_message += f": {', '.join(error_files)}"
+            return None, error_message
+
+        # Combine all DataFrames
+        try:
+            combined_df = pd.concat(dfs, ignore_index=True)
+            success_message = (
+                f"Successfully loaded {len(dfs)} file(s) with {len(combined_df)} total rows"
+            )
+            if error_files:
+                success_message += f". Some files had errors: {', '.join(error_files)}"
+            return combined_df, success_message
+        except Exception as e:
+            logger.error(f"Error combining DataFrames: {e}")
+            return None, f"Error combining files: {str(e)}"
 
     def _update_recent_files(self, file_path: str) -> None:
         """

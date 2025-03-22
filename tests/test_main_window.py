@@ -29,18 +29,16 @@ from chestbuddy.ui.correction_tab import CorrectionTab
 
 
 class SignalCatcher:
-    """Utility class to catch Qt signals."""
+    """Helper class to catch Qt signals."""
 
     def __init__(self):
         """Initialize the signal catcher."""
         self.signal_received = False
-        self.signal_count = 0
         self.signal_args = None
 
     def handler(self, *args):
-        """Handle signal emission."""
+        """Handle a signal emission."""
         self.signal_received = True
-        self.signal_count += 1
         self.signal_args = args
 
 
@@ -163,13 +161,6 @@ class TestMainWindow:
         # Test menu bar exists
         assert main_window.menuBar() is not None
 
-        # Test toolbar exists
-        toolbar_found = False
-        for toolbar in main_window.findChildren(QAction):
-            if toolbar.text() in ["Open", "Save", "Validate", "Correct"]:
-                toolbar_found = True
-        assert toolbar_found
-
     def test_menu_file_actions_exist(self, main_window):
         """Test that File menu actions exist."""
         file_menu = None
@@ -231,19 +222,39 @@ class TestMainWindow:
         # Check for expected actions
         assert "&About" in actions
 
-    def test_toolbar_actions_exist(self, main_window):
-        """Test that toolbar actions exist."""
-        toolbar = main_window.findChild(QAction, name="Open")
-        assert toolbar is not None
+    def test_menu_actions_exist(self, main_window):
+        """Test that essential actions exist in menus."""
+        # Test Open action
+        open_action = False
+        for action in main_window.findChildren(QAction):
+            if action.text() == "&Open...":
+                open_action = True
+                break
+        assert open_action
 
-        toolbar = main_window.findChild(QAction, name="Save")
-        assert toolbar is not None
+        # Test Save action
+        save_action = False
+        for action in main_window.findChildren(QAction):
+            if action.text() == "&Save":
+                save_action = True
+                break
+        assert save_action
 
-        toolbar = main_window.findChild(QAction, name="Validate")
-        assert toolbar is not None
+        # Test Validate action
+        validate_action = False
+        for action in main_window.findChildren(QAction):
+            if action.text() == "&Validate":
+                validate_action = True
+                break
+        assert validate_action
 
-        toolbar = main_window.findChild(QAction, name="Correct")
-        assert toolbar is not None
+        # Test Correct action
+        correct_action = False
+        for action in main_window.findChildren(QAction):
+            if action.text() == "&Correct":
+                correct_action = True
+                break
+        assert correct_action
 
     def test_open_file_action(self, qtbot, main_window, test_csv_path, config_mock):
         """Test the open file action."""
@@ -251,20 +262,20 @@ class TestMainWindow:
         catcher = SignalCatcher()
         main_window.load_csv_triggered.connect(catcher.handler)
 
-        # Mock QFileDialog.getOpenFileName to return our test file path
-        with patch.object(QFileDialog, "getOpenFileName", return_value=(str(test_csv_path), "")):
+        # Mock QFileDialog.getOpenFileNames to return our test file path
+        with patch.object(QFileDialog, "getOpenFileNames", return_value=([str(test_csv_path)], "")):
             # Find and trigger the open action
             for action in main_window.findChildren(QAction):
                 if action.text() == "&Open":
                     action.trigger()
                     break
 
-        # Check if the signal was emitted with the correct path
+        # Check if the signal was emitted with the correct path list
         assert catcher.signal_received
-        assert catcher.signal_args[0] == str(test_csv_path)
+        assert isinstance(catcher.signal_args[0], list)
+        assert catcher.signal_args[0][0] == str(test_csv_path)
 
         # Check if config was updated
-        config_mock.set_path.assert_called()
         config_mock.add_recent_file.assert_called_with(str(test_csv_path))
 
     def test_save_file_action(self, qtbot, main_window, test_csv_path, config_mock):
@@ -494,3 +505,38 @@ class TestMainWindow:
 
             # Check if the window title was updated
             mock_update.assert_called_once()
+
+    def test_open_multiple_files(self, qtbot, main_window, test_csv_path, config_mock, tmp_path):
+        """Test opening multiple CSV files."""
+        # Create a second test file
+        second_file = tmp_path / "second_test.csv"
+        with open(second_file, "w") as f:
+            f.write("Date,Player Name,Source/Location,Chest Type,Value,Clan\n")
+            f.write("2023-01-01,Player1,Location1,Common,100,Clan1\n")
+
+        # List of test files
+        test_files = [str(test_csv_path), str(second_file)]
+
+        # Create a signal catcher for the load_csv_triggered signal
+        catcher = SignalCatcher()
+        main_window.load_csv_triggered.connect(catcher.handler)
+
+        # Mock QFileDialog.getOpenFileNames to return our test files
+        with patch.object(QFileDialog, "getOpenFileNames", return_value=(test_files, "")):
+            # Find and trigger the open action
+            for action in main_window.findChildren(QAction):
+                if action.text() == "&Open":
+                    action.trigger()
+                    break
+
+        # Check if the signal was emitted with the correct path list
+        assert catcher.signal_received
+        assert isinstance(catcher.signal_args[0], list)
+        assert len(catcher.signal_args[0]) == 2
+        assert catcher.signal_args[0][0] == str(test_csv_path)
+        assert catcher.signal_args[0][1] == str(second_file)
+
+        # Check if both files were added to recent files
+        assert config_mock.add_recent_file.call_count == 2
+        config_mock.add_recent_file.assert_any_call(str(test_csv_path))
+        config_mock.add_recent_file.assert_any_call(str(second_file))

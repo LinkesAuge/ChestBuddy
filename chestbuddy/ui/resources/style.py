@@ -305,25 +305,4 @@ def apply_application_style(app):
         QMenu::item:selected {
             background-color: #4A5568;
         }
-        
-        QToolBar {
-            background-color: #1A2C42;
-            border-bottom: 1px solid #4A5568;
-            spacing: 6px;
-        }
-        
-        QToolButton {
-            background-color: transparent;
-            border: none;
-            padding: 6px;
-            border-radius: 4px;
-        }
-        
-        QToolButton:hover {
-            background-color: #4A5568;
-        }
-        
-        QToolButton:pressed {
-            background-color: #718096;
-        }
     """)
