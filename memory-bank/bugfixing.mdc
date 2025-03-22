@@ -1287,3 +1287,24 @@ This is a pure UI improvement that makes the context menu cleaner and less confu
 This improves the user experience by making paste operations more forgiving and consistent. The keyboard shortcut now works in more situations and provides better feedback when issues occur.
 
 **Status**: FIXED
+
+## Logging Directory Inconsistency - 2025-03-23
+
+**Issue**: Despite updating the logging directory in `app.py` to use `chestbuddy/logs`, log files were still being created in the root `logs` directory.
+
+**Root Cause**: 
+The application had two separate logging configurations:
+1. One in `app.py` which was updated to use `chestbuddy/logs` 
+2. Another in `chestbuddy/__init__.py` which was still using `Path(__file__).parent.parent / "logs"` (pointing to the root logs directory)
+
+Both logging configurations were active, but since `__init__.py` is loaded first during import, its logging configuration took precedence and directed logs to the root directory.
+
+**Fix**:
+1. Updated the `setup_logging` function in `chestbuddy/__init__.py` to use the same path as in `app.py`: `Path(__file__).parent / "logs"`
+2. Added a log message in the `setup_logging` function that shows the log file path for easier debugging
+3. Kept the custom logger level settings for third-party libraries
+
+**Technical Notes**:
+When a Python application has multiple calls to `logging.basicConfig()`, only the first one takes effect. This is why the configuration in `__init__.py` was overriding the one in `app.py`. By ensuring both use the same log directory, we avoid confusion and ensure logs are stored in a consistent location.
+
+**Status**: FIXED

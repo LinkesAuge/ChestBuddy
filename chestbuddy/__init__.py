@@ -13,7 +13,8 @@ import sys
 # Setup logging
 def setup_logging():
     """Set up logging for the application."""
-    log_dir = Path(__file__).parent.parent / "logs"
+    # Use logs directory inside the chestbuddy package
+    log_dir = Path(__file__).parent / "logs"
     log_dir.mkdir(exist_ok=True)
 
     log_file = log_dir / "chestbuddy.log"
@@ -29,6 +30,8 @@ def setup_logging():
     logging.getLogger("PIL").setLevel(logging.WARNING)
     logging.getLogger("pandas").setLevel(logging.WARNING)
     logging.getLogger("PySide6").setLevel(logging.WARNING)
+
+    logging.info(f"Logging initialized to {log_file}")
 
 
 # Initialize logging
