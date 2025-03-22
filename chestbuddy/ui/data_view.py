@@ -280,8 +280,8 @@ class DataView(QWidget):
                         # Create item with explicit text
                         item = QStandardItem(value)
 
-                        # Set foreground explicitly
-                        item.setForeground(QColor("#FFFFFF"))  # White text
+                        # Set foreground explicitly - changed from white to black for visibility
+                        item.setForeground(QColor("#000000"))  # Black text
 
                         # Set validation and correction status as user data
                         # Use pre-fetched data instead of making method calls for each cell
@@ -493,8 +493,8 @@ class DataView(QWidget):
                         # Create item with explicit text
                         item = QStandardItem(value)
 
-                        # Set foreground explicitly
-                        item.setForeground(QColor("#FFFFFF"))  # White text
+                        # Set foreground explicitly - changed from white to black for visibility
+                        item.setForeground(QColor("#000000"))  # Black text
 
                         # Set validation and correction status as user data
                         # Use pre-fetched data instead of making method calls for each cell

@@ -998,3 +998,74 @@ if self._main_window:
 
 ### Status
 - Fixed. CSV files now load without threading errors, and the UI properly switches to the Data view.
+
+## Table Cell Text Visibility Issue - 2025-03-23
+
+### Issue
+Table cells appeared empty even though data was properly loaded into the model. The log showed "Sample cell [0,0] content: ''" indicating that while data was present in the model, it wasn't visible in the UI.
+
+### Root Cause
+The text color for all cells was explicitly set to white (#FFFFFF) when populating the model:
+```python
+# Set foreground explicitly
+item.setForeground(QColor("#FFFFFF"))  # White text
+```
+
+This made the text invisible on light backgrounds. The application has a style sheet for dark background, but that wasn't consistently applied across all environments.
+
+### Error Details
+- The data was being correctly loaded (12387 rows from CSV)
+- The table model dimensions were correct
+- Cell content was present but invisible due to white text
+- The issue appeared in both the _update_view and _update_view_with_filtered_data methods
+
+### Fix
+1. Changed text color from white to black to ensure visibility regardless of background:
+```python
+# Set foreground explicitly - changed from white to black for visibility
+item.setForeground(QColor("#000000"))  # Black text
+```
+
+2. Made this change in both _update_view and _update_view_with_filtered_data methods
+
+### Technical Notes
+- The application attempts to use a dark theme for tables with white text
+- However, if stylesheet application fails, explicit item styling takes precedence
+- Using black text ensures visibility on any background, even if stylesheets aren't applied correctly
+
+### Status
+- Fixed. Table now displays text regardless of background color settings.
+
+## Thread Safety Fix for View Switching - 2025-03-23
+
+### Issue
+Application error when switching views during CSV import:
+```
+AttributeError: type object 'PySide6.QtCore.Qt' has no attribute 'Q_ARG'
+```
+
+### Root Cause
+The code was using PyQt5-style thread safety approach with `QMetaObject.invokeMethod` and `Qt.Q_ARG`, but this syntax is not compatible with PySide6.
+
+### Fix
+Changed the thread-safe UI update in `_on_csv_load_success` method:
+
+From:
+```python
+QMetaObject.invokeMethod(self._main_window, "_set_active_view",
+                        Qt.QueuedConnection,
+                        Qt.Q_ARG(str, "Data"))
+```
+
+To PySide6-compatible approach:
+```python
+QTimer.singleShot(0, lambda: self._main_window._set_active_view("Data"))
+```
+
+### Technical Notes
+- PySide6 doesn't support Qt.Q_ARG like PyQt5 does
+- QTimer.singleShot with lambda is a more reliable cross-library approach
+- This pattern ensures UI updates occur on the main thread
+
+### Status
+- Fixed. View switching now works correctly after CSV import.

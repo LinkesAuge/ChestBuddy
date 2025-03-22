@@ -233,13 +233,8 @@ class ChestBuddyApp(QObject):
 
                 # Switch to the Data view in the main window using a thread-safe approach
                 if self._main_window:
-                    # Use invokeMethod to ensure UI updates happen on the main thread
-                    QMetaObject.invokeMethod(
-                        self._main_window,
-                        "_set_active_view",
-                        Qt.QueuedConnection,
-                        Qt.Q_ARG(str, "Data"),
-                    )
+                    # Use QTimer.singleShot instead of invokeMethod for thread-safety in PySide6
+                    QTimer.singleShot(0, lambda: self._main_window._set_active_view("Data"))
                     logger.info("Requested switch to Data view (thread-safe)")
             else:
                 self._show_error(f"Error loading file: {error}")
