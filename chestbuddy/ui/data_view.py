@@ -141,6 +141,9 @@ class DataView(QWidget):
         self._table_view.horizontalHeader().setStretchLastSection(True)
         self._table_view.verticalHeader().setVisible(True)
 
+        # Apply additional styling to ensure visibility
+        self._apply_table_styling()
+
         splitter.addWidget(self._table_view)
 
         # Set splitter sizes
@@ -231,10 +234,22 @@ class DataView(QWidget):
                         # Get row data directly using iloc to avoid itertuples() which can cause recursion
                         row_data = data.iloc[row_idx]
 
+                        # Log sample of row data for debugging
+                        if row_idx < 3:  # Only log first few rows to avoid flooding logs
+                            logger.debug(f"Row {row_idx} data: {row_data.to_dict()}")
+
                         for col_idx, column_name in enumerate(column_names):
                             # Get value directly and convert to string
                             value = str(row_data[column_name])
+                            if row_idx < 3 and col_idx < 3:  # Only log some values
+                                logger.debug(
+                                    f"Cell [{row_idx}, {col_idx}] ({column_name}): '{value}'"
+                                )
+
                             item = QStandardItem(value)
+
+                            # Explicitly set foreground color to ensure text visibility
+                            item.setForeground(QColor("#FFFFFF"))  # White text
 
                             # Set validation and correction status as user data
                             val_status = self._data_model.get_cell_validation_status(
@@ -376,6 +391,9 @@ class DataView(QWidget):
                             # Convert value to string
                             value = str(row_data[column_name])
                             item = QStandardItem(value)
+
+                            # Explicitly set foreground color to ensure text visibility
+                            item.setForeground(QColor("#FFFFFF"))  # White text
 
                             # Set validation and correction status
                             val_status = self._data_model.get_cell_validation_status(
@@ -580,3 +598,33 @@ class DataView(QWidget):
 
         except Exception as e:
             logger.error(f"Error handling item change: {str(e)}")
+
+    def _apply_table_styling(self) -> None:
+        """Apply additional styling to ensure table content is visible."""
+        # Set text color explicitly via stylesheet
+        self._table_view.setStyleSheet("""
+            QTableView {
+                color: white;
+                background-color: #1A2C42;
+                gridline-color: #4A5568;
+                selection-background-color: #D4AF37;
+                selection-color: #1A2C42;
+            }
+            QTableView::item {
+                color: white;
+                background-color: #1A2C42;
+            }
+            QTableView::item:alternate {
+                background-color: #2D3748;
+            }
+            QTableView::item:selected {
+                color: #1A2C42;
+                background-color: #D4AF37;
+            }
+        """)
+
+        # Make sure the model has appropriate default foreground color
+        self._table_model.setItemPrototype(QStandardItem())
+        prototype = self._table_model.itemPrototype()
+        if prototype:
+            prototype.setForeground(QColor("white"))
