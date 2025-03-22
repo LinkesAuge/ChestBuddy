@@ -130,7 +130,6 @@ class MainWindow(QMainWindow):
 
         # Create menus and toolbars
         self._init_menus()
-        self._init_toolbar()
 
         # Connect signals
         self._connect_signals()
@@ -278,21 +277,6 @@ class MainWindow(QMainWindow):
         about_action.setStatusTip("Show the application's About box")
         about_action.triggered.connect(self._show_about)
         help_menu.addAction(about_action)
-
-    def _init_toolbar(self) -> None:
-        """Initialize the application toolbar."""
-        # Create main toolbar
-        self._toolbar = QToolBar("Main Toolbar")
-        self._toolbar.setMovable(False)
-        self._toolbar.setIconSize(QSize(24, 24))
-        self.addToolBar(self._toolbar)
-
-        # Add actions to toolbar
-        self._toolbar.addAction(self._open_action)
-        self._toolbar.addAction(self._save_action)
-        self._toolbar.addSeparator()
-        self._toolbar.addAction(self._validate_action)
-        self._toolbar.addAction(self._correct_action)
 
     def _connect_signals(self) -> None:
         """Connect signals and slots."""

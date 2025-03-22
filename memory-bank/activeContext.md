@@ -87,6 +87,7 @@ graph LR
 4. Implemented sidebar navigation
 5. Developed dashboard view as main landing page
 6. Ensured all existing functionality works with the new UI
+7. Removed redundant toolbar from the main window (the one with "open", "save", "validate", and "correct" buttons) as these functions are already available in the menu and navigation bar
 
 ### Refactoring and Enhancements
 
