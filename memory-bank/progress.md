@@ -400,6 +400,7 @@ The application now allows users to:
 - [x] Fixed cell editing errors in DataView and ChestDataModel
 - [x] Fixed quitting errors related to thread shutdown
 - [x] Fixed column mapping issue by standardizing column names to match CSV structure
+- [x] Added multi-cell paste functionality to improve data entry efficiency
 
 ## Known Issues
 

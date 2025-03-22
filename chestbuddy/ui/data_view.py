@@ -28,7 +28,14 @@ from PySide6.QtWidgets import (
     QSplitter,
     QApplication,
 )
-from PySide6.QtGui import QStandardItemModel, QStandardItem, QAction, QColor
+from PySide6.QtGui import (
+    QStandardItemModel,
+    QStandardItem,
+    QAction,
+    QColor,
+    QKeySequence,
+    QShortcut,
+)
 
 from chestbuddy.core.models import ChestDataModel
 
@@ -141,6 +148,9 @@ class DataView(QWidget):
         self._table_view.horizontalHeader().setStretchLastSection(True)
         self._table_view.verticalHeader().setVisible(True)
 
+        # Enable keyboard shortcuts for copy/paste
+        self._setup_shortcuts()
+
         # Apply additional styling to ensure visibility
         self._apply_table_styling()
 
@@ -150,6 +160,16 @@ class DataView(QWidget):
         splitter.setSizes([100, 500])
 
         main_layout.addWidget(splitter)
+
+    def _setup_shortcuts(self) -> None:
+        """Set up keyboard shortcuts for common operations."""
+        # Copy shortcut (Ctrl+C)
+        copy_shortcut = QShortcut(QKeySequence.Copy, self._table_view)
+        copy_shortcut.activated.connect(self._copy_selected_cells)
+
+        # Paste shortcut (Ctrl+V)
+        paste_shortcut = QShortcut(QKeySequence.Paste, self._table_view)
+        paste_shortcut.activated.connect(self._paste_to_selected_cells)
 
     def _connect_signals(self) -> None:
         """Connect signals and slots."""
@@ -591,9 +611,19 @@ class DataView(QWidget):
         copy_action.triggered.connect(lambda: self._copy_cell(index))
         context_menu.addAction(copy_action)
 
+        # Get selected cells to determine context menu options
+        selected_indexes = self._table_view.selectedIndexes()
+
+        # Standard paste option (always available)
         paste_action = QAction("Paste", self)
         paste_action.triggered.connect(lambda: self._paste_cell(index))
         context_menu.addAction(paste_action)
+
+        # Add special paste option when multiple cells are selected
+        if len(selected_indexes) > 1:
+            paste_all_action = QAction(f"Paste to all {len(selected_indexes)} selected cells", self)
+            paste_all_action.triggered.connect(lambda: self._paste_cell(index))
+            context_menu.addAction(paste_all_action)
 
         # Show the menu
         context_menu.exec_(self._table_view.viewport().mapToGlobal(position))
@@ -616,19 +646,35 @@ class DataView(QWidget):
 
     def _paste_cell(self, index) -> None:
         """
-        Paste clipboard text to the cell.
+        Paste clipboard text to the cell(s).
 
         Args:
-            index: The index of the cell to paste to.
+            index: The index of the clicked cell (when using context menu).
+                   If multiple cells are selected, they will all be updated.
+                   Can be an invalid index when called from keyboard shortcuts.
         """
-        if not index.isValid():
-            return
-
         # Get the text from clipboard
         text = QApplication.clipboard().text()
 
-        # Set the value
-        self._table_model.setData(index, text, Qt.EditRole)
+        # Check if there are multiple cells selected
+        selected_indexes = self._table_view.selectedIndexes()
+
+        if selected_indexes:
+            # Multiple cells selected, paste to all of them
+            for sel_index in selected_indexes:
+                # Set the value for each selected cell
+                self._table_model.setData(sel_index, text, Qt.EditRole)
+
+            logger.info(f"Pasted value to {len(selected_indexes)} selected cells")
+        elif index.isValid():
+            # Single cell via context menu, just paste to that
+            self._table_model.setData(index, text, Qt.EditRole)
+            logger.info(
+                f"Pasted value to single cell at row {index.row()}, column {index.column()}"
+            )
+        else:
+            logger.warning("Paste operation failed: No valid cell selected")
+            return
 
     @Slot()
     def _on_data_changed(self) -> None:
@@ -763,3 +809,30 @@ class DataView(QWidget):
         prototype = self._table_model.itemPrototype()
         if prototype:
             prototype.setForeground(QColor("white"))
+
+    def _copy_selected_cells(self) -> None:
+        """Copy the currently selected cell(s) to clipboard."""
+        selected_indexes = self._table_view.selectedIndexes()
+        if not selected_indexes:
+            return
+
+        # If only one cell is selected, use the existing copy function
+        if len(selected_indexes) == 1:
+            self._copy_cell(selected_indexes[0])
+            return
+
+        # For multiple cells, we could implement more advanced copying in the future
+        # For now, just copy the first selected cell
+        self._copy_cell(selected_indexes[0])
+        logger.info(f"Copied first of {len(selected_indexes)} selected cells")
+
+    def _paste_to_selected_cells(self) -> None:
+        """Paste clipboard content to the currently selected cell(s)."""
+        selected_indexes = self._table_view.selectedIndexes()
+        if not selected_indexes:
+            logger.warning("Paste operation failed: No cells selected")
+            return
+
+        # Use an empty QModelIndex for the first parameter because we're not
+        # responding to a context menu click but to a keyboard shortcut
+        self._paste_cell(QModelIndex())
