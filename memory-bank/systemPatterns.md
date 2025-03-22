@@ -52,6 +52,7 @@ The Chest Buddy application follows a Model-View-Controller (MVC) architecture w
 - **AnalysisService**: Provides data analysis functions
 - **ChartService**: Generates chart visualizations
 - **ReportService**: Generates HTML reports
+- **DataManager**: Handles high-level data operations including loading, saving, and column mapping
 
 ### 5. Background Processing Layer
 - **BackgroundWorker**: Manages execution of tasks in separate threads
@@ -510,4 +511,32 @@ Each component is styled with consistent properties:
     border-radius: 4px;
     padding: 6px 12px;
 }
+```
+
+## Service Layer Architecture
+
+The application follows a service-oriented architecture with specialized services for different functionality domains:
+
+- **CSVService**: Handles low-level CSV file operations (reading, writing, encoding detection)
+- **ValidationService**: Validates chest data against rules and patterns
+- **CorrectionService**: Applies corrections to invalid chest data
+- **ChartService**: Generates charts and visualizations from chest data
+- **DataManager**: Handles high-level data operations including loading, saving, and column mapping
+
+Each service is responsible for a specific domain of functionality and interacts with other components through well-defined interfaces and signals.
+
+### Service Dependencies
+
+```mermaid
+graph TD
+    App[ChestBuddyApp] --> DM[DataManager]
+    App --> VS[ValidationService]
+    App --> CS[CorrectionService]
+    App --> CHS[ChartService]
+    DM --> CSV[CSVService]
+    VS --> CDM[ChestDataModel]
+    CS --> CDM
+    CHS --> CDM
+    DM --> CDM
+    UI[UI Components] --> App
 ``` 

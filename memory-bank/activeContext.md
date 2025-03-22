@@ -88,6 +88,28 @@ graph LR
 5. Developed dashboard view as main landing page
 6. Ensured all existing functionality works with the new UI
 
+### Code Refactoring: DataManager Service
+
+I've implemented a significant architecture improvement by creating a new `DataManager` service that handles all file operations, particularly CSV loading and saving. The key changes include:
+
+1. Created a new `data_manager.py` file in `chestbuddy/core/services/` with a `DataManager` class
+2. Moved CSV loading and saving logic from `app.py` to this new service
+3. Added column mapping functionality to properly handle CSV files with uppercase column names
+4. Implemented signals for load/save success and error events
+5. Updated `app.py` to use the DataManager service instead of handling these operations directly
+
+This refactoring aligns with the single responsibility principle by:
+- Moving file operations out of the main application class
+- Centralizing all data import/export operations in a dedicated service
+- Improving separation of concerns between UI and data operations
+
+The main application class (`ChestBuddyApp`) now primarily focuses on:
+- Initializing services and UI components
+- Connecting signals between components
+- Handling application lifecycle events
+
+The new architecture makes it easier to add new data import/export formats in the future by extending the DataManager service without modifying the main application class.
+
 ### Current Tasks
 
 - [x] Create base UI structure

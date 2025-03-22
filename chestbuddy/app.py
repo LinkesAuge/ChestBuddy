@@ -16,7 +16,13 @@ from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QTimer, QObject, Signal, Slot, Qt, QMetaObject
 
 from chestbuddy.core.models import ChestDataModel
-from chestbuddy.core.services import CSVService, ValidationService, CorrectionService, ChartService
+from chestbuddy.core.services import (
+    CSVService,
+    ValidationService,
+    CorrectionService,
+    ChartService,
+    DataManager,
+)
 from chestbuddy.ui.main_window import MainWindow
 from chestbuddy.utils.config import ConfigManager
 from chestbuddy.utils.background_processing import BackgroundWorker
@@ -71,6 +77,7 @@ class ChestBuddyApp(QObject):
         self._validation_service = ValidationService(self._data_model)
         self._correction_service = CorrectionService(self._data_model)
         self._chart_service = ChartService(self._data_model)
+        self._data_manager = DataManager(self._data_model, self._csv_service)
 
         # Initialize background worker
         self._worker = BackgroundWorker()
@@ -123,8 +130,8 @@ class ChestBuddyApp(QObject):
         self._app.aboutToQuit.connect(self._on_shutdown)
 
         # Connect main window signals
-        self._main_window.load_csv_triggered.connect(self._load_csv)
-        self._main_window.save_csv_triggered.connect(self._save_csv)
+        self._main_window.load_csv_triggered.connect(self._data_manager.load_csv)
+        self._main_window.save_csv_triggered.connect(self._data_manager.save_csv)
         self._main_window.validate_data_triggered.connect(self._validate_data)
         self._main_window.apply_corrections_triggered.connect(self._apply_corrections)
         self._main_window.export_validation_issues_triggered.connect(self._export_validation_issues)
@@ -135,6 +142,27 @@ class ChestBuddyApp(QObject):
         # Connect background worker signals
         self._worker.task_completed.connect(self._on_background_task_completed)
         self._worker.task_failed.connect(self._on_background_task_failed)
+
+        # Connect data manager signals
+        self._data_manager.load_success.connect(self._on_data_load_success)
+        self._data_manager.load_error.connect(self._show_error)
+        self._data_manager.save_success.connect(lambda path: logger.info(f"File saved: {path}"))
+        self._data_manager.save_error.connect(self._show_error)
+
+    def _on_data_load_success(self, row_count: str) -> None:
+        """
+        Handle successful data load.
+
+        Args:
+            row_count: Number of rows loaded
+        """
+        logger.info(f"Data loaded successfully with {row_count} rows")
+
+        # Switch to the Data view in the main window using a thread-safe approach
+        if self._main_window:
+            # Use QTimer.singleShot for thread-safety in PySide6
+            QTimer.singleShot(0, lambda: self._main_window._set_active_view("Data"))
+            logger.info("Requested switch to Data view (thread-safe)")
 
     def _setup_autosave(self) -> None:
         """Set up periodic autosave functionality."""
@@ -164,16 +192,8 @@ class ChestBuddyApp(QObject):
         # Create parent directory if it doesn't exist
         autosave_path.parent.mkdir(exist_ok=True)
 
-        # Save the data
-        try:
-            # Correct parameter order: data first, then path
-            result, error = self._csv_service.write_csv(autosave_path, self._data_model.data)
-            if result:
-                logger.info(f"Autosave completed to {autosave_path}")
-            else:
-                logger.error(f"Error during autosave: {error}")
-        except Exception as e:
-            logger.error(f"Error during autosave: {str(e)}")
+        # Save the data using the data manager
+        self._data_manager.save_csv(str(autosave_path))
 
     def _on_shutdown(self) -> None:
         """Handle application shutdown."""
@@ -185,103 +205,6 @@ class ChestBuddyApp(QObject):
         self._config.save()
 
         logger.info("Application shutdown")
-
-    def _load_csv(self, file_path):
-        """
-        Load a CSV file.
-
-        Args:
-            file_path (str): Path to the CSV file.
-        """
-        logger.info(f"Loading CSV file: {file_path}")
-
-        # Add the file to the list of recent files
-        recent_files = self._config.get_list("Files", "recent_files", [])
-        if file_path in recent_files:
-            recent_files.remove(file_path)
-        recent_files.insert(0, file_path)
-        # Keep only the 5 most recent files
-        recent_files = recent_files[:5]
-        self._config.set_list("Files", "recent_files", recent_files)
-        self._config.set("Files", "last_file", file_path)
-        self._config.set_path("Files", "last_directory", os.path.dirname(file_path))
-
-        # Temporarily disconnect data_changed signals during import to prevent cascading updates
-        self._data_model.blockSignals(True)
-        try:
-            # Use the background worker to load the file
-            self._worker.run_task(
-                self._csv_service.read_csv,
-                file_path,
-                task_id="load_csv",
-                on_success=self._on_csv_load_success,
-            )
-        except Exception as e:
-            # Ensure signals are unblocked even if an error occurs
-            self._data_model.blockSignals(False)
-            logger.error(f"Error during CSV import: {e}")
-            self._show_error(f"Error loading file: {str(e)}")
-
-    def _on_csv_load_success(self, result):
-        """Handle successful CSV load."""
-        try:
-            df, error = result
-            if df is not None:
-                # Map CSV column names to expected column names in the data model
-                column_mapping = {
-                    "DATE": "Date",
-                    "PLAYER": "Player Name",
-                    "SOURCE": "Source/Location",
-                    "CHEST": "Chest Type",
-                    "SCORE": "Value",
-                    "CLAN": "Clan",
-                }
-
-                # Rename columns if they exist in the DataFrame
-                for csv_col, model_col in column_mapping.items():
-                    if csv_col in df.columns:
-                        df.rename(columns={csv_col: model_col}, inplace=True)
-                        logger.info(f"Mapped column {csv_col} to {model_col}")
-
-                # Log mapped columns for debugging
-                logger.info(f"DataFrame columns after mapping: {df.columns.tolist()}")
-
-                # Update the data model with signals blocked
-                self._data_model.update_data(df)
-                logger.info(f"CSV file loaded successfully with {len(df)} rows")
-
-                # Switch to the Data view in the main window using a thread-safe approach
-                if self._main_window:
-                    # Use QTimer.singleShot instead of invokeMethod for thread-safety in PySide6
-                    QTimer.singleShot(0, lambda: self._main_window._set_active_view("Data"))
-                    logger.info("Requested switch to Data view (thread-safe)")
-            else:
-                self._show_error(f"Error loading file: {error}")
-        finally:
-            # Always unblock signals when done
-            self._data_model.blockSignals(False)
-            # Emit one controlled data_changed signal
-            self._data_model.data_changed.emit()
-
-    def _save_csv(self, file_path):
-        """
-        Save a CSV file.
-
-        Args:
-            file_path (str): Path to save the CSV file.
-        """
-        logger.info(f"Saving CSV file: {file_path}")
-
-        # Get the dataframe from the model
-        df = self._data_model.data
-
-        # Use the background worker to save the file
-        self._worker.run_task(
-            self._csv_service.write_csv,
-            file_path,
-            df,
-            task_id="save_csv",
-        )
 
     def _validate_data(self):
         """Validate the data in the model."""
@@ -402,7 +325,7 @@ class ChestBuddyApp(QObject):
         # Check for initial file to load from command-line args
         file_to_load = self._parse_args()
         if file_to_load:
-            self._load_csv(file_to_load)
+            self._data_manager.load_csv(str(file_to_load))
 
         # Enter main event loop
         logger.info("Starting application main event loop")
