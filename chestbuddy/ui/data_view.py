@@ -9,7 +9,7 @@ from typing import Dict, List, Optional, Any
 import time
 
 import pandas as pd
-from PySide6.QtCore import Qt, Signal, Slot
+from PySide6.QtCore import Qt, Signal, Slot, QModelIndex
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,

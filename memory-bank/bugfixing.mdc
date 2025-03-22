@@ -1360,3 +1360,24 @@ Qt couldn't determine which handler should receive the event due to the ambiguit
 In Qt, having multiple handlers for the same shortcut can cause ambiguity errors, especially when using ApplicationShortcut context. It's better to use context-specific shortcuts (WidgetShortcut or WidgetWithChildrenShortcut) to maintain a clear hierarchy of which handler should receive the event. The event filter approach is particularly reliable since it intercepts events before standard event processing.
 
 **Status**: FIXED
+
+## QModelIndex Not Defined in Paste Function - 2025-03-24
+
+**Issue**: Error when trying to paste with Ctrl+V: `NameError: name 'QModelIndex' is not defined`
+
+**Root Cause**: 
+In the `_paste_to_selected_cells` method of the `DataView` class, the code was trying to use `QModelIndex()` but the `QModelIndex` class wasn't imported. The error occurred specifically on this line:
+```python
+self._paste_cell(QModelIndex())
+```
+
+**Fix**:
+Added `QModelIndex` to the imports from PySide6.QtCore:
+```python
+from PySide6.QtCore import Qt, Signal, Slot, QModelIndex
+```
+
+**Technical Notes**:
+When using Qt classes in Python with PySide6, it's important to explicitly import all the classes you need. Unlike C++/Qt where the classes are available through the namespace after including the header, in Python each class needs to be individually imported. QModelIndex is part of the QtCore module in PySide6.
+
+**Status**: FIXED
