@@ -1332,3 +1332,31 @@ Implemented a multi-layered approach to ensure Ctrl+V is captured reliably:
 This comprehensive approach ensures that the paste operation will be triggered regardless of which widget has focus and how Qt routes the event. By implementing multiple layers of handling, we've created redundancy that makes the operation much more robust. The logs will help identify which method is actually capturing the event in different scenarios.
 
 **Status**: FIXED
+
+## Ambiguous Ctrl+V Shortcut Overload - 2025-03-24
+
+**Issue**: Qt was showing a warning "QAction::event: Ambiguous shortcut overload: Ctrl+V" when using the paste shortcut, and paste functionality wasn't working consistently in table view.
+
+**Root Cause**: 
+Multiple handlers for the Ctrl+V shortcut were registered with the same context:
+1. Multiple QShortcut objects with ApplicationShortcut context
+2. A QAction with the same Ctrl+V shortcut 
+3. An event filter also capturing the same event
+
+Qt couldn't determine which handler should receive the event due to the ambiguity, causing inconsistent behavior.
+
+**Fix**:
+1. Removed redundant Ctrl+V shortcut handlers, keeping only:
+   - An event filter on the table view (for when the table has focus)
+   - One widget-level QShortcut with WidgetWithChildrenShortcut context (instead of ApplicationShortcut)
+2. Removed the global QAction and keyPressEvent override
+3. Enhanced the paste functionality to:
+   - Properly check for valid table data before pasting
+   - Validate clipboard content
+   - Provide better user feedback via status messages
+   - Properly handle cell selection
+
+**Technical Notes**:
+In Qt, having multiple handlers for the same shortcut can cause ambiguity errors, especially when using ApplicationShortcut context. It's better to use context-specific shortcuts (WidgetShortcut or WidgetWithChildrenShortcut) to maintain a clear hierarchy of which handler should receive the event. The event filter approach is particularly reliable since it intercepts events before standard event processing.
+
+**Status**: FIXED
