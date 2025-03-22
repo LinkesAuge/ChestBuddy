@@ -1308,3 +1308,27 @@ Both logging configurations were active, but since `__init__.py` is loaded first
 When a Python application has multiple calls to `logging.basicConfig()`, only the first one takes effect. This is why the configuration in `__init__.py` was overriding the one in `app.py`. By ensuring both use the same log directory, we avoid confusion and ensure logs are stored in a consistent location.
 
 **Status**: FIXED
+
+## Ctrl+V Paste Operation Not Working - 2025-03-23
+
+**Issue**: The Ctrl+V shortcut was not working when trying to paste data into the table, despite having shortcuts configured in the code.
+
+**Root Cause**: 
+Multiple issues contributed to this problem:
+1. Qt's keyboard event handling can be complex, with events being processed at different levels
+2. The shortcuts were registered but not with the appropriate context (WindowShortcut vs ApplicationShortcut)
+3. The events weren't being captured directly at the widget level through keyPressEvent
+4. No event filter was installed on the table view to explicitly catch key events
+
+**Fix**:
+Implemented a multi-layered approach to ensure Ctrl+V is captured reliably:
+1. Set all shortcuts to use Qt.ApplicationShortcut context instead of the default WindowShortcut
+2. Added a direct QAction for paste with the Ctrl+V shortcut and attached it to the widget
+3. Implemented keyPressEvent override to explicitly handle Ctrl+V at the widget level
+4. Added an event filter on the table view to catch key events directly at the source
+5. Added detailed logging at each level to track which capture method succeeds
+
+**Technical Notes**:
+This comprehensive approach ensures that the paste operation will be triggered regardless of which widget has focus and how Qt routes the event. By implementing multiple layers of handling, we've created redundancy that makes the operation much more robust. The logs will help identify which method is actually capturing the event in different scenarios.
+
+**Status**: FIXED

@@ -35,6 +35,7 @@ from PySide6.QtGui import (
     QColor,
     QKeySequence,
     QShortcut,
+    QKeyEvent,
 )
 
 from chestbuddy.core.models import ChestDataModel
@@ -148,6 +149,10 @@ class DataView(QWidget):
         self._table_view.horizontalHeader().setStretchLastSection(True)
         self._table_view.verticalHeader().setVisible(True)
 
+        # Install event filter on table view to capture key events
+        self._table_view.installEventFilter(self)
+        logger.info("Installed event filter on table view")
+
         # Enable keyboard shortcuts for copy/paste
         self._setup_shortcuts()
 
@@ -166,17 +171,27 @@ class DataView(QWidget):
         # Copy shortcut (Ctrl+C)
         copy_shortcut = QShortcut(QKeySequence.Copy, self._table_view)
         copy_shortcut.activated.connect(self._copy_selected_cells)
-        logger.info("Registered Ctrl+C shortcut for copying")
+        copy_shortcut.setContext(Qt.ApplicationShortcut)
+        logger.info("Registered Ctrl+C shortcut for copying (application-wide)")
 
         # Paste shortcut (Ctrl+V)
         paste_shortcut = QShortcut(QKeySequence.Paste, self._table_view)
         paste_shortcut.activated.connect(self._paste_to_selected_cells)
-        logger.info("Registered Ctrl+V shortcut for pasting")
+        paste_shortcut.setContext(Qt.ApplicationShortcut)
+        logger.info("Registered Ctrl+V shortcut for pasting (application-wide)")
 
         # Add an additional paste shortcut for the entire widget to catch it regardless of focus
         widget_paste_shortcut = QShortcut(QKeySequence.Paste, self)
         widget_paste_shortcut.activated.connect(self._paste_to_selected_cells)
-        logger.info("Registered widget-level Ctrl+V shortcut for pasting")
+        widget_paste_shortcut.setContext(Qt.ApplicationShortcut)
+        logger.info("Registered widget-level Ctrl+V shortcut for pasting (application-wide)")
+
+        # Create global actions for additional handling
+        paste_action = QAction("Paste", self)
+        paste_action.setShortcut(QKeySequence.Paste)
+        paste_action.triggered.connect(self._paste_to_selected_cells)
+        self.addAction(paste_action)
+        logger.info("Added global paste action to widget")
 
     def _connect_signals(self) -> None:
         """Connect signals and slots."""
@@ -903,3 +918,56 @@ class DataView(QWidget):
         # Use an empty QModelIndex for the first parameter because we're not
         # responding to a context menu click but to a keyboard shortcut
         self._paste_cell(QModelIndex())
+
+    def eventFilter(self, watched, event):
+        """
+        Event filter to capture keyboard events from table view.
+
+        Args:
+            watched: The object being watched.
+            event: The event that occurred.
+
+        Returns:
+            True if the event was handled, False to pass it on.
+        """
+        # Only process events for the table view
+        if watched is self._table_view:
+            # Check for key press events
+            if event.type() == event.Type.KeyPress:
+                key_event = event
+                # Check for Ctrl+V (paste)
+                if key_event.matches(QKeySequence.Paste):
+                    logger.info("Captured Ctrl+V via table view event filter")
+                    self._paste_to_selected_cells()
+                    return True
+                # Check for Ctrl+C (copy)
+                elif key_event.matches(QKeySequence.Copy):
+                    logger.info("Captured Ctrl+C via table view event filter")
+                    self._copy_selected_cells()
+                    return True
+
+        # Pass the event on to the standard event processing
+        return super().eventFilter(watched, event)
+
+    def keyPressEvent(self, event: QKeyEvent) -> None:
+        """
+        Override keyPressEvent to handle keyboard shortcuts directly.
+
+        Args:
+            event: The key event.
+        """
+        # Check for Ctrl+V (paste)
+        if event.matches(QKeySequence.Paste):
+            logger.info("Captured Ctrl+V via keyPressEvent override")
+            self._paste_to_selected_cells()
+            event.accept()
+            return
+        # Check for Ctrl+C (copy)
+        elif event.matches(QKeySequence.Copy):
+            logger.info("Captured Ctrl+C via keyPressEvent override")
+            self._copy_selected_cells()
+            event.accept()
+            return
+
+        # Let the parent handle other key events
+        super().keyPressEvent(event)
