@@ -7,9 +7,9 @@ date: 2023-04-02
 
 Updated: 2025-03-24
 
-## Current Focus
+## Current Focus: CSV Import Progress Reporting Improvements
 
-We have enhanced the progress reporting for CSV imports to provide a better user experience. The improvements address the issue of progress bars jumping from 0% to 100% and provide more detailed information during the import process. Key changes include:
+We've enhanced the progress reporting for CSV imports to provide a better user experience. The improvements address the issue of progress bars jumping from 0% to 100% and provide more detailed information during the import process. Key changes include:
 
 1. **Incremental Progress Updates**:
    - Fixed progress bar jumping from 0% to 100% by implementing proper chunk-based progress reporting
@@ -20,13 +20,13 @@ We have enhanced the progress reporting for CSV imports to provide a better user
    - Enhanced progress dialog to show detailed file and row information
    - Added formatted numbers with commas for better readability (e.g., "1,234" instead of "1234")
    - Implemented separate indicators for per-file progress and overall progress
-   - Added file count information (e.g., "File 1 of 3") for multi-file imports
+   - Added file count information (e.g., "x / y files - z rows processed") for multi-file imports
 
-3. **Enhanced Progress Calculation**:
-   - Improved algorithm to calculate progress based on file processing status
-   - Added total row estimation and tracking across multiple files
-   - Implemented throttled updates to prevent UI overload
-   - Added proper error handling for progress reporting
+3. **Simplified Progress Reporting**:
+   - Removed row estimation in favor of showing only actual processed rows
+   - Streamlined the progress display to "x / y files - z rows processed"
+   - Improved final completion message clarity
+   - Added processing state indication during data model updates
 
 4. **Progress Pathways**:
    - Enhanced code pathways from background tasks to UI display
@@ -390,140 +390,20 @@ We'll approach the report generation phase in these steps:
 
 ## Active Decisions and Considerations
 
-- **Test-Driven Approach**: Following a strict test-first approach for all chart functionality
-- **Performance Focus**: Ensuring chart rendering remains efficient with larger datasets
-- **Integration Testing**: Verifying proper integration between all components
-- **User Experience**: Maintaining a consistent and intuitive chart interface
+### Progress Dialog Enhancements
+- We opted for a two-level progress tracking system (overall and per-file) for better user feedback during multi-file operations
+- We standardized progress reporting to use a consistent 0-100 scale across all operations
+- We implemented graceful thread cleanup to prevent application crashes during shutdown
+- We chose to enhance the existing progress dialog rather than creating a new component to maintain consistency
 
-## Known Issues
+### Report Generation Approach
+- Considering a template-based approach for flexible report generation
+- Evaluating different PDF generation libraries for the best balance of features and integration ease
+- Planning to maintain HTML-based reports with PDF export as an additional option
+- Considering how to best embed charts and maintain interactivity in reports
 
-- No known issues at this time
-
-### Column Name Standardization
-
-We've updated the `ChestDataModel.EXPECTED_COLUMNS` to match the actual column names in our standard CSV file (`Chests_input_test.csv`). The columns are now defined using uppercase names:
-
-```python
-EXPECTED_COLUMNS = ["DATE", "PLAYER", "SOURCE", "CHEST", "SCORE", "CLAN"]
-```
-
-Previously, we were using title case column names like "Player Name", but our CSV files actually use uppercase names like "PLAYER". This mismatch was causing data to not display properly in the table view.
-
-We've also updated the `DataManager._map_columns` method to include a default mapping between old column names and new ones to maintain compatibility with existing code that might be using the old column names.
-
-Tests have been updated to reflect these changes, ensuring that all references to column names use the new uppercase format.
-
-### CSV Operations Refactoring 
-
-### Multi-Cell Paste Enhancement
-
-We've improved the user experience by implementing multi-cell paste functionality, allowing users to select multiple cells in the table and paste content to all of them simultaneously. The key improvements include:
-
-1. Modified the `_paste_cell` method in `DataView` to handle multiple selections
-2. Added a context menu option that shows "Paste to all X selected cells" when multiple cells are selected
-3. Implemented keyboard shortcuts (Ctrl+V) for paste operations
-4. Added better logging for paste operations to improve debugging
-
-This enhancement allows for more efficient data entry and editing, especially when the same value needs to be applied to multiple cells. Users can now:
-
-1. Select multiple cells by clicking and dragging or using Ctrl+click for non-adjacent selections
-2. Press Ctrl+V or use the right-click context menu to paste to all selected cells
-3. See immediate feedback as all selected cells are updated simultaneously
-
-### Column Name Standardization 
-
-## Current Focus: CSV Loading Improvements
-
-We are implementing enhancements to the CSV file loading process to improve performance and user experience with large files. The current implementation causes the application to freeze during loading with no visual feedback.
-
-### Implementation Plan for CSV Loading Improvements
-
-1. **Create MultiCSVLoadTask Class**
-   - Create a new class extending BackgroundTask
-   - Handle loading multiple files with progress reporting
-   - Use chunked reading for better memory efficiency
-
-2. **Update DataManager**
-   - Add new signals:
-     - `load_progress(str, int, int)` for file name, current progress, total
-     - `load_started()` and `load_finished()` for UI feedback
-   - Modify `load_csv` to use the new task
-   - Implement cancellation support
-
-3. **Add Progress Dialog in MainWindow**
-   - Create QProgressDialog when loading starts
-   - Update the dialog as loading progresses
-   - Support cancellation with proper cleanup
-   - Close dialog when loading completes
-
-4. **Use Efficient File Processing**
-   - Switch from `read_csv` to `read_csv_chunked` or `read_csv_background`
-   - Process files in manageable chunks
-   - Report progress based on chunks processed
-
-5. **Implement Proper Cancellation**
-   - Allow users to cancel long-running operations
-   - Clean up resources when canceled
-   - Update UI appropriately after cancellation
-
-### Expected Benefits
-- UI remains responsive during file loading
-- Users see visual progress indication
-- Users can cancel operations if needed
-- Better memory management with chunked reading
-- Improved performance for large files
-
-### Current Tasks
-- [ ] Create MultiCSVLoadTask class
-- [ ] Update DataManager with new signals and methods
-- [ ] Add progress dialog to MainWindow
-- [ ] Implement proper chunked file loading
-- [ ] Add cancellation support
-- [ ] Create tests for new functionality
-
-## Recent Changes
-
-# Current Focus
-
-## CSV Import Functionality Stabilization
-
-Our current focus is on stabilizing and improving the CSV import functionality in ChestBuddy, particularly addressing issues with progress reporting and handling large imports efficiently.
-
-### Key Areas of Focus
-
-1. **Progress Reporting Improvements**
-   - Enhanced progress dialog with more accurate row counting across multiple files
-   - Better estimation of total rows by tracking actual file sizes
-   - Added intermediate "Processing data" step to show data model updates
-   - Prevent UI freezing during heavy operations with strategic event processing
-
-2. **Memory Management Optimizations**
-   - Improvements to `read_csv_chunked` method for better memory usage
-   - Added explicit garbage collection after processing large dataframes
-   - Strategic data model updates to minimize memory overhead
-
-3. **Thread Safety Enhancements**
-   - Improved coordination between background workers and UI updates
-   - Safer progress reporting with proper error handling
-
-4. **Comprehensive Error Handling**
-   - More robust handling of file access issues
-   - Better handling of encoding detection
-   - Graceful recovery from corrupted CSV files
-   - Added user feedback for parsing errors
-
-### Recent Changes
-
-1. Added more accurate row count estimation in the progress reporting
-2. Improved UI responsiveness during data model updates with processing state
-3. Refined progress bar updates to show intermediate steps
-
-### Next Steps
-
-1. Further testing with large CSV datasets to ensure stability
-2. Address any remaining performance bottlenecks in the data model update process
-3. Consider implementing a background thread for the data model update
-
-### Testing
-
-A dedicated test script has been created at `tests/test_csv_import.py` to verify the CSV import functionality improvements. 
+### UI Enhancement Considerations
+- Keep the consistent UI style when designing the new report view
+- Ensure the report generation process provides appropriate progress feedback
+- Design the report customization interface to be intuitive and user-friendly
+- Maintain visual consistency with the existing chart and data views
