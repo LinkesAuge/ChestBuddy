@@ -366,5 +366,10 @@ class ProgressDialog(QDialog):
         """Reset the progress dialog to its initial state."""
         self._was_canceled = False
         self._progress_bar.setValue(self._minimum)
-        self._progress_bar.setState(ProgressBar.State.NORMAL)
-        self._progress_bar.setStatus("")
+
+        # Check if these methods exist before calling them (compatibility with QProgressBar)
+        if hasattr(self._progress_bar, "setState"):
+            self._progress_bar.setState(ProgressBar.State.NORMAL)
+
+        if hasattr(self._progress_bar, "setStatus"):
+            self._progress_bar.setStatus("")

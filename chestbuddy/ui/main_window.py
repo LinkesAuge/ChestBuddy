@@ -854,27 +854,60 @@ class MainWindow(QMainWindow):
             logger.debug("No progress dialog to update")
             return
 
-        # Update the dialog to indicate completion
-        self._progress_dialog.setLabelText(status_message)
+        try:
+            # Update the dialog to indicate completion
+            self._progress_dialog.setLabelText("Loading complete")
 
-        # Set progress to max to indicate completion
-        self._progress_dialog.setValue(self._progress_dialog.maximum())
+            # Set progress to max to indicate completion
+            self._progress_dialog.setValue(self._progress_dialog.maximum())
 
-        # If message contains "error" or "failed", show error styling
-        if "error" in status_message.lower() or "failed" in status_message.lower():
-            # Error state - show confirmation to close
-            logger.error(f"Load operation failed: {status_message}")
-            self._progress_dialog.setButtonText("Close")
-        else:
-            # Success state - show confirmation to continue
-            logger.debug(f"Load operation completed successfully: {status_message}")
-            self._progress_dialog.setButtonText("Confirm")
+            # Set status text if we have a status message
+            if hasattr(self._progress_dialog, "setStatusText"):
+                self._progress_dialog.setStatusText(status_message)
 
-        # Enable the button to allow user to continue
-        self._progress_dialog.setCancelButtonEnabled(True)
+            # If message contains "error" or "failed", show error styling
+            if "error" in status_message.lower() or "failed" in status_message.lower():
+                # Error state - show confirmation to close
+                logger.error(f"Load operation failed: {status_message}")
+                self._progress_dialog.setButtonText("Close")
 
-        # Allow UI to process
-        QApplication.processEvents()
+                # Set error state if the method exists
+                if hasattr(self._progress_dialog, "setState") and hasattr(ProgressBar, "State"):
+                    self._progress_dialog.setState(ProgressBar.State.ERROR)
+            else:
+                # Success state - show confirmation to continue
+                logger.debug(f"Load operation completed successfully: {status_message}")
+                self._progress_dialog.setButtonText("Confirm")
+
+            # Disconnect previous signal connections to cancel loading
+            try:
+                self._progress_dialog.canceled.disconnect(self._cancel_loading)
+            except:
+                pass  # Ignore if not connected
+
+            # Connect cancel button to close the dialog
+            self._progress_dialog.canceled.connect(self._progress_dialog.close)
+
+            # Enable the button to allow user to continue
+            if hasattr(self._progress_dialog, "setCancelButtonEnabled"):
+                self._progress_dialog.setCancelButtonEnabled(True)
+
+            # Allow UI to process
+            QApplication.processEvents()
+
+        except Exception as e:
+            logger.error(f"Error updating progress dialog on load finished: {e}")
+            # Try to ensure the dialog can be closed
+            try:
+                if self._progress_dialog and hasattr(self._progress_dialog, "_cancel_button"):
+                    self._progress_dialog._cancel_button.setEnabled(True)
+                    self._progress_dialog._cancel_button.setText("Close")
+                    self._progress_dialog._cancel_button.clicked.disconnect()
+                    self._progress_dialog._cancel_button.clicked.connect(
+                        self._progress_dialog.close
+                    )
+            except Exception as inner_e:
+                logger.error(f"Failed to recover progress dialog: {inner_e}")
 
     def _cancel_loading(self) -> None:
         """
