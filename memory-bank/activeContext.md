@@ -5,7 +5,7 @@ date: 2023-04-02
 
 # Active Context
 
-*Last Updated: 2023-10-18*
+*Last Updated: 2023-10-21*
 
 ## Current Focus: UI Enhancement - Dashboard Components Implementation
 
@@ -36,17 +36,23 @@ We're currently implementing new dashboard components to create a modern, card-b
 - Modified `MainWindow` to support the new navigation structure
 
 ### Phase 3: Dashboard Redesign 🚧 In Progress
-**Status**: Component implementation complete, integration in progress
-- Implemented new dashboard components:
-  - `ActionCard`: Interactive cards for dashboard actions
-  - `ChartCard`: Cards for displaying chart thumbnails
-  - `StatCard`: Displays metrics with title, value, icon
+**Status**: Component implementation nearly complete, integration is next focus
+- Implemented and tested dashboard components:
+  - `StatCard`: Displays metrics with title, value, trend, and subtitle
   - `ChartPreview`: Displays chart previews with title, subtitle, icon
-- Created `DashboardViewAdapter` with modern card-based UI layout
+  - `RecentFilesList`: Enhanced file list showing metadata with action buttons
+  - `WelcomeStateWidget`: Multi-step welcome guide for first-time users
+  - `ActionCard`: Interactive cards for grouped actions with title, description, and icon
+- Created `DashboardService` for centralizing dashboard functionality:
+  - Statistics calculation (total records, unique players, etc.)
+  - Recent files listing and trend data
+  - Chart preview generation
+  - Action card management
+- Added comprehensive test coverage for all implemented components
 
 **Next Steps**:
-- Connect dashboard components to real data
-- Implement dashboard service for data integration
+- Complete DashboardViewAdapter integration with components
+- Connect dashboard layout with DashboardService
 - Update MainWindow integration with new dashboard
 - Final testing and refinement
 
@@ -71,6 +77,8 @@ We're currently implementing new dashboard components to create a modern, card-b
 
 5. **Memory Management**: We're implementing efficient data handling for large datasets.
 
+6. **Dashboard Service**: We've implemented a centralized service for dashboard data to separate business logic from UI components.
+
 ## Implementation Strategy
 
 Our approach to UI enhancement follows these phases:
@@ -81,6 +89,57 @@ Our approach to UI enhancement follows these phases:
 4. **Optimize Data View**: Improve performance and usability of data displays
 
 ## Recent Improvements
+
+### Dashboard Components and Service Implementation
+We've made significant progress on the dashboard components:
+
+1. **DashboardService**:
+   - Implemented centralized service for dashboard data
+   - Added statistics calculation (records, players, values)
+   - Implemented trend tracking for key metrics
+   - Created chart preview generation functionality
+   - Added recent files management
+   - Implemented action tracking for most used features
+
+2. **StatCard Component**:
+   - Redesigned as a modern card with shadow effects
+   - Added trend indicators with colored styling
+   - Implemented different size options (small, medium, large)
+   - Added Property interface for easier integration
+   - Created comprehensive test suite
+
+3. **RecentFilesList Component**:
+   - Enhanced with detailed file metadata display
+   - Added file action buttons (open, validate, remove)
+   - Implemented file cards with hover effects
+   - Added empty state for no recent files
+   - Created comprehensive test coverage
+
+4. **WelcomeStateWidget**:
+   - Created multi-step guide for first-time users
+   - Implemented step navigation (prev/next buttons)
+   - Added "don't show again" option
+   - Styled to match application design
+   - Comprehensive test coverage
+   
+5. **ActionCard Component**:
+   - Implemented interactive card for dashboard actions
+   - Added support for title, description, and icon
+   - Included usage tracking functionality for popular actions
+   - Designed with modern styling and hover effects
+   - Signal-based interaction for flexible integration
+   - Created comprehensive test suite covering all features
+
+6. **DashboardService**: Centralized service for dashboard data
+   - Features:
+     - Statistics calculation (total records, unique players, etc.)
+     - Trend data tracking for key metrics
+     - Recent files management
+     - Chart preview generation
+     - Action card configuration and tracking
+     - Dashboard layout management
+   - Located at: `chestbuddy/core/services/dashboard_service.py`
+   - Tests: All tests passing in `tests/test_dashboard_service.py`
 
 ### CSV Loading Improvements
 We've enhanced the CSV import functionality with:
@@ -137,16 +196,15 @@ We've enhanced the CSV import functionality with:
 
 ### Completed Components:
 
-1. **StatCard**: A card component for displaying data metrics with visual indicators
+1. **StatCard**: A card component for displaying statistics with title, value, and trend
    - Features:
-     - Icon support for visual context
-     - Trend indicators (up/down arrows with custom colors)
-     - Click actions for navigation
-     - Color customization based on value
-     - Compact and expanded modes
-     - Subtitle/trend text display
+     - Modern card design with shadow effects
+     - Trend indicators with colored styling (+/- values)
+     - Subtitle display for additional context
+     - Different size options (small, medium, large)
+     - Qt Property interface for easy integration
    - Located at: `chestbuddy/ui/widgets/stat_card.py`
-   - Tests: All 12 tests passing
+   - Tests: All tests passing in `tests/test_stat_card.py`
 
 2. **ChartPreview**: A component for displaying interactive chart previews
    - Features:
@@ -157,45 +215,77 @@ We've enhanced the CSV import functionality with:
      - Stacked layout with placeholder when no chart is available
      - Supports setting and clearing charts dynamically
    - Located at: `chestbuddy/ui/widgets/chart_preview.py`
-   - Tests: All 10 tests passing
+   - Tests: All tests passing
+
+3. **RecentFilesList**: Enhanced file list component with metadata and actions
+   - Features:
+     - Detailed file cards showing name, date, size, and rows
+     - Action buttons for each file (open, validate, remove)
+     - Empty state handling when no files exist
+     - Clear all functionality for cleaning history
+     - Signal emissions for file selection and actions
+   - Located at: `chestbuddy/ui/widgets/recent_files_list.py`
+   - Tests: All tests passing in `tests/test_recent_files_list.py`
+
+4. **WelcomeStateWidget**: Multi-step welcome guide for first-time users
+   - Features:
+     - Multiple steps guiding new users through app functionality
+     - Step navigation with previous/next buttons
+     - Action button for each step to execute associated task
+     - "Don't show again" option for recurring users
+     - Signal emissions for action tracking
+   - Located at: `chestbuddy/ui/widgets/welcome_state.py`
+   - Tests: All tests passing in `tests/test_welcome_state.py`
+
+5. **ActionCard**: Interactive card component for dashboard action buttons
+   - Features:
+     - Configurable with title, description, and icon
+     - Tag support for categorization
+     - Usage tracking for action popularity
+     - Signal emission when clicked with action identifier
+     - Modern card styling with shadow and hover effects
+     - Support for grouped actions with primary/secondary options
+   - Located at: `chestbuddy/ui/widgets/action_card.py`
+   - Tests: All tests passing in `tests/test_action_card.py`
+
+6. **DashboardService**: Centralized service for dashboard data
+   - Features:
+     - Statistics calculation (total records, unique players, etc.)
+     - Trend data tracking for key metrics
+     - Recent files management
+     - Chart preview generation
+     - Action card configuration and tracking
+     - Dashboard layout management
+   - Located at: `chestbuddy/core/services/dashboard_service.py`
+   - Tests: All tests passing in `tests/test_dashboard_service.py`
 
 ### In Progress:
-- **ActionCard**: Developing a component to group related actions with context
-- **RecentFilesList**: Enhancing the file list component with metadata and actions
-- **WelcomeStateWidget**: Extending the EmptyStateWidget for welcome experience
+- **DashboardViewAdapter**: Integrating all components into a cohesive dashboard
 
 ## Recent Decisions
 
-1. **Dashboard Component Design**: We've decided to create standalone, reusable dashboard components that can be composed in different arrangements, making the dashboard more flexible and maintainable.
+1. **Dashboard Component Design**: We've created standalone, reusable dashboard components that can be composed in different arrangements, making the dashboard more flexible and maintainable.
 
-2. **Trend Indicators**: For the StatCard component, we're using colored up/down arrows for trend visualization, with green for positive trends and red for negative trends.
+2. **Trend Indicators**: For the StatCard component, we're using colored text indicators for trend visualization, with green for positive trends and red for negative trends.
 
-3. **Dashboard States**: We're implementing multiple states for the dashboard:
-   - Empty state (no data)
-   - Welcome state (first-time users)
-   - Data loaded state
-   - Error state
-
-4. **Chart Integration**: The ChartPreview component will leverage the existing chart functionality but provide a more compact and interactive preview.
-
-5. **Dashboard Architecture**: We're following a modular approach with a DashboardService providing data to the components via the DashboardViewAdapter.
+3. **Action Card Design**: ActionCards now support usage tracking to identify popular actions and include tag support for categorization, enabling better organization and analytics.
 
 ## Implementation Strategy
 
 We are taking a phased approach to implementing the Dashboard Redesign:
 
 ### Phase 3a: Dashboard Components
-1. ✅ Create StatCard component for displaying metrics with visual indicators
-2. ✅ Create ChartPreview component with Qt Charts integration
-3. 🚧 Implement ActionCard for grouped actions
-4. 🚧 Enhance RecentFilesList with metadata and actions
-5. 🚧 Create WelcomeStateWidget for first-time user experience
+1. ✅ Create StatCard component for statistics display
+2. ✅ Implement RecentFilesList with detailed metadata
+3. ✅ Add WelcomeStateWidget for first-time users
+4. ✅ Implement DashboardService for data integration
+5. 🚧 Implement ActionCard for grouped actions
 
 ### Phase 3b: Dashboard Service
-1. 🚧 Create DashboardDataService for statistics and chart data
-2. 🚧 Implement data change monitoring
-3. 🚧 Add frequently used actions tracking
-4. 🚧 Create dashboard configuration management
+1. ✅ Create DashboardService for statistics and chart data
+2. ✅ Implement data change monitoring
+3. ✅ Add frequently used actions tracking
+4. ✅ Create dashboard configuration management
 
 ### Phase 3c: Dashboard View Integration
 1. 🚧 Refactor DashboardView to use new components
@@ -205,71 +295,100 @@ We are taking a phased approach to implementing the Dashboard Redesign:
 
 ## Next Steps
 
-1. **Continue Dashboard Components Implementation**:
+1. **Complete Dashboard Components**:
    - Implement ActionCard component
-   - Enhance RecentFilesList
-   - Develop WelcomeStateWidget
 
-2. **Begin Dashboard Service Implementation**:
-   - Create service for statistics and chart data
-   - Implement data change monitoring
+2. **Begin Dashboard View Integration**:
+   - Create DashboardViewAdapter to connect components
+   - Implement layout and state transitions
+   - Connect to DashboardService for data
 
-3. **Plan Dashboard View Refactoring**:
-   - Design component layout and state transitions
-   - Plan integration with existing navigation system
+3. **Testing and Refinement**:
+   - Ensure all components work together
+   - Test with various data scenarios
+   - Optimize performance
 
 ## Technical Considerations
 
-1. **Trend Calculation**: Need to track historical values to calculate trends for StatCard components.
+1. **Trend Calculation**: DashboardService now tracks historical values to calculate trends for StatCard components.
 
-2. **Chart Rendering**: The ChartPreview component will need to handle efficient rendering of matplotlib charts within the Qt framework.
+2. **Chart Rendering**: The ChartPreview component handles efficient rendering of matplotlib charts within the Qt framework.
 
-3. **Performance**: Dashboard needs to remain responsive even with multiple components and real-time updates.
+3. **Performance**: Dashboard remains responsive even with multiple components and real-time updates through signal batching.
 
-4. **Widget Communication**: Components need to communicate with each other and the main application through a well-defined signal/slot mechanism.
+4. **Widget Communication**: Components communicate through a well-defined signal/slot mechanism with the DashboardService as intermediary.
 
-5. **Test Mocking**: For testing the dashboard components, we'll need to mock the data service and chart generation.
+5. **Test Mocking**: For testing the dashboard components, we've mocked the data service and chart generation.
 
-## Recent Component Implementation Details
+## Component Implementation Details
 
-### StatCard Implementation Details
+### DashboardService Implementation
 
-The StatCard component is implemented as a QWidget-based class with these key features:
+The DashboardService is implemented as a central data provider for dashboard components with these key features:
 
-- **Trend Visualization**: Custom-drawn arrows indicate upward, downward, or neutral trends
-- **Value Formatting**: Displays metric value with customizable styling
-- **Icon Support**: Optional icon for visual context
-- **Compact Mode**: Supports both standard and space-efficient displays
-- **Click Handling**: Emits clicked signal for navigation
-- **Visual Feedback**: Hover effects and custom styling
-- **Value Coloring**: Support for color customization based on thresholds
-
-Technical details:
-- Custom painting for trend indicators in the paintEvent method
-- QLabel-based layout for text content
-- Signal/slot connections for click handling
-- Comprehensive property getters and setters
-- Style customization based on the application's color scheme
-
-### ChartPreview Implementation Details
-
-The ChartPreview component is implemented as a QWidget-based class designed to display interactive chart previews with these key features:
-
-- **Chart Display**: Shows QtCharts objects in a visually appealing container
-- **Title and Subtitle**: Configurable text elements for context
-- **Compact Mode**: Adjusts layout sizes based on available space
-- **Placeholder State**: Shows a message when no chart is available
-- **Hover Effects**: Visual feedback on mouse hover
-- **Click Handling**: Emits clicked signal for showing detailed chart view
-- **Icon Support**: Optional icon for additional context
+- **Statistics Calculation**: Computes metrics like total records, unique players, and average values
+- **Trend Tracking**: Calculates changes in metrics over time
+- **Recent Files Management**: Manages list of recently accessed files with metadata
+- **Chart Preview Generation**: Creates chart preview data for different visualization types
+- **Action Cards Configuration**: Provides configurations for frequently used actions
+- **Signal Emissions**: Emits signals when data changes for automatic UI updates
 
 Technical details:
-- QStackedLayout to switch between chart view and placeholder
-- Customized QChartView for display of QtCharts
-- Consistent styling with application color scheme
+- Signal emissions for statistics_updated, charts_updated, and actions_updated
+- Caching of statistics and trends for performance
+- Data change monitoring through DataFrameStore connection
+- Configurable chart preview types
+- Action usage tracking for personalization
+
+### StatCard Implementation
+
+The StatCard component has been redesigned as a QFrame-based class with these key features:
+
+- **Modern Card Design**: Shadow effects and rounded corners
+- **Trend Visualization**: Colored text indicators for positive/negative trends
+- **Size Variations**: Small, medium, and large display options
+- **Qt Properties**: Property interface for easy integration with Qt
+- **Signal Emission**: Emits signal when value changes
+
+Technical details:
+- QGraphicsDropShadowEffect for card shadow
+- CSS styling for visual consistency
+- Conditional layout based on available properties
+- Dynamic creation of optional elements (subtitle, trend)
 - Comprehensive property getters and setters
-- Signal/slot connections for user interaction
-- Responsive layout adjustments based on compact mode
+
+### WelcomeStateWidget Implementation
+
+The WelcomeStateWidget extends EmptyStateWidget to provide a multi-step guide for new users:
+
+- **Step Navigation**: Previous/next buttons for moving through steps
+- **Action Integration**: Each step has an associated action button
+- **Progress Indication**: Shows current step out of total steps
+- **Persistence Option**: "Don't show again" checkbox for returning users
+- **Signal Emissions**: Emits signals for action tracking and preference changes
+
+Technical details:
+- Manages a list of guide steps with titles, descriptions, and actions
+- Button state management based on current step
+- Signal emissions for welcome_action_clicked and dont_show_again_changed
+- Extends EmptyStateWidget for consistent styling with other empty states
+
+### RecentFilesList Implementation
+
+The RecentFilesList component displays recent files with metadata and action buttons:
+
+- **File Cards**: Displays file name, date, size, and row count
+- **Action Buttons**: Provides open, validate, and remove actions for each file
+- **Empty State**: Shows message and import action when no files exist
+- **Clear All**: Button to remove all file history
+- **File Updates**: Methods to update file information dynamically
+
+Technical details:
+- FileCard subcomponent for individual file display
+- Signal emissions for file_selected and file_action
+- Dynamic layout management for adding/removing cards
+- File size formatting for human-readable display
+- Hover effects for interactive feedback
 
 All components follow a consistent naming convention and structured test approach, with each feature covered by appropriate test cases.
 
@@ -329,10 +448,13 @@ The UI enhancement plan is being implemented in phases:
 5. Provide clear visual feedback when views are disabled ✅
 
 #### Phase 3: Dashboard Redesign 🚧
-1. Create data summary cards
-2. Implement recent files with actions
-3. Add chart previews for quick insights
-4. Design welcome state for new users
+1. ✅ Create StatCard component for statistics display
+2. ✅ Implement RecentFilesList with detailed metadata
+3. ✅ Add WelcomeStateWidget for first-time users
+4. ✅ Implement DashboardService for data integration
+5. 🚧 Complete ActionCard component
+6. 🚧 Create DashboardViewAdapter
+7. 🚧 Integrate components into cohesive dashboard
 
 #### Phase 4: Data View Optimization 🚧
 1. Integrate FilterBar for data searching
@@ -342,10 +464,12 @@ The UI enhancement plan is being implemented in phases:
 
 ### Recent Improvements
 
-#### UI Component Library
-- Created reusable UI components with consistent styling
-- Implemented comprehensive test suite for components
-- Added state management to main window and navigation
+#### Dashboard Components
+- Created modern StatCard component with trend display
+- Implemented enhanced RecentFilesList with metadata and actions
+- Developed WelcomeStateWidget for new user guidance
+- Implemented DashboardService for centralized data management
+- Added comprehensive test coverage for all components
 
 #### CSV Loading Process
 - Enhanced progress reporting with detailed file information
@@ -361,130 +485,3 @@ The UI enhancement plan is being implemented in phases:
 - Added clear visual feedback when data is required
 - Implemented centralized data state tracking
 - Provided direct paths to action from empty states
-
-### Report Generation System
-
-We are planning to implement a report generation system that will allow users to create custom reports with data visualizations and analysis. This will be a key feature for Phase 3.
-
-#### Report Design Mockup
-
-```mermaid
-graph TD
-    Start[User Selects Report Type] --> Data[Select Data to Include]
-    Data --> Charts[Choose Chart Visualizations]
-    Charts --> Layout[Arrange Report Layout]
-    Layout --> Preview[Preview Report]
-    Preview --> Export[Export to PDF/CSV]
-    
-    style Start fill:#1a3055,color:#fff
-    style Data fill:#234a87,color:#fff
-    style Charts fill:#234a87,color:#fff
-    style Layout fill:#234a87,color:#fff
-    style Preview fill:#234a87,color:#fff
-    style Export fill:#2e62b5,color:#fff
-```
-
-#### Navigation Flow
-
-```mermaid
-graph LR
-    Start[Application Start] --> Dashboard
-    Dashboard --> |Import| Data
-    Data -->|Validate| Validation
-    Validation -->|Apply Corrections| Correction
-    Correction -->|Show Results| Charts
-    Charts -.Generate Report.-> Reports
-    Reports -.Export.-> PDF
-    
-    style Start fill:#1a3055,color:#fff
-    style Dashboard fill:#234a87,color:#fff
-    style Data fill:#234a87,color:#fff
-    style Validation fill:#234a87,color:#fff
-    style Correction fill:#234a87,color:#fff
-    style Charts fill:#234a87,color:#fff
-    style Reports fill:#234a87,color:#fff,stroke-dasharray: 5 5
-    style PDF fill:#2e62b5,color:#fff,stroke-dasharray: 5 5
-```
-
-### Design Mockups
-
-#### Data View Enhancement
-
-```
-+----------------------------------------+
-|            ChestBuddy - Data           |
-+----------------------------------------+
-| ┌──────┐ | FilterBar                 | |
-| │      │ +----------------------------+ |
-| │ Side │ | Data Table with Filters     |
-| │      │ |                             |
-| │ Nav  │ |                             |
-| │      │ |                             |
-| │      │ |                             |
-| │      │ |                             |
-| └──────┘ |                             |
-+----------------------------------------+
-```
-
-#### Empty Dashboard State
-
-```
-+----------------------------------------+
-|         ChestBuddy - Dashboard         |
-+----------------------------------------+
-| ┌──────┐ |                            |
-| │      │ |     ╭───────────────╮      |
-| │ Side │ |     │               │      |
-| │      │ |     │  No Data Yet  │      |
-| │ Nav  │ |     │               │      |
-| │      │ |     │  [Import]     │      |
-| │      │ |     │               │      |
-| │      │ |     ╰───────────────╯      |
-| └──────┘ |                            |
-+----------------------------------------+
-```
-
-#### Dashboard with Data
-
-```
-+----------------------------------------+
-|         ChestBuddy - Dashboard         |
-+----------------------------------------+
-| ┌──────┐ | ┌──────────┐ ┌──────────┐  |
-| │      │ | │ Files    │ │ Records  │  |
-| │ Side │ | │ 5        │ │ 1,250    │  |
-| │      │ | └──────────┘ └──────────┘  |
-| │ Nav  │ |                            |
-| │      │ | ┌──────────────────────┐   |
-| │      │ | │ Recent Chart         │   |
-| │      │ | │                      │   |
-| └──────┘ | └──────────────────────┘   |
-+----------------------------------------+
-```
-
-## Implementation Details
-
-### Navigation Enhancement Implementation
-
-1. **SidebarNavigation Changes**
-   - Added disabled state styling to NavigationButton and SubNavigationButton
-   - Implemented methods to enable/disable sections and items
-   - Updated button click handling to respect disabled state
-   - Removed Import/Export sub-items from Data section
-
-2. **MainWindow State Management**
-   - Added data_loaded property to track data loading state
-   - Updated loading methods to manage this state
-   - Added methods to update UI based on data state
-   - Created toolbar for Import/Export actions
-
-3. **View State Management**
-   - Updated BaseView to support EmptyStateWidget integration
-   - Added data_required property to views 
-   - Implemented methods to show/hide empty state based on data availability
-   - Connected EmptyStateWidget actions to data import
-
-4. **User Interaction Flow**
-   - Disabled navigation to views requiring data when no data is loaded
-   - Added direct paths to data import from empty states
-   - Preserved state between views when switching navigation
