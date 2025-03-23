@@ -701,198 +701,107 @@ class CSVService:
         progress_callback: Optional[Callable[[int, int], None]] = None,
     ) -> Tuple[Optional[pd.DataFrame], Optional[str]]:
         """
-        Read a CSV file in chunks to handle large files efficiently.
+        Read a CSV file in chunks to avoid memory issues with large files.
 
         Args:
-            file_path: The path to the CSV file.
-            chunk_size: The number of rows to read in each chunk.
-            encoding: Optional encoding to use. If None, auto-detection is used.
-            normalize_text: Whether to normalize text encoding issues.
-            robust_mode: Whether to use robust mode for handling severely corrupted files.
-            progress_callback: Optional callback function for reporting progress.
-                The callback receives current and total row counts and should return
-                True to continue processing or False to cancel.
+            file_path: Path to the CSV file
+            chunk_size: Number of rows to read in each chunk
+            encoding: Optional encoding to use (auto-detected if None)
+            normalize_text: Whether to normalize text in the CSV
+            robust_mode: Whether to use robust mode for reading
+            progress_callback: Optional callback for progress reporting
 
         Returns:
-            A tuple containing:
-                - The DataFrame containing the CSV data, or None if an error occurred.
-                - An error message, or None if the operation was successful.
+            Tuple containing DataFrame and error message (if any)
         """
-        import gc  # Import garbage collector for memory management
-
-        logger.info(f"Reading CSV file in chunks: {file_path}, chunk size: {chunk_size}")
-        path = Path(file_path) if isinstance(file_path, str) else file_path
-
         try:
-            # Check if file exists
-            if not path.exists():
-                return None, f"File not found: {path}"
+            file_path = Path(file_path)
+            if not file_path.exists():
+                return None, f"File not found: {file_path}"
 
             # Detect encoding if not provided
-            if not encoding:
-                encoding = self._detect_encoding(path)
-                if encoding:
-                    logger.info(f"Detected encoding: {encoding}")
+            if encoding is None:
+                # First check for BOM
+                bom_encoding = self._detect_bom(file_path)
+                if bom_encoding:
+                    logger.info(f"BOM detected, using encoding: {bom_encoding}")
+                    encoding = bom_encoding
+                else:
+                    # Then try auto-detection
+                    detected_encoding = self._detect_encoding(file_path)
+                    if detected_encoding:
+                        logger.info(f"Detected encoding: {detected_encoding}")
+                        encoding = detected_encoding
+                    else:
+                        logger.warning("Could not detect encoding, using utf-8")
+                        encoding = "utf-8"
 
-            # On encoding failure, try a fallback approach
-            if not encoding:
-                logger.warning("Could not detect encoding, trying fallbacks")
-                for fallback_encoding in FALLBACK_ENCODINGS:
-                    try:
-                        # Try to read the first few lines with this encoding
-                        with open(path, "r", encoding=fallback_encoding) as f:
-                            # Read a small sample to verify encoding works
-                            sample = "".join(f.readline() for _ in range(10))
-                            if sample:  # If we could read something, use this encoding
-                                encoding = fallback_encoding
-                                logger.info(f"Using fallback encoding: {encoding}")
-                                break
-                    except UnicodeDecodeError:
-                        continue  # Try next encoding
-                    except Exception as e:
-                        logger.debug(f"Error with fallback encoding {fallback_encoding}: {e}")
-
-            # If we still don't have an encoding, use utf-8 as last resort
-            if not encoding:
-                logger.warning("Using utf-8 as last resort encoding")
-                encoding = "utf-8"
-
-            # First try to get file size and line count for progress reporting
+            # First pass: Count rows to enable progress reporting
+            total_rows = 0
             try:
-                file_size = path.stat().st_size
-                estimated_lines = 0
-
-                # Try to estimate line count by checking number of newlines in a sample
-                with open(path, "r", encoding=encoding) as f:
-                    # Read a small sample (up to 100KB) of the file
-                    sample_size = min(file_size, 100 * 1024)  # 100KB max
-                    sample = f.read(sample_size)
-                    if sample:
-                        # Count newlines and estimate total based on file size ratio
-                        newlines = sample.count("\n")
-                        if newlines > 0:
-                            # Add 20% buffer to the estimate to avoid progress going backwards
-                            estimated_lines = int((newlines / len(sample)) * file_size * 1.2)
-                        else:
-                            # If no newlines in sample, use fallback estimate
-                            estimated_lines = int(
-                                file_size / 50
-                            )  # Assume average 50 bytes per line
+                with open(file_path, "r", encoding=encoding, errors="replace") as f:
+                    total_rows = sum(1 for _ in f) - 1  # Subtract 1 for header row
             except Exception as e:
-                logger.warning(f"Could not estimate line count: {e}")
-                # Use file size as fallback (1 line per 50 bytes is a rough estimate)
-                estimated_lines = int(file_size / 50)
+                logger.warning(f"Error counting rows: {e}. Progress reporting may be inaccurate.")
+                # If we can't count rows, we'll use a rough estimate based on file size
+                total_rows = int(file_path.stat().st_size / 100)  # Rough estimate
 
-            # Cap estimate at a reasonable value to avoid UI lag with very large estimates
-            estimated_lines = min(estimated_lines, 10000000)  # 10 million max estimate
+            # Read the file in chunks using pandas
+            logger.info(f"Reading CSV file in chunks: {file_path}, chunk size: {chunk_size}")
 
-            # Set up reading in chunks
-            chunks = []
-            total_chunks = 0
-            processed_rows = 0
-
-            # Set up pandas options for memory efficiency
-            pd.options.mode.copy_on_write = True  # Use more memory-efficient copy on write
-
-            # Use a context manager to ensure file is properly closed
-            reader = pd.read_csv(
-                path,
+            # Use dtype=str for all columns to avoid pandas type inference
+            # which can cause recursion issues
+            chunks = pd.read_csv(
+                file_path,
                 encoding=encoding,
                 chunksize=chunk_size,
-                on_bad_lines="warn" if robust_mode else "error",
-                low_memory=True,  # Use less memory
+                dtype=str,  # Force all columns to be strings to avoid type inference
+                engine="python",  # Use the Python engine for more robust parsing
+                on_bad_lines="skip" if robust_mode else None,
             )
 
-            with reader:
-                for i, chunk in enumerate(reader):
-                    # Check if we should continue (via progress callback)
-                    if progress_callback:
-                        # Update processed rows
-                        processed_rows += len(chunk)
+            all_chunks = []
+            rows_processed = 0
 
-                        # Call progress callback with current progress
-                        if not progress_callback(processed_rows, estimated_lines):
-                            # If callback returns False, cancel operation
-                            logger.info("CSV reading cancelled by progress callback")
+            for chunk_idx, chunk in enumerate(chunks):
+                # Force all data to be processed as strings to avoid type inference issues
+                for col in chunk.columns:
+                    # Convert all values to string to ensure consistent handling
+                    chunk[col] = chunk[col].astype(str)
 
-                            # Clean up chunks to free memory
-                            for c in chunks:
-                                del c
-                            chunks = []
-                            gc.collect()
+                # Add processed chunk to the list
+                all_chunks.append(chunk)
 
-                            return None, "Operation cancelled"
+                # Update progress counter
+                rows_processed += len(chunk)
 
-                    # Process the chunk
-                    if normalize_text:
-                        chunk = self._normalize_dataframe_text(chunk)
-
-                    # Add to chunks list
-                    chunks.append(chunk)
-                    total_chunks += 1
-
-                    # Periodically combine chunks to avoid having too many small DataFrames
-                    # This reduces memory fragmentation
-                    if len(chunks) > 10:
-                        # Combine chunks and clear the list
-                        combined = pd.concat(chunks, ignore_index=True)
-
-                        # Clear individual chunks to free memory
-                        for c in chunks:
-                            del c
-                        chunks = [combined]
-
-                        # Explicitly run garbage collection to release memory
-                        gc.collect()
-
-            # No chunks means empty file
-            if not chunks:
-                return pd.DataFrame(), "File was empty"
+                # Call progress callback if provided
+                if progress_callback and total_rows > 0:
+                    # Prevent division by zero and progress > 100%
+                    progress_pct = min(100, int((rows_processed / total_rows) * 100))
+                    try:
+                        progress_callback(rows_processed, total_rows)
+                    except Exception as e:
+                        logger.error(f"Error in progress callback: {e}")
 
             # Combine all chunks into a single DataFrame
-            final_df = pd.concat(chunks, ignore_index=True) if len(chunks) > 1 else chunks[0]
+            if all_chunks:
+                # Concatenate all chunks, but avoid type inference again
+                final_df = pd.concat(all_chunks, ignore_index=True)
 
-            # Clean up chunks to free memory
-            for c in chunks:
-                del c
-            chunks = []
-            gc.collect()
+                # To further avoid recursion issues, ensure all column data is string
+                # This is especially important for date columns
+                for col in final_df.columns:
+                    final_df[col] = final_df[col].astype(str)
 
-            # Final progress update
-            if progress_callback:
-                progress_callback(len(final_df), len(final_df))
+                logger.info(f"Successfully read CSV file with {len(final_df)} rows")
+                return final_df, None
+            else:
+                return None, "No data read from CSV file"
 
-            logger.info(f"Successfully read CSV file with {len(final_df)} rows")
-            return final_df, None
-
-        except pd.errors.ParserError as e:
-            logger.error(f"CSV parsing error: {e}")
-            return None, f"Error parsing CSV: {str(e)}"
-        except pd.errors.EmptyDataError:
-            logger.warning("CSV file is empty")
-            return pd.DataFrame(), "File is empty"
-        except UnicodeDecodeError as e:
-            logger.error(f"Encoding error: {e}")
-            return None, f"Character encoding error: {str(e)}"
-        except PermissionError as e:
-            logger.error(f"Permission error accessing file: {e}")
-            return None, f"Cannot access file (permission denied)"
-        except IOError as e:
-            logger.error(f"I/O error: {e}")
-            return None, f"Error reading file: {str(e)}"
         except Exception as e:
-            # Get more detailed stack trace for hard-to-debug errors
-            import traceback
-
-            logger.error(f"Unexpected error reading CSV file: {e}")
-            logger.debug(f"Traceback: {traceback.format_exc()}")
-            return None, f"Error reading CSV: {str(e)}"
-        finally:
-            # Ensure we clear any remaining chunks in case of exceptions
-            if "chunks" in locals() and chunks:
-                for c in chunks:
-                    del c
-                gc.collect()
+            logger.error(f"Error reading CSV file: {e}")
+            return None, f"Error reading CSV file: {str(e)}"
 
     def read_csv_background(
         self,

@@ -568,9 +568,8 @@ class MainWindow(QMainWindow):
             "total_rows": 0,
         }
 
-        # Reset total row counters
+        # Reset row counter
         self._total_rows_loaded = 0
-        self._total_rows_estimated = 0
         self._last_progress_current = 0
 
         # Show progress dialog if not already visible
@@ -621,13 +620,10 @@ class MainWindow(QMainWindow):
                 if file_path != self._loading_state["current_file"]:
                     # If we're moving to a new file, record the size of the completed file
                     if self._loading_state["current_file"]:
-                        # Initialize file sizes tracking dictionary if it doesn't exist
-                        if not hasattr(self, "_file_sizes"):
-                            self._file_sizes = {}
-                        # Store the actual size of the completed file
-                        self._file_sizes[self._loading_state["current_file"]] = self._loading_state[
-                            "total_rows"
-                        ]
+                        # Keep track of completed files
+                        processed_files = self._loading_state["processed_files"]
+                        if self._loading_state["current_file"] not in processed_files:
+                            processed_files.append(self._loading_state["current_file"])
 
                     # Add new file to processed files if needed
                     if file_path not in self._loading_state["processed_files"]:
@@ -641,15 +637,13 @@ class MainWindow(QMainWindow):
                         )
                     self._loading_state["current_file"] = file_path
 
-                # Update total rows for this file
+                # Update total rows for current file
                 self._loading_state["total_rows"] = max(total, self._loading_state["total_rows"])
 
                 # Track rows across all files
                 if not hasattr(self, "_total_rows_loaded"):
                     self._total_rows_loaded = 0
-                    self._total_rows_estimated = 0
                     self._last_progress_current = 0
-                    self._file_sizes = {}
 
                 # Increment total rows loaded by the increase since last update
                 if hasattr(self, "_last_progress_current"):
@@ -660,86 +654,41 @@ class MainWindow(QMainWindow):
                 else:
                     self._last_progress_current = current
 
-                # Better row estimation based on known file sizes
-                if hasattr(self, "_file_sizes"):
-                    # Calculate known total from processed files
-                    known_sizes = sum(self._file_sizes.values())
-                    known_files = len(self._file_sizes)
-
-                    # Current file's expected size
-                    current_size = total
-
-                    # Calculate average file size from known files
-                    if known_files > 0:
-                        avg_size = known_sizes / known_files
-                    else:
-                        avg_size = current_size  # Fall back to current file size
-
-                    # Count remaining files
-                    remaining_files = (
-                        self._loading_state["total_files"] - known_files - 1
-                    )  # -1 for current file
-                    if remaining_files < 0:
-                        remaining_files = 0
-
-                    # Estimate total rows across all files
-                    self._total_rows_estimated = (
-                        known_sizes + current_size + (avg_size * remaining_files)
-                    )
-                else:
-                    # Fall back to simpler estimation if we don't have file sizes yet
-                    self._total_rows_estimated = max(
-                        self._total_rows_estimated,
-                        total * len(self._loading_state["processed_files"]),
-                    )
-
             # Calculate progress percentage safely
             percentage = min(100, int((current * 100 / total) if total > 0 else 0))
 
-            # Create a consistent progress message
+            # Create a simple progress message with actual counts, no estimates
             filename = (
                 os.path.basename(self._loading_state["current_file"])
                 if self._loading_state["current_file"]
-                else "files"
+                else ""
             )
 
             # Build a descriptive progress message
             if self._loading_state["total_files"] > 0:
-                # File count information
-                if self._loading_state["total_files"] > 1:
-                    message = f"Loading file {self._loading_state['current_file_index']}/{self._loading_state['total_files']}: {filename}"
+                # Simple file count information
+                file_info = f"{self._loading_state['current_file_index']} / {self._loading_state['total_files']} files"
+
+                # Include row count information, showing only actual processed rows
+                if hasattr(self, "_total_rows_loaded") and self._total_rows_loaded > 0:
+                    # Format with commas for readability
+                    message = f"Loading file: {filename}"
+                    self._progress_dialog.setStatusText(
+                        f"{file_info} - {self._total_rows_loaded:,} rows processed"
+                    )
                 else:
                     message = f"Loading file: {filename}"
-
-                # Row count information
-                if total > 0:
-                    # Format numbers with commas for readability
-                    current_formatted = f"{current:,}"
-                    total_formatted = f"{total:,}"
-
-                    if hasattr(self, "_total_rows_loaded") and self._total_rows_estimated > 0:
-                        # Show both file-specific and overall progress
-                        message += f" ({current_formatted}/{total_formatted} rows)"
-
-                        # Add total rows information as status text
-                        total_progress = f"Total: {self._total_rows_loaded:,} of ~{self._total_rows_estimated:,} rows"
-                        self._progress_dialog.setStatusText(total_progress)
-                    else:
-                        # Fall back to just file-specific progress
-                        message += f" ({current_formatted}/{total_formatted} rows)"
-                        self._progress_dialog.setStatusText("")
+                    self._progress_dialog.setStatusText(file_info)
             else:
                 # Fallback if we don't have file count yet
                 message = f"Loading {filename}..."
-                if total > 0:
-                    message += f" ({current:,}/{total:,} rows)"
+                self._progress_dialog.setStatusText("")
 
             # Update the dialog
             self._progress_dialog.setLabelText(message)
             self._progress_dialog.setValue(percentage)
 
             # Only make visibility adjustments if the dialog is not already visible
-            # This prevents unnecessary UI updates that can make it appear like a new window
             if not self._progress_dialog.isVisible():
                 self._progress_dialog.show()
                 self._progress_dialog.raise_()
@@ -772,19 +721,14 @@ class MainWindow(QMainWindow):
                     self._progress_dialog.setLabelText(message)
                     self._progress_dialog.setValue(100)
                     self._progress_dialog.setCancelButtonText("Please wait...")
-                    self._progress_dialog.setStatusText("Preparing data model...")
+                    self._progress_dialog.setStatusText("Processing data...")
 
                     # Process events to update the UI
                     QApplication.processEvents()
                     return  # Don't complete the dialog yet
 
                 # Set the label to indicate completion
-                completion_message = message if message else "Loading complete"
-
-                # Add file count to the completion message if available
-                if self._loading_state["total_files"] > 0:
-                    if not "files" in completion_message.lower():
-                        completion_message += f" ({self._loading_state['total_files']} files)"
+                completion_message = "Loading complete"
 
                 # Extract actual row count from the message if present
                 actual_row_count = None
@@ -797,8 +741,14 @@ class MainWindow(QMainWindow):
                         # Fall back to the tracked count if parsing fails
                         actual_row_count = None
 
-                if actual_row_count is None:
+                if actual_row_count is None and hasattr(self, "_total_rows_loaded"):
+                    actual_row_count = self._total_rows_loaded
+                elif actual_row_count is None:
                     actual_row_count = self._loading_state["total_rows"]
+
+                # Display final message with total files and rows
+                total_files = self._loading_state["total_files"]
+                final_status = f"{total_files} file{'s' if total_files != 1 else ''} - {actual_row_count:,} rows processed"
 
                 # Ensure progress dialog is updated with completion status
                 self._progress_dialog.setLabelText(completion_message)
@@ -807,8 +757,8 @@ class MainWindow(QMainWindow):
                 # Set success state for the progress bar
                 self._progress_dialog.setState(ProgressBar.State.SUCCESS)
 
-                # Set status with detail message using the most accurate row count
-                self._progress_dialog.setStatusText(f"Processed {actual_row_count:,} total rows")
+                # Set status with final message
+                self._progress_dialog.setStatusText(final_status)
 
                 # Update the cancel button to "Close" or "Confirm"
                 self._progress_dialog.setCancelButtonText("Confirm")

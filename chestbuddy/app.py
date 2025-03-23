@@ -89,7 +89,6 @@ class ChestBuddyApp(QObject):
             self._validation_service,
             self._correction_service,
             self._chart_service,
-            data_manager=self._data_manager,
         )
 
         # Connect signals
@@ -113,7 +112,7 @@ class ChestBuddyApp(QObject):
         logs_dir.mkdir(exist_ok=True)
 
         # Set up logging configuration
-        log_level = "DEBUG"  # Force DEBUG level
+        log_level = self._config.get("Logging", "level", "INFO")
         log_file = logs_dir / "chestbuddy.log"
 
         # Configure root logger
@@ -160,11 +159,10 @@ class ChestBuddyApp(QObject):
         logger.info(f"Data loaded successfully with {row_count} rows")
 
         # Switch to the Data view in the main window using a thread-safe approach
-        # Comment out the automatic tab change as requested by the user
-        # if self._main_window:
-        #     # Use QTimer.singleShot for thread-safety in PySide6
-        #     QTimer.singleShot(0, lambda: self._main_window._set_active_view("Data"))
-        #     logger.info("Requested switch to Data view (thread-safe)")
+        if self._main_window:
+            # Use QTimer.singleShot for thread-safety in PySide6
+            QTimer.singleShot(0, lambda: self._main_window._set_active_view("Data"))
+            logger.info("Requested switch to Data view (thread-safe)")
 
     def _setup_autosave(self) -> None:
         """Set up periodic autosave functionality."""
@@ -199,48 +197,14 @@ class ChestBuddyApp(QObject):
 
     def _on_shutdown(self) -> None:
         """Handle application shutdown."""
-        logger.info("Starting application shutdown sequence")
+        # Save any unsaved work
+        if not self._data_model.is_empty:
+            self._on_autosave()
 
-        # Check for any running background tasks and wait for them to complete
-        data_manager = self._data_manager
-        if data_manager:
-            try:
-                # Cancel any running tasks first
-                if hasattr(data_manager, "_worker") and hasattr(data_manager._worker, "is_running"):
-                    if data_manager._worker.is_running and data_manager._current_task:
-                        logger.info("Cancelling running background tasks")
-                        try:
-                            # Request cancellation
-                            data_manager._current_task.cancel()
+        # Save configuration
+        self._config.save()
 
-                            # Give a brief moment for tasks to clean up
-                            for _ in range(5):  # Process some events to allow tasks to clean up
-                                self._app.processEvents()
-
-                        except Exception as e:
-                            logger.error(f"Error cancelling background tasks: {e}")
-            except Exception as e:
-                logger.error(f"Error handling background tasks during shutdown: {e}")
-
-        # Auto-save data if model is not empty
-        if data_manager and hasattr(data_manager, "model") and data_manager.model:
-            if not data_manager.model.empty():
-                try:
-                    logger.info("Auto-saving data before shutdown")
-                    data_manager.save_csv(
-                        self._config.get_path("Autosave", "path", Path("data") / "autosave.csv")
-                    )
-                except Exception as e:
-                    logger.error(f"Error during auto-save on shutdown: {e}")
-
-        # Save application configuration
-        try:
-            logger.info("Saving configuration")
-            self._config.save()
-        except Exception as e:
-            logger.error(f"Error saving configuration during shutdown: {e}")
-
-        logger.info("Application shutdown complete")
+        logger.info("Application shutdown")
 
     def _validate_data(self):
         """Validate the data in the model."""
@@ -346,31 +310,6 @@ class ChestBuddyApp(QObject):
         logger.error(message)
         from PySide6.QtWidgets import QMessageBox
 
-        # Update progress dialog if it exists and if the error is related to loading
-        if hasattr(self, "_main_window") and self._main_window:
-            if (
-                hasattr(self._main_window, "_progress_dialog")
-                and self._main_window._progress_dialog
-            ):
-                if self._main_window._progress_dialog.isVisible():
-                    # Import needed for the enum
-                    from chestbuddy.ui.widgets.progress_bar import ProgressBar
-
-                    # Set error state in progress dialog
-                    self._main_window._progress_dialog.setState(ProgressBar.State.ERROR)
-                    self._main_window._progress_dialog.setStatusText(f"Error: {message}")
-                    self._main_window._progress_dialog.setCancelButtonText("Close")
-
-                    # Disconnect previous connections and connect to close dialog
-                    try:
-                        self._main_window._progress_dialog.canceled.disconnect()
-                    except:
-                        pass
-                    self._main_window._progress_dialog.canceled.connect(
-                        self._main_window._progress_dialog.close
-                    )
-
-        # Show error message box
         QMessageBox.critical(None, "Error", message)
 
     def run(self) -> int:
