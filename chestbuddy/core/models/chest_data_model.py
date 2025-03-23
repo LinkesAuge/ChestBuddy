@@ -148,8 +148,10 @@ class ChestDataModel(QObject):
     def _notify_change(self) -> None:
         """Emit a data changed signal."""
         try:
+            print("ChestDataModel._notify_change called")
             # Skip emission if signals are blocked
             if self.signalsBlocked():
+                print("Signals blocked, skipping emission.")
                 logger.debug("Signals blocked, skipping emission.")
                 return
 
@@ -158,6 +160,7 @@ class ChestDataModel(QObject):
             elapsed_ms = current_time - self._last_emission_time
 
             if elapsed_ms < self._emission_rate_limit_ms:
+                print(f"Skipping emission, occurred too soon after previous ({elapsed_ms}ms).")
                 logger.debug(
                     f"Skipping emission, occurred too soon after previous ({elapsed_ms}ms)."
                 )
@@ -168,6 +171,7 @@ class ChestDataModel(QObject):
 
             # Only emit if the data has actually changed
             if new_hash == self._current_data_hash:
+                print("Skipping emission, no actual data change detected.")
                 logger.debug("Skipping emission, no actual data change detected.")
                 return
 
@@ -176,10 +180,13 @@ class ChestDataModel(QObject):
             self._last_emission_time = current_time
 
             # Emit the signal
+            print("EMITTING data_changed signal!!!")
             logger.debug("Emitting data_changed signal.")
             self.data_changed.emit()
+            print("data_changed signal emitted.")
 
         except Exception as e:
+            print(f"Error emitting data_changed signal: {e}")
             logger.error(f"Error emitting data_changed signal: {str(e)}")
 
     @property
@@ -319,15 +326,22 @@ class ChestDataModel(QObject):
             new_data: The new DataFrame to use as the chest data.
         """
         try:
+            print(
+                f"ChestDataModel.update_data called with DataFrame of shape: {new_data.shape if new_data is not None else 'None'}"
+            )
+
             # Prevent recursive updates
             if self._updating:
+                print("Canceling update as another update is in progress.")
                 logger.debug("Canceling update as another update is in progress.")
                 return
 
             self._updating = True
+            print("Set _updating to True")
 
             # Check if this is an actual data change
             if not self._data.empty and new_data is not None and not new_data.empty:
+                print("Checking if data has changed with hash")
                 temp_current_hash = self._calculate_data_hash()
 
                 # Calculate what the hash would be with the new data
@@ -338,15 +352,18 @@ class ChestDataModel(QObject):
 
                 # If the hashes match, this is a no-op update - skip it
                 if temp_current_hash == temp_new_hash:
+                    print("Skipping update as data is identical")
                     logger.debug("Skipping update as data is identical")
                     self._updating = False
                     return
 
             # Track if signals were already blocked
             self._signals_already_blocked = self.signalsBlocked()
+            print(f"Signals already blocked: {self._signals_already_blocked}")
 
             # Block signals if not already blocked
             if not self._signals_already_blocked:
+                print("Blocking signals")
                 self.blockSignals(True)
 
             try:
@@ -355,8 +372,10 @@ class ChestDataModel(QObject):
                     if col not in new_data.columns:
                         new_data[col] = ""
 
+                print(f"Setting data with columns: {', '.join(self.EXPECTED_COLUMNS)}")
                 # Keep only the expected columns in the specified order
                 self._data = new_data[self.EXPECTED_COLUMNS].copy()
+                print(f"New data shape: {self._data.shape}")
 
                 # Initialize validation and correction status DataFrames
                 self._init_status_dataframes()
@@ -367,14 +386,17 @@ class ChestDataModel(QObject):
             # Only notify change if we weren't already blocking signals
             if not self._signals_already_blocked:
                 # Unblock signals before emitting
+                print("Unblocking signals before notifying")
                 self.blockSignals(False)
 
             # Update the current hash before notifying
             self._update_data_hash()
+            print("Calling _notify_change to emit signals")
         except Exception as e:
             # Ensure signals are unblocked on exception
             if not self._signals_already_blocked:
                 self.blockSignals(False)
+            print(f"Error updating data: {e}")
             logger.error(f"Error updating data: {e}")
             raise
         finally:
@@ -387,6 +409,7 @@ class ChestDataModel(QObject):
 
             # Mark update as complete and notify if needed
             self._updating = False
+            print("Data update complete, set _updating to False")
 
     def get_row(self, index: int) -> pd.Series:
         """

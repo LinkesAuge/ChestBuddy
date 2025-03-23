@@ -1,5 +1,108 @@
 ---
-description: 
+description: Tracking of bugs, fixes, and ongoing issues
 globs: 
 alwaysApply: false
 ---
+
+# Fixed Issues
+
+## UI/Display Issues
+- ✅ Progress dialog not showing during file loading
+  - Fixed by ensuring the dialog is created with the right settings in MainWindow._on_load_started
+  - Set minimum duration to 0 to show immediately
+  - Added explicit visibility commands
+
+- ✅ Data not displaying in table view after loading
+  - Fixed the DataView._update_view method to correctly display data from the model
+  - Added clearer logs to trace data flow
+  - Improved error handling in update methods
+
+- ✅ Multiple file import crashing
+  - Fixed progress handling in MultiCSVLoadTask
+  - Improved error resilience in _on_load_progress method
+  - Added proper error handling for the progress dialog updates
+
+- ✅ Progress dialog consistency issues
+  - Enhanced MainWindow._on_load_progress to provide consistent information
+  - Added proper tracking of file count, current file, and row progress
+  - Improved visibility handling to ensure dialog stays visible throughout the loading process
+  - Added more descriptive messages showing file progress (x/y) and row count
+
+- ✅ SyntaxError in progress_bar.py
+  - Fixed by removing extraneous backticks (```) at the end of the file
+  - This was causing the application to fail at startup
+
+- ✅ Incorrect import in main_window.py
+  - Fixed incorrect import path for DataView module
+  - Changed from 'chestbuddy.ui.widgets.data_view' to 'chestbuddy.ui.data_view'
+
+- ✅ Missing color constant in progress_dialog.py
+  - Fixed reference to non-existent color constant TEXT_PRIMARY
+  - Changed to use TEXT_LIGHT which is available in the Colors class
+
+## Background Processing Issues
+- ✅ Signal connections not working properly
+  - Fixed connections between DataManager and MainWindow
+  - Enhanced signal handling with proper debug logs
+  - Improved DataManager._connect_signals() method
+
+- ✅ Progress not updating during file load
+  - Fixed by modifying the MultiCSVLoadTask to use a consistent scale
+  - Implemented better file-specific progress reporting
+  - Added overall progress updates at appropriate points
+
+- ✅ Background worker cleanup issues
+  - Improved thread cleanup in BackgroundWorker.__del__
+  - Added better error handling for worker cleanup
+  - Eliminated forced thread termination during shutdown
+
+- **App crashes during CSV file import**: The application would crash in the middle of processing CSV files, particularly with large files.
+  - Fixed by improving the memory management in `csv_service.py`, particularly the `read_csv_chunked` method which now incrementally processes chunks instead of storing all in memory.
+  - Added robust error handling for memory errors, allowing partial data recovery.
+  - Reduced UI update frequency in progress callbacks to prevent overwhelming the event queue.
+  - Improved thread safety and signal handling for cross-thread communication.
+  - Added proper resource cleanup and signal disconnection in the `BackgroundWorker` class.
+  - Added safeguards against invalid configuration values like chunk size.
+
+## Data Handling Issues
+- ✅ ChestDataModel.update_data not notifying correctly
+  - Fixed notification logic to ensure data changes are properly communicated
+  - Added more detailed logging for debugging
+
+# Remaining Issues
+
+## Minor Issues
+- QThread object deletion warning at shutdown
+  - Non-critical issue related to Background Worker cleanup
+  - Only occurs during application shutdown and doesn't affect functionality
+  - Implemented a more graceful shutdown process to avoid thread termination
+  - Improved warning messages to debug level to avoid alarming users
+
+- **Memory usage during large file imports**: While improved, importing very large files still requires significant memory. 
+  - Could be further improved by implementing disk-based intermediate storage for extremely large datasets.
+
+## Lessons Learned
+
+1. Signal connections require careful debugging to ensure they're properly connected and functioning
+2. Progress reporting should have consistent scales and clear distinction between file-specific and overall progress
+3. The Qt progress dialog requires explicit visibility commands in some cases
+4. Background task error handling is critical for preventing crashes during file operations
+5. Debug logging in key methods greatly assists troubleshooting complex interaction issues
+6. Thread cleanup during application shutdown requires special handling to avoid errors
+7. Tracking state in a dedicated dictionary (_loading_state) provides more consistent UI updates
+8. Processing events (QApplication.processEvents()) is important for responsive UI updates during file operations
+9. Check Python files for syntax errors such as extraneous code block markers (```) or incorrect indentation
+10. Verify color constants and other resources exist before using them in UI components
+11. Keep import paths consistent with actual project structure
+
+- **Memory Management Patterns**: Accumulating chunks of data in memory can lead to crashes with large files. Instead:
+  - Process data incrementally where possible
+  - Implement early exit strategies for memory errors
+  - Add progress throttling to reduce overhead
+  - Consider using disk-based intermediate storage for very large datasets
+
+- **Signal Safety**: When working with signals across threads:
+  - Use robust error handling around every signal emission
+  - Implement throttling for high-frequency progress updates
+  - Always disconnect signals when done to prevent memory leaks
+  - Use try/except blocks around Qt object interactions that might be deleted

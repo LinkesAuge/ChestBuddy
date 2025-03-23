@@ -140,6 +140,14 @@ Date,Player Name,Source/Location,Chest Type,Value,Clan
 - Embedded data tables and SVG charts
 - Summary statistics sections
 - User-customizable report elements
+- PDF export capability using a dedicated library (planned)
+
+### PDF Generation Libraries (Under Evaluation)
+- **WeasyPrint**: HTML to PDF conversion with CSS styling support
+- **ReportLab**: Comprehensive PDF generation framework
+- **PyFPDF**: Lightweight PDF generation library
+- **Qt's QPdfWriter**: Native Qt-based PDF creation (via PySide6)
+- Final selection will be based on chart embedding capability, styling options, and integration with existing code
 
 ## Performance Optimization
 
@@ -148,6 +156,8 @@ Date,Player Name,Source/Location,Chest Type,Value,Clan
 - Background thread for loading large files
 - Progress indication for long operations
 - Chunked reading for memory efficiency
+- Multi-file loading with consolidated progress reporting
+- Two-level progress tracking (overall and per-file)
 
 ### Background Processing
 - Worker-based threading model using QThread
@@ -155,6 +165,10 @@ Date,Player Name,Source/Location,Chest Type,Value,Clan
 - Signal-based progress reporting mechanism
 - Proper error handling and cancellation support
 - Thread-safe UI updates
+- Improved thread cleanup with error handling
+- Graceful thread termination during application shutdown
+- Support for hierarchical progress reporting (task → subtask)
+- Callback mechanism for detailed operation status updates
 
 ### UI Responsiveness
 - Separate threads for data processing
@@ -162,6 +176,9 @@ Date,Player Name,Source/Location,Chest Type,Value,Clan
 - Signal/slot mechanism for thread communication
 - Batch updates to UI elements
 - Pagination for large datasets
+- Enhanced progress dialog with detailed status information
+- Consistent progress reporting scale (0-100) across all operations
+- Cancellation support with proper cleanup
 
 ### Memory Management
 - Chunked data processing for large files
@@ -169,6 +186,8 @@ Date,Player Name,Source/Location,Chest Type,Value,Clan
 - Cleanup of temporary files and resources
 - Worker cleanup after task completion
 - Memory usage monitoring
+- Improved reference handling during thread termination
+- Prevention of memory leaks during error conditions
 
 ## Testing Strategy
 
@@ -501,3 +520,44 @@ The application uses Python's built-in logging module for logging messages. Logs
 - Each log message includes a timestamp, the module name, the log level, and the message
 - The logs directory is automatically created if it doesn't exist
 - The log path is determined relative to the app.py file location, ensuring consistency regardless of where the application is launched from 
+
+## Progress Dialog System
+
+### Dialog Features
+- Consistent modal dialog for all long-running operations
+- Clear title indicating the current operation
+- Progress bar with percentage display (0-100%)
+- Detailed status message showing:
+  - Current file being processed (x of y)
+  - File name and path
+  - Current operation details (rows processed, etc.)
+- Cancel button for operation termination
+- Minimum width to ensure readability of paths and messages
+- Proper cleanup on cancellation or completion
+
+### Progress Reporting Protocol
+- Operations report progress on a consistent 0-100 scale
+- Multi-step operations provide hierarchical progress:
+  - Overall operation progress (e.g., files 2/10)
+  - Current step progress (e.g., rows 150/500)
+- Each progress update includes:
+  - Numeric progress value (0-100)
+  - Contextual information (current file, operation details)
+  - Optional status message override
+
+### Implementation
+- MainWindow manages the ProgressDialog instance
+- DataManager coordinates between UI and background workers
+- BackgroundWorker manages the thread and signal connections
+- Tasks emit progress signals with detailed information
+- Signal chain: Task → BackgroundWorker → DataManager → MainWindow → ProgressDialog
+
+### Progress State Tracking
+- MainWindow maintains a _loading_state dictionary with:
+  - Total number of files being processed
+  - Current file index and path
+  - List of processed files
+  - Current operation details
+- This state ensures consistent progress reporting across loading phases
+- Provides context for progress dialog messages
+- Enables proper handling of cancellation and cleanup

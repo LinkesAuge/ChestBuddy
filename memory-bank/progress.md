@@ -56,6 +56,19 @@ All core functionality including data model, services, UI components, and end-to
 - Created proper component separation for UI reusability
 - Integrated with existing codebase while maintaining backward compatibility
 
+### Phase 13c: Enhanced Progress Reporting
+
+We've made significant improvements to the CSV import progress reporting:
+
+- [x] Fixed long loading delay after imports by adding an intermediate "Processing data" step
+- [x] Improved accuracy of row count estimation across multiple files by tracking actual file sizes
+- [x] Enhanced UI responsiveness during data model updates with strategic event processing
+- [x] Implemented better progress messaging with clearer status updates
+- [x] Fixed jumping from 0% to 100% issue with incremental updates
+- [x] Added protection against UI freezing during heavy operations
+
+These improvements provide users with a much better experience during large CSV imports, with more accurate progress reporting and responsive UI feedback throughout the entire import process.
+
 ## Project Completion Status
 
 - Project Setup: 100%
@@ -189,6 +202,12 @@ We have successfully completed all improvements to the CSV loading functionality
   - Enhanced cleanup of resources during application shutdown
   - Added validation and error handling for corrupt or invalid CSV files
   - Fixed thread termination issues that caused "destroyed while running" warnings
+- [x] Improved progress reporting for CSV imports:
+  - Fixed progress bar jumping from 0% to 100% with smooth updates
+  - Enhanced progress dialog to show total rows loaded across files
+  - Added formatted numbers with commas for better readability
+  - Improved progress calculation based on all files being processed
+  - Added separate tracking of per-file and overall progress
 
 ### Background Processing
 - Implemented robust CSV import with memory-efficient processing
@@ -292,6 +311,11 @@ No critical issues at this time. The minor QThread object deletion warning at sh
   - Created tests/test_csv_import.py to verify the full import process
 - [x] Optimize progress reporting to avoid UI overload
   - Implemented throttled progress updates to prevent overwhelming the UI thread
+- [x] Enhance progress reporting for CSV imports
+  - Fixed progress bar jumping from 0% to 100% with smooth updates
+  - Added total rows tracking across multiple files
+  - Implemented formatted numbers with commas for readability
+  - Added comprehensive file and progress information
 
 ## UI Components
 

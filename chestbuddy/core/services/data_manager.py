@@ -14,6 +14,7 @@ from typing import Callable, Dict, List, Optional, Tuple, Any, Union
 
 import pandas as pd
 from PySide6.QtCore import QObject, Signal
+from PySide6.QtWidgets import QApplication
 
 from chestbuddy.utils.config import ConfigManager
 from chestbuddy.utils.background_processing import BackgroundWorker, MultiCSVLoadTask
@@ -184,6 +185,21 @@ class DataManager(QObject):
             current: Current progress value
             total: Total progress value
         """
+        # Check if we're receiving valid progress values
+        if total <= 0:
+            # Avoid division by zero and show indeterminate progress
+            logger.debug("Received invalid progress values: current=%s, total=%s", current, total)
+            # Forward a placeholder progress value to indicate activity without percentage
+            self.load_progress.emit("", 0, 0)
+            return
+
+        # Calculate percentage for consistent progress display
+        percentage = min(100, int((current / total) * 100))
+
+        # Log progress at useful intervals to avoid log spam
+        if percentage % 10 == 0 or percentage >= 100:
+            logger.debug(f"CSV loading progress: {percentage}% ({current}/{total})")
+
         # Forward the progress signal without a file path (overall progress)
         self.load_progress.emit("", current, total)
 
@@ -310,7 +326,15 @@ class DataManager(QObject):
             if self._current_file_path:
                 self._update_recent_files(self._current_file_path)
 
-            # Attempt to map columns
+            # FIRST emit the load_finished signal to let the UI finish progress reporting
+            # before we update the data model (which can trigger resource-intensive UI updates)
+            success_message = f"Successfully loaded {len(data)} rows of data"
+            self.load_finished.emit(success_message)
+
+            # Allow UI to process the completion event
+            QApplication.processEvents()
+
+            # THEN attempt to map columns
             mapped_data = self._map_columns(data)
 
             # Update the data model with the new data
@@ -325,10 +349,6 @@ class DataManager(QObject):
 
             # Clear the current task
             self._current_task = None
-
-            # Emit load finished signal with success message
-            success_message = f"Successfully loaded {len(data)} rows of data"
-            self.load_finished.emit(success_message)
 
         except Exception as e:
             # Ensure signals are unblocked
@@ -564,7 +584,8 @@ class DataManager(QObject):
                 logger.error(f"Error connecting worker.progress signal: {e}")
 
             try:
-                self._worker.finished.connect(self._on_csv_load_success)
+                # Don't directly connect - use an adapter function
+                self._worker.finished.connect(self._adapt_task_result)
             except Exception as e:
                 logger.error(f"Error connecting worker.finished signal: {e}")
 
@@ -589,3 +610,37 @@ class DataManager(QObject):
 
         except Exception as e:
             logger.error(f"Error in _connect_signals: {e}")
+
+    def _adapt_task_result(self, result):
+        """
+        Adapt the result from MultiCSVLoadTask to the format expected by _on_csv_load_success.
+
+        The MultiCSVLoadTask returns (success: bool, result: Union[DataFrame, str])
+        but _on_csv_load_success expects (DataFrame, str) tuple.
+
+        Args:
+            result: Result tuple from the MultiCSVLoadTask
+        """
+        try:
+            logger.debug(f"Adapting task result: {type(result)}")
+
+            # Check if result is the expected tuple format
+            if not isinstance(result, tuple):
+                logger.error(f"Task result is not a tuple: {type(result)}")
+                self._on_csv_load_success((None, f"Invalid result format: {type(result)}"))
+                return
+
+            # Unpack the tuple
+            success, data_or_error = result
+
+            if success and isinstance(data_or_error, pd.DataFrame):
+                # Success case - pass DataFrame and empty message
+                self._on_csv_load_success((data_or_error, None))
+            else:
+                # Error case - pass None and error message
+                error_msg = data_or_error if isinstance(data_or_error, str) else str(data_or_error)
+                self._on_csv_load_success((None, error_msg))
+
+        except Exception as e:
+            logger.error(f"Error adapting task result: {e}")
+            self._on_csv_load_success((None, f"Error processing result: {str(e)}"))

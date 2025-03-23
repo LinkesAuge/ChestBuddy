@@ -210,183 +210,67 @@ class DataView(QWidget):
         """Update the view with current data."""
         # Guard against recursive calls
         if self._is_updating:
-            logger.debug("Skipping recursive _update_view call")
+            print("Skipping recursive _update_view call")
             return
 
         try:
             self._is_updating = True
-            logger.info("Starting _update_view method")
+            print("Starting _update_view method")
 
             # Clear the table model
             self._table_model.clear()
 
             # Check if data is empty
             if self._data_model.is_empty:
-                logger.warning("Data model is empty, no data to display")
+                print("Data model is empty, no data to display")
                 self._status_label.setText("No data loaded")
                 self._filtered_rows = []  # Initialize to empty list when no data
+                self._is_updating = False
                 return
 
             # Get data from model - get a shallow copy to avoid modifying original
             try:
                 data = self._data_model.data
-                logger.info(
-                    f"Got data from model: {len(data)} rows, columns: {data.columns.tolist()}"
+                print(f"Got data from model: {len(data)} rows, columns: {list(data.columns)}")
+
+                # Get column names
+                column_names = list(data.columns)
+
+                # Set table dimensions
+                self._table_model.setColumnCount(len(column_names))
+                self._table_model.setRowCount(len(data))
+
+                # Set headers
+                self._table_model.setHorizontalHeaderLabels(column_names)
+
+                # Populate table with data - direct access for performance
+                for row_idx in range(len(data)):
+                    for col_idx, col_name in enumerate(column_names):
+                        value = data.iloc[row_idx, col_idx]
+                        text = "" if pd.isna(value) else str(value)
+                        self._table_model.setItem(row_idx, col_idx, QStandardItem(text))
+
+                # Store filtered rows
+                self._filtered_rows = list(range(len(data)))
+
+                # Update filter column combo
+                self._filter_column.clear()
+                self._filter_column.addItems(column_names)
+
+                # Update status
+                self._status_label.setText(f"Loaded {len(data)} records")
+
+                print(
+                    f"Finished populating table with {len(data)} rows and {len(column_names)} columns"
                 )
 
-                # Store the column names separately to avoid repeated access
-                column_names = self._data_model.column_names
-                logger.info(f"Column names: {column_names}")
             except Exception as e:
-                logger.error(f"Error getting data: {e}")
+                print(f"Error getting/displaying data: {e}")
                 self._status_label.setText("Error loading data")
-                return
+                import traceback
 
-            # Initialize filtered_rows with all row indices
-            self._filtered_rows = list(
-                range(len(data))
-            )  # Use simple range instead of data.index.tolist()
+                traceback.print_exc()
 
-            # Explicitly set model dimensions - important for proper initialization
-            row_count = len(data)
-            col_count = len(column_names)
-            logger.info(
-                f"Setting table model dimensions to {row_count} rows and {col_count} columns"
-            )
-            self._table_model.setRowCount(row_count)
-            self._table_model.setColumnCount(col_count)
-
-            # Set headers
-            self._table_model.setHorizontalHeaderLabels(column_names)
-            logger.info(f"Set horizontal headers with {len(column_names)} columns")
-
-            # Populate filter column combo box
-            current_column = self._filter_column.currentText()
-            self._filter_column.clear()
-            self._filter_column.addItems(column_names)
-
-            # Restore selected column if it exists
-            if current_column in column_names:
-                self._filter_column.setCurrentText(current_column)
-
-            # Add data to the table model - use a safer approach
-            try:
-                # Simplified direct population - no batching or complex access patterns
-                logger.info("Populating table model with data (simplified approach)")
-
-                # Ensure the model has the right dimensions
-                row_count = len(data)
-                col_count = len(column_names)
-                self._table_model.setRowCount(row_count)
-                self._table_model.setColumnCount(col_count)
-
-                # Convert the entire DataFrame to a list of lists for direct access
-                # This avoids repeated DataFrame accesses which can cause recursion
-                data_array = data.values.tolist()
-
-                # Pre-fetch validation and correction status to avoid repeated calls
-                # This reduces the risk of recursion by doing all data access upfront
-                try:
-                    validation_status = self._data_model.get_validation_status()
-                    correction_status = self._data_model.get_correction_status()
-                    has_validation = not validation_status.empty
-                    has_correction = not correction_status.empty
-                    logger.debug(
-                        f"Pre-fetched validation status ({has_validation}) and correction status ({has_correction})"
-                    )
-                except Exception as e:
-                    logger.warning(f"Could not pre-fetch status data: {e}")
-                    has_validation = False
-                    has_correction = False
-
-                # Process all rows at once
-                for row_idx in range(row_count):
-                    # Log progress for large datasets
-                    if row_idx % 1000 == 0 and row_idx > 0:
-                        logger.debug(f"Processing row {row_idx}/{row_count}")
-
-                    for col_idx, column_name in enumerate(column_names):
-                        # Get value directly from the pre-converted array
-                        cell_value = data_array[row_idx][col_idx]
-                        # Convert to string with proper None/NaN handling
-                        value = (
-                            ""
-                            if cell_value is None
-                            or (isinstance(cell_value, float) and pd.isna(cell_value))
-                            else str(cell_value)
-                        )
-
-                        # Create item with explicit text
-                        item = QStandardItem(value)
-
-                        # Set foreground explicitly - changed from white to black for visibility
-                        item.setForeground(QColor("#000000"))  # Black text
-
-                        # Set validation and correction status as user data
-                        # Use pre-fetched data instead of making method calls for each cell
-                        if has_validation:
-                            try:
-                                val_status = self._data_model.get_cell_validation_status(
-                                    row_idx, column_name
-                                )
-                                if val_status:
-                                    item.setData(val_status, Qt.UserRole + 1)
-                            except Exception as vs_error:
-                                # Don't let validation status errors block the display
-                                logger.debug(f"Validation status access error: {vs_error}")
-
-                        if has_correction:
-                            try:
-                                corr_status = self._data_model.get_cell_correction_status(
-                                    row_idx, column_name
-                                )
-                                if corr_status:
-                                    item.setData(corr_status, Qt.UserRole + 2)
-                            except Exception as cs_error:
-                                # Don't let correction status errors block the display
-                                logger.debug(f"Correction status access error: {cs_error}")
-
-                        # Set the item directly
-                        self._table_model.setItem(row_idx, col_idx, item)
-
-                # Log detailed info about first few rows for debugging
-                for row_idx in range(min(3, row_count)):
-                    row_values = [str(data_array[row_idx][col_idx]) for col_idx in range(col_count)]
-                    logger.debug(f"Row {row_idx} values: {row_values}")
-
-                logger.info(
-                    f"Successfully populated model with {row_count} rows and {col_count} columns"
-                )
-            except Exception as e:
-                logger.error(f"Error populating table model: {e}", exc_info=True)
-                self._status_label.setText("Error displaying data")
-
-            # Resize columns to contents
-            self._table_view.resizeColumnsToContents()
-            logger.info("Resized columns to contents")
-
-            # Update status label
-            row_count = len(data)
-            self._status_label.setText(f"Loaded {row_count} rows")
-            logger.info(f"View update complete, loaded {row_count} rows")
-
-            # Force the table to refresh - use the correct approach for QTableView
-            self._table_view.reset()
-            self._table_view.viewport().update()
-
-            # Select the first row to ensure data is visible
-            if self._table_model.rowCount() > 0:
-                self._table_view.selectRow(0)
-
-            # Add final verification of model state for debugging
-            logger.info(
-                f"Final table model state: {self._table_model.rowCount()} rows, {self._table_model.columnCount()} columns"
-            )
-            if self._table_model.rowCount() > 0 and self._table_model.columnCount() > 0:
-                # Log a sample item to verify content
-                sample_item = self._table_model.item(0, 0)
-                sample_text = sample_item.text() if sample_item else "None"
-                logger.info(f"Sample cell [0,0] content: '{sample_text}'")
         finally:
             self._is_updating = False
 
@@ -733,24 +617,27 @@ class DataView(QWidget):
 
     @Slot()
     def _on_data_changed(self) -> None:
-        """
-        Update the view when the data model changes.
+        """Handle data model changes."""
+        logger.debug("DataView._on_data_changed called")
+        print("DataView._on_data_changed called!")
 
-        This method ensures the view is always updated when the data model changes,
-        with protections against recursive updates.
-        """
-        try:
-            # Ignore the signal if we're already updating to avoid recursion
-            if self._is_updating:
-                logger.debug("Ignoring data_changed signal - UI already updating")
-                return
+        # Rate-limit updates to prevent UI freezing
+        current_time = time.time() * 1000
+        time_since_last_update = current_time - self._last_update_time
 
-            # Force view update on data change - remove debouncing for initial load
-            logger.info("Processing data_changed signal - updating view")
-            self._update_view()
+        if time_since_last_update < self._update_debounce_ms:
+            logger.debug(
+                f"Skipping update due to rate limiting: {time_since_last_update}ms < {self._update_debounce_ms}ms"
+            )
+            print(
+                f"Skipping update due to rate limiting: {time_since_last_update}ms < {self._update_debounce_ms}ms"
+            )
+            return
 
-        except Exception as e:
-            logger.error(f"Error updating view on data change: {str(e)}")
+        print("Forcing _update_view call from _on_data_changed")
+        # Force update the view
+        self._update_view()
+        self._last_update_time = current_time
 
     @Slot(object)
     def _on_validation_changed(self, validation_status) -> None:

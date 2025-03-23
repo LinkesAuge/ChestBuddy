@@ -12,6 +12,8 @@ import traceback
 from pathlib import Path
 from typing import Any, Optional, Callable, TypeVar, Generic, Dict, List, Tuple, Type, Union
 import time
+import gc
+import pandas as pd
 
 from PySide6.QtCore import QObject, Signal, Slot, QThread, QRunnable, QThreadPool
 from PySide6.QtWidgets import QApplication
@@ -88,24 +90,70 @@ class MultiCSVLoadTask(BackgroundTask):
     along the way. It handles cancellation and error reporting.
     """
 
-    def __init__(self, csv_service, file_paths, chunk_size=1000):
+    # Additional signal for file-specific progress
+    file_progress = Signal(str, int, int)  # file_path, current, total
+
+    def __init__(self, *args, **kwargs):
         """
         Initialize the task with multiple CSV files to load.
 
         Args:
+            Can be called in two ways:
+            1. (csv_service, file_paths, chunk_size=1000, ...)
+            2. (file_paths=paths, csv_service=service, chunk_size=size, ...)
+
             csv_service: The CSVService instance to use for loading
             file_paths: List of paths to CSV files to load
             chunk_size: Size of chunks to use when loading CSV files
+            normalize_text: Whether to normalize text in CSV files (passed to CSVService)
+            robust_mode: Whether to use robust mode for handling corrupt files (passed to CSVService)
+            encoding: Optional encoding to use for CSV files (passed to CSVService)
         """
+        # Handle different ways this can be called (positional or keyword)
+        if args and len(args) >= 2:
+            # Called as (csv_service, file_paths, ...)
+            csv_service = args[0]
+            file_paths = args[1]
+            chunk_size = args[2] if len(args) > 2 else kwargs.get("chunk_size", 1000)
+        else:
+            # Called with keywords: (file_paths=paths, csv_service=service, ...)
+            csv_service = kwargs.get("csv_service")
+            file_paths = kwargs.get("file_paths")
+            chunk_size = kwargs.get("chunk_size", 1000)
+
+        if not csv_service:
+            raise ValueError("csv_service is required")
+        if not file_paths:
+            raise ValueError("file_paths is required")
+
+        # Get other parameters with defaults
+        normalize_text = kwargs.get("normalize_text", True)
+        robust_mode = kwargs.get("robust_mode", False)
+        encoding = kwargs.get("encoding", None)
+
+        # Initialize with task_id based on number of files
         super().__init__(f"load_multi_csv_{len(file_paths)}_files")
+
+        # Store parameters
         self.csv_service = csv_service
         self.file_paths = file_paths
         self.chunk_size = chunk_size
+        self.normalize_text = normalize_text
+        self.robust_mode = robust_mode
+        self.encoding = encoding
+
+        # Initialize other attributes
         self.dataframes = []
         self._throttle_timer = None
         self._last_update_time = time.time()
         # Min time between progress updates to avoid overloading the UI
         self._min_update_interval = 0.1  # seconds
+
+        # Initialize progress tracking variables
+        self._total_rows_loaded = 0
+        self._total_rows_estimated = 0
+        self._current_file_rows = 0
+        self._current_file_total_rows = 0
 
     def _throttled_progress_update(self, current, total):
         """
@@ -135,14 +183,38 @@ class MultiCSVLoadTask(BackgroundTask):
         # Only update if sufficient time has passed or we're at 100%
         if time_since_last >= self._min_update_interval or percentage >= 100:
             try:
-                # Update status with file info if we have it
-                status_suffix = ""
+                # Update status with file info and total row count
+                file_info = ""
+                current_file_path = ""
+
                 if hasattr(self, "_current_file_index") and hasattr(self, "_num_files"):
-                    status_suffix = f" (File {self._current_file_index + 1}/{self._num_files})"
+                    file_info = f" (File {self._current_file_index + 1}/{self._num_files})"
+
+                    # Get the current file path for file_progress signal
+                    if hasattr(self, "_current_file_index") and self._current_file_index < len(
+                        self.file_paths
+                    ):
+                        current_file_path = str(self.file_paths[self._current_file_index])
+
+                # Calculate progress across all files
+                if self._total_rows_estimated > 0:
+                    # Show progress as loaded rows out of total estimated
+                    total_progress = (
+                        f"{self._total_rows_loaded:,} of {self._total_rows_estimated:,} rows"
+                    )
+                else:
+                    # Fall back to percentage if no row estimate
+                    total_progress = f"{percentage}%"
 
                 # Emit progress and status signals within try block to catch Qt errors
                 self.progress.emit(percentage, 100)
-                self.status_signal.emit(f"Loading CSV data: {percentage}%{status_suffix}")
+                self.status_signal.emit(f"Loading CSV data: {total_progress}{file_info}")
+
+                # Emit file_progress signal if we have a current file path
+                if current_file_path:
+                    self.file_progress.emit(
+                        current_file_path, self._current_file_rows, self._current_file_total_rows
+                    )
 
                 # Update last update time
                 self._last_update_time = current_time
@@ -157,173 +229,201 @@ class MultiCSVLoadTask(BackgroundTask):
         # Continue processing
         return not self.is_cancelled
 
-    def run(self):
+    def _on_file_progress(self, current, total):
         """
-        Load multiple CSV files and combine them into a single result.
+        Handle progress updates from the CSV service for the current file.
 
-        This method processes each file in sequence, handling errors and
-        reporting progress along the way.
+        Args:
+            current: Current rows processed in the file
+            total: Total rows estimated in the file
 
         Returns:
-            A tuple with (True, combined_dataframe) on success or
+            False if the task was cancelled, True otherwise
+        """
+        # Update current file progress
+        self._current_file_rows = current
+        self._current_file_total_rows = total
+
+        # Update total progress
+        if self._total_rows_estimated == 0:
+            # If this is the first progress update, initialize total estimate
+            self._total_rows_estimated = total * self._num_files
+
+        # Calculate overall progress percentage
+        if self._num_files > 0:
+            # Calculate what percentage one file represents
+            file_weight = 1.0 / self._num_files
+
+            # Calculate current file's progress (0.0-1.0)
+            file_progress = min(1.0, current / total) if total > 0 else 0
+
+            # Calculate overall progress
+            # Previous files (100% each) + current file's progress
+            overall_progress = (self._current_file_index * file_weight) + (
+                file_progress * file_weight
+            )
+
+            # Convert to percentage (0-100)
+            progress_percent = int(overall_progress * 100)
+
+            # Update the UI
+            self._throttled_progress_update(progress_percent, 100)
+
+        # Return not cancelled
+        return not self.is_cancelled
+
+    def run(self):
+        """
+        Execute the task, loading and combining multiple CSV files.
+
+        Returns:
+            (True, combined_df) on success,
             (False, error_message) on failure
         """
-        import gc  # Import garbage collector for memory management
-
         if not self.file_paths:
             return False, "No CSV files provided to load"
 
-        # Track combined data from all files
+        # Initialize counters and storage
+        self._total_rows_loaded = 0
         combined_df = None
-        total_rows = 0
-        error_messages = []
+        self._num_files = len(self.file_paths)
 
-        try:
-            # Track number of files for progress reporting
-            self._num_files = len(self.file_paths)
+        # Create parameters dict for read_csv_chunked calls
+        csv_params = {
+            "chunk_size": self.chunk_size,
+            "normalize_text": getattr(self, "normalize_text", False),
+            "robust_mode": getattr(self, "robust_mode", False),
+        }
 
-            # Process each file
-            for i, file_path in enumerate(self.file_paths):
-                # Store current file index for progress reporting
-                self._current_file_index = i
+        # Add encoding if it exists
+        if hasattr(self, "encoding") and self.encoding:
+            csv_params["encoding"] = self.encoding
 
-                # Update status with file info
-                try:
-                    file_name = Path(file_path).name
-                    self.status_signal.emit(
-                        f"Loading CSV file {i + 1}/{len(self.file_paths)}: {file_name}"
-                    )
-                except (RuntimeError, AttributeError, ReferenceError) as e:
-                    # Handle Qt object deleted gracefully
-                    if "C++ object" in str(e):
-                        logger.debug("Qt C++ object already deleted during status update")
-                    else:
-                        logger.warning(f"Error updating status: {e}")
+        # Process each file
+        for i, file_path in enumerate(self.file_paths):
+            # Check for cancellation before starting each file
+            if self.is_cancelled:
+                logger.info(f"CSV load task cancelled after processing {i} files")
+                gc.collect()  # Force garbage collection
+                return False, "Operation cancelled"
 
-                # Check if cancelled before each file
+            # Set current file info for progress updates
+            self._current_file_index = i
+            self._current_file_rows = 0
+            self._current_file_total_rows = 1  # Will be updated by callback
+            file_path_str = str(file_path)
+
+            # Send an initial progress update for this file
+            self._throttled_progress_update(i * (100 // self._num_files), 100)
+
+            try:
+                # Create a progress callback for this file
+                def file_progress_callback(current, total):
+                    # Update file-specific progress information
+                    return self._on_file_progress(current, total)
+
+                # Add progress callback to parameters
+                csv_params["progress_callback"] = file_progress_callback
+
+                # Try to read the file - returns tuple of (dataframe, error_message)
+                result_tuple = self.csv_service.read_csv_chunked(file_path_str, **csv_params)
+
+                # Unpack the tuple
+                file_df, error_msg = result_tuple
+
+                # Handle file read result
+                if error_msg is not None:
+                    error_msg = f"Error reading CSV file {file_path_str}: {error_msg}"
+                    logger.error(error_msg)
+
+                    # Clean up and return error
+                    if combined_df is not None:
+                        del combined_df
+                    gc.collect()
+                    return False, error_msg
+
+                # Get the DataFrame from successful read
+                if file_df is None:
+                    error_msg = f"No data returned from CSV file {file_path_str}"
+                    logger.error(error_msg)
+                    continue
+
+                # Update total rows loaded
+                file_rows = len(file_df)
+                self._total_rows_loaded += file_rows
+
+                # First file becomes the initial combined DataFrame
+                if combined_df is None:
+                    combined_df = file_df
+                else:
+                    # Combine with existing data
+                    try:
+                        # Use pandas concat
+                        combined_df = pd.concat([combined_df, file_df], ignore_index=True)
+
+                        # Clean up individual file DataFrame to save memory
+                        del file_df
+                        gc.collect()
+                    except Exception as e:
+                        error_msg = f"Error combining DataFrame {file_path_str}: {str(e)}"
+                        logger.error(error_msg)
+
+                        # We'll continue with what we have, but report the error
+                        if i == len(self.file_paths) - 1:
+                            # If this was the last file, log warning and return partial data
+                            logger.warning(
+                                f"Loaded {self._total_rows_loaded} rows with errors: Error combining data: {str(e)}"
+                            )
+                            if combined_df is not None and len(combined_df) > 0:
+                                return True, combined_df
+                            else:
+                                return False, f"Error combining data: {str(e)}"
+
+                # Check for cancellation after each file
                 if self.is_cancelled:
+                    logger.info(f"CSV load task cancelled after processing {i + 1} files")
+                    if combined_df is not None:
+                        del combined_df
+                    gc.collect()
                     return False, "Operation cancelled"
 
-                # Load the current file with progress callback
-                try:
-                    df, error = self.csv_service.read_csv_chunked(
-                        file_path,
-                        chunk_size=self.chunk_size,
-                        progress_callback=self._throttled_progress_update,
-                    )
+            except Exception as e:
+                # Catch any unexpected errors
+                error_msg = f"Unexpected error processing {file_path_str}: {str(e)}"
+                logger.error(error_msg)
+                traceback.print_exc()
 
-                    # If cancelled during file read, return early
-                    if self.is_cancelled:
-                        # Clean up to free memory
-                        if df is not None:
-                            del df
-                        gc.collect()
-                        return False, "Operation cancelled"
-
-                    # Handle errors reading the file
-                    if error:
-                        error_messages.append(f"Error loading {Path(file_path).name}: {error}")
-                        logger.error(f"Error loading CSV file {file_path}: {error}")
-                        continue  # Skip this file and try the next
-
-                    # Handle empty file
-                    if df is None or len(df) == 0:
-                        logger.warning(f"CSV file {file_path} is empty")
-                        continue  # Skip empty files
-
-                    # Append to combined result
-                    if combined_df is None:
-                        combined_df = df
-                    else:
-                        # Combine dataframes
-                        try:
-                            combined_df = pd.concat([combined_df, df], ignore_index=True)
-
-                            # Clean up individual DataFrame to free memory
-                            del df
-                            gc.collect()
-                        except Exception as e:
-                            error_messages.append(f"Error combining data: {str(e)}")
-                            logger.error(f"Error combining DataFrame {file_path}: {e}")
-
-                            # If we can't combine, at least keep what we have
-                            if df is not None:
-                                del df
-                            gc.collect()
-
-                    # Update total row count
-                    if combined_df is not None:
-                        total_rows = len(combined_df)
-
-                    # Check if cancelled after each file
-                    if self.is_cancelled:
-                        # Clean up to free memory
-                        if combined_df is not None:
-                            del combined_df
-                        gc.collect()
-                        return False, "Operation cancelled"
-
-                except MemoryError as me:
-                    error_msg = f"Memory error processing {Path(file_path).name}: {str(me)}"
-                    error_messages.append(error_msg)
-                    logger.error(error_msg)
-
-                    # If we have partial data but ran out of memory, return what we have
-                    if combined_df is not None and not combined_df.empty:
-                        return True, combined_df
-                    else:
-                        return False, "Memory error while processing files"
-                except Exception as e:
-                    error_msg = f"Error processing {Path(file_path).name}: {str(e)}"
-                    error_messages.append(error_msg)
-                    logger.error(error_msg)
-
-                    # Continue to the next file
-
-                # Run garbage collection between files
-                gc.collect()
-
-            # Final check for cancellation
-            if self.is_cancelled:
-                # Clean up to free memory before returning
+                # Clean up and return
                 if combined_df is not None:
                     del combined_df
                 gc.collect()
-                return False, "Operation cancelled"
+                return False, error_msg
 
-            # Final status update
-            try:
-                percentage = 100
-                self.progress.emit(percentage, 100)
-                self.status_signal.emit(f"CSV import complete: {total_rows} rows loaded")
-            except (RuntimeError, AttributeError, ReferenceError) as e:
-                logger.debug(f"Error in final status update (likely shutdown): {e}")
-
-            # Handle final result
-            if combined_df is None or combined_df.empty:
-                if error_messages:
-                    return False, "\n".join(error_messages)
-                else:
-                    return False, "No data loaded from CSV files"
-
-            # Handle partial success
-            if error_messages:
-                logger.warning(f"Loaded {total_rows} rows with errors: {'; '.join(error_messages)}")
-            else:
+        # Final cleanup and check
+        try:
+            # Return success if we have data
+            if combined_df is not None and len(combined_df) > 0:
                 logger.info(
-                    f"Successfully loaded {total_rows} rows from {len(self.file_paths)} CSV files"
+                    f"Successfully loaded {self._total_rows_loaded} rows from {len(self.file_paths)} files"
                 )
 
-            return True, combined_df
+                # Final progress update - show 100% with total rows loaded
+                self._throttled_progress_update(100, 100)
+
+                return True, combined_df
+            else:
+                return False, "No data loaded from CSV files"
 
         except Exception as e:
-            logger.error(f"Unexpected error in MultiCSVLoadTask: {e}")
-            return False, f"Error loading CSV files: {str(e)}"
-        finally:
-            # Ensure we clean up all DataFrames to free memory
-            if "combined_df" in locals() and combined_df is not None:
+            error_msg = f"Error in final data processing: {str(e)}"
+            logger.error(error_msg)
+
+            # Clean up
+            if combined_df is not None:
                 del combined_df
             gc.collect()
+
+            return False, error_msg
 
 
 class FunctionTask(BackgroundTask):

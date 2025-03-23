@@ -1,5 +1,256 @@
 # System Patterns
 
+This document outlines the key architectural patterns and design decisions for the ChestBuddy application.
+
+## Application Architecture
+
+ChestBuddy follows a modular, service-oriented architecture with clear separation of concerns:
+
+```mermaid
+flowchart TB
+    App[App Controller] --> UI[UI Components]
+    App --> Services[Services]
+    App --> Models[Data Models]
+    
+    UI -->|Signals| App
+    App -->|Updates| UI
+    
+    Services --> Models
+    Services --> Workers[Background Workers]
+    
+    Workers -->|Signals| Services
+    Services -->|Signals| App
+```
+
+## Key Design Patterns
+
+### 1. Model-View-Controller (MVC)
+
+The application follows an MVC pattern:
+- **Models**: Responsible for data structure and business logic
+- **Views**: UI components for data display and user interaction
+- **Controllers**: Coordinate between models and views
+
+### 2. Service Layer
+
+Services encapsulate specific functionality and are injected where needed:
+- `CSVService`: Handles CSV file operations
+- `ValidationService`: Validates data against rules
+- `CorrectionService`: Applies corrections to data
+- `ConfigService`: Manages application configuration
+- `ChartService`: Generates data visualizations
+- *Planned* `ReportService`: Will handle report generation
+
+### 3. Dependency Injection
+
+Dependencies are injected through constructors rather than created internally:
+```python
+def __init__(self, config_service: ConfigService, csv_service: CSVService):
+    self._config_service = config_service
+    self._csv_service = csv_service
+```
+
+### 4. Event-Driven Communication
+
+Components communicate through Qt signals and slots:
+```python
+# Signal definition
+data_loaded = Signal(pd.DataFrame)
+
+# Connection
+self._data_service.data_loaded.connect(self._on_data_loaded)
+
+# Slot implementation
+@Slot(pd.DataFrame)
+def _on_data_loaded(self, df: pd.DataFrame) -> None:
+    # Handle loaded data
+```
+
+### 5. Background Processing
+
+Long-running operations are executed in background threads:
+```python
+# Running a task in background
+self._worker.run_task(
+    self._csv_service.load_csv, 
+    file_path, 
+    on_success=self._on_load_success,
+    on_error=self._on_load_error
+)
+```
+
+### 6. UI Component Composition
+
+UI is built through composition of smaller components:
+```python
+# Main view composed of header and content
+self._header = ViewHeader("Dashboard")
+self._content = QWidget()
+self._content_layout = QVBoxLayout(self._content)
+
+# Add components to layout
+self._content_layout.addWidget(self._chart_view)
+self._content_layout.addWidget(self._stats_panel)
+```
+
+### 7. UI Widget Pattern
+
+Custom widgets are created for reusable UI elements with consistent behavior and styling. Each widget follows patterns:
+
+1. **Base Widget Class**: Define custom widget inheriting from Qt class with controlled API
+2. **State Management**: Internal state tracking with signals for state changes
+3. **Styling**: Use Colors and stylesheet constants for consistent appearance
+4. **Custom Painting**: Override paintEvent for custom appearance when needed
+
+Examples:
+```python
+# Signal definitions
+valueChanged = Signal(int)
+stateChanged = Signal(int)
+
+# Property definition with getter/setter
+@Property(int, value, setValue)
+def progress(self):
+    return self._value
+
+# Custom painting
+def paintEvent(self, event):
+    painter = QPainter(self)
+    painter.setRenderHint(QPainter.Antialiasing)
+    # Custom drawing code
+```
+
+Key UI widgets:
+- `ProgressBar`: Custom progress bar with state-based styling (normal, success, error)
+- `ProgressDialog`: Dialog wrapping ProgressBar with enhanced functionality
+- `StatusBar`: Custom status bar with multiple information sections
+- `ViewHeader`: Standardized header for application views
+
+### 8. Adapter Pattern for Views
+
+View adapters connect the UI components to the application logic:
+```python
+class DataViewAdapter:
+    def __init__(self, data_view: DataView, data_model: DataModel):
+        self._data_view = data_view
+        self._data_model = data_model
+        
+        # Connect signals
+        self._data_model.data_changed.connect(self._update_view)
+```
+
+### 9. Resource Management
+
+Resources like icons and styles are centrally managed:
+```python
+# Resource loading
+icon = self._resource_manager.get_icon("open_file")
+```
+
+### 10. Configuration Management
+
+Application settings are managed through a dedicated service:
+```python
+# Getting configuration
+auto_save = self._config.get_bool("Autosave", "enabled", default=True)
+
+# Setting configuration
+self._config.set_value("Autosave", "interval", 5)
+```
+
+## Error Handling Strategy
+
+1. **Service Level**: Catch and log specific errors, translate to appropriate signals
+2. **Controller Level**: Connect error signals to UI updates
+3. **UI Level**: Display error messages to users, recover gracefully
+4. **Background Tasks**: Catch and report errors without crashing the application
+
+Example error handling flow:
+```python
+try:
+    # Operation that might fail
+    result = potentially_failing_operation()
+except SpecificError as e:
+    logger.error(f"Operation failed: {e}")
+    self.operation_failed.emit(str(e))
+    return False
+```
+
+## Progress Reporting Pattern
+
+Progress reporting follows a standardized pattern:
+
+1. **Signal Definition**: Services define progress signals
+   ```python
+   load_started = Signal()
+   load_progress = Signal(str, int, int)  # file_path, current, total
+   load_finished = Signal(str)  # message
+   ```
+
+2. **Progress Dialog**: UI shows a custom ProgressDialog when operations start
+   ```python
+   # Create progress dialog
+   self._progress_dialog = ProgressDialog(
+       "Loading data...", 
+       "Cancel", 
+       0, 
+       100, 
+       self
+   )
+   self._progress_dialog.canceled.connect(self._cancel_operation)
+   ```
+
+3. **Progress Updates**: Operations emit progress updates
+   ```python
+   # Emit progress
+   self.load_progress.emit(file_path, current_row, total_rows)
+   ```
+
+4. **State Management**: ProgressBar displays different states
+   ```python
+   # Set state based on result
+   if success:
+       self._progress_dialog.setState(ProgressBar.State.SUCCESS)
+   else:
+       self._progress_dialog.setState(ProgressBar.State.ERROR)
+   ```
+
+5. **Completion Handling**: Services emit finished signal
+   ```python
+   # Operation completed
+   self.load_finished.emit("Data loaded successfully")
+   ```
+
+## File Structure 
+
+The application follows a modular file structure:
+
+```
+chestbuddy/
+├── app.py                  # Application entry point
+├── config.py               # Configuration management
+├── core/                   # Core functionality
+│   ├── models/             # Data models
+│   └── services/           # Business logic services
+├── ui/                     # User interface components
+│   ├── widgets/            # Reusable UI widgets
+│   │   ├── progress_bar.py # Custom progress bar
+│   │   └── progress_dialog.py # Custom progress dialog
+│   ├── views/              # Main application views
+│   ├── adapters/           # View adapters
+│   └── resources/          # UI resources (icons, styles)
+└── utils/                  # Utility functions and classes
+    └── background_processing.py  # Background task handling
+```
+
+## Integration Points
+
+1. **Data Loading → Validation**: Loaded data is passed to validation service
+2. **Validation → Correction**: Validation results guide correction process
+3. **Data → Charts**: Chart service uses data model for visualization
+4. **Charts → Reports**: Chart outputs will be embedded in reports
+5. **Configuration → All Components**: Configuration service informs component behavior
+
 ## Architecture Overview
 
 The Chest Buddy application follows a Model-View-Controller (MVC) architecture with clear separation of concerns:
@@ -58,6 +309,7 @@ The Chest Buddy application follows a Model-View-Controller (MVC) architecture w
 - **BackgroundWorker**: Manages execution of tasks in separate threads
 - **BackgroundTask**: Base class for defining asynchronous operations
 - **CSVReadTask**: Specific implementation for CSV reading operations
+- **MultiCSVLoadTask**: Handles loading of multiple CSV files with progress tracking
 
 ### 6. Configuration Layer
 - **ConfigManager**: Manages application settings and user preferences
@@ -237,6 +489,175 @@ chestbuddy/
 - Cancellation support for long-running operations
 - Resource cleanup on task completion or cancellation
 - Chunked processing for memory-intensive operations
+- Improved thread management with graceful cleanup during application shutdown
+- Two-level progress reporting for multi-file operations (overall progress and per-file progress)
+- Consistent progress reporting on a 0-100 scale for all background tasks
+- Callbacks for detailed progress reporting during complex operations
+
+### Progress Dialog Architecture
+
+The progress dialog system implements a comprehensive approach to providing feedback during long-running operations:
+
+```mermaid
+sequenceDiagram
+    participant UI as MainWindow
+    participant DM as DataManager
+    participant BW as BackgroundWorker
+    participant Task as MultiCSVLoadTask
+    participant Dialog as ProgressDialog
+
+    UI->>DM: load_csv_files(files)
+    DM->>BW: start_task(MultiCSVLoadTask)
+    BW->>Task: run()
+    BW-->>DM: load_started
+    DM-->>UI: load_started
+    UI->>Dialog: show()
+    
+    loop For each file
+        Task->>Task: process_file()
+        Task-->>BW: progress_updated(file_index, file_count, file_progress)
+        BW-->>DM: load_progress
+        DM-->>UI: load_progress
+        UI->>Dialog: update(overall_progress, file_info)
+        
+        UI->>DM: check_cancel
+        DM->>BW: check_cancel
+        BW->>Task: check_cancel
+    end
+    
+    Task-->>BW: task_finished(result)
+    BW-->>DM: load_finished
+    DM-->>UI: load_finished
+    UI->>Dialog: complete()
+```
+
+The progress reporting follows a consistent pattern:
+1. Task initialization triggers load_started signal
+2. Regular progress updates during processing with contextual information
+3. Completion triggers load_finished signal with results
+4. Cancellation can be checked and applied at any point in the process
+
+### Multi-File Processing Pattern
+
+For operations involving multiple files:
+
+```mermaid
+graph TD
+    Start[Start Task] --> Init[Initialize Progress Tracking]
+    Init --> FileLoop[Process Next File]
+    FileLoop --> FileProgress[Update File Progress]
+    FileProgress --> OverallProgress[Calculate & Update Overall Progress]
+    OverallProgress --> Cancel{Check Cancel}
+    Cancel -->|Yes| CleanupCancel[Cleanup Resources]
+    Cancel -->|No| NextFile{More Files?}
+    NextFile -->|Yes| FileLoop
+    NextFile -->|No| CompleteProcess[Complete Processing]
+    CompleteProcess --> EmitResult[Emit Final Result]
+    EmitResult --> Cleanup[Cleanup Resources]
+    CleanupCancel --> EmitCancelled[Emit Cancelled]
+    EmitCancelled --> Cleanup
+```
+
+## Planned Report Generation Architecture
+
+For the upcoming Report Generation phase, we're planning to implement the following architecture:
+
+### 1. Report Service Components
+
+```mermaid
+classDiagram
+    class ReportService {
+        +generate_report(template, data, charts)
+        +export_to_pdf(report)
+        +list_templates()
+        +preview_report(report)
+    }
+    
+    class ReportTemplate {
+        +String name
+        +String description
+        +Dict sections
+        +apply(data, charts)
+    }
+    
+    class PDFExporter {
+        +export(report_html)
+        -setup_page_settings()
+        -embed_charts()
+        -apply_styling()
+    }
+    
+    class ReportElement {
+        +String type
+        +Dict properties
+        +render()
+    }
+    
+    ReportService --> ReportTemplate : uses
+    ReportService --> PDFExporter : uses
+    ReportTemplate --> ReportElement : contains
+```
+
+### 2. Report Generation Flow
+
+```mermaid
+graph TD
+    UserRequest[User Request] --> SelectTemplate[Select Template]
+    SelectTemplate --> ConfigureReport[Configure Report]
+    ConfigureReport --> DataSelection[Select Data to Include]
+    DataSelection --> ChartSelection[Select Charts to Include]
+    ChartSelection --> GenerateReport[Generate Report]
+    GenerateReport --> PreviewReport[Preview Report]
+    PreviewReport --> Export{Export?}
+    Export -->|Yes| ExportPDF[Export to PDF]
+    Export -->|No| Return[Return to Editor]
+```
+
+### 3. Report View Architecture
+
+```mermaid
+classDiagram
+    class ReportView {
+        +init_ui()
+        +setup_connections()
+        +update_preview()
+        +export_report()
+    }
+    
+    class TemplateSelector {
+        +List templates
+        +selection_changed()
+    }
+    
+    class ReportConfigPanel {
+        +setup_options()
+        +apply_config()
+    }
+    
+    class DataSelectionPanel {
+        +show_available_data()
+        +get_selected_data()
+    }
+    
+    class ChartSelectionPanel {
+        +show_available_charts()
+        +get_selected_charts()
+    }
+    
+    class ReportPreview {
+        +update_preview(html)
+        +zoom_in()
+        +zoom_out()
+    }
+    
+    ReportView --> TemplateSelector : contains
+    ReportView --> ReportConfigPanel : contains
+    ReportView --> DataSelectionPanel : contains
+    ReportView --> ChartSelectionPanel : contains
+    ReportView --> ReportPreview : contains
+```
+
+This architecture will allow for flexible, customizable report generation with a focus on user experience and high-quality output. The components are designed to be modular and extensible, enabling easy addition of new report templates and export formats in the future.
 
 ## UI Architecture
 

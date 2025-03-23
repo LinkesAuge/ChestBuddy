@@ -9,7 +9,9 @@ Usage:
 
 import os
 import logging
-from typing import Dict, List, Optional, Any, Tuple
+from pathlib import Path
+from datetime import datetime
+from typing import Dict, List, Optional, Union, Any, Set, Tuple
 
 from PySide6.QtCore import Qt, Signal, Slot, QSettings, QSize, QTimer
 from PySide6.QtWidgets import (
@@ -43,6 +45,8 @@ from chestbuddy.ui.views.data_view_adapter import DataViewAdapter
 from chestbuddy.ui.views.validation_view_adapter import ValidationViewAdapter
 from chestbuddy.ui.views.correction_view_adapter import CorrectionViewAdapter
 from chestbuddy.ui.views.chart_view_adapter import ChartViewAdapter
+from chestbuddy.ui.widgets import ProgressDialog, ProgressBar
+from chestbuddy.ui.data_view import DataView
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -96,6 +100,7 @@ class MainWindow(QMainWindow):
         validation_service: ValidationService,
         correction_service: CorrectionService,
         chart_service: ChartService,
+        data_manager=None,
         parent: Optional[QWidget] = None,
     ) -> None:
         """
@@ -107,6 +112,7 @@ class MainWindow(QMainWindow):
             validation_service: Service for data validation.
             correction_service: Service for data correction.
             chart_service: Service for chart generation.
+            data_manager: The data manager service (optional).
             parent: The parent widget.
         """
         super().__init__(parent)
@@ -117,6 +123,12 @@ class MainWindow(QMainWindow):
         self._validation_service = validation_service
         self._correction_service = correction_service
         self._chart_service = chart_service
+        self._data_manager = data_manager
+
+        if self._data_manager:
+            logger.debug("MainWindow initialized with data_manager")
+        else:
+            logger.error("MainWindow initialized WITHOUT data_manager")
 
         # Set window title and icon
         self.setWindowTitle("ChestBuddy - Chest Data Analysis Tool")
@@ -141,8 +153,17 @@ class MainWindow(QMainWindow):
         self._recent_files: List[str] = []
         self._load_recent_files()
 
-        # Setup progress dialog for file operations
-        self._setup_progress_dialog()
+        # Don't set up progress dialog yet - it will be created when needed
+        self._progress_dialog = None
+
+        # State tracking for file loading progress
+        self._loading_state = {
+            "total_files": 0,  # Total number of files being loaded
+            "current_file_index": 0,  # Current file being processed (1-based)
+            "current_file": "",  # Path of current file
+            "processed_files": [],  # List of processed file paths
+            "total_rows": 0,  # Total rows processed so far
+        }
 
         # Update UI
         self._update_ui()
@@ -289,12 +310,16 @@ class MainWindow(QMainWindow):
         self._data_model.correction_applied.connect(self._on_correction_applied)
 
         # Connect data manager signals for progress reporting
-        if hasattr(self, "_data_manager"):
+        if self._data_manager:
+            logger.debug("Connecting data_manager signals in MainWindow")
             self._data_manager.load_started.connect(self._on_load_started)
             self._data_manager.load_progress.connect(self._on_load_progress)
             self._data_manager.load_finished.connect(self._on_load_finished)
-            self._data_manager.load_success.connect(self._on_load_finished)
-            self._data_manager.load_error.connect(self._on_load_finished)
+            self._data_manager.load_success.connect(lambda msg: self._status_bar.set_status(msg))
+            self._data_manager.load_error.connect(self._on_load_error)
+            logger.debug("All data_manager signals connected successfully")
+        else:
+            logger.warning("No data_manager available, progress signals will not be connected")
 
     def _load_settings(self) -> None:
         """Load application settings."""
@@ -532,10 +557,48 @@ class MainWindow(QMainWindow):
     @Slot()
     def _on_load_started(self) -> None:
         """Handle the start of a loading operation."""
-        # Show the progress dialog
-        self._progress_dialog.setValue(0)
-        self._progress_dialog.setLabelText("Loading files...")
+        logger.debug("Load operation started")
+
+        # Initialize loading state
+        self._loading_state = {
+            "current_file": "",
+            "current_file_index": 0,
+            "processed_files": [],
+            "total_files": 0,
+            "total_rows": 0,
+        }
+
+        # Reset total row counters
+        self._total_rows_loaded = 0
+        self._total_rows_estimated = 0
+        self._last_progress_current = 0
+
+        # Show progress dialog if not already visible
+        if hasattr(self, "_progress_dialog") and self._progress_dialog:
+            # Use existing dialog
+            self._progress_dialog.setLabelText("Preparing to load data...")
+            self._progress_dialog.setValue(0)
+            self._progress_dialog.setStatusText("")
+            self._progress_dialog.setCancelButtonText("Cancel")
+            self._progress_dialog.reset()
+
+        else:
+            # Create a new progress dialog with our custom implementation
+            self._progress_dialog = ProgressDialog(
+                "Preparing to load data...", "Cancel", 0, 100, self
+            )
+            self._progress_dialog.setWindowTitle("CSV Import - ChestBuddy")
+
+            # Connect cancel button
+            self._progress_dialog.canceled.connect(self._cancel_loading)
+
+        # Make sure dialog is visible and activated
         self._progress_dialog.show()
+        self._progress_dialog.raise_()
+        self._progress_dialog.activateWindow()
+
+        # Process events to ensure UI updates
+        QApplication.processEvents()
 
     def _on_load_progress(self, file_path: str, current: int, total: int) -> None:
         """
@@ -546,27 +609,309 @@ class MainWindow(QMainWindow):
             current: Current progress value
             total: Total progress value
         """
-        # Update the progress dialog
-        percentage = int(current * 100 / total) if total > 0 else 0
+        # Ensure progress dialog exists
+        if not hasattr(self, "_progress_dialog") or not self._progress_dialog:
+            return
 
-        if file_path:
-            import os
+        try:
+            # Update loading state based on signal type
+            if file_path:
+                # This is a file-specific progress update
+                # If this is a new file, update the file index
+                if file_path != self._loading_state["current_file"]:
+                    # If we're moving to a new file, record the size of the completed file
+                    if self._loading_state["current_file"]:
+                        # Initialize file sizes tracking dictionary if it doesn't exist
+                        if not hasattr(self, "_file_sizes"):
+                            self._file_sizes = {}
+                        # Store the actual size of the completed file
+                        self._file_sizes[self._loading_state["current_file"]] = self._loading_state[
+                            "total_rows"
+                        ]
 
-            filename = os.path.basename(file_path)
-            self._progress_dialog.setLabelText(f"Loading {filename}... ({percentage}%)")
+                    # Add new file to processed files if needed
+                    if file_path not in self._loading_state["processed_files"]:
+                        self._loading_state["current_file_index"] += 1
+                        if file_path not in self._loading_state["processed_files"]:
+                            self._loading_state["processed_files"].append(file_path)
+                        self._loading_state["total_files"] = max(
+                            self._loading_state["current_file_index"],
+                            self._loading_state["total_files"],
+                            len(self._loading_state["processed_files"]),
+                        )
+                    self._loading_state["current_file"] = file_path
 
-        self._progress_dialog.setValue(percentage)
+                # Update total rows for this file
+                self._loading_state["total_rows"] = max(total, self._loading_state["total_rows"])
 
-    def _on_load_finished(self) -> None:
-        """Handle the completion of a loading operation."""
-        # Close the progress dialog
-        self._progress_dialog.close()
+                # Track rows across all files
+                if not hasattr(self, "_total_rows_loaded"):
+                    self._total_rows_loaded = 0
+                    self._total_rows_estimated = 0
+                    self._last_progress_current = 0
+                    self._file_sizes = {}
+
+                # Increment total rows loaded by the increase since last update
+                if hasattr(self, "_last_progress_current"):
+                    # Only increment if current is greater than last value (to avoid counting backwards)
+                    if current > self._last_progress_current:
+                        self._total_rows_loaded += current - self._last_progress_current
+                    self._last_progress_current = current
+                else:
+                    self._last_progress_current = current
+
+                # Better row estimation based on known file sizes
+                if hasattr(self, "_file_sizes"):
+                    # Calculate known total from processed files
+                    known_sizes = sum(self._file_sizes.values())
+                    known_files = len(self._file_sizes)
+
+                    # Current file's expected size
+                    current_size = total
+
+                    # Calculate average file size from known files
+                    if known_files > 0:
+                        avg_size = known_sizes / known_files
+                    else:
+                        avg_size = current_size  # Fall back to current file size
+
+                    # Count remaining files
+                    remaining_files = (
+                        self._loading_state["total_files"] - known_files - 1
+                    )  # -1 for current file
+                    if remaining_files < 0:
+                        remaining_files = 0
+
+                    # Estimate total rows across all files
+                    self._total_rows_estimated = (
+                        known_sizes + current_size + (avg_size * remaining_files)
+                    )
+                else:
+                    # Fall back to simpler estimation if we don't have file sizes yet
+                    self._total_rows_estimated = max(
+                        self._total_rows_estimated,
+                        total * len(self._loading_state["processed_files"]),
+                    )
+
+            # Calculate progress percentage safely
+            percentage = min(100, int((current * 100 / total) if total > 0 else 0))
+
+            # Create a consistent progress message
+            filename = (
+                os.path.basename(self._loading_state["current_file"])
+                if self._loading_state["current_file"]
+                else "files"
+            )
+
+            # Build a descriptive progress message
+            if self._loading_state["total_files"] > 0:
+                # File count information
+                if self._loading_state["total_files"] > 1:
+                    message = f"Loading file {self._loading_state['current_file_index']}/{self._loading_state['total_files']}: {filename}"
+                else:
+                    message = f"Loading file: {filename}"
+
+                # Row count information
+                if total > 0:
+                    # Format numbers with commas for readability
+                    current_formatted = f"{current:,}"
+                    total_formatted = f"{total:,}"
+
+                    if hasattr(self, "_total_rows_loaded") and self._total_rows_estimated > 0:
+                        # Show both file-specific and overall progress
+                        message += f" ({current_formatted}/{total_formatted} rows)"
+
+                        # Add total rows information as status text
+                        total_progress = f"Total: {self._total_rows_loaded:,} of ~{self._total_rows_estimated:,} rows"
+                        self._progress_dialog.setStatusText(total_progress)
+                    else:
+                        # Fall back to just file-specific progress
+                        message += f" ({current_formatted}/{total_formatted} rows)"
+                        self._progress_dialog.setStatusText("")
+            else:
+                # Fallback if we don't have file count yet
+                message = f"Loading {filename}..."
+                if total > 0:
+                    message += f" ({current:,}/{total:,} rows)"
+
+            # Update the dialog
+            self._progress_dialog.setLabelText(message)
+            self._progress_dialog.setValue(percentage)
+
+            # Only make visibility adjustments if the dialog is not already visible
+            # This prevents unnecessary UI updates that can make it appear like a new window
+            if not self._progress_dialog.isVisible():
+                self._progress_dialog.show()
+                self._progress_dialog.raise_()
+                self._progress_dialog.activateWindow()
+
+            # Process events to ensure UI updates, but limit this to avoid excessive refreshing
+            # Only process events if the percentage changes significantly
+            if percentage % 5 == 0 or percentage >= 100:
+                QApplication.processEvents()
+
+        except Exception as e:
+            # Add error handling to prevent crashes
+            logger.error(f"Error updating progress dialog: {e}")
+            # Don't crash the application if there's an error updating the progress
+
+    def _on_load_finished(self, message: str = None) -> None:
+        """
+        Handle the completion of a loading operation.
+
+        Args:
+            message: Optional message to display
+        """
+        logger.debug("MainWindow._on_load_finished called")
+
+        # If the progress dialog exists
+        if hasattr(self, "_progress_dialog") and self._progress_dialog:
+            try:
+                # Check if this is a processing message (intermediate step)
+                if message and "Processing" in message:
+                    self._progress_dialog.setLabelText(message)
+                    self._progress_dialog.setValue(100)
+                    self._progress_dialog.setCancelButtonText("Please wait...")
+                    self._progress_dialog.setStatusText("Preparing data model...")
+
+                    # Process events to update the UI
+                    QApplication.processEvents()
+                    return  # Don't complete the dialog yet
+
+                # Set the label to indicate completion
+                completion_message = message if message else "Loading complete"
+
+                # Add file count to the completion message if available
+                if self._loading_state["total_files"] > 0:
+                    if not "files" in completion_message.lower():
+                        completion_message += f" ({self._loading_state['total_files']} files)"
+
+                # Extract actual row count from the message if present
+                actual_row_count = None
+                if message and "loaded" in message:
+                    try:
+                        # Try to extract the row count from messages like "Successfully loaded 12345 rows of data"
+                        parts = message.split("loaded")[1].split("rows")[0].strip()
+                        actual_row_count = int(parts.replace(",", ""))
+                    except (IndexError, ValueError):
+                        # Fall back to the tracked count if parsing fails
+                        actual_row_count = None
+
+                if actual_row_count is None:
+                    actual_row_count = self._loading_state["total_rows"]
+
+                # Ensure progress dialog is updated with completion status
+                self._progress_dialog.setLabelText(completion_message)
+                self._progress_dialog.setValue(100)  # Ensure 100% progress is shown
+
+                # Set success state for the progress bar
+                self._progress_dialog.setState(ProgressBar.State.SUCCESS)
+
+                # Set status with detail message using the most accurate row count
+                self._progress_dialog.setStatusText(f"Processed {actual_row_count:,} total rows")
+
+                # Update the cancel button to "Close" or "Confirm"
+                self._progress_dialog.setCancelButtonText("Confirm")
+
+                # Disconnect previous cancel signal connections
+                try:
+                    self._progress_dialog.canceled.disconnect()
+                except:
+                    pass  # It's OK if it wasn't connected
+
+                # Connect cancel button to close the dialog
+                self._progress_dialog.canceled.connect(self._progress_dialog.close)
+
+                # Make sure dialog is visible without excessive UI updates
+                if not self._progress_dialog.isVisible():
+                    self._progress_dialog.show()
+                    self._progress_dialog.raise_()
+                    self._progress_dialog.activateWindow()
+
+                # Process events to update the UI
+                QApplication.processEvents()
+
+                logger.debug("Progress dialog updated for completion")
+            except Exception as e:
+                logger.error(f"Error updating progress dialog on completion: {e}")
+
+            # Reset loading state
+            self._loading_state = {
+                "total_files": 0,
+                "current_file_index": 0,
+                "current_file": "",
+                "processed_files": [],
+                "total_rows": 0,
+            }
+        else:
+            logger.warning("No progress dialog found in _on_load_finished")
 
     def _cancel_loading(self) -> None:
-        """Cancel the current loading operation."""
+        """
+        Cancel the current loading operation.
+
+        This method is only connected to the progress dialog during active loading,
+        not after loading is complete (when the button becomes "Confirm").
+        """
         # Tell the data manager to cancel the operation
-        if hasattr(self, "_data_manager"):
+        if self._data_manager:
             self._data_manager.cancel_loading()
+
+    def _on_load_error(self, message: str) -> None:
+        """
+        Handle errors during the loading process.
+
+        Args:
+            message: Error message
+        """
+        logger.error(f"Load error: {message}")
+
+        # Update the status bar
+        self._status_bar.set_status(f"Error: {message}")
+
+        # If the progress dialog exists, update it to show the error
+        if hasattr(self, "_progress_dialog") and self._progress_dialog:
+            try:
+                # Set error state
+                self._progress_dialog.setState(ProgressBar.State.ERROR)
+
+                # Update labels
+                self._progress_dialog.setLabelText("Loading failed")
+                self._progress_dialog.setStatusText(f"Error: {message}")
+
+                # Change button to Close
+                self._progress_dialog.setCancelButtonText("Close")
+
+                # Disconnect previous signal connections
+                try:
+                    self._progress_dialog.canceled.disconnect()
+                except:
+                    pass
+
+                # Connect cancel button to close the dialog
+                self._progress_dialog.canceled.connect(self._progress_dialog.close)
+
+                # Make sure dialog is visible
+                if not self._progress_dialog.isVisible():
+                    self._progress_dialog.show()
+                    self._progress_dialog.raise_()
+                    self._progress_dialog.activateWindow()
+
+                # Process events to update the UI
+                QApplication.processEvents()
+
+                logger.debug("Progress dialog updated to show error")
+            except Exception as e:
+                logger.error(f"Error updating progress dialog for error state: {e}")
+
+        # Reset loading state
+        self._loading_state = {
+            "total_files": 0,
+            "current_file_index": 0,
+            "current_file": "",
+            "processed_files": [],
+            "total_rows": 0,
+        }
 
     # ===== Actions =====
 
@@ -787,16 +1132,3 @@ class MainWindow(QMainWindow):
             import logging
 
             logging.getLogger(__name__).error(f"Error updating status bar: {e}")
-
-    def _setup_progress_dialog(self) -> None:
-        """Set up the progress dialog for file loading operations."""
-        # Create progress dialog
-        self._progress_dialog = QProgressDialog("Loading files...", "Cancel", 0, 100, self)
-        self._progress_dialog.setWindowTitle("Loading CSV Files")
-        self._progress_dialog.setWindowModality(Qt.WindowModal)
-        self._progress_dialog.setAutoClose(True)
-        self._progress_dialog.setAutoReset(True)
-        self._progress_dialog.setMinimumDuration(500)  # Show only for operations > 500ms
-
-        # Connect cancel button
-        self._progress_dialog.canceled.connect(self._cancel_loading)

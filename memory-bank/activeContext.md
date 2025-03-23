@@ -5,33 +5,36 @@ date: 2023-04-02
 
 # Active Context
 
-Updated: 2025-03-23
+Updated: 2025-03-24
 
 ## Current Focus
 
-We have completed the stabilization of CSV import functionality, addressing memory management issues, thread safety concerns, and improving error handling. Key changes include:
+We have enhanced the progress reporting for CSV imports to provide a better user experience. The improvements address the issue of progress bars jumping from 0% to 100% and provide more detailed information during the import process. Key changes include:
 
-1. **Memory Management**: 
-   - Optimized the `read_csv_chunked` method to handle large files more efficiently
-   - Added explicit garbage collection to free memory during processing
-   - Implemented better cleanup of intermediate DataFrames
-   
-2. **Thread Safety**:
-   - Improved thread cleanup in the `BackgroundWorker.__del__` method
-   - Enhanced error handling for cases where Qt C++ objects are deleted
-   - Made progress reporting more robust to prevent crashes
-   
-3. **Error Handling**:
-   - Added comprehensive error handling for file access, encoding, and parsing issues
-   - Implemented graceful recovery from corrupted CSV files
-   - Provided more detailed error messages and logging
-   
-4. **Test Script**:
-   - Created a dedicated test script `tests/test_csv_import.py` to verify CSV import functionality
-   - The test simulates actual application usage for importing multiple CSV files
-   - Includes proper cleanup and validation of imported data
+1. **Incremental Progress Updates**:
+   - Fixed progress bar jumping from 0% to 100% by implementing proper chunk-based progress reporting
+   - Enhanced `MultiCSVLoadTask` to pass progress callbacks to `read_csv_chunked`
+   - Added tracking of total rows loaded across multiple files
 
-These improvements ensure the application can reliably import multiple large CSV files without crashing, providing a solid foundation for the next phase of development.
+2. **Improved User Interface**:
+   - Enhanced progress dialog to show detailed file and row information
+   - Added formatted numbers with commas for better readability (e.g., "1,234" instead of "1234")
+   - Implemented separate indicators for per-file progress and overall progress
+   - Added file count information (e.g., "File 1 of 3") for multi-file imports
+
+3. **Enhanced Progress Calculation**:
+   - Improved algorithm to calculate progress based on file processing status
+   - Added total row estimation and tracking across multiple files
+   - Implemented throttled updates to prevent UI overload
+   - Added proper error handling for progress reporting
+
+4. **Progress Pathways**:
+   - Enhanced code pathways from background tasks to UI display
+   - Updated `DataManager` to properly handle and forward progress signals
+   - Improved `MainWindow._on_load_progress` to display comprehensive information
+   - Enhanced initialization and cleanup of progress tracking variables
+
+This work builds upon our previous stability improvements for CSV import functionality, creating a more robust and user-friendly experience when loading data.
 
 ## Next Steps
 
@@ -480,4 +483,47 @@ We are implementing enhancements to the CSV file loading process to improve perf
 
 ## Recent Changes
 
-// ... existing content continues 
+# Current Focus
+
+## CSV Import Functionality Stabilization
+
+Our current focus is on stabilizing and improving the CSV import functionality in ChestBuddy, particularly addressing issues with progress reporting and handling large imports efficiently.
+
+### Key Areas of Focus
+
+1. **Progress Reporting Improvements**
+   - Enhanced progress dialog with more accurate row counting across multiple files
+   - Better estimation of total rows by tracking actual file sizes
+   - Added intermediate "Processing data" step to show data model updates
+   - Prevent UI freezing during heavy operations with strategic event processing
+
+2. **Memory Management Optimizations**
+   - Improvements to `read_csv_chunked` method for better memory usage
+   - Added explicit garbage collection after processing large dataframes
+   - Strategic data model updates to minimize memory overhead
+
+3. **Thread Safety Enhancements**
+   - Improved coordination between background workers and UI updates
+   - Safer progress reporting with proper error handling
+
+4. **Comprehensive Error Handling**
+   - More robust handling of file access issues
+   - Better handling of encoding detection
+   - Graceful recovery from corrupted CSV files
+   - Added user feedback for parsing errors
+
+### Recent Changes
+
+1. Added more accurate row count estimation in the progress reporting
+2. Improved UI responsiveness during data model updates with processing state
+3. Refined progress bar updates to show intermediate steps
+
+### Next Steps
+
+1. Further testing with large CSV datasets to ensure stability
+2. Address any remaining performance bottlenecks in the data model update process
+3. Consider implementing a background thread for the data model update
+
+### Testing
+
+A dedicated test script has been created at `tests/test_csv_import.py` to verify the CSV import functionality improvements. 
