@@ -744,14 +744,13 @@ class MainWindow(QMainWindow):
             # Process events to ensure the dialog updates are visible
             QApplication.processEvents()
 
-            # Add a short delay so users can see the completion message (100ms)
-            QTimer.singleShot(100, self._close_progress_dialog)
+            # Keep dialog open for user confirmation
+            # Dialog will close when user clicks the "Close" button
 
         except Exception as e:
             logger.error(f"Error in _on_load_finished: {e}")
             # Try to ensure dialog can be closed
             self._finalize_loading(f"Error: {str(e)}", True)
-            self._close_progress_dialog()
 
     def _close_progress_dialog(self) -> None:
         """
