@@ -126,3 +126,145 @@ alwaysApply: false
   - Implement throttling for high-frequency progress updates
   - Always disconnect signals when done to prevent memory leaks
   - Use try/except blocks around Qt object interactions that might be deleted
+
+# Bugfixing Log
+
+*Last Updated: 2025-03-23*
+
+## Recent Fixes
+
+### 2025-03-23: Dashboard Layout and Import Button Fix
+
+**Issue**: Dashboard layout had a redundant empty state panel at the bottom that was overlaying other UI elements, and the "Get Started" button in the welcome panel was not correctly triggering the file import dialog.
+
+**Root Cause**:
+1. The dashboard view adapter had a redundant empty state section at the bottom that was interfering with other UI elements.
+2. The welcome panel's button was labeled "Get Started" which was unclear about its actual function (importing data).
+3. The welcome panel was emitting the signal "import_csv" instead of "import" which MainWindow was expecting, causing the action to fail.
+
+**Fix**:
+1. Removed the redundant empty state panel at the bottom of the dashboard layout.
+2. Changed the "Get Started" button to "Import Data" in the welcome panel for better clarity.
+3. Corrected the action signal emitted by the Import Data button from "import_csv" to "import" to match MainWindow's expectations.
+
+**Validation**:
+- Tested the dashboard layout to verify all elements are now visible.
+- Confirmed the Import Data button correctly opens the file dialog.
+- Successfully imported CSV files using the button.
+- Verified that 23,843 rows were loaded from the selected files.
+
+**File(s) Modified**:
+- `chestbuddy/ui/views/dashboard_view_adapter.py`
+
+## Ongoing Issues
+
+### Performance with Large Datasets
+
+**Issue**: Table view performance degrades with datasets larger than 100,000 rows.
+
+**Status**: Under investigation
+
+**Observations**:
+- Memory usage spikes during filtering operations
+- UI becomes unresponsive during sorting operations
+- Model updates trigger multiple UI refreshes
+
+**Planned Fixes**:
+- Implement virtual scrolling to only render visible rows
+- Optimize in-memory data structures for faster access
+- Batch UI updates to reduce rendering overhead
+
+### Chart Export Quality
+
+**Issue**: Exported charts have lower resolution than displayed charts and some formatting is lost during PDF export.
+
+**Status**: Identified, scheduled for Milestone 5
+
+**Observations**:
+- Font rendering differs between screen and PDF output
+- Colors may appear differently in exported files
+- Legend positioning is inconsistent in exports
+
+### UI Freezing During Heavy Operations
+
+**Issue**: UI occasionally freezes during heavy data processing operations.
+
+**Status**: Partially fixed, ongoing work
+
+**Observations**:
+- Operations that process the entire dataset can cause UI freezes
+- Progress dialog updates can be delayed during intensive operations
+- Some background operations are blocking the main thread
+
+**Partial Fixes Applied**:
+- Moved CSV loading to background thread
+- Implemented chunked processing for large files
+- Added cancellation support for long-running operations
+
+**Remaining Work**:
+- Improve thread management for all intensive operations
+- Add more granular progress reporting
+- Implement task prioritization for background work
+
+## Fixed Issues History
+
+### 2025-02-15: Chart Preview Rendering Issue
+
+**Issue**: Chart previews were not rendering correctly in the dashboard, appearing as blank cards.
+
+**Root Cause**: The chart rendering was happening on a background thread, but the UI update was not properly synchronized with the main thread.
+
+**Fix**: Implemented proper signal/slot connection to ensure chart updates are processed on the main thread.
+
+**File(s) Modified**:
+- `chestbuddy/ui/widgets/chart_preview.py`
+- `chestbuddy/core/services/dashboard_service.py`
+
+### 2025-01-20: Memory Leak During CSV Loading
+
+**Issue**: Memory usage would continuously increase when loading multiple CSV files in succession.
+
+**Root Cause**: Temporary data structures used during CSV parsing were not being properly cleaned up after use.
+
+**Fix**: Added explicit cleanup of temporary structures and implemented proper reference management.
+
+**File(s) Modified**:
+- `chestbuddy/core/data/csv_loader.py`
+- `chestbuddy/core/tasks/multi_csv_load_task.py`
+
+### 2024-12-05: Encoding Detection Failure
+
+**Issue**: Some CSV files with non-standard encodings were failing to load.
+
+**Root Cause**: The encoding detection algorithm was too strict and was rejecting valid encodings.
+
+**Fix**: Enhanced the encoding detection to try multiple approaches and fall back to common encodings when detection is uncertain.
+
+**File(s) Modified**:
+- `chestbuddy/core/utils/file_utils.py`
+- `chestbuddy/core/data/csv_loader.py`
+
+### 2024-11-10: Configuration Save Failure
+
+**Issue**: Application settings were not being saved when the application was closed abruptly.
+
+**Root Cause**: Configuration was only being saved on normal exit, not during unexpected terminations.
+
+**Fix**: Implemented periodic autosave of configuration and added signal handlers for application termination events.
+
+**File(s) Modified**:
+- `chestbuddy/core/config/config_manager.py`
+- `chestbuddy/app.py`
+
+### 2024-10-15: Action Button Styling Inconsistency
+
+**Issue**: Action buttons had inconsistent styling across different views.
+
+**Root Cause**: Style properties were being defined independently in each view instead of using a central style definition.
+
+**Fix**: Created a central style definition for action buttons and updated all instances to use it.
+
+**File(s) Modified**:
+- `chestbuddy/ui/widgets/action_button.py`
+- `chestbuddy/ui/styles/style_constants.py`
+- Multiple view adapter files

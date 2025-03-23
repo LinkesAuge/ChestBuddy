@@ -423,10 +423,12 @@ class DashboardView(BaseView):
         self._stats_layout.setSpacing(20)
 
         # Create stats cards
-        self._dataset_card = StatCard("Current Dataset", "0 rows", Icons.get_icon(Icons.TABLE))
-        self._validation_card = StatCard("Validation Status", "N/A", Icons.get_icon(Icons.CHECK))
+        self._dataset_card = StatCard("Current Dataset", "0 rows", Icons.get_icon(Icons.DATA))
+        self._validation_card = StatCard(
+            "Validation Status", "N/A", Icons.get_icon(Icons.CHECK_CIRCLE)
+        )
         self._correction_card = StatCard(
-            "Correction Status", "0 corrected", Icons.get_icon(Icons.EDIT)
+            "Correction Status", "0 corrected", Icons.get_icon(Icons.CORRECT)
         )
         self._import_card = StatCard("Last Import", "Never", Icons.get_icon(Icons.IMPORT))
 
@@ -452,7 +454,7 @@ class DashboardView(BaseView):
         self._top_players_chart = ChartPreview(
             title="Top Players",
             subtitle="Most frequent players in dataset",
-            icon=Icons.get_icon(Icons.USER),
+            icon=Icons.get_icon(Icons.CHART),
         )
         self._top_players_chart.clicked.connect(lambda: self.chart_clicked.emit("top_players"))
         self._charts_layout.addWidget(self._top_players_chart, 0, 1)
@@ -461,7 +463,7 @@ class DashboardView(BaseView):
         self._chest_sources_chart = ChartPreview(
             title="Top Chest Sources",
             subtitle="Most common chest sources",
-            icon=Icons.get_icon(Icons.FOLDER),
+            icon=Icons.get_icon(Icons.CHART_LINE),
         )
         self._chest_sources_chart.clicked.connect(lambda: self.chart_clicked.emit("chest_sources"))
         self._charts_layout.addWidget(self._chest_sources_chart, 1, 0)

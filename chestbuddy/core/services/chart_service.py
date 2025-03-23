@@ -430,3 +430,177 @@ class ChartService:
         except Exception as e:
             print(f"Error saving chart: {e}")
             return False
+
+    def create_player_distribution_chart(self, title: str = "Top Players") -> QChart:
+        """
+        Create a bar chart showing the distribution of players in the dataset.
+
+        Args:
+            title (str, optional): Chart title. Defaults to "Top Players".
+
+        Returns:
+            QChart: The created bar chart
+
+        Raises:
+            ValueError: If data is empty or player column doesn't exist
+        """
+        try:
+            # Identify the player/user column - this might need adjustment based on your data structure
+            player_column = next(
+                (
+                    col
+                    for col in self._data_model.data.columns
+                    if col.lower() in ["player", "user", "username", "name"]
+                ),
+                None,
+            )
+
+            if not player_column:
+                # Fallback to first column if no player column is found
+                player_column = self._data_model.data.columns[0]
+
+            # Create a bar chart of the top 5-10 players by frequency
+            df = self._data_model.data
+
+            if df.empty:
+                # Return empty chart if data is empty
+                chart = QChart()
+                chart.setTitle(title)
+                return chart
+
+            # Count occurrences of each player
+            player_counts = df[player_column].value_counts().head(10)
+
+            # Create bar chart with this data
+            # Create a bar series
+            bar_series = QBarSeries()
+
+            # Create a bar set
+            bar_set = QBarSet("Count")
+
+            # Add values to the bar set
+            for value in player_counts.values:
+                bar_set.append(value)
+
+            # Set bar color
+            bar_set.setColor(self._colors[0])
+
+            # Add the bar set to the series
+            bar_series.append(bar_set)
+
+            # Create the chart
+            chart = QChart()
+            chart.addSeries(bar_series)
+            chart.setTitle(title)
+            chart.setAnimationOptions(QChart.SeriesAnimations)
+
+            # Create the axes
+            axis_x = QBarCategoryAxis()
+            categories = [str(player) for player in player_counts.index]
+            axis_x.append(categories)
+
+            axis_y = QValueAxis()
+            max_value = max(player_counts.values) if not player_counts.empty else 10
+            axis_y.setRange(0, max_value * 1.1)  # Add 10% margin
+
+            # Set axis titles
+            axis_x.setTitleText("Player")
+            axis_y.setTitleText("Entries")
+
+            # Attach axes to the chart
+            chart.addAxis(axis_x, Qt.AlignBottom)
+            chart.addAxis(axis_y, Qt.AlignLeft)
+
+            # Attach series to axes
+            bar_series.attachAxis(axis_x)
+            bar_series.attachAxis(axis_y)
+
+            # Set legend visibility
+            chart.legend().setVisible(True)
+            chart.legend().setAlignment(Qt.AlignBottom)
+
+            return chart
+
+        except Exception as e:
+            # In case of error, return empty chart
+            chart = QChart()
+            chart.setTitle(f"{title} (Error: {str(e)})")
+            return chart
+
+    def create_chest_sources_chart(self, title: str = "Chest Sources") -> QChart:
+        """
+        Create a pie chart showing the distribution of chest sources in the dataset.
+
+        Args:
+            title (str, optional): Chart title. Defaults to "Chest Sources".
+
+        Returns:
+            QChart: The created pie chart
+
+        Raises:
+            ValueError: If data is empty or source column doesn't exist
+        """
+        try:
+            # Identify the source column - this might need adjustment based on your data structure
+            source_column = next(
+                (
+                    col
+                    for col in self._data_model.data.columns
+                    if col.lower() in ["source", "chest_source", "origin", "type"]
+                ),
+                None,
+            )
+
+            if not source_column:
+                # Fallback to second column if no source column is found
+                source_column = self._data_model.data.columns[
+                    min(1, len(self._data_model.data.columns) - 1)
+                ]
+
+            # Create a pie chart of the chest sources
+            df = self._data_model.data
+
+            if df.empty:
+                # Return empty chart if data is empty
+                chart = QChart()
+                chart.setTitle(title)
+                return chart
+
+            # Count occurrences of each source
+            source_counts = df[source_column].value_counts()
+
+            # Create pie chart with this data
+            # Create a pie series
+            pie_series = QPieSeries()
+
+            # Add slices to the pie
+            for i, (source, count) in enumerate(source_counts.items()):
+                slice = pie_series.append(f"{source}: {count}", count)
+                slice.setBrush(self._colors[i % len(self._colors)])
+
+            # Create the chart
+            chart = QChart()
+            chart.addSeries(pie_series)
+            chart.setTitle(title)
+            chart.setAnimationOptions(QChart.SeriesAnimations)
+
+            # Set legend visibility
+            chart.legend().setVisible(True)
+            chart.legend().setAlignment(Qt.AlignRight)
+
+            # Customize slices
+            for i, slice in enumerate(pie_series.slices()):
+                # Set slice labels visible
+                slice.setLabelVisible(True)
+
+                # Set the first slice to explode slightly
+                if i == 0:
+                    slice.setExploded(True)
+
+            return chart
+
+        except Exception as e:
+            # In case of error, return empty chart
+            chart = QChart()
+            chart.setTitle(f"{title} (Error: {str(e)})")
+            return chart

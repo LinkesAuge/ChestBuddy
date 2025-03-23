@@ -1,93 +1,60 @@
 """
 stat_card.py
 
-Description: A widget for displaying data metrics with visual indicators
+Description: Card component for displaying statistics in the dashboard
 Usage:
-    stat_card = StatCard(
-        title="Total Files",
-        value="156",
-        icon=QIcon(":/icons/file.png")
-    )
-    stat_card.clicked.connect(on_stat_card_clicked)
-    stat_card.set_trend(StatCard.Trend.UP, "12% increase")
-    stat_card.set_value_color(QColor(Colors.SUCCESS))
-    layout.addWidget(stat_card)
+    stat_card = StatCard("Total Records", "1,234", trend="+5%")
+    stat_card.value_changed.connect(my_handler)
 """
 
-from typing import Optional, Union, Callable
-from enum import Enum
-
-from PySide6.QtCore import Qt, Signal, QSize, QRect, QRectF, QPoint
-from PySide6.QtGui import (
-    QIcon,
-    QFont,
-    QColor,
-    QPainter,
-    QPen,
-    QBrush,
-    QPaintEvent,
-    QMouseEvent,
-    QCursor,
-)
+from PySide6.QtCore import Qt, Signal, Property
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
     QLabel,
-    QSizePolicy,
-    QSpacerItem,
     QFrame,
+    QSizePolicy,
+    QGraphicsDropShadowEffect,
 )
 
-from chestbuddy.ui.resources.style import Colors
 
-
-class StatCard(QWidget):
+class StatCard(QFrame):
     """
-    A widget for displaying a statistic with visual indicators.
-
-    Provides a visual representation of a metric with title, value,
-    trend indicators, and optional icon.
+    A card component for displaying statistics with a title, value, and trend indicator.
 
     Attributes:
-        clicked (Signal): Signal emitted when the card is clicked
+        value_changed (Signal): Emitted when the stat value changes
 
     Implementation Notes:
-        - Supports compact and expanded modes
-        - Displays trend indicators (up, down, neutral)
-        - Supports custom value colors based on thresholds
-        - Includes click handling for navigation
-        - Can show icon for visual context
+        - Card appears with shadow effect and rounded corners
+        - Trend indicators show positive/negative changes with color coding
+        - Supports different sizes through size_hint property
     """
 
-    # Signal definitions
-    clicked = Signal()
-
-    # Trend enum for direction indicators
-    class Trend(Enum):
-        NONE = 0
-        UP = 1
-        DOWN = 2
+    # Signal emitted when the value changes
+    value_changed = Signal(str)
 
     def __init__(
         self,
         title: str = "",
-        value: str = "",
+        value: str = "0",
         subtitle: str = "",
-        icon: Optional[QIcon] = None,
-        parent: Optional[QWidget] = None,
-        compact: bool = False,
+        trend: str = "",
+        icon: str = "",
+        parent: QWidget = None,
     ):
         """
-        Initialize a new StatCard.
+        Initialize the stat card with title, value, and trend.
 
         Args:
-            title (str): The title/label for the statistic
-            value (str): The value to display (can include units)
-            subtitle (str): Additional context text to display below the value
-            icon (QIcon, optional): Icon to display for visual context
-            parent (QWidget, optional): Parent widget
-            compact (bool): Whether to use compact mode
+            title (str): The title of the stat
+            value (str): The value to display
+            subtitle (str): Optional subtitle or description
+            trend (str): Optional trend indicator (e.g., "+5.2%")
+            icon (str): Optional icon name
+            parent (QWidget): Parent widget
         """
         super().__init__(parent)
 
@@ -95,412 +62,310 @@ class StatCard(QWidget):
         self._title = title
         self._value = value
         self._subtitle = subtitle
-        self._icon = icon or QIcon()
-        self._compact = compact
-        self._trend = self.Trend.NONE
-        self._trend_text = ""
-        self._value_color = QColor(Colors.TEXT_LIGHT)
-        self._clickable = True
+        self._trend = trend
+        self._icon = icon
+        self._size_hint = "medium"  # small, medium, large
 
-        # Set up the UI
+        # Setup UI
         self._setup_ui()
 
-        # Configure widget behavior
-        self.setMouseTracking(True)
-        self.setCursor(QCursor(Qt.PointingHandCursor))
-
     def _setup_ui(self):
-        """Set up the widget's UI components."""
-        # Main layout
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(
-            12, 10, 12, 10
-        ) if not self._compact else main_layout.setContentsMargins(8, 6, 8, 6)
-        main_layout.setSpacing(6) if not self._compact else main_layout.setSpacing(4)
-
-        # Top row with title and icon
-        top_row = QHBoxLayout()
-        top_row.setContentsMargins(0, 0, 0, 0)
-        top_row.setSpacing(8)
-
-        # Title label
-        self._title_label = QLabel(self._title)
-        title_font = QFont()
-        title_font.setPointSize(10) if not self._compact else title_font.setPointSize(9)
-        title_font.setBold(True)
-        self._title_label.setFont(title_font)
-        self._title_label.setStyleSheet(f"color: {Colors.TEXT_MUTED};")
-        top_row.addWidget(self._title_label)
-
-        # Spacer to push icon to the right
-        top_row.addItem(QSpacerItem(0, 0, QSizePolicy.Expanding, QSizePolicy.Minimum))
-
-        # Icon (if provided)
-        if not self._icon.isNull():
-            self._icon_label = QLabel()
-            icon_size = QSize(16, 16) if not self._compact else QSize(12, 12)
-            self._icon_label.setPixmap(self._icon.pixmap(icon_size))
-            top_row.addWidget(self._icon_label)
-        else:
-            self._icon_label = None
-
-        main_layout.addLayout(top_row)
-
-        # Value and trend indicators
-        value_row = QHBoxLayout()
-        value_row.setContentsMargins(0, 0, 0, 0)
-        value_row.setSpacing(8)
-
-        # Value label
-        self._value_label = QLabel(self._value)
-        value_font = QFont()
-        value_font.setPointSize(18) if not self._compact else value_font.setPointSize(14)
-        value_font.setBold(True)
-        self._value_label.setFont(value_font)
-        self._value_label.setStyleSheet(f"color: {Colors.TEXT_LIGHT};")
-        value_row.addWidget(self._value_label)
-
-        # Spacer to push trend indicator to the right
-        value_row.addItem(QSpacerItem(0, 0, QSizePolicy.Expanding, QSizePolicy.Minimum))
-
-        # Trend indicator (custom drawn in the paintEvent)
-        self._trend_indicator = QFrame()
-        self._trend_indicator.setFixedSize(QSize(24, 24) if not self._compact else QSize(18, 18))
-        self._trend_indicator.setVisible(self._trend != self.Trend.NONE)
-        value_row.addWidget(self._trend_indicator)
-
-        main_layout.addLayout(value_row)
-
-        # Subtitle/trend text (optional)
-        if self._subtitle or self._trend_text:
-            self._subtitle_label = QLabel(self._subtitle or self._trend_text)
-            subtitle_font = QFont()
-            subtitle_font.setPointSize(9) if not self._compact else subtitle_font.setPointSize(8)
-            self._subtitle_label.setFont(subtitle_font)
-            self._subtitle_label.setStyleSheet(f"color: {Colors.TEXT_MUTED};")
-            main_layout.addWidget(self._subtitle_label)
-        else:
-            self._subtitle_label = None
-
-        # Set minimum size
-        min_width = 180 if not self._compact else 120
-        min_height = 90 if not self._compact else 70
-        self.setMinimumSize(min_width, min_height)
-
-        # Set style sheet for the card
-        self.setStyleSheet(f"""
-            StatCard {{
-                background-color: {Colors.PRIMARY};
-                border: 1px solid {Colors.BORDER};
-                border-radius: 6px;
-            }}
-            StatCard:hover {{
-                border: 1px solid {Colors.ACCENT};
-                background-color: #1D324A;  /* Slightly lighter than PRIMARY */
-            }}
+        """Set up the UI components of the stat card."""
+        # Set frame styling
+        self.setObjectName("statCard")
+        self.setFrameShape(QFrame.StyledPanel)
+        self.setFrameShadow(QFrame.Raised)
+        self.setStyleSheet("""
+            #statCard {
+                background-color: #ffffff;
+                border-radius: 8px;
+                border: 1px solid #e0e0e0;
+            }
         """)
 
-    def _update_trend_indicator(self):
-        """Update the trend indicator based on the current trend."""
-        self._trend_indicator.setVisible(self._trend != self.Trend.NONE)
-        if self._trend_indicator.isVisible():
-            # Custom painting will be done in paintEvent
-            self._trend_indicator.update()
+        # Apply drop shadow
+        shadow = QGraphicsDropShadowEffect(self)
+        shadow.setBlurRadius(10)
+        shadow.setColor(QColor(0, 0, 0, 30))
+        shadow.setOffset(0, 2)
+        self.setGraphicsEffect(shadow)
 
-        # Update subtitle if trend text exists
-        if self._subtitle_label and self._trend_text:
-            self._subtitle_label.setText(self._trend_text)
+        # Create layouts
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(16, 16, 16, 16)
+        main_layout.setSpacing(8)
 
-    def paintEvent(self, event: QPaintEvent):
-        """
-        Handle the paint event to draw the trend indicator.
+        # Create title label
+        self._title_label = QLabel(self._title)
+        self._title_label.setObjectName("statCardTitle")
+        self._title_label.setStyleSheet("""
+            #statCardTitle {
+                color: #585858;
+                font-size: 14px;
+                font-weight: 500;
+            }
+        """)
 
-        Args:
-            event (QPaintEvent): The paint event
-        """
-        super().paintEvent(event)
+        # Create value label
+        self._value_label = QLabel(self._value)
+        self._value_label.setObjectName("statCardValue")
+        self._value_label.setStyleSheet("""
+            #statCardValue {
+                color: #333333;
+                font-size: 28px;
+                font-weight: 600;
+            }
+        """)
 
-        # Draw trend indicator if visible
-        if self._trend_indicator and self._trend_indicator.isVisible():
-            painter = QPainter(self._trend_indicator)
-            painter.setRenderHint(QPainter.Antialiasing)
+        # Create subtitle label if provided
+        self._subtitle_label = None
+        if self._subtitle:
+            self._subtitle_label = QLabel(self._subtitle)
+            self._subtitle_label.setObjectName("statCardSubtitle")
+            self._subtitle_label.setStyleSheet("""
+                #statCardSubtitle {
+                    color: #7c7c7c;
+                    font-size: 12px;
+                }
+            """)
 
-            # Calculate center of the indicator
-            rect = self._trend_indicator.rect()
-            center_x = rect.width() / 2
-            center_y = rect.height() / 2
+        # Create trend label if provided
+        self._trend_label = None
+        if self._trend:
+            self._trend_label = QLabel(self._trend)
+            self._trend_label.setObjectName("statCardTrend")
 
-            # Set color based on trend
-            if self._trend == self.Trend.UP:
-                color = QColor(Colors.SUCCESS)
-            elif self._trend == self.Trend.DOWN:
-                color = QColor(Colors.ERROR)
+            # Determine trend direction and apply color
+            if self._trend.startswith("+"):
+                self._trend_label.setStyleSheet("""
+                    #statCardTrend {
+                        color: #4caf50;
+                        font-size: 12px;
+                        font-weight: 500;
+                    }
+                """)
+            elif self._trend.startswith("-"):
+                self._trend_label.setStyleSheet("""
+                    #statCardTrend {
+                        color: #f44336;
+                        font-size: 12px;
+                        font-weight: 500;
+                    }
+                """)
             else:
-                color = QColor(Colors.TEXT_MUTED)
+                self._trend_label.setStyleSheet("""
+                    #statCardTrend {
+                        color: #7c7c7c;
+                        font-size: 12px;
+                        font-weight: 500;
+                    }
+                """)
 
-            # Draw the arrow
-            pen = QPen(color, 2)
-            painter.setPen(pen)
-            painter.setBrush(QBrush(color))
+        # Add widgets to layout
+        main_layout.addWidget(self._title_label)
+        main_layout.addWidget(self._value_label)
 
-            # Calculate arrow size based on compact mode
-            arrow_size = 8 if not self._compact else 6
+        # Create bottom row for subtitle and trend
+        if self._subtitle_label or self._trend_label:
+            bottom_row = QHBoxLayout()
+            bottom_row.setSpacing(8)
 
-            if self._trend == self.Trend.UP:
-                # Draw upward arrow
-                points = [
-                    QPoint(int(center_x), int(center_y - arrow_size)),
-                    QPoint(int(center_x - arrow_size), int(center_y + arrow_size / 2)),
-                    QPoint(int(center_x + arrow_size), int(center_y + arrow_size / 2)),
-                ]
-                painter.drawPolygon(points)
-            elif self._trend == self.Trend.DOWN:
-                # Draw downward arrow
-                points = [
-                    QPoint(int(center_x), int(center_y + arrow_size)),
-                    QPoint(int(center_x - arrow_size), int(center_y - arrow_size / 2)),
-                    QPoint(int(center_x + arrow_size), int(center_y - arrow_size / 2)),
-                ]
-                painter.drawPolygon(points)
-            else:
-                # Draw horizontal line for no trend
-                painter.drawLine(
-                    int(center_x - arrow_size),
-                    int(center_y),
-                    int(center_x + arrow_size),
-                    int(center_y),
-                )
+            if self._subtitle_label:
+                bottom_row.addWidget(self._subtitle_label)
 
-            painter.end()
+            # Add stretch if both subtitle and trend exist
+            if self._subtitle_label and self._trend_label:
+                bottom_row.addStretch()
 
-    def mousePressEvent(self, event: QMouseEvent):
-        """
-        Handle mouse press events.
+            if self._trend_label:
+                bottom_row.addWidget(self._trend_label, alignment=Qt.AlignRight)
 
-        Args:
-            event (QMouseEvent): The mouse event
-        """
-        super().mousePressEvent(event)
-        if event.button() == Qt.LeftButton and self._clickable:
-            self.clicked.emit()
+            main_layout.addLayout(bottom_row)
 
-    def title(self) -> str:
-        """
-        Get the title text.
-
-        Returns:
-            str: The title text
-        """
-        return self._title
-
-    def value(self) -> str:
-        """
-        Get the value text.
-
-        Returns:
-            str: The value text
-        """
-        return self._value
-
-    def subtitle(self) -> str:
-        """
-        Get the subtitle text.
-
-        Returns:
-            str: The subtitle text
-        """
-        return self._subtitle
-
-    def icon(self) -> QIcon:
-        """
-        Get the icon.
-
-        Returns:
-            QIcon: The icon
-        """
-        return self._icon
-
-    def trend(self) -> Trend:
-        """
-        Get the current trend.
-
-        Returns:
-            Trend: The trend enum value
-        """
-        return self._trend
-
-    def trend_text(self) -> str:
-        """
-        Get the trend description text.
-
-        Returns:
-            str: The trend text
-        """
-        return self._trend_text
-
-    def is_compact(self) -> bool:
-        """
-        Check if the card is in compact mode.
-
-        Returns:
-            bool: True if compact, False otherwise
-        """
-        return self._compact
-
-    def is_clickable(self) -> bool:
-        """
-        Check if the card is clickable.
-
-        Returns:
-            bool: True if clickable, False otherwise
-        """
-        return self._clickable
-
-    def value_color(self) -> QColor:
-        """
-        Get the value text color.
-
-        Returns:
-            QColor: The text color
-        """
-        return self._value_color
+        # Set size policy
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self.setMinimumHeight(100)
 
     def set_title(self, title: str):
         """
-        Set the title text.
+        Set the title of the stat card.
 
         Args:
-            title (str): The new title text
+            title (str): The new title
         """
         self._title = title
         self._title_label.setText(title)
 
+    def title(self) -> str:
+        """
+        Get the current title.
+
+        Returns:
+            str: The current title
+        """
+        return self._title
+
     def set_value(self, value: str):
         """
-        Set the value text.
+        Set the value of the stat card.
 
         Args:
-            value (str): The new value text
+            value (str): The new value
         """
-        self._value = value
-        self._value_label.setText(value)
+        if self._value != value:
+            self._value = value
+            self._value_label.setText(value)
+            # Emit signal
+            self.value_changed.emit(value)
+
+    def value(self) -> str:
+        """
+        Get the current value.
+
+        Returns:
+            str: The current value
+        """
+        return self._value
 
     def set_subtitle(self, subtitle: str):
         """
-        Set the subtitle text.
+        Set the subtitle of the stat card.
 
         Args:
-            subtitle (str): The new subtitle text
+            subtitle (str): The new subtitle
         """
         self._subtitle = subtitle
-        if self._subtitle_label:
-            # Only update if not showing trend text
-            if not self._trend_text:
-                self._subtitle_label.setText(subtitle)
-        else:
-            # Create subtitle label if it doesn't exist
+
+        # Create subtitle label if it doesn't exist
+        if not self._subtitle_label and subtitle:
             self._subtitle_label = QLabel(subtitle)
-            subtitle_font = QFont()
-            subtitle_font.setPointSize(9) if not self._compact else subtitle_font.setPointSize(8)
-            self._subtitle_label.setFont(subtitle_font)
-            self._subtitle_label.setStyleSheet(f"color: {Colors.TEXT_MUTED};")
-            self.layout().addWidget(self._subtitle_label)
+            self._subtitle_label.setObjectName("statCardSubtitle")
+            self._subtitle_label.setStyleSheet("""
+                #statCardSubtitle {
+                    color: #7c7c7c;
+                    font-size: 12px;
+                }
+            """)
 
-    def set_icon(self, icon: QIcon):
+            # Recreate layout with subtitle
+            self._setup_ui()
+        elif self._subtitle_label:
+            self._subtitle_label.setText(subtitle)
+
+    def subtitle(self) -> str:
         """
-        Set the icon.
+        Get the current subtitle.
+
+        Returns:
+            str: The current subtitle
+        """
+        return self._subtitle
+
+    def set_trend(self, trend: str):
+        """
+        Set the trend indicator of the stat card.
 
         Args:
-            icon (QIcon): The new icon
-        """
-        self._icon = icon
-
-        # Update icon if it exists
-        if self._icon_label:
-            icon_size = QSize(16, 16) if not self._compact else QSize(12, 12)
-            self._icon_label.setPixmap(icon.pixmap(icon_size))
-        else:
-            # Create icon label if it doesn't exist and icon is valid
-            if not icon.isNull():
-                top_row = self.layout().itemAt(0).layout()
-                self._icon_label = QLabel()
-                icon_size = QSize(16, 16) if not self._compact else QSize(12, 12)
-                self._icon_label.setPixmap(icon.pixmap(icon_size))
-                top_row.addWidget(self._icon_label)
-
-    def set_trend(self, trend: Trend, trend_text: str = ""):
-        """
-        Set the trend indicator and optional trend text.
-
-        Args:
-            trend (Trend): The trend direction (UP, DOWN, NONE)
-            trend_text (str, optional): Description text for the trend
+            trend (str): The new trend indicator
         """
         self._trend = trend
-        self._trend_text = trend_text
 
-        # Update subtitle to show trend text
-        if trend_text and self._subtitle_label:
-            self._subtitle_label.setText(trend_text)
+        # Create trend label if it doesn't exist
+        if not self._trend_label and trend:
+            self._trend_label = QLabel(trend)
+            self._trend_label.setObjectName("statCardTrend")
 
-        # Update trend indicator
-        self._update_trend_indicator()
+            # Recreate layout with trend
+            self._setup_ui()
+        elif self._trend_label:
+            self._trend_label.setText(trend)
 
-    def set_compact(self, compact: bool):
-        """
-        Set the compact mode of the card.
-
-        Args:
-            compact (bool): Whether to use compact styling
-        """
-        if self._compact != compact:
-            self._compact = compact
-            # Refresh the UI to apply compact changes
-            self._refresh_ui()
-
-    def set_clickable(self, clickable: bool):
-        """
-        Set whether the card is clickable.
-
-        Args:
-            clickable (bool): Whether the card should be clickable
-        """
-        if self._clickable != clickable:
-            self._clickable = clickable
-
-            # Update cursor
-            if clickable:
-                self.setCursor(QCursor(Qt.PointingHandCursor))
+            # Update styling based on trend direction
+            if trend.startswith("+"):
+                self._trend_label.setStyleSheet("""
+                    #statCardTrend {
+                        color: #4caf50;
+                        font-size: 12px;
+                        font-weight: 500;
+                    }
+                """)
+            elif trend.startswith("-"):
+                self._trend_label.setStyleSheet("""
+                    #statCardTrend {
+                        color: #f44336;
+                        font-size: 12px;
+                        font-weight: 500;
+                    }
+                """)
             else:
-                self.setCursor(QCursor(Qt.ArrowCursor))
+                self._trend_label.setStyleSheet("""
+                    #statCardTrend {
+                        color: #7c7c7c;
+                        font-size: 12px;
+                        font-weight: 500;
+                    }
+                """)
 
-    def set_value_color(self, color: QColor):
+    def trend(self) -> str:
         """
-        Set the color of the value text.
+        Get the current trend indicator.
+
+        Returns:
+            str: The current trend indicator
+        """
+        return self._trend
+
+    def set_size_hint(self, size: str):
+        """
+        Set the size hint of the stat card.
 
         Args:
-            color (QColor): The color for the value text
+            size (str): Size hint ("small", "medium", or "large")
         """
-        self._value_color = color
-        self._value_label.setStyleSheet(f"color: {color.name()};")
+        if size in ["small", "medium", "large"]:
+            self._size_hint = size
 
-    def _refresh_ui(self):
-        """Rebuild the UI to reflect current properties."""
-        # Clear the current layout
-        while self.layout().count():
-            item = self.layout().takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
-            elif item.layout():
-                # Clear nested layouts
-                while item.layout().count():
-                    nested_item = item.layout().takeAt(0)
-                    if nested_item.widget():
-                        nested_item.widget().deleteLater()
+            # Apply size-specific styling
+            if size == "small":
+                self._value_label.setStyleSheet("""
+                    #statCardValue {
+                        color: #333333;
+                        font-size: 22px;
+                        font-weight: 600;
+                    }
+                """)
+                self.setMinimumHeight(80)
+            elif size == "medium":
+                self._value_label.setStyleSheet("""
+                    #statCardValue {
+                        color: #333333;
+                        font-size: 28px;
+                        font-weight: 600;
+                    }
+                """)
+                self.setMinimumHeight(100)
+            elif size == "large":
+                self._value_label.setStyleSheet("""
+                    #statCardValue {
+                        color: #333333;
+                        font-size: 36px;
+                        font-weight: 600;
+                    }
+                """)
+                self.setMinimumHeight(120)
 
-        # Rebuild the UI
-        self._setup_ui()
+    def size_hint(self) -> str:
+        """
+        Get the current size hint.
 
-        # Restore dynamic properties
-        self._value_label.setStyleSheet(f"color: {self._value_color.name()};")
-        self._update_trend_indicator()
+        Returns:
+            str: The current size hint
+        """
+        return self._size_hint
+
+    # Define Qt properties
+    title = Property(str, title, set_title)
+    value = Property(str, value, set_value)
+    subtitle = Property(str, subtitle, set_subtitle)
+    trend = Property(str, trend, set_trend)
+    size_hint = Property(str, size_hint, set_size_hint)

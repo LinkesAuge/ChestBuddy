@@ -15,11 +15,12 @@ from PySide6.QtWidgets import (
     QPushButton,
     QFrame,
     QStackedWidget,
+    QSizePolicy,
 )
 
-from chestbuddy.ui.resources.style import Colors
-from chestbuddy.ui.resources.icons import Icons
 from chestbuddy.ui.widgets.empty_state_widget import EmptyStateWidget
+from chestbuddy.ui.resources.icons import Icons
+from chestbuddy.ui.resources.style import Colors
 
 
 class ViewHeader(QFrame):
