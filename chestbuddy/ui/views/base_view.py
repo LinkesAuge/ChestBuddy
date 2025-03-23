@@ -7,9 +7,19 @@ Usage:
 """
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame
+from PySide6.QtWidgets import (
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QFrame,
+    QStackedWidget,
+)
 
 from chestbuddy.ui.resources.style import Colors
+from chestbuddy.ui.resources.icons import Icons
+from chestbuddy.ui.widgets.empty_state_widget import EmptyStateWidget
 
 
 class ViewHeader(QFrame):
@@ -77,14 +87,93 @@ class ViewHeader(QFrame):
             QPushButton: The created button
         """
         button = QPushButton(text)
+        button.setObjectName(f"action_button_{name}")
+        button.setCursor(Qt.PointingHandCursor)
 
-        # Apply class based on type
-        if button_type != "default":
-            button.setProperty("class", button_type)
+        # Apply button style based on type
+        if button_type == "primary":
+            button.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {Colors.PRIMARY};
+                    color: white;
+                    border: none;
+                    padding: 8px 16px;
+                    border-radius: 4px;
+                }}
+                QPushButton:hover {{
+                    background-color: {Colors.PRIMARY_HOVER};
+                }}
+                QPushButton:pressed {{
+                    background-color: {Colors.PRIMARY_ACTIVE};
+                }}
+            """)
+        elif button_type == "secondary":
+            button.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {Colors.SECONDARY};
+                    color: white;
+                    border: none;
+                    padding: 8px 16px;
+                    border-radius: 4px;
+                }}
+                QPushButton:hover {{
+                    background-color: {Colors.SECONDARY_HOVER};
+                }}
+                QPushButton:pressed {{
+                    background-color: {Colors.SECONDARY_ACTIVE};
+                }}
+            """)
+        elif button_type == "success":
+            button.setStyleSheet("""
+                QPushButton {
+                    background-color: #28a745;
+                    color: white;
+                    border: none;
+                    padding: 8px 16px;
+                    border-radius: 4px;
+                }
+                QPushButton:hover {
+                    background-color: #218838;
+                }
+                QPushButton:pressed {
+                    background-color: #1e7e34;
+                }
+            """)
+        elif button_type == "danger":
+            button.setStyleSheet("""
+                QPushButton {
+                    background-color: #dc3545;
+                    color: white;
+                    border: none;
+                    padding: 8px 16px;
+                    border-radius: 4px;
+                }
+                QPushButton:hover {
+                    background-color: #c82333;
+                }
+                QPushButton:pressed {
+                    background-color: #bd2130;
+                }
+            """)
+        else:  # default
+            button.setStyleSheet("""
+                QPushButton {
+                    background-color: #f8f9fa;
+                    color: #212529;
+                    border: 1px solid #d6d8db;
+                    padding: 8px 16px;
+                    border-radius: 4px;
+                }
+                QPushButton:hover {
+                    background-color: #e2e6ea;
+                }
+                QPushButton:pressed {
+                    background-color: #dae0e5;
+                }
+            """)
 
         self._action_layout.addWidget(button)
         self._action_buttons[name] = button
-
         return button
 
     def get_action_button(self, name):
@@ -115,18 +204,26 @@ class BaseView(QWidget):
     Base class for all content views in the application.
 
     This provides common structure and functionality for all views.
+
+    Attributes:
+        data_required (bool): Whether this view requires data to be loaded to function
     """
 
-    def __init__(self, title, parent=None):
+    # Signal to request data
+    data_requested = Signal()
+
+    def __init__(self, title, parent=None, data_required=False):
         """
         Initialize the base view.
 
         Args:
             title (str): The view title
             parent (QWidget, optional): The parent widget
+            data_required (bool): Whether this view requires data to function
         """
         super().__init__(parent)
         self._title = title
+        self._data_required = data_required
         self._setup_ui()
         self._connect_signals()
         self._add_action_buttons()
@@ -142,12 +239,31 @@ class BaseView(QWidget):
         self._header = ViewHeader(self._title)
         self._layout.addWidget(self._header)
 
-        # Content area
+        # Content area with stacked widget for content and empty state
+        self._content_stack = QStackedWidget()
+        self._layout.addWidget(self._content_stack)
+
+        # Regular content widget
         self._content = QWidget()
         self._content_layout = QVBoxLayout(self._content)
         self._content_layout.setContentsMargins(24, 24, 24, 24)
+        self._content_stack.addWidget(self._content)
 
-        self._layout.addWidget(self._content)
+        # Empty state widget (for views that require data)
+        if self._data_required:
+            self._empty_state = EmptyStateWidget(
+                title="No Data Available",
+                message="Import data to use this view.",
+                action_text="Import Data",
+                icon=Icons.get_icon(Icons.IMPORT),
+            )
+            self._empty_state.action_clicked.connect(self._on_import_data_requested)
+            self._content_stack.addWidget(self._empty_state)
+        else:
+            self._empty_state = None
+
+        # Default to showing content
+        self._content_stack.setCurrentWidget(self._content)
 
     def _connect_signals(self):
         """Connect signals to slots."""
@@ -203,6 +319,59 @@ class BaseView(QWidget):
             QVBoxLayout: The content layout
         """
         return self._content_layout
+
+    def set_data_available(self, data_available):
+        """
+        Set whether data is available for this view.
+
+        Args:
+            data_available (bool): Whether data is available
+        """
+        if not self._data_required:
+            return
+
+        if data_available:
+            self._content_stack.setCurrentWidget(self._content)
+        else:
+            self._content_stack.setCurrentWidget(self._empty_state)
+
+    def set_empty_state_props(self, title=None, message=None, action_text=None, icon=None):
+        """
+        Configure the empty state widget properties.
+
+        Args:
+            title (str, optional): Title for the empty state
+            message (str, optional): Message for the empty state
+            action_text (str, optional): Text for the action button
+            icon (QIcon, optional): Icon to display
+        """
+        if not self._data_required or not self._empty_state:
+            return
+
+        if title:
+            self._empty_state.set_title(title)
+
+        if message:
+            self._empty_state.set_message(message)
+
+        if action_text:
+            self._empty_state.set_action(action_text)
+
+        if icon:
+            self._empty_state.set_icon(icon)
+
+    def is_data_required(self):
+        """
+        Check if this view requires data.
+
+        Returns:
+            bool: True if this view requires data, False otherwise
+        """
+        return self._data_required
+
+    def _on_import_data_requested(self):
+        """Handle when the import data button is clicked on the empty state widget."""
+        self.data_requested.emit()
 
     def _add_action_buttons(self):
         """Add action buttons to the header. To be implemented by subclasses."""

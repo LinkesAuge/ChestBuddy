@@ -3,119 +3,319 @@ title: System Patterns - ChestBuddy Application
 date: 2023-04-02
 ---
 
-# System Architecture and Design Patterns
+# System Patterns
 
-This document outlines the major architectural decisions, design patterns, and component relationships within the ChestBuddy application.
+*Last Updated: 2023-10-18*
 
 ## Application Architecture
 
-ChestBuddy follows a layered architecture with clear separation of concerns:
+The ChestBuddy application follows a layered architecture pattern with these key layers:
 
-1. **Presentation Layer**: UI components built with PySide6
-2. **Application Layer**: Application logic and controllers
-3. **Domain Layer**: Business rules and domain models
-4. **Infrastructure Layer**: Data access, file operations, and utilities
+### 1. Presentation Layer (UI)
+- **MainWindow**: Central UI container that manages views and navigation
+- **SidebarNavigation**: Provides navigation between different application views
+- **ViewAdapters**: Bridge between views and the application layer
+- **Components**: Reusable UI elements like buttons, toolbars, and widgets
+
+### 2. Application Layer (Services)
+- **DataManager**: Coordinates data loading, saving, and manipulation
+- **ConfigManager**: Handles application configuration and settings
+- **ValidationService**: Manages validation rules and processing
+- **CorrectionService**: Applies corrections to identified data issues
+- **DashboardService**: Provides dashboard statistics and chart data (planned)
+
+### 3. Domain Layer (Core Logic)
+- **Models**: Core data structures representing chest data
+- **Rules**: Business logic for data validation and processing
+- **Algorithms**: Analysis and processing algorithms
+- **Events**: Domain events representing significant state changes
+
+### 4. Infrastructure Layer (Data & System)
+- **FileIO**: Handles file reading and writing operations
+- **Database**: Manages persistent storage (SQLite)
+- **Logging**: System-wide logging functionality
+- **Configuration**: Application settings storage and retrieval
 
 ## UI Component Library
 
-We've established a consistent UI component library that follows these principles:
+ChestBuddy implements a custom UI component library designed for consistency and reusability:
 
-### Reusable UI Components
+### ActionButton
+- **Purpose**: Standardized button with consistent styling and behavior
+- **Features**:
+  - Icon support (leading or trailing)
+  - Multiple styles (primary, secondary, danger)
+  - Size variations (small, medium, large)
+  - Disabled state styling
+  - Customizable tooltips
 
-1. **ActionButton**
-   - Purpose: Consistent button styling for all actions in the application
-   - Features:
-     - Support for text, icon, or both
-     - Primary styling for prominent actions
-     - Compact mode for space efficiency
-     - Tooltip support for better usability
-   - Implementation:
-     - Extends QPushButton with consistent styling
-     - Uses signals/slots for action handling
-     - Maintains consistent sizing and spacing
+### ActionToolbar
+- **Purpose**: Container for organizing action buttons
+- **Features**:
+  - Horizontal or vertical orientation
+  - Consistent spacing and alignment
+  - Button grouping capabilities
+  - Overflow handling for smaller screens
+  - Style coordination with ActionButtons
 
-2. **ActionToolbar**
-   - Purpose: Organize related action buttons into logical groups
-   - Features:
-     - Horizontal or vertical orientation
-     - Button grouping with separators
-     - Consistent spacing between button groups
-     - Flexibility for different screen sizes
-   - Implementation:
-     - Container for ActionButton components
-     - Manages button layout and grouping
-     - Provides API for adding/removing buttons
+### EmptyStateWidget
+- **Purpose**: Visual feedback when content is unavailable
+- **Features**:
+  - Customizable title and message
+  - Icon display
+  - Action button for resolution
+  - Consistent visual style with the application
+  - Signal for action button clicks
 
-3. **EmptyStateWidget**
-   - Purpose: Display informative content when no data is available
-   - Features:
-     - Title and descriptive message
-     - Optional icon for visual context
-     - Call-to-action button for primary action
-     - Customizable appearance
-   - Implementation:
-     - Composite widget with layout management
-     - Signal emission for action button clicks
-     - Accessibility support for screen readers
+### FilterBar
+- **Purpose**: Interface for searching and filtering data
+- **Features**:
+  - Search field with clear button
+  - Filter button with dropdown options
+  - Placeholder text customization
+  - Search term highlighting
+  - Real-time filtering capability
 
-4. **FilterBar**
-   - Purpose: Provide search and filtering functionality for data views
-   - Features:
-     - Search field with clear button
-     - Expandable filter section
-     - Support for multiple filter categories
-     - Signals for search/filter changes
-   - Implementation:
-     - Composite widget with expandable sections
-     - Manages filter state internally
-     - Emits signals when search text or filters change
+### Dashboard Components (Phase 3)
 
-### Component Design Principles
+#### StatCard
+- **Purpose**: Display data metrics with visual indicators
+- **Features**:
+  - Icon support for visual context
+  - Trend indicators (up/down arrows)
+  - Click actions for navigation
+  - Color customization based on value
+  - Compact and expanded modes
 
-1. **Signal-Based Communication**
-   - Components emit signals when state changes
-   - Parent components connect to signals to handle events
-   - Reduces tight coupling between components
+#### ChartPreview
+- **Purpose**: Display interactive chart previews with context
+- **Features**:
+  - Qt Charts integration for chart rendering
+  - Title and subtitle display for context
+  - Clickable interaction for detailed view
+  - Compact mode for space-efficient display
+  - Placeholder state when no chart is available
+  - Icon support for additional context
+  - Responsive layout adjustments
 
-2. **Consistent Styling**
-   - Application-wide style sheet for visual consistency
-   - Reuse of colors, fonts, and spacing values
-   - Style inheritance to maintain look and feel
+#### ActionCard
+- **Purpose**: Group related actions with context
+- **Features**:
+  - Multiple action buttons in a consistent layout
+  - Section grouping for related actions
+  - Status indicators for action state
+  - Description text for context
+  - Action tracking for frequently used actions
 
-3. **Property-Based Configuration**
-   - Components expose properties for configuration
-   - Changes to properties update component appearance
-   - Default values ensure components work out-of-the-box
+#### Enhanced RecentFilesList
+- **Purpose**: Display recent files with metadata and actions
+- **Features**:
+  - File metadata display (size, date, row count)
+  - Quick action buttons per file
+  - File status indicators
+  - Sorting and filtering capabilities
+  - Empty state handling
 
-4. **Composition Over Inheritance**
-   - Build complex widgets by composing simpler ones
-   - Limit inheritance to cases where it adds clear value
-   - Use QWidget containment for complex components
+#### WelcomeStateWidget
+- **Purpose**: Provide first-time user experience
+- **Features**:
+  - Application branding and introduction
+  - Getting started guidance
+  - Quick start action buttons
+  - Preference to disable in future sessions
+  - Responsive layout for different screen sizes
 
-5. **Test-Driven Development**
-   - Comprehensive test suite for all UI components
-   - Tests validate component behavior and edge cases
-   - Changes must pass all tests before integration
+## Navigation and State Management
 
-## Application Architecture
+### Sidebar Navigation System
+- **Structure**: Hierarchical navigation with primary and secondary items
+- **State Management**: Navigation items can be enabled/disabled based on application state
+- **Visual Feedback**: Clear indication of current view and disabled items
+- **Customization**: Configurable through the ConfigManager
 
-ChestBuddy follows a modular, service-oriented architecture with clear separation of concerns:
+### State-Dependent Navigation
+- **Data Loading State**: Navigation sections requiring loaded data are disabled when no data is available
+- **View Transitions**: Smooth transitions between views with state preservation
+- **History Management**: Back/forward navigation capability
+- **Persistent State**: View state is stored between sessions
 
-```mermaid
-flowchart TB
-    App[App Controller] --> UI[UI Components]
-    App --> Services[Services]
-    App --> Models[Data Models]
-    
-    UI -->|Signals| App
-    App -->|Updates| UI
-    
-    Services --> Models
-    Services --> Workers[Background Workers]
-    
-    Workers -->|Signals| Services
-    Services -->|Signals| App
+### Empty State Handling
+- **Data Required Views**: Views that require data display EmptyStateWidget when no data is loaded
+- **Custom Messages**: Each view provides specific guidance when data is missing
+- **Action Integration**: Empty state actions connect directly to data loading functionality
+- **Consistent Experience**: Unified approach to no-data states across the application
+
+### Dashboard States (Phase 3 Plan)
+- **Welcome State**: First-time user experience with getting started information
+- **Empty State**: No data loaded, prompting for data import
+- **Data Loaded State**: Shows insights and statistics about loaded data
+- **Error State**: Displays information about errors and recovery actions
+- **State Transitions**: Handled by DashboardViewAdapter based on application state
+
+## Design Principles
+
+### Signal-Based Communication
+- Components communicate through Qt signals and slots
+- Changes in one component can trigger updates in others
+- Clear separation of concerns with loose coupling
+- Event-driven architecture for responsive UI
+
+### Consistent Styling
+- Unified color scheme defined in StyleConstants
+- Common margins, paddings, and spacing values
+- Typography system with defined text styles
+- Shared icons and visual elements
+
+### Property-Based Configuration
+- UI components are configured through QProperties
+- Dynamic updates when properties change
+- Default values with override capabilities
+- Type checking for properties
+
+### Composition over Inheritance
+- UI components built by composing smaller elements
+- Limited inheritance depth to avoid complexity
+- Clear interfaces between components
+- Focused component responsibilities
+
+### Test-Driven Development
+- Comprehensive test suite for UI components
+- Mock objects for testing complex interactions
+- Automated UI testing for critical paths
+- Performance testing for data-intensive operations
+
+## Data Management
+
+### Data Flow Patterns
+- **Import → Validation → Correction → Analysis → Export** pipeline
+- Clear boundaries between processing stages
+- Progress tracking throughout the pipeline
+- Error handling at each stage
+
+### State Management
+- Observable data models via Qt's Model/View framework
+- Centralized DataManager for coordinating data operations
+- Change notification via signals
+- Undo/redo capability for data modifications
+
+### Dashboard Data Service (Phase 3 Plan)
+- **Statistics Calculation**: Compute metrics from data model
+- **Chart Data Generation**: Prepare data for chart visualizations
+- **User Activity Tracking**: Monitor frequently used actions
+- **Dashboard Configuration**: Manage dashboard layout preferences
+- **Data Change Monitoring**: Update dashboard on data changes
+
+### Data Loading Process
+1. File selection via standard dialog
+2. Progress indication during loading
+3. Initial validation of data structure
+4. Population of data models
+5. UI update with loaded data
+
+### Data Processing
+1. Validation rules application
+2. Issue identification and categorization
+3. Correction suggestions generation
+4. Manual or automated corrections
+5. Results visualization
+
+### Data Export
+1. Format selection (CSV, Excel, PDF)
+2. Export configuration options
+3. Progress indication during export
+4. Success confirmation with file location
+5. Error handling for export failures
+
+## Testing Strategy
+
+### Component Testing
+- Individual UI components tested in isolation
+- Property verification
+- Signal emission testing
+- Visual appearance verification
+- Edge case handling
+
+### Integration Testing
+- Component interactions tested
+- Data flow verification
+- State transitions
+- Error propagation
+
+### End-to-End Testing
+- Complete workflows tested
+- File import/export
+- Data processing pipeline
+- Configuration persistence
+
+## Extension and Plugin Architecture
+
+### Plugin Interfaces
+- **DataImportPlugin**: Custom data import formats
+- **ValidationRulePlugin**: Custom validation rules
+- **VisualizationPlugin**: Custom chart types
+- **ExportFormatPlugin**: Custom export formats
+
+### Future Architectural Considerations
+- Multi-user support
+- Cloud integration
+- Mobile companion application
+- Distributed processing for large datasets
+
+## Dashboard Redesign Architecture (Phase 3 Plan)
+
+### Component Relationships
+
 ```
+┌───────────────────┐          ┌─────────────────────┐
+│ DashboardAdapter  │◄────────►│  DashboardService   │
+└───────┬───────────┘          └─────────┬───────────┘
+        │                                 │
+        │                                 │
+        ▼                                 ▼
+┌───────────────────┐          ┌─────────────────────┐
+│   DashboardView   │◄────────►│   DataModel/Other   │
+└───────┬───────────┘          │      Services       │
+        │                      └─────────────────────┘
+        │
+        ├─────────────┬─────────────┬──────────────┐
+        │             │             │              │
+        ▼             ▼             ▼              ▼
+┌───────────────┐ ┌─────────────┐ ┌────────────┐ ┌──────────────┐
+│   StatCard    │ │ChartPreview │ │ ActionCard │ │RecentFilesList│
+└───────────────┘ └─────────────┘ └────────────┘ └──────────────┘
+```
+
+### Key Architectural Patterns for Dashboard
+
+1. **Adapter Pattern**:
+   - DashboardViewAdapter mediates between MainWindow and DashboardView
+   - Handles data state transitions and UI updates
+   - Connects dashboard components to application services
+   - Manages dashboard configuration
+
+2. **Service Pattern**:
+   - DashboardService provides data to dashboard components
+   - Abstracts data retrieval and processing logic
+   - Monitors data changes and updates dashboard
+   - Handles dashboard-specific configuration
+
+3. **Composite Pattern**:
+   - Dashboard composed of multiple smaller components
+   - Each component is self-contained with its own responsibility
+   - Components communicate through well-defined interfaces
+   - Layout manager handles component arrangement
+
+4. **State Pattern**:
+   - Dashboard handles multiple states (welcome, empty, data loaded)
+   - State transitions are managed by the adapter
+   - Each state has specific visual representation
+   - Components respond to state changes
+
+5. **Observer Pattern**:
+   - Dashboard components observe data model changes
+   - Components update when observed data changes
+   - Loose coupling between data and visualization
+   - Signal/slot mechanism for change notification
 
 ## Key Design Patterns
 
@@ -1140,4 +1340,97 @@ def _update_content_state(self):
 def _show_empty_state(self):
     self._empty_widget.setVisible(True)
     self._content_widget.setVisible(False)
+```
+
+## Dashboard Architecture
+
+The Dashboard provides users with an overview of the current data state, available actions, and key insights from the data.
+
+```mermaid
+flowchart TD
+        A[MainWindow] --> B[DashboardView]
+        B --> C[Empty State]
+        B --> D[Dashboard Content]
+        D --> E[Stats Cards]
+        D --> F[Charts/Visualizations]
+        D --> G[Quick Actions]
+        D --> H[Recent Files]
+```
+
+### Key Architectural Patterns for Dashboard
+
+1. **Component Pattern**:
+   - Reusable visual components for consistent UI
+   - Each component manages its own state and appearance
+   - Clear separation of concerns between components
+
+2. **State Display Pattern**:
+   - Dashboard adapts displays based on data availability
+   - EmptyStateWidget shows when no data is loaded
+   - Content widgets show when data is available
+
+3. **Interactive Data Visualization**:
+   - Chart components provide interactive previews of data
+   - Clicking on charts can trigger detailed views
+   - Visual indicators show trends and patterns
+
+```mermaid
+classDiagram
+        DashboardView --|> BaseView
+        DashboardView *-- EmptyStateWidget
+        DashboardView *-- StatCard
+        DashboardView *-- ChartPreview
+        DashboardView *-- RecentFilesWidget
+        DashboardView *-- QuickActionsWidget
+        
+        class DashboardView {
+            -QStackedWidget _content_stack
+            -EmptyStateWidget _empty_state
+            -Widget _dash_content
+            -StatCard _dataset_card
+            -StatCard _validation_card
+            -StatCard _correction_card
+            -ChartPreview _top_players_chart
+            -ChartPreview _chest_sources_chart
+            -RecentFilesWidget _recent_files
+            -QuickActionsWidget _quick_actions
+            +set_data_available(available)
+            +set_player_chart(chart)
+            +set_chest_sources_chart(chart)
+            +update_stats(...)
+            +set_recent_files(files)
+        }
+        
+        class StatCard {
+            -String _title
+            -String _value
+            -String _subtitle
+            -QIcon _icon
+            +clicked Signal
+            +set_value()
+            +set_trend()
+            +set_value_color()
+        }
+        
+        class ChartPreview {
+            -String _title
+            -String _subtitle
+            -QChart _chart
+            -QIcon _icon
+            +clicked Signal
+            +set_chart()
+            +clear_chart()
+            +set_compact()
+        }
+        
+        class EmptyStateWidget {
+            -String _title
+            -String _message
+            -String _action_text
+            -QIcon _icon
+            +action_clicked Signal
+            +set_title()
+            +set_message()
+            +set_action()
+        }
 ``` 

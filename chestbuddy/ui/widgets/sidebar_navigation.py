@@ -43,6 +43,10 @@ class NavigationButton(QPushButton):
         # Set style properties
         self.setCheckable(True)
         self.setCursor(Qt.PointingHandCursor)
+        self._update_style()
+
+    def _update_style(self):
+        """Update button styling based on current state."""
         self.setStyleSheet(f"""
             QPushButton {{
                 text-align: left;
@@ -64,7 +68,26 @@ class NavigationButton(QPushButton):
                 border-left: 3px solid {Colors.SECONDARY};
                 font-weight: bold;
             }}
+            
+            QPushButton:disabled {{
+                color: rgba(200, 200, 200, 0.3);
+                background-color: transparent;
+                border-left: none;
+                font-weight: normal;
+            }}
         """)
+
+    def set_enabled(self, enabled):
+        """
+        Set the enabled state of the button.
+
+        Args:
+            enabled (bool): Whether the button should be enabled
+        """
+        self.setEnabled(enabled)
+        if not enabled:
+            self.setChecked(False)
+        self._update_style()
 
 
 class SubNavigationButton(QPushButton):
@@ -84,6 +107,10 @@ class SubNavigationButton(QPushButton):
         # Set style properties
         self.setCheckable(True)
         self.setCursor(Qt.PointingHandCursor)
+        self._update_style()
+
+    def _update_style(self):
+        """Update button styling based on current state."""
         self.setStyleSheet(f"""
             QPushButton {{
                 text-align: left;
@@ -104,7 +131,25 @@ class SubNavigationButton(QPushButton):
                 background-color: transparent;
                 font-weight: bold;
             }}
+            
+            QPushButton:disabled {{
+                color: rgba(200, 200, 200, 0.3);
+                background-color: transparent;
+                font-weight: normal;
+            }}
         """)
+
+    def set_enabled(self, enabled):
+        """
+        Set the enabled state of the button.
+
+        Args:
+            enabled (bool): Whether the button should be enabled
+        """
+        self.setEnabled(enabled)
+        if not enabled:
+            self.setChecked(False)
+        self._update_style()
 
 
 class NavigationSection(QWidget):
@@ -142,11 +187,12 @@ class NavigationSection(QWidget):
         self._main_button.clicked.connect(self._on_main_button_clicked)
 
         # Track sub-buttons
-        self._sub_buttons = []
+        self._sub_buttons = {}
 
     def _on_main_button_clicked(self):
         """Handle main button click."""
-        self.button_clicked.emit(self._title, "")
+        if self._main_button.isEnabled():
+            self.button_clicked.emit(self._title, "")
 
     def add_sub_button(self, text):
         """
@@ -160,7 +206,7 @@ class NavigationSection(QWidget):
         """
         button = SubNavigationButton(text)
         self._sub_layout.addWidget(button)
-        self._sub_buttons.append(button)
+        self._sub_buttons[text] = button
 
         # Connect button click
         button.clicked.connect(lambda: self.button_clicked.emit(self._title, text))
@@ -178,14 +224,59 @@ class NavigationSection(QWidget):
         self._main_button.setChecked(is_main)
 
         if sub_text:
-            for button in self._sub_buttons:
+            for text, button in self._sub_buttons.items():
                 button.setChecked(button.text() == sub_text)
 
     def uncheck_all(self):
         """Uncheck all buttons in this section."""
         self._main_button.setChecked(False)
-        for button in self._sub_buttons:
+        for button in self._sub_buttons.values():
             button.setChecked(False)
+
+    def set_enabled(self, enabled):
+        """
+        Set the enabled state for the main button and all sub-buttons.
+
+        Args:
+            enabled (bool): Whether the section should be enabled
+        """
+        self._main_button.set_enabled(enabled)
+        for button in self._sub_buttons.values():
+            button.set_enabled(enabled)
+
+    def set_sub_button_enabled(self, text, enabled):
+        """
+        Set the enabled state for a specific sub-button.
+
+        Args:
+            text (str): The text of the sub-button
+            enabled (bool): Whether the button should be enabled
+        """
+        if text in self._sub_buttons:
+            self._sub_buttons[text].set_enabled(enabled)
+
+    def is_enabled(self):
+        """
+        Check if the section is enabled.
+
+        Returns:
+            bool: True if the main button is enabled, False otherwise
+        """
+        return self._main_button.isEnabled()
+
+    def is_sub_button_enabled(self, text):
+        """
+        Check if a specific sub-button is enabled.
+
+        Args:
+            text (str): The text of the sub-button
+
+        Returns:
+            bool: True if the sub-button is enabled, False otherwise
+        """
+        if text in self._sub_buttons:
+            return self._sub_buttons[text].isEnabled()
+        return False
 
 
 class SidebarNavigation(QFrame):
@@ -282,10 +373,8 @@ class SidebarNavigation(QFrame):
 
         # Data section with sub-items
         data_section = self.add_section("Data", None)
-        data_section.add_sub_button("Import")
         data_section.add_sub_button("Validate")
         data_section.add_sub_button("Correct")
-        data_section.add_sub_button("Export")
 
         # Analysis section with sub-items
         analysis_section = self.add_section("Analysis", None)
@@ -362,3 +451,61 @@ class SidebarNavigation(QFrame):
         if section in self._sections:
             is_main = not item
             self._sections[section].set_checked(is_main, item)
+
+    def set_section_enabled(self, section, enabled):
+        """
+        Set the enabled state for a section.
+
+        Args:
+            section (str): The section title
+            enabled (bool): Whether the section should be enabled
+        """
+        if section in self._sections:
+            self._sections[section].set_enabled(enabled)
+
+    def set_item_enabled(self, section, item, enabled):
+        """
+        Set the enabled state for a specific item in a section.
+
+        Args:
+            section (str): The section title
+            item (str): The item text (empty for main section button)
+            enabled (bool): Whether the item should be enabled
+        """
+        if section in self._sections:
+            if item:
+                self._sections[section].set_sub_button_enabled(item, enabled)
+            else:
+                self._sections[section].set_enabled(enabled)
+
+    def is_section_enabled(self, section):
+        """
+        Check if a section is enabled.
+
+        Args:
+            section (str): The section title
+
+        Returns:
+            bool: True if the section is enabled, False otherwise
+        """
+        if section in self._sections:
+            return self._sections[section].is_enabled()
+        return False
+
+    def is_item_enabled(self, section, item):
+        """
+        Check if a specific item is enabled.
+
+        Args:
+            section (str): The section title
+            item (str): The item text (empty for main section button)
+
+        Returns:
+            bool: True if the item is enabled, False otherwise
+        """
+        if section in self._sections:
+            if item:
+                return self._sections[section].is_sub_button_enabled(item)
+            else:
+                return self._sections[section].is_enabled()
+        return False

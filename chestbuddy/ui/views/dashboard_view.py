@@ -16,10 +16,15 @@ from PySide6.QtWidgets import (
     QFrame,
     QGridLayout,
     QScrollArea,
+    QStackedWidget,
 )
 
 from chestbuddy.ui.views.base_view import BaseView
 from chestbuddy.ui.resources.style import Colors
+from chestbuddy.ui.resources.icons import Icons
+from chestbuddy.ui.widgets.empty_state_widget import EmptyStateWidget
+from chestbuddy.ui.widgets.chart_preview import ChartPreview
+from chestbuddy.ui.widgets.stat_card import StatCard
 
 
 class StatsCard(QFrame):
@@ -365,6 +370,7 @@ class DashboardView(BaseView):
 
     action_triggered = Signal(str)  # action name
     file_selected = Signal(str)  # file path
+    chart_clicked = Signal(str)  # chart id
 
     def __init__(self, data_model=None, parent=None):
         """
@@ -374,8 +380,33 @@ class DashboardView(BaseView):
             data_model: The data model (optional)
             parent (QWidget, optional): The parent widget
         """
-        super().__init__("Dashboard", parent)
+        super().__init__("Dashboard", parent, data_required=False)
         self._data_model = data_model
+        self._data_available = False
+
+        # Create stacked widget for content/empty state
+        self._content_stack = QStackedWidget()
+        self.get_content_layout().addWidget(self._content_stack)
+
+        # Create main content widget
+        self._dash_content = QWidget()
+        self._dash_layout = QVBoxLayout(self._dash_content)
+        self._dash_layout.setContentsMargins(0, 0, 0, 0)
+        self._dash_layout.setSpacing(20)
+        self._content_stack.addWidget(self._dash_content)
+
+        # Create empty state widget
+        self._empty_state = EmptyStateWidget(
+            title="No Data Available",
+            message="Import data to see dashboard insights and statistics.",
+            action_text="Import Data",
+            icon=Icons.get_icon(Icons.IMPORT),
+        )
+        self._empty_state.action_clicked.connect(self._on_import_clicked)
+        self._content_stack.addWidget(self._empty_state)
+
+        # Set default view based on data availability
+        self._content_stack.setCurrentWidget(self._empty_state)
 
         # Create dashboard widgets
         self._create_dashboard_widgets()
@@ -383,7 +414,7 @@ class DashboardView(BaseView):
 
     def _create_dashboard_widgets(self):
         """Create the dashboard widgets."""
-        content_layout = self.get_content_layout()
+        content_layout = self._dash_layout
 
         # Stats cards grid
         self._stats_grid = QWidget()
@@ -392,10 +423,12 @@ class DashboardView(BaseView):
         self._stats_layout.setSpacing(20)
 
         # Create stats cards
-        self._dataset_card = StatsCard("Current Dataset", "0 rows")
-        self._validation_card = StatsCard("Validation Status", "N/A")
-        self._correction_card = StatsCard("Correction Status", "0 corrected")
-        self._import_card = StatsCard("Last Import", "Never")
+        self._dataset_card = StatCard("Current Dataset", "0 rows", Icons.get_icon(Icons.TABLE))
+        self._validation_card = StatCard("Validation Status", "N/A", Icons.get_icon(Icons.CHECK))
+        self._correction_card = StatCard(
+            "Correction Status", "0 corrected", Icons.get_icon(Icons.EDIT)
+        )
+        self._import_card = StatCard("Last Import", "Never", Icons.get_icon(Icons.IMPORT))
 
         # Add to grid
         self._stats_layout.addWidget(self._dataset_card, 0, 0)
@@ -404,9 +437,6 @@ class DashboardView(BaseView):
         self._stats_layout.addWidget(self._import_card, 0, 3)
 
         content_layout.addWidget(self._stats_grid)
-
-        # Add spacing
-        content_layout.addSpacing(20)
 
         # Charts grid (two columns)
         self._charts_grid = QWidget()
@@ -419,11 +449,21 @@ class DashboardView(BaseView):
         self._charts_layout.addWidget(self._recent_files, 0, 0)
 
         # Top players chart
-        self._top_players_chart = ChartWidget("Top Players")
+        self._top_players_chart = ChartPreview(
+            title="Top Players",
+            subtitle="Most frequent players in dataset",
+            icon=Icons.get_icon(Icons.USER),
+        )
+        self._top_players_chart.clicked.connect(lambda: self.chart_clicked.emit("top_players"))
         self._charts_layout.addWidget(self._top_players_chart, 0, 1)
 
         # Chest sources chart
-        self._chest_sources_chart = ChartWidget("Top Chest Sources")
+        self._chest_sources_chart = ChartPreview(
+            title="Top Chest Sources",
+            subtitle="Most common chest sources",
+            icon=Icons.get_icon(Icons.FOLDER),
+        )
+        self._chest_sources_chart.clicked.connect(lambda: self.chart_clicked.emit("chest_sources"))
         self._charts_layout.addWidget(self._chest_sources_chart, 1, 0)
 
         # Quick actions widget
@@ -448,6 +488,10 @@ class DashboardView(BaseView):
         # Recent files
         self._recent_files.file_selected.connect(self.file_selected)
 
+    def _on_import_clicked(self):
+        """Handle import button click from empty state."""
+        self.action_triggered.emit("import")
+
     def update_stats(
         self, dataset_rows=0, validation_status="N/A", corrections=0, last_import="Never"
     ):
@@ -465,6 +509,9 @@ class DashboardView(BaseView):
         self._correction_card.set_value(f"{corrections:,} corrected")
         self._import_card.set_value(last_import)
 
+        # Update data availability state
+        self.set_data_available(dataset_rows > 0)
+
     def set_recent_files(self, files):
         """
         Set the list of recent files.
@@ -473,3 +520,42 @@ class DashboardView(BaseView):
             files (list): List of file paths
         """
         self._recent_files.set_files(files)
+
+    def set_data_available(self, available):
+        """
+        Set whether data is available for the dashboard.
+
+        Args:
+            available (bool): Whether data is available
+        """
+        self._data_available = available
+
+        # Show appropriate view based on data availability
+        if available:
+            self._content_stack.setCurrentWidget(self._dash_content)
+        else:
+            self._content_stack.setCurrentWidget(self._empty_state)
+
+    def set_player_chart(self, chart):
+        """
+        Set the top players chart.
+
+        Args:
+            chart: The chart to display
+        """
+        if chart:
+            self._top_players_chart.set_chart(chart)
+        else:
+            self._top_players_chart.clear_chart()
+
+    def set_chest_sources_chart(self, chart):
+        """
+        Set the chest sources chart.
+
+        Args:
+            chart: The chart to display
+        """
+        if chart:
+            self._chest_sources_chart.set_chart(chart)
+        else:
+            self._chest_sources_chart.clear_chart()

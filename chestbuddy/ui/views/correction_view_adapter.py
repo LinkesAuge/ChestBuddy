@@ -14,6 +14,7 @@ from chestbuddy.core.models import ChestDataModel
 from chestbuddy.core.services import CorrectionService
 from chestbuddy.ui.correction_tab import CorrectionTab
 from chestbuddy.ui.views.base_view import BaseView
+from chestbuddy.ui.resources.icons import Icons
 
 
 class CorrectionViewAdapter(BaseView):
@@ -53,8 +54,16 @@ class CorrectionViewAdapter(BaseView):
         self._correction_tab = CorrectionTab(data_model, correction_service)
 
         # Initialize the base view
-        super().__init__("Data Correction", parent)
+        super().__init__("Data Correction", parent, data_required=True)
         self.setObjectName("CorrectionViewAdapter")
+
+        # Set custom empty state properties
+        self.set_empty_state_props(
+            title="No Data to Correct",
+            message="Import CSV files to correct your chest data.",
+            action_text="Import Data",
+            icon=Icons.get_icon(Icons.CORRECT),
+        )
 
     def _setup_ui(self):
         """Set up the UI components."""
@@ -75,6 +84,6 @@ class CorrectionViewAdapter(BaseView):
     def _add_action_buttons(self):
         """Add action buttons to the header."""
         # Add action buttons for common correction operations
-        self.add_header_action("apply", "Apply Correction")
-        self.add_header_action("history", "View History")
+        self.add_header_action("apply", "Apply Corrections", "primary")
+        self.add_header_action("clear", "Clear Corrections")
         self.add_header_action("refresh", "Refresh")

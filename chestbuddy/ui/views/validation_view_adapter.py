@@ -14,6 +14,7 @@ from chestbuddy.core.models import ChestDataModel
 from chestbuddy.core.services import ValidationService
 from chestbuddy.ui.validation_tab import ValidationTab
 from chestbuddy.ui.views.base_view import BaseView
+from chestbuddy.ui.resources.icons import Icons
 
 
 class ValidationViewAdapter(BaseView):
@@ -53,8 +54,16 @@ class ValidationViewAdapter(BaseView):
         self._validation_tab = ValidationTab(data_model, validation_service)
 
         # Initialize the base view
-        super().__init__("Data Validation", parent)
+        super().__init__("Data Validation", parent, data_required=True)
         self.setObjectName("ValidationViewAdapter")
+
+        # Set custom empty state properties
+        self.set_empty_state_props(
+            title="No Data to Validate",
+            message="Import CSV files to validate your chest data.",
+            action_text="Import Data",
+            icon=Icons.get_icon(Icons.VALIDATE),
+        )
 
     def _setup_ui(self):
         """Set up the UI components."""
@@ -75,6 +84,6 @@ class ValidationViewAdapter(BaseView):
     def _add_action_buttons(self):
         """Add action buttons to the header."""
         # Add action buttons for common validation operations
-        self.add_header_action("validate", "Validate")
+        self.add_header_action("validate", "Validate", "primary")
         self.add_header_action("clear", "Clear Validation")
         self.add_header_action("refresh", "Refresh")

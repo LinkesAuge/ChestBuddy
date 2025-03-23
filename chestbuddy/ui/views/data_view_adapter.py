@@ -44,8 +44,15 @@ class DataViewAdapter(BaseView):
         self._data_view = DataView(data_model)
 
         # Initialize the base view
-        super().__init__("Data View", parent)
+        super().__init__("Data View", parent, data_required=True)
         self.setObjectName("DataViewAdapter")
+
+        # Set custom empty state properties
+        self.set_empty_state_props(
+            title="No Data Loaded",
+            message="Import CSV files to view and manage your chest data.",
+            action_text="Import Data",
+        )
 
     def _setup_ui(self):
         """Set up the UI components."""
@@ -66,6 +73,4 @@ class DataViewAdapter(BaseView):
     def _add_action_buttons(self):
         """Add action buttons to the header."""
         # Add action buttons for common data operations
-        self.add_header_action("filter", "Filter")
-        self.add_header_action("clear", "Clear Filters")
-        self.add_header_action("refresh", "Refresh")
+        self.add_header_action("refresh", "Refresh", "default")
