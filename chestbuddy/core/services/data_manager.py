@@ -654,3 +654,12 @@ class DataManager(QObject):
         except Exception as e:
             logger.error(f"Error adapting task result: {e}")
             self._on_csv_load_success((None, f"Error processing result: {str(e)}"))
+
+    @property
+    def total_files(self):
+        """Get the total number of files being loaded."""
+        # Use our current setting if we have files being loaded
+        if hasattr(self, "_files_to_load") and self._files_to_load:
+            return len(self._files_to_load)
+        # Otherwise return 0
+        return 0

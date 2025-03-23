@@ -578,14 +578,22 @@ class MainWindow(QMainWindow):
             "current_file": "",
             "current_file_index": 0,
             "processed_files": [],
-            "total_files": 0,
+            "total_files": 0,  # Will be set by the caller via total_files property
             "total_rows": 0,
         }
+
+        # Get total files from data manager if available
+        if self._data_manager and hasattr(self._data_manager, "total_files"):
+            self._loading_state["total_files"] = self._data_manager.total_files
+            logger.debug(
+                f"Setting total files to {self._loading_state['total_files']} from data manager"
+            )
 
         # Reset total row counters
         self._total_rows_loaded = 0
         self._total_rows_estimated = 0
         self._last_progress_current = 0
+        self._table_population_complete = False
 
         # Flag to track if dialog was successfully created and shown
         progress_dialog_ready = False
@@ -645,13 +653,26 @@ class MainWindow(QMainWindow):
         Args:
             data: The data to populate in the table
         """
-        logger.debug("Received request to populate table during data loading")
+        logger.debug(f"Received request to populate table with {len(data):,} rows")
+
+        # Set flag indicating we've reached table population phase
+        self._file_loading_complete = True
+        self._table_population_complete = False
 
         # Update progress dialog to show table population
         if hasattr(self, "_progress_dialog") and self._progress_dialog:
             self._progress_dialog.setLabelText(f"Populating table with {len(data):,} rows...")
             self._progress_dialog.setValue(0)  # Reset progress for table population
+            self._progress_dialog.setStatusText("Building data table...")
             QApplication.processEvents()
+
+            # Set up a timer to update progress during table population
+            if not hasattr(self, "_table_population_timer"):
+                self._table_population_timer = QTimer()
+                self._table_population_timer.timeout.connect(self._update_table_population_progress)
+                self._table_population_start_time = datetime.now()
+                self._table_population_progress = 0
+                self._table_population_timer.start(100)  # Update every 100ms
 
         # Track if table was populated successfully
         table_populated = False
@@ -671,14 +692,54 @@ class MainWindow(QMainWindow):
                     except Exception as e:
                         logger.error(f"Error populating table: {e}")
 
+        # Stop the progress timer
+        if hasattr(self, "_table_population_timer") and self._table_population_timer.isActive():
+            self._table_population_timer.stop()
+
         # Allow UI to process after table population attempt
         QApplication.processEvents()
 
         # After table population is complete, finalize the progress dialog
         if table_populated and hasattr(self, "_progress_dialog") and self._progress_dialog:
+            # Set flag to indicate completion
+            self._table_population_complete = True
+
             # Call _on_load_finished with a completion message
             completion_message = f"Successfully loaded and populated table with {len(data):,} rows"
             self._on_load_finished(completion_message)
+
+    def _update_table_population_progress(self):
+        """Update the progress dialog during table population."""
+        if not hasattr(self, "_progress_dialog") or not self._progress_dialog:
+            return
+
+        # Increase the progress value based on time elapsed
+        if not hasattr(self, "_table_population_start_time"):
+            self._table_population_start_time = datetime.now()
+            self._table_population_progress = 0
+
+        # Calculate estimated progress based on time (up to 95%)
+        elapsed = (datetime.now() - self._table_population_start_time).total_seconds()
+        if elapsed < 0.1:
+            elapsed = 0.1
+
+        # Use a curve that starts fast then slows down - typical for table building
+        # Progress goes from 0 to 95 (leaving 5% for finalization)
+        if elapsed <= 10:  # Fast progress for first 10 seconds
+            self._table_population_progress = min(95, int(elapsed * 9.5))
+        else:  # Slower progress after 10 seconds
+            self._table_population_progress = min(
+                95, int(95 - (95 - self._table_population_progress) * 0.95)
+            )
+
+        # Update the progress dialog
+        self._progress_dialog.setValue(self._table_population_progress)
+
+        # Check if we need to keep updating
+        if self._table_population_progress >= 95 or self._table_population_complete:
+            # Stop the timer if we're at max progress or table population is complete
+            if hasattr(self, "_table_population_timer") and self._table_population_timer.isActive():
+                self._table_population_timer.stop()
 
     def _on_load_progress(self, file_path: str, current: int, total: int) -> None:
         """
@@ -694,6 +755,10 @@ class MainWindow(QMainWindow):
             return
 
         try:
+            # Skip progress updates if table population is complete
+            if hasattr(self, "_table_population_complete") and self._table_population_complete:
+                return
+
             # Update loading state based on signal type
             if file_path:
                 # This is a file-specific progress update
@@ -714,11 +779,6 @@ class MainWindow(QMainWindow):
                         self._loading_state["current_file_index"] += 1
                         if file_path not in self._loading_state["processed_files"]:
                             self._loading_state["processed_files"].append(file_path)
-                        self._loading_state["total_files"] = max(
-                            self._loading_state["current_file_index"],
-                            self._loading_state["total_files"],
-                            len(self._loading_state["processed_files"]),
-                        )
                     self._loading_state["current_file"] = file_path
 
                 # Update total rows for this file
@@ -786,10 +846,11 @@ class MainWindow(QMainWindow):
             # Standardized progress message format: "File X of Y - Z rows processed"
             if self._loading_state["total_files"] > 0:
                 # Format file information
-                if self._loading_state["total_files"] > 1:
-                    file_info = f"File {self._loading_state['current_file_index']} of {self._loading_state['total_files']}"
-                else:
-                    file_info = "File 1 of 1"
+                # Always use total_files directly, not current_file_index
+                total_files = self._loading_state["total_files"]
+                current_file_index = self._loading_state["current_file_index"]
+
+                file_info = f"File {current_file_index} of {total_files}"
 
                 # Add filename
                 file_info += f": {filename}"
@@ -855,6 +916,12 @@ class MainWindow(QMainWindow):
             return
 
         try:
+            # Check if this is the final completion (after table population)
+            # or just the file loading part
+            is_final_completion = (
+                hasattr(self, "_table_population_complete") and self._table_population_complete
+            )
+
             # Update the dialog to indicate completion
             self._progress_dialog.setLabelText("Loading complete")
 
