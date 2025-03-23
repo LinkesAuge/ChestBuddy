@@ -5,19 +5,43 @@ date: 2023-04-02
 
 # Active Context
 
-## Current Focus: UI Modernization and Restructuring
+## Current Focus: Transition to Report Generation (Phase 14)
 
-We've just completed a major UI overhaul for ChestBuddy, implementing a modern, sleek interface with a consistent dark blue and gold color scheme. The new UI features a sidebar navigation system and a modular view structure that improves both aesthetics and usability.
+We've completed the CSV Loading Improvements and Bugfixing phase, implementing a significantly improved progress dialog experience and enhancing the multi-file loading capabilities of the application. We're now preparing to transition to Phase 14: Report Generation, which will focus on creating comprehensive reports with embedded charts.
 
 ### Implementation Strategy
 
-We've taken an adapter-based approach to integrate existing functionality with our new UI structure:
+We'll take a modular approach to the report generation functionality:
 
-1. Created a base view architecture (`BaseView`) that standardizes layout and styling
-2. Developed adapter classes that wrap existing components
-3. Implemented a sidebar navigation system for intuitive section navigation
-4. Added a dashboard as the main landing page
-5. Ensured consistent styling and behavior across all views
+1. Design report templates with customizable sections
+2. Implement a ReportService to handle generation
+3. Create a ReportView component for the UI
+4. Add PDF export capabilities
+5. Integrate chart embedding functionality
+
+### Recent Improvements
+
+We've significantly enhanced the progress window experience for CSV loading:
+
+1. **Enhanced Progress Dialog**
+   - Created a consistent progress window that stays visible throughout loading
+   - Added detailed information showing current file (x of y), file name, and row progress
+   - Improved visual appearance with better window title and sizing
+   - Implemented proper completion handling with 100% progress display
+   - Enhanced cancellation support with proper cleanup
+
+2. **Background Processing Improvements**
+   - Enhanced thread management for better stability
+   - Improved error handling during thread cleanup
+   - Implemented a more graceful application shutdown process
+   - Added consistent progress reporting on a 0-100 scale
+   - Created better coordination between file-specific and overall progress
+
+3. **User Experience Enhancements**
+   - Added more informative loading messages
+   - Improved UI responsiveness during loading operations
+   - Provided clear file count and progress information
+   - Created smoother transitions between loading and completion states
 
 ### UI Architecture
 
@@ -31,11 +55,13 @@ graph TD
     CS --> VV[ValidationViewAdapter]
     CS --> CV[CorrectionViewAdapter]
     CS --> CHV[ChartViewAdapter]
+    CS -.planned.-> RPV[ReportViewAdapter]
     
     DV -.wraps.-> DO[DataView]
     VV -.wraps.-> VO[ValidationTab]
     CV -.wraps.-> CO[CorrectionTab]
     CHV -.wraps.-> CHO[ChartTab]
+    RPV -.will wrap.-> RPO[ReportView]
     
     style MW fill:#1a3055,color:#fff
     style SB fill:#1a3055,color:#fff
@@ -46,13 +72,15 @@ graph TD
     style VV fill:#234a87,color:#fff
     style CV fill:#234a87,color:#fff
     style CHV fill:#234a87,color:#fff
+    style RPV fill:#234a87,color:#fff,stroke-dasharray: 5 5
     style DO fill:#2e62b5,color:#fff
     style VO fill:#2e62b5,color:#fff
     style CO fill:#2e62b5,color:#fff
     style CHO fill:#2e62b5,color:#fff
+    style RPO fill:#2e62b5,color:#fff,stroke-dasharray: 5 5
 ```
 
-### User Flow
+### User Flow with Reports
 
 ```mermaid
 graph LR
@@ -66,9 +94,12 @@ graph LR
     SideNav -->|Navigate| Validation
     SideNav -->|Navigate| Correction
     SideNav -->|Navigate| Charts
+    SideNav -.Navigate.-> Reports
     Data -->|Validate| Validation
     Validation -->|Apply Corrections| Correction
     Correction -->|Show Results| Charts
+    Charts -.Generate Report.-> Reports
+    Reports -.Export.-> PDF
     
     style Start fill:#1a3055,color:#fff
     style Dashboard fill:#234a87,color:#fff
@@ -77,339 +108,148 @@ graph LR
     style Correction fill:#234a87,color:#fff
     style Charts fill:#234a87,color:#fff
     style SideNav fill:#1a3055,color:#fff
+    style Reports fill:#234a87,color:#fff,stroke-dasharray: 5 5
+    style PDF fill:#2e62b5,color:#fff,stroke-dasharray: 5 5
 ```
 
-### Recent Changes
+### Implementation Details for Progress Dialog Enhancements
 
-1. Restructured UI using BaseView as foundation
-2. Created adapter pattern to integrate existing components
-3. Added dark blue and gold color scheme
-4. Implemented sidebar navigation
-5. Developed dashboard view as main landing page
-6. Ensured all existing functionality works with the new UI
-7. Removed redundant toolbar from the main window (the one with "open", "save", "validate", and "correct" buttons) as these functions are already available in the menu and navigation bar
+1. **State Tracking Improvements**
+   - Added a `_loading_state` dictionary to MainWindow to track:
+     - Total number of files being processed
+     - Current file index and path
+     - List of processed files
+     - Total rows being processed
+   - This state allows for consistent progress reporting across all phases of loading
 
-### Refactoring and Enhancements
+2. **Progress Reporting Enhancements**
+   - Modified `_on_load_started` to properly initialize the progress dialog
+   - Enhanced `_on_load_progress` to provide consistent file count and row information
+   - Improved `_on_load_finished` to show proper completion status
+   - Added visibility checks and reinforcement to ensure dialog remains visible
 
-1. **Created DataManager Service**: Moved CSV operations from MainWindow to a dedicated DataManager service, improving separation of concerns.
+3. **Thread Management Improvements**
+   - Enhanced BackgroundWorker.__del__ with better thread cleanup
+   - Improved error handling during thread termination
+   - Eliminated forced thread termination during shutdown
+   - Added proper reference handling to prevent C++ object deletion errors
 
-2. **Column Mapping Enhancement**: Updated the column mapping functionality to handle both uppercase and title case column names, making the application more robust against different CSV formats.
-
-3. **Consolidated Logging Configuration**: Consolidated logging directories from having two separate logs folders (root and chestbuddy/) to a single location at `chestbuddy/logs`. This ensures all logs are stored in one consistent location regardless of where the application is launched from.
-
-### Code Refactoring: DataManager Service
-
-I've implemented a significant architecture improvement by creating a new `DataManager` service that handles all file operations, particularly CSV loading and saving. The key changes include:
-
-1. Created a new `data_manager.py` file in `chestbuddy/core/services/` with a `DataManager` class
-2. Moved CSV loading and saving logic from `app.py` to this new service
-3. Added column mapping functionality to properly handle CSV files with uppercase column names
-4. Implemented signals for load/save success and error events
-5. Updated `app.py` to use the DataManager service instead of handling these operations directly
-
-This refactoring aligns with the single responsibility principle by:
-- Moving file operations out of the main application class
-- Centralizing all data import/export operations in a dedicated service
-- Improving separation of concerns between UI and data operations
-
-The main application class (`ChestBuddyApp`) now primarily focuses on:
-- Initializing services and UI components
-- Connecting signals between components
-- Handling application lifecycle events
-
-The new architecture makes it easier to add new data import/export formats in the future by extending the DataManager service without modifying the main application class.
+4. **User Experience Considerations**
+   - Added minimum width to the progress dialog for better readability
+   - Improved window title and button text
+   - Enhanced progress messages with clearer information
+   - Added event processing to ensure UI responsiveness
 
 ### Current Tasks
 
-- [x] Create base UI structure
-- [x] Implement adapter pattern for existing components
-- [x] Design and implement sidebar navigation
-- [x] Create dashboard view
-- [x] Apply consistent styling
-- [x] Connect all signals and slots
-- [ ] Add placeholder views for remaining sections
-- [ ] Ensure responsive design for different screen sizes
-- [ ] Implement dark/light theme toggle
+- [x] Complete progress dialog enhancements
+- [x] Fix thread cleanup issues during application shutdown
+- [x] Implement consistent progress reporting for multi-file operations
+- [x] Ensure smooth transition between loading states
+- [ ] Begin design of report templates and structure
+- [ ] Research PDF generation libraries for Python/PySide6
+- [ ] Design ReportView component interface
+- [ ] Define data model for report generation
 
-### Decisions
+## Planning for Phase 14: Report Generation
 
-1. **Adapter Pattern**: We chose to use the adapter pattern to wrap existing components rather than rewriting them from scratch to preserve functionality while improving the UI.
+### Core Components
 
-2. **Color Scheme**: Selected a professional dark blue theme with gold accents to create a modern, sleek application appearance.
+1. **ReportService**
+   - Handle report generation logic
+   - Support different report types (summary, detailed, custom)
+   - Manage chart embedding
+   - Provide PDF export capabilities
 
-3. **BaseView Architecture**: Created a standardized view structure to ensure consistency across all application sections.
+2. **ReportView**
+   - Interface for report creation and customization
+   - Report preview functionality
+   - Export options and settings
+   - Template selection
 
-4. **Dashboard First**: Prioritized the dashboard view to provide users with a clear entry point and quick access to common actions.
+3. **Report Templates**
+   - Standard templates for common report types
+   - Customizable sections
+   - Chart placement options
+   - Header and footer customization
 
-## Current Focus
+4. **PDF Generation**
+   - High-quality PDF rendering
+   - Support for embedded charts and images
+   - Font and layout options
+   - Metadata support
 
-- **COMPLETED**: Integration tests for chart functionality (Phase 12)
-- **IN PROGRESS**: CSV Loading Improvements (Phase 13)
-- **UPCOMING**: Planning and preparation for report generation (Phase 14)
+### Development Approach
 
-We are implementing improvements to the CSV loading functionality to enhance the user experience and performance when loading large or multiple files. This includes:
+We'll approach the report generation phase in these steps:
 
-1. Creating a MultiCSVLoadTask class to handle loading multiple files with progress reporting
-2. Adding a progress dialog to provide visual feedback during file loading
-3. Implementing chunked reading for better memory efficiency
-4. Adding cancellation support for long-running operations
-5. Testing the new functionality thoroughly
+1. **Research and Design (Week 1)**
+   - Evaluate PDF libraries for Python/PySide6
+   - Design report templates
+   - Define the ReportService interface
+   - Plan the ReportView component
 
-### Implementation Plan for CSV Loading Improvements
+2. **Backend Implementation (Week 2)**
+   - Implement the ReportService
+   - Create report generation logic
+   - Implement PDF generation
+   - Add chart embedding functionality
 
-1. **Create MultiCSVLoadTask Class**
-   - Create a new class extending BackgroundTask
-   - Handle loading multiple files with progress reporting
-   - Use chunked reading for better memory efficiency
+3. **Frontend Development (Week 3)**
+   - Create the ReportView component
+   - Implement report customization interface
+   - Add report preview functionality
+   - Integrate with the ReportService
 
-2. **Update DataManager**
-   - Add new signals:
-     - `load_progress(str, int, int)` for file name, current progress, total
-     - `load_started()` and `load_finished()` for UI feedback
-   - Modify `load_csv` to use the new task
-   - Implement cancellation support
-
-3. **Add Progress Dialog in MainWindow**
-   - Create QProgressDialog when loading starts
-   - Update the dialog as loading progresses
-   - Support cancellation with proper cleanup
-   - Close dialog when loading completes
-
-4. **Use Efficient File Processing**
-   - Switch from `read_csv` to `read_csv_chunked` or `read_csv_background`
-   - Process files in manageable chunks
-   - Report progress based on chunks processed
-
-5. **Implement Proper Cancellation**
-   - Allow users to cancel long-running operations
-   - Clean up resources when canceled
-   - Update UI appropriately after cancellation
-
-### Expected Benefits
-- UI remains responsive during file loading
-- Users see visual progress indication
-- Users can cancel operations if needed
-- Better memory management with chunked reading
-- Improved performance for large files
-
-### Current Tasks
-- [x] Create MultiCSVLoadTask class
-- [x] Update DataManager with new signals and methods
-- [x] Add progress dialog to MainWindow
-- [x] Implement proper chunked file loading
-- [x] Add cancellation support
-- [x] Create tests for new functionality
-
-## Recent Changes
-
-- Enhanced MultiCSVLoadTask to track progress more effectively
-- Added a get_progress() method to MultiCSVLoadTask for better state monitoring
-- Created comprehensive tests for the DataManager's progress reporting capabilities
-- Updated tests for MultiCSVLoadTask to verify the new features
-- Improved cancellation handling with more frequent checks during file processing
-
-## Current Implementation Status
-
-We are currently implementing CSV Loading Improvements to enhance the user experience when loading CSV files in the application. The improvements focus on providing progress feedback, supporting cancellation, and handling multiple files more efficiently.
-
-### CSV Loading Improvements 
-
-1. **MultiCSVLoadTask Class**
-   - ✅ Created a new class extending BackgroundTask
-   - ✅ Implemented loading multiple files with progress reporting
-   - ✅ Added chunked reading for better memory efficiency
-   - ✅ Added progress tracking and reporting for individual files
-   - ✅ Enhanced cancellation support with more frequent checks
-
-2. **DataManager Updates**
-   - ✅ Added new signals:
-     - `load_progress(str, int, int)` for file name, current progress, total
-     - `load_started()` and `load_finished()` for UI feedback
-   - ✅ Modified `load_csv` to use the new task
-   - ✅ Implemented cancellation support with proper cleanup
-
-3. **Progress Dialog in MainWindow**
-   - ✅ Added QProgressDialog for file loading operations
-   - ✅ Connected dialog to data manager signals
-   - ✅ Implemented updating the dialog as loading progresses
-   - ✅ Added support for cancellation with proper cleanup
-
-4. **Testing Coverage**
-   - ✅ Created tests for MultiCSVLoadTask functionality
-   - ✅ Implemented tests for progress reporting
-   - ✅ Added tests for cancellation support
-   - ✅ Created tests for DataManager progress reporting
-   - ✅ Added edge case tests for error handling
-
-### Current Tasks
-- [x] Create MultiCSVLoadTask class
-- [x] Update DataManager with new signals and methods
-- [x] Add progress dialog to MainWindow
-- [x] Implement proper chunked file loading
-- [x] Add cancellation support
-- [x] Create tests for new functionality
-
-## Recent Changes
-
-- Enhanced MultiCSVLoadTask to track progress more effectively
-- Added a get_progress() method to MultiCSVLoadTask for better state monitoring
-- Created comprehensive tests for the DataManager's progress reporting capabilities
-- Updated tests for MultiCSVLoadTask to verify the new features
-- Improved cancellation handling with more frequent checks during file processing
-
-## Current Status
-
-- All chart functionality is working correctly
-- Test coverage for chart features is comprehensive
-- Performance tests confirm charts work with various data sizes
-- The application can now visualize data in multiple chart formats
-- The project is ready to move to the next phase (Report Generation)
+4. **Testing and Refinement (Week 4)**
+   - Write tests for all components
+   - Verify PDF output quality
+   - Test with various data sets
+   - Optimize performance
 
 ## Known Issues
-- None identified for chart functionality at this time
 
-## Active Decisions
-- Adopted a test-driven approach for chart functionality
-- Using performance testing to ensure chart rendering remains efficient with large datasets
-- Maintaining compatibility with the current PySide6 version (6.8.2.1)
-
-## Design Considerations
-- ChartService remains decoupled from UI components for better testability
-- Chart configuration is flexible and supports various data visualizations
-- Performance considerations for large datasets have been addressed
-- Error handling is in place for chart generation edge cases
-
-## Active Context
-
-**Current Focus:** Completing Chart Integration Testing (Phase 12)
-
-## Current Implementation Status
-
-We have successfully implemented comprehensive tests for the chart functionality in the ChestBuddy application:
-
-1. **Integration Tests**: Created MainWindow-ChartTab integration tests that verify proper data flow and UI interactions.
-2. **Performance Tests**: Implemented tests to measure chart rendering performance with datasets of various sizes.
-3. **Workflow Tests**: Created end-to-end workflow tests that include chart functionality, from data loading through validation, correction, and chart generation.
-
-## Recent Changes
-
-- Created test_mainwindow_chart_integration.py with tests for:
-  - Verifying chart tab exists in main window
-  - Testing data updates propagate to chart tab
-  - Testing chart creation from main window
-  - Verifying tab switching preserves chart settings
-  - Testing chart export functionality
-
-- Implemented test_chart_performance.py with:
-  - Performance measurements for different chart types
-  - Tests with small, medium, and large datasets
-  - Memory usage monitoring during chart rendering
-
-- Created test_chart_workflows.py with tests for:
-  - Complete workflow from loading data to creating charts
-  - Chart export workflow
-  - Verifying charts update after data corrections
+- Minor QThread object deletion warning at shutdown (non-critical)
+  - Only occurs during application shutdown and doesn't affect functionality
+  - Improved with better thread management and error handling
+  - Warning level reduced to debug to avoid alarming users
 
 ## Next Steps
 
-1. **Run Tests**: Execute all the implemented tests to verify chart functionality
-2. **Documentation**: Update the user documentation to include information about the new chart features
-3. **Memory Bank Update**: Update progress.md to reflect the completion of chart integration testing
-4. **Phase 13 Planning**: Begin planning for Report Generation phase
+1. **Begin Phase 14: Report Generation**
+   - Design report templates and structure
+   - Research PDF generation libraries
+   - Define ReportService interface
+   - Design ReportView component
+
+2. **Documentation Update**
+   - Document completed progress dialog improvements
+   - Create developer notes on thread management
+   - Update user documentation with new features
+   - Prepare documentation for report generation features
+
+3. **Placeholder Development**
+   - Create placeholder for Reports view in UI
+   - Add basic ReportService structure
+   - Implement minimal ReportView component
+   - Add sidebar navigation item for Reports
 
 ## Active Decisions and Considerations
 
-- **Test-Driven Approach**: Following a strict test-first approach for all chart functionality
-- **Performance Focus**: Ensuring chart rendering remains efficient with larger datasets
-- **Integration Testing**: Verifying proper integration between all components
-- **User Experience**: Maintaining a consistent and intuitive chart interface
+### Progress Dialog Enhancements
+- We opted for a two-level progress tracking system (overall and per-file) for better user feedback during multi-file operations
+- We standardized progress reporting to use a consistent 0-100 scale across all operations
+- We implemented graceful thread cleanup to prevent application crashes during shutdown
+- We chose to enhance the existing progress dialog rather than creating a new component to maintain consistency
 
-## Known Issues
+### Report Generation Approach
+- Considering a template-based approach for flexible report generation
+- Evaluating different PDF generation libraries for the best balance of features and integration ease
+- Planning to maintain HTML-based reports with PDF export as an additional option
+- Considering how to best embed charts and maintain interactivity in reports
 
-- No known issues at this time
-
-### Column Name Standardization
-
-We've updated the `ChestDataModel.EXPECTED_COLUMNS` to match the actual column names in our standard CSV file (`Chests_input_test.csv`). The columns are now defined using uppercase names:
-
-```python
-EXPECTED_COLUMNS = ["DATE", "PLAYER", "SOURCE", "CHEST", "SCORE", "CLAN"]
-```
-
-Previously, we were using title case column names like "Player Name", but our CSV files actually use uppercase names like "PLAYER". This mismatch was causing data to not display properly in the table view.
-
-We've also updated the `DataManager._map_columns` method to include a default mapping between old column names and new ones to maintain compatibility with existing code that might be using the old column names.
-
-Tests have been updated to reflect these changes, ensuring that all references to column names use the new uppercase format.
-
-### CSV Operations Refactoring 
-
-### Multi-Cell Paste Enhancement
-
-We've improved the user experience by implementing multi-cell paste functionality, allowing users to select multiple cells in the table and paste content to all of them simultaneously. The key improvements include:
-
-1. Modified the `_paste_cell` method in `DataView` to handle multiple selections
-2. Added a context menu option that shows "Paste to all X selected cells" when multiple cells are selected
-3. Implemented keyboard shortcuts (Ctrl+V) for paste operations
-4. Added better logging for paste operations to improve debugging
-
-This enhancement allows for more efficient data entry and editing, especially when the same value needs to be applied to multiple cells. Users can now:
-
-1. Select multiple cells by clicking and dragging or using Ctrl+click for non-adjacent selections
-2. Press Ctrl+V or use the right-click context menu to paste to all selected cells
-3. See immediate feedback as all selected cells are updated simultaneously
-
-### Column Name Standardization 
-
-## Current Focus: CSV Loading Improvements
-
-We are implementing enhancements to the CSV file loading process to improve performance and user experience with large files. The current implementation causes the application to freeze during loading with no visual feedback.
-
-### Implementation Plan for CSV Loading Improvements
-
-1. **Create MultiCSVLoadTask Class**
-   - Create a new class extending BackgroundTask
-   - Handle loading multiple files with progress reporting
-   - Use chunked reading for better memory efficiency
-
-2. **Update DataManager**
-   - Add new signals:
-     - `load_progress(str, int, int)` for file name, current progress, total
-     - `load_started()` and `load_finished()` for UI feedback
-   - Modify `load_csv` to use the new task
-   - Implement cancellation support
-
-3. **Add Progress Dialog in MainWindow**
-   - Create QProgressDialog when loading starts
-   - Update the dialog as loading progresses
-   - Support cancellation with proper cleanup
-   - Close dialog when loading completes
-
-4. **Use Efficient File Processing**
-   - Switch from `read_csv` to `read_csv_chunked` or `read_csv_background`
-   - Process files in manageable chunks
-   - Report progress based on chunks processed
-
-5. **Implement Proper Cancellation**
-   - Allow users to cancel long-running operations
-   - Clean up resources when canceled
-   - Update UI appropriately after cancellation
-
-### Expected Benefits
-- UI remains responsive during file loading
-- Users see visual progress indication
-- Users can cancel operations if needed
-- Better memory management with chunked reading
-- Improved performance for large files
-
-### Current Tasks
-- [ ] Create MultiCSVLoadTask class
-- [ ] Update DataManager with new signals and methods
-- [ ] Add progress dialog to MainWindow
-- [ ] Implement proper chunked file loading
-- [ ] Add cancellation support
-- [ ] Create tests for new functionality
-
-## Recent Changes
-
-// ... existing content continues 
+### UI Enhancement Considerations
+- Keep the consistent UI style when designing the new report view
+- Ensure the report generation process provides appropriate progress feedback
+- Design the report customization interface to be intuitive and user-friendly
+- Maintain visual consistency with the existing chart and data views
