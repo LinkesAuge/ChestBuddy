@@ -13,6 +13,7 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
+    QApplication,
     QDialog,
     QVBoxLayout,
     QHBoxLayout,
@@ -21,6 +22,9 @@ from PySide6.QtWidgets import (
     QFrame,
     QSizePolicy,
     QSpacerItem,
+    QProgressBar,
+    QStyle,
+    QDesktopWidget,
 )
 
 from chestbuddy.ui.widgets.progress_bar import ProgressBar
@@ -29,16 +33,9 @@ from chestbuddy.ui.resources.style import Colors
 
 class ProgressDialog(QDialog):
     """
-    Custom progress dialog using the ProgressBar widget.
+    A dialog that shows progress for an operation.
 
-    Attributes:
-        canceled: Signal emitted when the user cancels the operation
-
-    Implementation Notes:
-        - Wraps the ProgressBar widget in a dialog
-        - Provides a similar API to QProgressDialog
-        - Includes a cancel button for operations
-        - Can show detailed status information
+    This dialog can show a progress bar, a label, and an optional cancel button.
     """
 
     # Signal emitted when user cancels the operation
@@ -46,67 +43,117 @@ class ProgressDialog(QDialog):
 
     def __init__(
         self,
-        label_text: str,
-        cancel_button_text: str,
-        minimum: int = 0,
-        maximum: int = 100,
-        parent: Optional[QDialog] = None,
+        parent=None,
+        minimum=0,
+        maximum=100,
+        title="Progress",
+        label_text="Processing...",
+        show_cancel_button=True,
+        cancel_button_text="Cancel",
     ):
         """
         Initialize the progress dialog.
 
         Args:
-            label_text: Text to display above the progress bar
-            cancel_button_text: Text for the cancel button
-            minimum: Minimum progress value
-            maximum: Maximum progress value
-            parent: Parent widget
+            parent: The parent widget
+            minimum: The minimum value of the progress bar
+            maximum: The maximum value of the progress bar
+            title: The title of the dialog
+            label_text: The text to display above the progress bar
+            show_cancel_button: Whether to show a cancel button
+            cancel_button_text: The text for the cancel button
         """
         super().__init__(parent)
 
-        # Initialize attributes
-        self._cancel_button_text = cancel_button_text
-        self._was_canceled = False
         self._minimum = minimum
         self._maximum = maximum
+        self._title = title
+        self._label_text = label_text
+        self._show_cancel_button = show_cancel_button
+        self._cancel_button_text = cancel_button_text
+        self._was_canceled = False
 
-        # Configure dialog
-        self.setWindowTitle("Progress")
-        self.setModal(True)
-        self.setMinimumWidth(400)
-        self.setWindowFlags(Qt.Dialog | Qt.WindowTitleHint | Qt.CustomizeWindowHint)
+        # Ensure we have references to UI elements
+        self._label = None
+        self._progress_bar = None
+        self._cancel_button = None
+        self._status_label = None
+        self._title_label = None
 
-        # Setup UI
-        self._setup_ui(label_text)
+        # Set up the UI
+        self._setup_ui()
 
-    def _setup_ui(self, label_text: str):
-        """
-        Set up the user interface.
+        # Set initial values
+        self.setValue(minimum)
+        self.setLabelText(label_text)
 
-        Args:
-            label_text: Text to display above the progress bar
-        """
+        # Center the dialog on the parent
+        if parent:
+            self.setGeometry(
+                QStyle.alignedRect(
+                    Qt.LeftToRight,
+                    Qt.AlignCenter,
+                    self.size(),
+                    parent.geometry(),
+                )
+            )
+        else:
+            # Center on screen if no parent
+            self.move(QDesktopWidget().availableGeometry().center() - self.rect().center())
+
+    def _setup_ui(self) -> None:
+        """Set up the UI components."""
+        # Set window flags to make it modal and frameless
+        self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+        self.setWindowModality(Qt.ApplicationModal)
+        self.setFixedSize(420, 250)
+
+        # Set the style for the dialog
+        self.setStyleSheet(f"""
+            QDialog {{
+                background-color: {Colors.BG_DARK};
+                border: 1px solid {Colors.BORDER};
+                border-radius: 8px;
+            }}
+            QLabel {{
+                color: {Colors.TEXT_LIGHT};
+            }}
+        """)
+
         # Main layout
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(20, 20, 20, 20)
-        main_layout.setSpacing(16)
+        main_layout.setSpacing(15)
 
         # Title label
-        self._label = QLabel(label_text)
-        self._label.setStyleSheet(f"color: {Colors.TEXT_LIGHT}; font-weight: bold;")
-        self._label.setAlignment(Qt.AlignLeft)
+        self._title_label = QLabel(self._title)
+        self._title_label.setStyleSheet(f"""
+            font-size: 18px;
+            font-weight: bold;
+            color: {Colors.TEXT_LIGHT};
+        """)
+        main_layout.addWidget(self._title_label)
 
-        # Progress bar
-        self._progress_bar = ProgressBar(self)
-        self._progress_bar.setMaximum(self._maximum)
+        # Label for progress information
+        self._label = QLabel(self._label_text)
+        self._label.setWordWrap(True)
+        self._label.setStyleSheet(f"""
+            font-size: 14px;
+            color: {Colors.TEXT_LIGHT};
+        """)
+        main_layout.addWidget(self._label)
 
-        # Apply additional styling to match app theme
+        # Create progress bar
+        self._progress_bar = QProgressBar()
+        self._progress_bar.setRange(self._minimum, self._maximum)
+        self._progress_bar.setValue(self._minimum)
         self._progress_bar.setStyleSheet(f"""
             QProgressBar {{
-                background-color: {Colors.BG_DARK};
+                background-color: {Colors.BG_MEDIUM};
+                color: {Colors.TEXT_LIGHT};
                 border-radius: 4px;
-                height: 12px;
                 text-align: center;
+                height: 12px;
             }}
             
             QProgressBar::chunk {{
@@ -114,89 +161,117 @@ class ProgressDialog(QDialog):
                 border-radius: 4px;
             }}
         """)
-
-        # Cancel/confirm button layout - centered
-        button_layout = QHBoxLayout()
-        button_layout.setContentsMargins(0, 0, 0, 0)
-
-        # Add spacers on both sides to center the button
-        left_spacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
-        button_layout.addItem(left_spacer)
-
-        self._cancel_button = QPushButton(self._cancel_button_text)
-        self._cancel_button.clicked.connect(self._on_cancel_clicked)
-
-        # Apply consistent button styling
-        self._cancel_button.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {Colors.PRIMARY};
-                color: {Colors.TEXT_LIGHT};
-                border: none;
-                border-radius: 4px;
-                padding: 8px 16px;
-                font-weight: bold;
-            }}
-            
-            QPushButton:hover {{
-                background-color: {Colors.ACCENT};
-            }}
-            
-            QPushButton:pressed {{
-                background-color: {Colors.BG_MEDIUM};
-            }}
-        """)
-
-        button_layout.addWidget(self._cancel_button)
-
-        # Add right spacer to ensure centering
-        right_spacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
-        button_layout.addItem(right_spacer)
-
-        # Add widgets to layout
-        main_layout.addWidget(self._label)
         main_layout.addWidget(self._progress_bar)
-        main_layout.addLayout(button_layout)
 
-        # Set fixed size based on content
-        self.adjustSize()
-        self.setFixedSize(self.size())
+        # Status text label
+        self._status_label = QLabel("")
+        self._status_label.setWordWrap(True)
+        self._status_label.setStyleSheet(f"""
+            font-size: 12px;
+            color: {Colors.TEXT_SECONDARY};
+        """)
+        main_layout.addWidget(self._status_label)
+
+        # Add stretch to push button to bottom
+        main_layout.addStretch()
+
+        # Button layout with center alignment
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+
+        # Create cancel button if requested
+        if self._show_cancel_button:
+            self._cancel_button = QPushButton(self._cancel_button_text)
+            self._cancel_button.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {Colors.PRIMARY};
+                    color: {Colors.TEXT_LIGHT};
+                    border: none;
+                    padding: 8px 16px;
+                    border-radius: 4px;
+                    font-weight: bold;
+                }}
+                QPushButton:hover {{
+                    background-color: {Colors.ACCENT};
+                }}
+            """)
+            self._cancel_button.clicked.connect(self._on_cancel_clicked)
+            button_layout.addWidget(self._cancel_button)
+        else:
+            self._cancel_button = None
+
+        # Add stretch to center the button
+        button_layout.addStretch()
+
+        # Add button layout to main layout
+        main_layout.addLayout(button_layout)
 
     def _on_cancel_clicked(self):
         """Handle when the cancel button is clicked."""
         self._was_canceled = True
         self.canceled.emit()
 
-    def setValue(self, value: int):
+    def setValue(self, value: int) -> None:
         """
-        Set the current progress value.
+        Set the value of the progress bar.
 
         Args:
-            value: Progress value
+            value: The value to set
         """
-        # Update progress bar
-        self._progress_bar.setValue(value)
+        if self._progress_bar:
+            self._progress_bar.setValue(value)
 
-        # Process events to ensure UI updates
-        self.repaint()
-
-    def setMaximum(self, maximum: int):
+    def value(self) -> int:
         """
-        Set the maximum progress value.
+        Get the current value of the progress bar.
+
+        Returns:
+            The current progress value
+        """
+        if self._progress_bar:
+            return self._progress_bar.value()
+        return self._minimum
+
+    def setRange(self, minimum: int, maximum: int) -> None:
+        """
+        Set the range of the progress bar.
 
         Args:
-            maximum: Maximum value
+            minimum: The minimum value
+            maximum: The maximum value
         """
+        self._minimum = minimum
         self._maximum = maximum
-        self._progress_bar.setMaximum(maximum)
+        if self._progress_bar:
+            self._progress_bar.setRange(minimum, maximum)
 
-    def setLabelText(self, text: str):
+    def setLabelText(self, text: str) -> None:
         """
-        Set the label text above the progress bar.
+        Set the text of the label above the progress bar.
 
         Args:
-            text: Label text
+            text: The text to set
         """
-        self._label.setText(text)
+        if self._label:
+            self._label.setText(text)
+
+    def maximum(self) -> int:
+        """
+        Get the maximum value of the progress bar.
+
+        Returns:
+            The maximum progress value
+        """
+        return self._maximum
+
+    def minimum(self) -> int:
+        """
+        Get the minimum value of the progress bar.
+
+        Returns:
+            The minimum progress value
+        """
+        return self._minimum
 
     def setStatusText(self, text: str):
         """
@@ -205,17 +280,65 @@ class ProgressDialog(QDialog):
         Args:
             text: Status text
         """
-        self._progress_bar.setStatus(text)
+        self._status_label.setText(text)
 
-    def setCancelButtonText(self, text: str):
+    def setCancelButtonText(self, text: str) -> None:
         """
-        Set the cancel button text.
+        Set the text of the cancel button.
 
         Args:
-            text: Button text
+            text: The text to set for the cancel button
         """
-        self._cancel_button_text = text
-        self._cancel_button.setText(text)
+        if self._cancel_button:
+            self._cancel_button.setText(text)
+
+    def setButtonText(self, text: str) -> None:
+        """
+        Set the text of the action button.
+        This is an alias for setCancelButtonText for more intuitive API.
+
+        Args:
+            text: The text to set for the button
+        """
+        self.setCancelButtonText(text)
+
+    def setCancelButtonEnabled(self, enabled: bool) -> None:
+        """
+        Enable or disable the cancel button.
+
+        Args:
+            enabled: True to enable the button, False to disable it
+        """
+        if self._cancel_button:
+            self._cancel_button.setEnabled(enabled)
+            # Update styling based on enabled state
+            if enabled:
+                # Active button style
+                self._cancel_button.setStyleSheet(f"""
+                    QPushButton {{
+                        background-color: {Colors.PRIMARY};
+                        color: {Colors.TEXT_LIGHT};
+                        border: none;
+                        padding: 8px 16px;
+                        border-radius: 4px;
+                        font-weight: bold;
+                    }}
+                    QPushButton:hover {{
+                        background-color: {Colors.ACCENT};
+                    }}
+                """)
+            else:
+                # Disabled button style
+                self._cancel_button.setStyleSheet(f"""
+                    QPushButton {{
+                        background-color: {Colors.BG_DARK};
+                        color: {Colors.TEXT_DISABLED};
+                        border: none;
+                        padding: 8px 16px;
+                        border-radius: 4px;
+                        font-weight: bold;
+                    }}
+                """)
 
     def wasCanceled(self) -> bool:
         """
@@ -226,14 +349,15 @@ class ProgressDialog(QDialog):
         """
         return self._was_canceled
 
-    def setState(self, state: ProgressBar.State):
+    def setState(self, state):
         """
-        Set the visual state of the progress bar.
+        Set the state of the progress bar.
 
         Args:
-            state: The visual state (NORMAL, SUCCESS, ERROR)
+            state: The state to set
         """
-        self._progress_bar.setState(state)
+        if hasattr(self._progress_bar, "setState"):
+            self._progress_bar.setState(state)
 
     def reset(self):
         """Reset the progress dialog to its initial state."""

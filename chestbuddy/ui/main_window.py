@@ -630,6 +630,9 @@ class MainWindow(QMainWindow):
             self._progress_dialog.setValue(0)  # Reset progress for table population
             QApplication.processEvents()
 
+        # Track if table was populated successfully
+        table_populated = False
+
         # Get the data view
         if hasattr(self, "_content_stack"):
             # Find the data view
@@ -640,12 +643,19 @@ class MainWindow(QMainWindow):
                     try:
                         # Call update view to populate table (it has its own chunking)
                         widget._update_view()
+                        table_populated = True
                         break
                     except Exception as e:
                         logger.error(f"Error populating table: {e}")
 
         # Allow UI to process after table population attempt
         QApplication.processEvents()
+
+        # After table population is complete, finalize the progress dialog
+        if table_populated and hasattr(self, "_progress_dialog") and self._progress_dialog:
+            # Call _on_load_finished with a completion message
+            completion_message = f"Successfully loaded and populated table with {len(data):,} rows"
+            self._on_load_finished(completion_message)
 
     def _on_load_progress(self, file_path: str, current: int, total: int) -> None:
         """
@@ -807,96 +817,41 @@ class MainWindow(QMainWindow):
             logger.error(f"Error updating progress dialog: {e}")
             # Don't crash the application if there's an error updating the progress
 
-    def _on_load_finished(self, message: str = None) -> None:
+    def _on_load_finished(self, status_message: str) -> None:
         """
         Handle the completion of a loading operation.
 
         Args:
-            message: Optional message to display
+            status_message: Message indicating the status of the loading operation
         """
-        logger.debug("MainWindow._on_load_finished called")
+        logger.debug(f"Load finished: {status_message}")
 
-        # If the progress dialog exists
-        if hasattr(self, "_progress_dialog") and self._progress_dialog:
-            try:
-                # Check if this is a processing message (intermediate step)
-                if message and "Processing" in message:
-                    self._progress_dialog.setLabelText(message)
-                    self._progress_dialog.setValue(100)
-                    self._progress_dialog.setCancelButtonText("Please wait...")
-                    self._progress_dialog.setStatusText("Preparing data model...")
+        # Early return if progress dialog doesn't exist
+        if not hasattr(self, "_progress_dialog") or not self._progress_dialog:
+            logger.debug("No progress dialog to update")
+            return
 
-                    # Process events to update the UI
-                    QApplication.processEvents()
-                    return  # Don't complete the dialog yet
+        # Update the dialog to indicate completion
+        self._progress_dialog.setLabelText(status_message)
 
-                # Set the label to indicate completion
-                completion_message = message if message else "Loading complete"
+        # Set progress to max to indicate completion
+        self._progress_dialog.setValue(self._progress_dialog.maximum())
 
-                # Add file count to the completion message if available
-                if self._loading_state["total_files"] > 0:
-                    if not "files" in completion_message.lower():
-                        completion_message += f" ({self._loading_state['total_files']} files)"
-
-                # Extract actual row count from the message if present
-                actual_row_count = None
-                if message and "loaded" in message:
-                    try:
-                        # Try to extract the row count from messages like "Successfully loaded 12345 rows of data"
-                        parts = message.split("loaded")[1].split("rows")[0].strip()
-                        actual_row_count = int(parts.replace(",", ""))
-                    except (IndexError, ValueError):
-                        # Fall back to the tracked count if parsing fails
-                        actual_row_count = None
-
-                if actual_row_count is None:
-                    actual_row_count = self._loading_state["total_rows"]
-
-                # Ensure progress dialog is updated with completion status
-                self._progress_dialog.setLabelText(completion_message)
-                self._progress_dialog.setValue(100)  # Ensure 100% progress is shown
-
-                # Set success state for the progress bar
-                self._progress_dialog.setState(ProgressBar.State.SUCCESS)
-
-                # Set status with detail message using the most accurate row count
-                self._progress_dialog.setStatusText(f"Processed {actual_row_count:,} total rows")
-
-                # Update the cancel button to "Close" or "Confirm"
-                self._progress_dialog.setCancelButtonText("Confirm")
-
-                # Disconnect previous cancel signal connections
-                try:
-                    self._progress_dialog.canceled.disconnect()
-                except:
-                    pass  # It's OK if it wasn't connected
-
-                # Connect cancel button to close the dialog
-                self._progress_dialog.canceled.connect(self._progress_dialog.close)
-
-                # Make sure dialog is visible without excessive UI updates
-                if not self._progress_dialog.isVisible():
-                    self._progress_dialog.show()
-                    self._progress_dialog.raise_()
-                    self._progress_dialog.activateWindow()
-
-                # Process events to update the UI
-                QApplication.processEvents()
-
-                logger.debug("Progress dialog updated for completion")
-            except Exception as e:
-                logger.error(f"Error updating progress dialog on completion: {e}")
-
-            # Reset loading state
-            self._loading_state = {
-                "total_files": 0,
-                "current_file_index": 0,
-                "current_file": "",
-                "processed_files": [],
-                "total_rows": 0,
-            }
+        # If message contains "error" or "failed", show error styling
+        if "error" in status_message.lower() or "failed" in status_message.lower():
+            # Error state - show confirmation to close
+            logger.error(f"Load operation failed: {status_message}")
+            self._progress_dialog.setButtonText("Close")
         else:
-            logger.warning("No progress dialog found in _on_load_finished")
+            # Success state - show confirmation to continue
+            logger.debug(f"Load operation completed successfully: {status_message}")
+            self._progress_dialog.setButtonText("Confirm")
+
+        # Enable the button to allow user to continue
+        self._progress_dialog.setCancelButtonEnabled(True)
+
+        # Allow UI to process
+        QApplication.processEvents()
 
     def _cancel_loading(self) -> None:
         """
