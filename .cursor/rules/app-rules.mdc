@@ -334,3 +334,95 @@ alwaysApply: true
 - Progress updates use `QApplication.processEvents()` to keep UI responsive
 - MultiCSVLoadTask reports progress while loading each file chunk
 - Progress dialog remains visible throughout the entire import process 
+
+## ChestBuddy Application Rules
+
+## Core Architecture
+
+- Use PySide6 for all GUI components
+- Maintain separation between UI components and core logic using MVVM pattern
+- Follow a consistent naming convention:
+  - Classes: PascalCase (e.g., DataModel)
+  - Methods and variables: snake_case (e.g., load_data())
+  - Constants: UPPER_SNAKE_CASE (e.g., MAX_ITEMS)
+- Store configuration settings in ConfigManager
+
+## Progress Reporting Guidelines
+
+- Use two-phase progress reporting for long operations:
+  - Phase 1 (0-50%): Loading/reading phase
+  - Phase 2 (50-100%): Processing/displaying phase
+- Use chunk size of 100 for all CSV data processing
+- Always update progress in small increments (avoid large jumps)
+- Include detailed status messages with:
+  - Current file being processed
+  - Total number of files
+  - Rows processed so far
+- Call QApplication.processEvents() regularly to keep the UI responsive
+- Handle cancellation at both phases
+- Use try/except blocks around all progress updates to prevent crashes
+
+## Background Processing
+
+- Use QThread-based tasks for long-running operations
+- Define clear signals for progress, success, error, and completion
+- Always connect task signals before starting the thread
+- Properly manage task lifecycle (creation, execution, cleanup)
+- Handle task cancellation gracefully
+- Clean up resources after task completion
+
+## File Handling
+
+- Use pathlib for file path manipulation
+- Handle file not found errors gracefully
+- Detect and handle file encoding issues
+- Process large files in chunks to manage memory usage
+- Provide clear error messages for file-related issues
+
+## Data Model
+
+- Use pandas DataFrame as the core data structure
+- Keep data model as a separate component from views
+- Signal data changes to update views
+- Handle empty datasets gracefully
+- Validate data before processing
+
+## User Interface
+
+- Follow a consistent color scheme and layout
+- Provide visual feedback for long operations
+- Use custom-styled components when needed
+- Ensure all UI elements are properly initialized
+- Check for null/None values before accessing properties
+- Handle window/dialog lifecycle properly
+
+## Error Handling
+
+- Use try/except blocks for error-prone operations
+- Log errors with appropriate severity levels
+- Provide user-friendly error messages
+- Prevent cascading failures
+- Clean up resources in finally blocks
+
+## Performance Considerations
+
+- Avoid blocking the main thread
+- Use chunked processing for large datasets
+- Release memory when no longer needed
+- Optimize critical paths
+- Cache frequently accessed data
+
+## Logging
+
+- Log at appropriate levels (debug, info, warning, error)
+- Include context in log messages
+- Use structured logging where possible
+- Avoid excessive logging in tight loops
+
+## Testing
+
+- Write unit tests for core functionality
+- Test edge cases and error conditions
+- Use pytest for all tests
+- Mock external dependencies
+- Test performance with large datasets 

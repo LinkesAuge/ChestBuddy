@@ -45,6 +45,16 @@ alwaysApply: false
   - Fixed reference to non-existent color constant TEXT_PRIMARY
   - Changed to use TEXT_LIGHT which is available in the Colors class
 
+- **Progress Dialog Not Showing Properly**: 
+  - Location: `chestbuddy/ui/widgets/progress_bar.py`, `chestbuddy/ui/widgets/progress_dialog.py`
+  - Issue: The progress dialog and progress bar weren't styled according to the desired design.
+  - Fix: Updated the progress bar to show percentage on the right side with blue gradient. Enhanced the progress dialog with shadow effects, better spacing, and improved button styling.
+
+- **App Freezing After CSV Import**: 
+  - Location: `chestbuddy/app.py`
+  - Issue: The application would freeze for some time after a CSV import completed because it automatically switched to the Data tab.
+  - Fix: Removed the automatic tab switching code in `_on_data_load_success` that was using a QTimer to switch to the Data view. This allows the user to remain on their current view and prevents UI freezing.
+
 ## Background Processing Issues
 - ✅ Signal connections not working properly
   - Fixed connections between DataManager and MainWindow
@@ -129,3 +139,65 @@ alwaysApply: false
   - Implement throttling for high-frequency progress updates
   - Always disconnect signals when done to prevent memory leaks
   - Use try/except blocks around Qt object interactions that might be deleted
+
+# Bugfixing and Issue Tracking
+
+## Fixed Issues
+
+### UI/Display Issues
+1. **Progress dialog not showing during file loading**: Fixed issue where the progress dialog was not properly displayed during CSV file loading. The MainWindow._on_load_started method was updated to ensure proper settings and visibility of the progress dialog. The method now blocks signals during the loading process and properly creates the dialog if it doesn't exist.
+
+2. **Data not displaying in the table view after loading**: Fixed issue with DataView._update_view method to properly display loaded data. The method now correctly handles the case where the data model is empty and provides appropriate feedback.
+
+3. **Multiple file import crashing**: Fixed issue where importing multiple files would cause the application to crash. The MultiCSVLoadTask class was updated to better handle progress reporting and multiple file imports.
+
+4. **Syntax errors and incorrect imports**: Fixed various syntax errors and incorrect imports throughout the codebase, ensuring that all required modules are properly imported and initialized.
+
+5. **Memory management during CSV imports**: Improved memory management during CSV imports to prevent crashes when loading large files. The DataManager now handles data more efficiently and releases resources after loading.
+
+6. **App freezing after CSV import and automatic tab switch**: Fixed issue where the app would freeze after the last file is loaded and automatically switch to the data tab. This was resolved by removing the automatic tab switch behavior in the `_on_data_load_success` method of the `DataManager` class.
+
+7. **Progress dialog styling**: Updated the styling of the progress dialog to match the app's overall design. The progress bar now has a blue gradient, shows percentage text, and the dialog has a white background with rounded corners.
+
+8. **Chunking system for data loading**: Implemented a proper chunking system with a size of 100 for data loading:
+   - Modified `CSVService.read_csv_chunked` to yield chunks instead of combining them
+   - Updated `MultiCSVLoadTask.run()` to process and yield chunks
+   - Added two-phase progress reporting (loading phase: 0-50%, processing phase: 50-100%)
+   - Enhanced `DataView` to support incremental updates via `append_data_chunk` method
+   - Updated the `MainWindow` to handle chunked processing with progress reporting for both phases
+
+### Background Processing Issues
+
+1. **CSV import data handling**: Fixed issue with CSV import where the data format returned by MultiCSVLoadTask.run() was not properly handled by DataManager._on_csv_load_success. The method now correctly handles the tuple format (success_boolean, data_or_error_message) instead of expecting (DataFrame, message).
+
+2. **Progress window visibility**: Fixed issue where the progress window was not visible during CSV imports. The MainWindow now properly receives and connects to the DataManager's progress signals, ensuring that the progress dialog appears and updates correctly.
+
+3. **Invalid progress reporting**: Fixed issue where progress was incorrectly reported, causing the progress bar to reach 100% before the table was fully populated. Implemented a two-phase progress reporting system where file loading represents 0-50% and table population represents 50-100%.
+
+### Data Processing Issues
+
+1. **CSV data chunks not processed efficiently**: Fixed issue where the chunking system (chunk size = 100) was not effectively utilized. The new implementation:
+   - Loads data in chunks as specified
+   - Updates the progress bar for both file reading and table population phases
+   - Populates the table incrementally with visual feedback
+   - Provides more accurate progress reporting
+
+2. **Memory efficiency issues**: Improved memory efficiency by processing data in chunks and avoiding the creation of large DataFrames in memory. The chunks are now processed incrementally, reducing memory usage and improving application responsiveness.
+
+3. **UI responsiveness during data loading**: Enhanced UI responsiveness by ensuring that QApplication.processEvents() is called at appropriate intervals during both loading and processing phases. The UI now remains responsive even when loading large files.
+
+## Known Issues
+
+1. **Error handling for invalid CSV files**: The application doesn't provide detailed error messages for invalid CSV files. It should provide more specific feedback about the issue (e.g., incorrect delimiter, encoding problems).
+
+2. **Performance with very large files**: While chunking helps, there are still performance issues with extremely large files (>1GB), which might require additional optimizations.
+
+3. **Cancellation during processing phase**: Cancelling a load operation during the processing phase does not immediately stop the operation. Need to implement more responsive cancellation.
+
+## Ongoing Investigations
+
+1. **Memory leak during multiple file imports**: Investigating potential memory leaks when importing multiple large files in sequence.
+
+2. **Inconsistent progress reporting with non-standard CSV files**: The progress reporting is sometimes inaccurate when loading files with non-standard formats or encodings.
+
+3. **UI freezing during validation operations**: The UI sometimes becomes unresponsive during complex validation operations. Investigating whether a similar chunking approach would help for validation tasks.
