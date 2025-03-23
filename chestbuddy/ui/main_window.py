@@ -738,13 +738,38 @@ class MainWindow(QMainWindow):
             # Check if this is an error message
             is_error = "error" in status_message.lower() or "failed" in status_message.lower()
 
-            # Finalize the loading process and close the dialog
+            # Update the dialog with the final status
             self._finalize_loading(status_message, is_error)
+
+            # Process events to ensure the dialog updates are visible
+            QApplication.processEvents()
+
+            # Add a short delay so users can see the completion message (100ms)
+            QTimer.singleShot(100, self._close_progress_dialog)
 
         except Exception as e:
             logger.error(f"Error in _on_load_finished: {e}")
             # Try to ensure dialog can be closed
             self._finalize_loading(f"Error: {str(e)}", True)
+            self._close_progress_dialog()
+
+    def _close_progress_dialog(self) -> None:
+        """
+        Close the progress dialog and set it to None.
+        This ensures no further updates will be sent to the dialog.
+        """
+        try:
+            # Only proceed if dialog exists
+            if hasattr(self, "_progress_dialog") and self._progress_dialog:
+                logger.debug("Closing progress dialog after load completion")
+
+                # Close the dialog
+                self._progress_dialog.close()
+
+                # Set to None to prevent further updates
+                self._progress_dialog = None
+        except Exception as e:
+            logger.error(f"Error closing progress dialog: {e}")
 
     def _finalize_loading(self, message: str, is_error: bool) -> None:
         """
