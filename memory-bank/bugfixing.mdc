@@ -91,6 +91,13 @@ alwaysApply: false
   - **Fix**: Implemented a timer-based delayed transition using QTimer.singleShot() to ensure all event processing completes before transition. Also added additional UI element re-enabling and more comprehensive event processing.
   - **Date**: 2023-07-31
 
+- ✅ UI remaining blocked after first import confirmation (sixth attempt)
+  - **Issue**: The UI blocking issue persisted despite multiple fix attempts.
+  - **Cause**: The automatic view transition to the Data view after the first import was identified as unnecessary and a source of complexity causing timing issues.
+  - **Fix**: Removed the view transition mechanism entirely while keeping the robust UI unblocking code. Added additional event processing and explicit UI element re-enabling to ensure full responsiveness.
+  - **Date**: 2025-03-24
+  - **Notes**: This simplification approach removes functionality that wasn't needed rather than adding more complexity to fix timing issues.
+
 ## Background Processing Issues
 - ✅ Signal connections not working properly
   - Fixed connections between DataManager and MainWindow

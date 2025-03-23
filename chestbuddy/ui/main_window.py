@@ -139,9 +139,6 @@ class MainWindow(QMainWindow):
         # Flag to track if progress dialog has been finalized
         self._progress_dialog_finalized = False
 
-        # Flag to indicate a view transition should occur after dialog closure
-        self._should_transition_to_data_view = False
-
         if self._data_manager:
             logger.debug("MainWindow initialized with data_manager")
         else:
@@ -914,64 +911,33 @@ class MainWindow(QMainWindow):
                 # Capture state after dialog closure
                 self._capture_snapshot("after_dialog_close")
 
-                # Check if we need to transition to the Data view (for first import)
-                if self._should_transition_to_data_view:
-                    logger.debug("[VIEW_TRANSITION] Scheduling delayed transition to Data view")
+                # Add a final round of event processing and UI updates
+                # This ensures UI remains fully responsive after dialog closure
+                logger.debug("[FINAL_UNBLOCK] Processing final round of events and UI updates")
 
-                    # Use a short timer delay to ensure all events are processed before transition
-                    # This helps prevent UI blocking by giving the event loop time to settle
-                    def delayed_transition():
-                        logger.debug(
-                            "[VIEW_TRANSITION] Executing delayed transition to Data view now"
-                        )
+                # Process events one more time
+                QApplication.processEvents()
 
-                        # Process events again before view transition to ensure UI is responsive
-                        QApplication.processEvents()
+                # Ensure DataView table is fully enabled if present
+                data_view = self._views.get("Data")
+                if (
+                    data_view
+                    and hasattr(data_view, "_data_view")
+                    and hasattr(data_view._data_view, "_table_view")
+                ):
+                    logger.debug(
+                        "[TABLE_FINAL_ENABLE] Final check to ensure table is fully enabled"
+                    )
+                    data_view._data_view._table_view.setEnabled(True)
+                    data_view._data_view._table_view.setSortingEnabled(True)
 
-                        # Double-check that DataView table is enabled before transition
-                        data_view = self._views.get("Data")
-                        if (
-                            data_view
-                            and hasattr(data_view, "_data_view")
-                            and hasattr(data_view._data_view, "_table_view")
-                        ):
-                            logger.debug(
-                                "[TABLE_FINAL_CHECK] Ensuring table is enabled before view transition"
-                            )
-                            data_view._data_view._table_view.setEnabled(True)
-                            data_view._data_view._table_view.setSortingEnabled(True)
+                # Final UI update to ensure everything is enabled
+                self._update_ui()
 
-                        # Perform the view transition now that dialog is fully closed
-                        self._set_active_view("Data")
+                # Process events once more
+                QApplication.processEvents()
 
-                        # Reset the flag
-                        self._should_transition_to_data_view = False
-
-                        # Process events again after view transition
-                        QApplication.processEvents()
-
-                        # One final UI update after everything is done
-                        self._update_ui()
-
-                        # One final check on table state
-                        if (
-                            data_view
-                            and hasattr(data_view, "_data_view")
-                            and hasattr(data_view._data_view, "_table_view")
-                        ):
-                            table_enabled = data_view._data_view._table_view.isEnabled()
-                            sorting_enabled = data_view._data_view._table_view.isSortingEnabled()
-                            logger.debug(
-                                f"[TABLE_STATE_AFTER_TRANSITION] Table enabled: {table_enabled}, "
-                                f"Sorting enabled: {sorting_enabled}"
-                            )
-
-                        logger.debug("[VIEW_TRANSITION] Data view transition complete")
-
-                    # Use a single-shot timer with 100ms delay to let the event loop process
-                    # This ensures all dialog cleanup events are processed before we transition
-                    QTimer.singleShot(100, delayed_transition)
-                    logger.debug("[VIEW_TRANSITION] Transition scheduled with timer")
+                logger.debug("[UNBLOCK_COMPLETE] Dialog closure and UI unblocking complete")
 
         except Exception as e:
             logger.error(f"[DIALOG_CLOSE_ERROR] Error closing progress dialog: {e}")
@@ -1047,21 +1013,6 @@ class MainWindow(QMainWindow):
         # Enable navigation based on data state
         logger.debug("[NAV_UPDATE] Updating navigation based on data state")
         self._update_navigation_based_on_data_state()
-
-        # If data was successfully loaded, set flag to transition to Data view after dialog closes
-        if self._data_loaded:
-            logger.debug(
-                "[VIEW_TRANSITION] Setting flag to switch to Data view after dialog closure"
-            )
-            self._should_transition_to_data_view = True
-
-            # Log current view for debugging
-            current_view = None
-            for view_name, view in self._views.items():
-                if self._content_stack.currentWidget() == view:
-                    current_view = view_name
-                    break
-            logger.debug(f"[CURRENT_VIEW] Current view before queued transition: {current_view}")
 
     def _on_populate_table_requested(self, data: pd.DataFrame) -> None:
         """
