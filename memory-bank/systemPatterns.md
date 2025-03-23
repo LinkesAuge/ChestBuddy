@@ -1616,7 +1616,7 @@ The application uses a view adapter pattern for navigation:
 ## UI Component Patterns
 
 1. **Consistent Signal Pattern**:
-   - Components use Qt's signal/slot mechanism
+   - Components use Qt's signal-slot mechanism
    - Signals emit clear information about user actions
    - Components don't make assumptions about handling
 
@@ -1635,4 +1635,89 @@ The application uses a view adapter pattern for navigation:
    - Components handle their own internal state
    - Parent components manage child component state
    - Application state managed by service classes
+
+## Application Patterns
+
+ChestBuddy implements several key architectural and design patterns:
+
+### 1. Model-View-Presenter (MVP)
+The application follows an MVP architecture with:
+- **Models**: Core data structures and business logic (ChestDataModel)
+- **Views**: User interface components (MainWindow, various UI widgets)
+- **Presenters**: Business logic that coordinates between models and views (DataManager, Services)
+
+The MVP pattern provides separation of concerns and facilitates testing.
+
+### 2. Observer Pattern
+Implemented via Qt's signal-slot mechanism to provide loose coupling between components. Key examples:
+- DataManager emits signals when data changes, which views observe
+- FileService emits signals when file operations complete
+- ProgressDialog emits signals when users interact with it
+
+### 3. Factory Pattern
+Used to create complex objects with standardized configuration:
+- ViewFactory creates UI views with proper initialization
+- DialogFactory creates standardized dialogs with consistent styling
+- ServiceFactory provides access to application services
+
+### 4. Adapter Pattern
+Adapts between different interfaces, particularly for:
+- TableModelAdapter converts DataFrame data to Qt table models
+- ChartAdapter converts data structures to chart-compatible formats
+- FileAdapter standardizes access to different file formats
+
+### 5. Command Pattern
+Encapsulates operations as objects to support:
+- Undo/redo functionality
+- Operation logging
+- Batch processing
+
+### 6. Singleton Pattern
+Used for service access and shared resources:
+- ConfigManager maintains a single configuration instance
+- LogManager provides centralized logging
+- DataStore serves as a single source of truth for application data
+
+### 7. Strategy Pattern
+Allows interchangeable algorithms:
+- ValidationStrategy for different validation approaches
+- CorrectionStrategy for applying corrections with different rules
+- ExportStrategy for supporting different export formats
+
+### 8. State Pattern
+Manages application state transitions:
+- ApplicationState tracks high-level application state
+- ViewState manages view-specific state
+- ImportState tracks the state of import operations
+
+### 9. UI State Management Pattern
+A new architectural pattern being implemented to handle UI blocking/unblocking:
+
+- **Core Components**:
+  - `UIStateManager`: Singleton that tracks and controls UI element states
+  - `OperationContext`: Context manager for operations that might block the UI
+  - `UIElementGroups`: Logical grouping of related UI elements
+  - `UIOperations`: Standard operations that can block UI elements
+  
+- **Key Concepts**:
+  - **Reference Counting**: Multiple operations can block the same UI element
+  - **Operation Context**: Operations define a context within which UI elements are blocked
+  - **Element Registration**: UI elements register with the manager and specify custom handling
+  - **Group Operations**: Operations can target groups of related elements
+  
+- **Advantages**:
+  - Centralized control of UI state
+  - Declarative rather than imperative approach
+  - No reliance on timing or delayed checks
+  - Thread-safe implementation
+  - Clear visibility into what's blocking UI elements and why
+  
+- **Implementation**:
+  - Uses Qt's signal-slot mechanism for state change notifications
+  - Leverages QMutex for thread safety
+  - Provides context managers for safe operation boundaries
+  - Supports custom handlers for special UI components
+
+This pattern replaces ad-hoc UI blocking/unblocking with a systematic approach that properly tracks UI state transitions and ensures UI elements are appropriately enabled/disabled.
+
 ``` 

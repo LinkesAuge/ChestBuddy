@@ -198,32 +198,41 @@ We've addressed several critical bugs in the import functionality:
 
 ## Current Development Focus
 
-### UI Blocking Issue Investigation
+### UI State Management System Redesign
 
-We've identified a persistent UI blocking issue that occurs specifically after the first import of data but not in subsequent imports. To address this issue, we've implemented an enhanced debugging plan:
+After multiple attempts to fix the persistent UI blocking issue after the first import, we've decided to implement a comprehensive, architectural solution rather than continuing with reactive fixes:
 
-1. **Enhanced Logging Strategy**
-   - Added detailed timestamped logs across the import flow
-   - Implemented logging for dialog visibility states
-   - Added logging for UI component states, particularly the DataView table
-   - Added contextual tags to log messages for easier filtering and analysis
+1. **Comprehensive UI State Manager**
+   - Designing a centralized `UIStateManager` singleton to track and control UI state
+   - Implementing reference counting for blocking operations
+   - Creating a context-manager based approach for UI blocking operations
+   - Adding registration system for UI elements with custom handlers
 
-2. **State Tracking and Comparison**
-   - Implemented a `StateSnapshot` system to capture application state at key points
-   - Added comparison functionality to identify state differences between snapshots
-   - Capturing snapshots before/after each import and dialog closure
+2. **Key Components of New Design**
+   - `UIStateManager`: Central singleton for tracking UI state
+   - `OperationContext`: Context manager for UI blocking operations
+   - `UIElementGroups`: Standard groups of UI elements 
+   - `UIOperations`: Standard operations that can block UI elements
+   - Custom handlers for special UI components like DataView
 
-3. **Performance and Event Monitoring**
-   - Added timing metrics for performance-critical operations
-   - Implemented event tracing to identify blocked or delayed UI events
-   - Created tooling to inspect event processing and UI component states
+3. **Implementation Plan**
+   - Phase 1: Core implementation (UIStateManager, signals, context)
+   - Phase 2: MainWindow integration
+   - Phase 3: Progress dialog integration
+   - Phase 4: DataView integration 
+   - Phase 5: BackgroundWorker integration
+   - Phase 6: Comprehensive testing
+   - Phase 7: Documentation and finalization
 
-4. **Debugging Tools**
-   - Added an emergency "rescue" functionality via F12 hotkey that opens a debugger dialog
-   - Implemented a UI component inspector to examine widget hierarchy and states
-   - Added tools to force-enable UI components and process pending events
+4. **Advantages Over Previous Approaches**
+   - Centralized control of UI state
+   - Proper reference counting for multiple blocking operations
+   - No reliance on timing or delayed checks
+   - Thread-safe implementation
+   - Declarative rather than imperative approach
+   - Clear visibility into what's blocking UI elements and why
 
-The debugging strategy aims to identify the exact differences between the first and subsequent imports that cause the UI to remain blocked after the first import but work correctly in subsequent imports.
+This architectural approach should resolve the UI blocking issues permanently by replacing our current ad-hoc implementation with a robust system that properly tracks UI state transitions.
 
 ### Current Hypotheses
 

@@ -120,6 +120,32 @@ alwaysApply: false
   - **Date**: 2025-03-24
   - **Notes**: This solution increases the chances of catching the end of the table population process, particularly for large datasets on the first import. The multiple checks at different intervals ensure we have multiple opportunities to re-enable the UI.
 
+- ⚠️ UI still blocked after first import (major architectural redesign)
+  - **Issue**: Despite multiple incremental fix attempts, the UI blocking issue after the first import persists.
+  - **Cause**: Root analysis shows our approach of reactive patching has fundamental flaws. The real problems are:
+    1. Lack of centralized UI state management
+    2. Ad-hoc implementation of UI blocking/unblocking
+    3. Reliance on timing and delayed checks (inherently fragile)
+    4. No proper reference counting for blocking operations
+    5. Mixed responsibilities in code (UI state mixed with business logic)
+  - **Planned Solution**: Complete architectural redesign with a `UIStateManager` system that provides:
+    1. Centralized tracking of which UI elements are blocked and why
+    2. Reference counting for multiple operations blocking the same element
+    3. Context manager for operations that might block the UI
+    4. Proper element state tracking and restoration
+    5. Thread-safe implementation for cross-thread operations
+    6. Clear separation of UI state from business logic
+  - **Implementation Plan**: Phased approach:
+    1. Core components (UIStateManager, signals, contexts)
+    2. MainWindow integration
+    3. ProgressDialog integration
+    4. DataView integration
+    5. BackgroundWorker integration
+    6. Comprehensive testing
+    7. Documentation and finalization
+  - **Date**: 2025-03-24
+  - **Notes**: This represents a shift from reactive fixes to a proper architectural solution that addresses the underlying design issues rather than symptoms.
+
 ## Background Processing Issues
 - ✅ Signal connections not working properly
   - Fixed connections between DataManager and MainWindow
