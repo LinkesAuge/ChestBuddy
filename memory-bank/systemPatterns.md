@@ -1,215 +1,317 @@
----
-title: System Patterns - ChestBuddy Application
-date: 2023-04-02
----
+# System Patterns
 
-# System Architecture and Design Patterns
-
-This document outlines the major architectural decisions, design patterns, and component relationships within the ChestBuddy application.
+*Last Updated: 2023-10-18*
 
 ## Application Architecture
 
-ChestBuddy follows a layered architecture with clear separation of concerns:
+### 1. Layered Architecture
 
-1. **Presentation Layer**: UI components built with PySide6
-2. **Application Layer**: Application logic and controllers
-3. **Domain Layer**: Business rules and domain models
-4. **Infrastructure Layer**: Data access, file operations, and utilities
+The application follows a layered architecture pattern:
 
-## UI Component Library
+```mermaid
+graph TD
+    PL[Presentation Layer] --> AL[Application Layer]
+    AL --> DL[Domain Layer]
+    DL --> IL[Infrastructure Layer]
+    
+    subgraph "Presentation Layer"
+        UI[UI Components]
+        Views[View Classes]
+        Navigation[Navigation System]
+    end
+    
+    subgraph "Application Layer"
+        Services[Services]
+        Controllers[Controllers]
+        ViewModels[ViewModels]
+    end
+    
+    subgraph "Domain Layer"
+        Models[Domain Models]
+        Business[Business Logic]
+        Validation[Validation Rules]
+    end
+    
+    subgraph "Infrastructure Layer"
+        Storage[Data Storage]
+        IO[I/O Operations]
+        External[External Services]
+    end
+```
 
-We've established a consistent UI component library that follows these principles:
+- **Presentation Layer**: UI components built with PySide6
+- **Application Layer**: Services that coordinate application functionality
+- **Domain Layer**: Models and business logic
+- **Infrastructure Layer**: Data persistence and external services
 
-### Reusable UI Components
+### 2. UI Component Library
 
-1. **ActionButton**
-   - Purpose: Consistent button styling for all actions in the application
-   - Features:
-     - Support for text, icon, or both
-     - Primary styling for prominent actions
-     - Compact mode for space efficiency
-     - Tooltip support for better usability
-   - Implementation:
-     - Extends QPushButton with consistent styling
-     - Uses signals/slots for action handling
-     - Maintains consistent sizing and spacing
+The application uses a custom UI component library with reusable elements:
 
-2. **ActionToolbar**
-   - Purpose: Organize related action buttons into logical groups
-   - Features:
-     - Horizontal or vertical orientation
-     - Button grouping with separators
-     - Consistent spacing between button groups
-     - Flexibility for different screen sizes
-   - Implementation:
-     - Container for ActionButton components
-     - Manages button layout and grouping
-     - Provides API for adding/removing buttons
+#### ActionButton
+- Purpose: Consistent button styling with icons and text
+- Features: 
+  - Icon positioning (left/right)
+  - Different button styles (primary, secondary, danger)
+  - Customizable size and appearance
 
-3. **EmptyStateWidget**
-   - Purpose: Display informative content when no data is available
-   - Features:
-     - Title and descriptive message
-     - Optional icon for visual context
-     - Call-to-action button for primary action
-     - Customizable appearance
-   - Implementation:
-     - Composite widget with layout management
-     - Signal emission for action button clicks
-     - Accessibility support for screen readers
+#### ActionToolbar
+- Purpose: Organize action buttons in a toolbar
+- Features:
+  - Horizontal or vertical orientation
+  - Spacing control
+  - Uniform button sizing
 
-4. **FilterBar**
-   - Purpose: Provide search and filtering functionality for data views
-   - Features:
-     - Search field with clear button
-     - Expandable filter section
-     - Support for multiple filter categories
-     - Signals for search/filter changes
-   - Implementation:
-     - Composite widget with expandable sections
-     - Manages filter state internally
-     - Emits signals when search text or filters change
+#### EmptyStateWidget
+- Purpose: Display information when no data is available
+- Features:
+  - Title and message customization
+  - Optional action button
+  - Custom icon support
 
-### Component Design Principles
+#### FilterBar
+- Purpose: Provide search and filtering capabilities
+- Features:
+  - Text search with signals
+  - Filter button for advanced filtering
+  - Clear button to reset
 
-1. **Signal-Based Communication**
-   - Components emit signals when state changes
-   - Parent components connect to signals to handle events
-   - Reduces tight coupling between components
+### 3. Navigation and State Management
 
-2. **Consistent Styling**
-   - Application-wide style sheet for visual consistency
-   - Reuse of colors, fonts, and spacing values
-   - Style inheritance to maintain look and feel
+The application uses a sidebar navigation system with state management:
 
-3. **Property-Based Configuration**
-   - Components expose properties for configuration
-   - Changes to properties update component appearance
-   - Default values ensure components work out-of-the-box
+```mermaid
+graph TD
+    MW[MainWindow] --> SN[SidebarNavigation]
+    MW --> DS[DataState]
+    MW --> VS[ViewStack]
+    DS --> SN
+    DS --> VS
+    
+    subgraph "Navigation"
+        SN --> Sections[Navigation Sections]
+        Sections --> Items[Navigation Items]
+    end
+    
+    subgraph "State Management"
+        DS --> DataLoaded[Data Loaded State]
+        DS --> ViewEnabledState[View Enabled States]
+    end
+    
+    subgraph "Views"
+        VS --> View1[Dashboard View]
+        VS --> View2[Data View]
+        VS --> View3[Analysis View]
+        VS --> ViewN[Other Views]
+    end
+```
 
-4. **Composition Over Inheritance**
-   - Build complex widgets by composing simpler ones
-   - Limit inheritance to cases where it adds clear value
-   - Use QWidget containment for complex components
+- **State-Dependent Navigation**: Navigation items can be enabled/disabled based on application state
+- **Data Dependency Tracking**: Views can declare if they require data
+- **Empty State Handling**: Automatic display of empty state widgets for views requiring data
 
-5. **Test-Driven Development**
-   - Comprehensive test suite for all UI components
-   - Tests validate component behavior and edge cases
-   - Changes must pass all tests before integration
+## Design Principles
+
+### 1. Signal-Based Communication
+
+Components communicate through Qt's signal-slot mechanism:
+
+```mermaid
+graph LR
+    A[Component A] -- Signal --> B[Component B]
+    B -- Signal --> C[Component C]
+    C -- Signal --> A
+```
+
+- Signals are emitted when state changes or user actions occur
+- Slots handle these signals to perform operations
+- Facilitates loose coupling between components
+
+### 2. Consistent Styling
+
+UI components follow consistent styling rules:
+
+- Common color palette defined in `Colors` class
+- Standardized button styles across components
+- Consistent spacing and layout guidelines
+
+### 3. Property-Based Configuration
+
+Components use property accessors for configuration:
+
+```python
+# Example pattern:
+component.set_property(value)  # Setter
+value = component.property()   # Getter
+```
+
+- Properties with getters/setters instead of direct attribute access
+- Changes to properties can trigger UI updates automatically
+- Consistent property naming conventions
+
+### 4. Composition Over Inheritance
+
+UI components are built using composition rather than deep inheritance hierarchies:
+
+```mermaid
+graph TD
+    BaseView --> ContentStack[QStackedWidget]
+    ContentStack --> Content[Content Widget]
+    ContentStack --> EmptyState[EmptyStateWidget]
+    BaseView --> Header[ViewHeader]
+```
+
+- BaseView contains components rather than inheriting from them
+- Promotes flexibility and reusability
+- Simplifies testing and maintenance
+
+### 5. Test-Driven Development
+
+UI components are developed with comprehensive tests:
+
+- Unit tests for all component properties and methods
+- Signal testing to verify correct emissions
+- Visual testing for UI appearance
+- Integration tests for component interactions
 
 ## Data Management
 
-### Data Flow Pattern
+### 1. Data Flow Patterns
 
-1. **Data Loading**
-   - CSV files → CSVLoader → DataManager → DataModel → Views
-   - Progress reporting via signals throughout chain
-   - Error handling at each step with appropriate feedback
+```mermaid
+graph TD
+    Load[Load Data] --> Process[Process Data]
+    Process --> Store[Store in Model]
+    Store --> Display[Display in Views]
+    Display --> Export[Export Data]
+```
 
-2. **Data Processing**
-   - Views → Processing Requests → DataManager → Updates → Views
-   - Background processing for CPU-intensive operations
-   - Signal notifications for updates and errors
+#### Loading
+- CSV files are loaded through the CSV service
+- Progress reporting during loading
+- Background processing for large files
 
-3. **Data Export**
-   - Views → Export Requests → ExportManager → File System
-   - Format-specific exporters (CSV, PDF, etc.)
-   - Progress reporting for long-running exports
+#### Processing
+- Data validation against business rules
+- Data correction based on validation results
+- Data transformation for analysis
 
-### State Management
+#### Exporting
+- Export to CSV with customizable options
+- Chart generation for visual reporting
+- Report creation from templates
 
-1. **Application State**
-   - Central MainWindow tracks core state (data loaded, view active)
-   - State changes propagate via signals
-   - UI components respond to state changes
+### 2. State Management
 
-2. **Component State**
-   - Each component maintains its internal state
-   - State transitions trigger signal emissions
-   - Parent components react to child state changes
+The application manages several types of state:
+
+#### Application State
+- Whether data is loaded (`_data_loaded`)
+- Current active view
+- Navigation selection state
+
+#### Component State
+- View-specific state (filter settings, selections)
+- UI component state (button enabled/disabled)
+- Transient UI state (dialog visibility)
 
 ## Testing Strategy
 
-1. **Component Testing**
-   - Isolated testing of individual UI components
-   - Signal/slot interaction verification
-   - Visual appearance testing where applicable
+### 1. Component Testing
 
-2. **Integration Testing**
-   - Testing component compositions
-   - Workflow validation across multiple components
-   - State transition testing between views
+- Unit tests for UI components
+- Property testing for correct get/set behavior
+- Signal testing for correct emissions
+- Visual testing for appearance
 
-3. **End-to-End Testing**
-   - Simulation of complete user workflows
-   - File I/O validation
-   - Performance testing under realistic conditions
+### 2. Integration Testing
+
+- Navigation flow testing
+- View interaction testing
+- Service integration testing
+
+### 3. End-to-End Testing
+
+- Complete workflows (load → validate → correct → analyze)
+- Error handling and edge cases
+- Performance under load
 
 ## Extension and Plugin Architecture
 
-Though not yet implemented, the application is designed with extensibility in mind:
+### 1. Defined Interfaces for Plugins
 
-1. **Plugin Interface**
-   - Defined interfaces for various extension points
-   - Dynamically loadable plugins
-   - Versioning support for API compatibility
+- Rule plugins for custom validation rules
+- Chart plugins for custom visualizations
+- Report templates for custom reporting
 
-2. **Extension Points**
-   - Data importers for additional formats
-   - Data processors for specialized analysis
-   - Visualization components for different chart types
-   - Report generators for custom output formats
+### 2. Future Architectural Considerations
 
-## Key Design Decisions
+- Multi-user support
+- Cloud integration
+- Mobile compatibility
+- External API integration
 
-1. **PySide6 for UI**
-   - Cross-platform compatibility
-   - Native look and feel
-   - Rich widget library
-   - Python integration
+## Navigation Enhancement Architecture
 
-2. **Pandas for Data Processing**
-   - Efficient data structure for tabular data
-   - Rich set of data manipulation functions
-   - Good performance for expected data sizes
-   - Extensive ecosystem of compatible libraries
+The navigation enhancement implements state-aware UI navigation with these patterns:
 
-3. **Signals and Slots for Communication**
-   - Loose coupling between components
-   - Event-driven architecture
-   - Simplified asynchronous programming
-   - Consistent with Qt paradigms
+```mermaid
+classDiagram
+    class MainWindow {
+        -_data_loaded: bool
+        -_sidebar: SidebarNavigation
+        -_views: Dict[str, BaseView]
+        +_update_navigation_based_on_data_state()
+        +_update_views_data_availability()
+    }
+    
+    class SidebarNavigation {
+        -_sections: Dict[str, NavigationSection]
+        +set_section_enabled(section, enabled)
+        +set_item_enabled(section, item, enabled)
+        +is_section_enabled(section)
+    }
+    
+    class NavigationSection {
+        -_main_button: NavigationButton
+        -_sub_buttons: Dict[str, SubNavigationButton]
+        +set_enabled(enabled)
+        +set_sub_button_enabled(text, enabled)
+        +is_enabled()
+    }
+    
+    class NavigationButton {
+        +set_enabled(enabled)
+        +_update_style()
+    }
+    
+    class BaseView {
+        -_data_required: bool
+        -_empty_state: EmptyStateWidget
+        -_content_stack: QStackedWidget
+        +set_data_available(data_available)
+        +set_empty_state_props(...)
+    }
+    
+    class EmptyStateWidget {
+        -_title: str
+        -_message: str
+        -_action_text: str
+        -_icon: QIcon
+        +action_clicked: Signal
+    }
+    
+    MainWindow --> SidebarNavigation
+    MainWindow --> BaseView
+    SidebarNavigation --> NavigationSection
+    NavigationSection --> NavigationButton
+    BaseView --> EmptyStateWidget
+```
 
-4. **Background Processing for Long Tasks**
-   - Maintain UI responsiveness
-   - Progress reporting to user
-   - Cancellation support
-   - Error handling and recovery
+Key architectural patterns:
 
-5. **Centralized Configuration Management**
-   - Application settings in a single location
-   - User preferences persistence
-   - Environment-specific configuration
-   - Default values for all settings
-
-## Future Architectural Considerations
-
-1. **Multi-user Support**
-   - Authentication and authorization layer
-   - Role-based access control
-   - Data sharing between users
-
-2. **Cloud Integration**
-   - Remote data storage options
-   - Synchronization between devices
-   - Sharing and collaboration features
-
-3. **Advanced Analytics**
-   - Machine learning integration
-   - Predictive modeling capabilities
-   - Automated insight generation
-
-4. **Mobile Companion App**
-   - Shared core logic between desktop and mobile
-   - Optimized UI for touch interfaces
-   - Offline capability with synchronization
+1. **State Propagation**: Main window tracks data state and propagates to navigation and views
+2. **Composition**: Views contain empty state widgets rather than inheriting behavior
+3. **Signal-Based Communication**: Views request data through signals, not direct calls
+4. **Consistent Feedback**: Standardized empty state display across views
+5. **User-Centric Navigation**: Prevents navigation to views that can't function
