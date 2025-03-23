@@ -38,9 +38,10 @@ The active development focus is UI enhancement with a particular emphasis on das
 3. Fixed multiple file import crashes with improved progress handling
 4. Improved progress dialog UI and feedback during import operations
 5. Fixed various UI blocking issues, especially after confirming the first import:
-   - Fourth attempt solution: Fixed timing issue with view transitions by deferring Data view transition until after progress dialog is fully closed and processed
-   - Added robust debugging and logging to help identify UI state during transitions
-   - Improved event processing sequence to ensure UI remains responsive during complex operations
+   - Fifth attempt solution: Implemented a timer-based delayed view transition using QTimer.singleShot()
+   - Added more aggressive UI element re-enabling and state checking
+   - Enhanced event processing sequence to ensure UI remains responsive
+   - Added detailed logging to track component state during transitions
 
 ## Recent Improvements
 

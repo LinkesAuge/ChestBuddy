@@ -916,21 +916,62 @@ class MainWindow(QMainWindow):
 
                 # Check if we need to transition to the Data view (for first import)
                 if self._should_transition_to_data_view:
-                    logger.debug("[VIEW_TRANSITION] Executing delayed transition to Data view")
+                    logger.debug("[VIEW_TRANSITION] Scheduling delayed transition to Data view")
 
-                    # Process events again before view transition to ensure UI is responsive
-                    QApplication.processEvents()
+                    # Use a short timer delay to ensure all events are processed before transition
+                    # This helps prevent UI blocking by giving the event loop time to settle
+                    def delayed_transition():
+                        logger.debug(
+                            "[VIEW_TRANSITION] Executing delayed transition to Data view now"
+                        )
 
-                    # Perform the view transition now that dialog is fully closed
-                    self._set_active_view("Data")
+                        # Process events again before view transition to ensure UI is responsive
+                        QApplication.processEvents()
 
-                    # Reset the flag
-                    self._should_transition_to_data_view = False
+                        # Double-check that DataView table is enabled before transition
+                        data_view = self._views.get("Data")
+                        if (
+                            data_view
+                            and hasattr(data_view, "_data_view")
+                            and hasattr(data_view._data_view, "_table_view")
+                        ):
+                            logger.debug(
+                                "[TABLE_FINAL_CHECK] Ensuring table is enabled before view transition"
+                            )
+                            data_view._data_view._table_view.setEnabled(True)
+                            data_view._data_view._table_view.setSortingEnabled(True)
 
-                    # Process events again after view transition
-                    QApplication.processEvents()
+                        # Perform the view transition now that dialog is fully closed
+                        self._set_active_view("Data")
 
-                    logger.debug("[VIEW_TRANSITION] Data view transition complete")
+                        # Reset the flag
+                        self._should_transition_to_data_view = False
+
+                        # Process events again after view transition
+                        QApplication.processEvents()
+
+                        # One final UI update after everything is done
+                        self._update_ui()
+
+                        # One final check on table state
+                        if (
+                            data_view
+                            and hasattr(data_view, "_data_view")
+                            and hasattr(data_view._data_view, "_table_view")
+                        ):
+                            table_enabled = data_view._data_view._table_view.isEnabled()
+                            sorting_enabled = data_view._data_view._table_view.isSortingEnabled()
+                            logger.debug(
+                                f"[TABLE_STATE_AFTER_TRANSITION] Table enabled: {table_enabled}, "
+                                f"Sorting enabled: {sorting_enabled}"
+                            )
+
+                        logger.debug("[VIEW_TRANSITION] Data view transition complete")
+
+                    # Use a single-shot timer with 100ms delay to let the event loop process
+                    # This ensures all dialog cleanup events are processed before we transition
+                    QTimer.singleShot(100, delayed_transition)
+                    logger.debug("[VIEW_TRANSITION] Transition scheduled with timer")
 
         except Exception as e:
             logger.error(f"[DIALOG_CLOSE_ERROR] Error closing progress dialog: {e}")

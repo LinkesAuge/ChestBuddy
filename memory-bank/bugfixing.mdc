@@ -85,6 +85,12 @@ alwaysApply: false
   - **Fix**: Moved view transition from `_finalize_loading` to `_close_progress_dialog` using a transition flag. This defers the view transition until after dialog is fully closed and all events processed, solving the timing conflict.
   - **Date**: 2023-07-31
 
+- ✅ UI remaining blocked after first import confirmation (fifth attempt)
+  - **Issue**: The UI was still occasionally becoming blocked after the first import despite previous fixes.
+  - **Cause**: Even with delayed view transition via flag, there could still be timing issues between dialog closure and view transition events.
+  - **Fix**: Implemented a timer-based delayed transition using QTimer.singleShot() to ensure all event processing completes before transition. Also added additional UI element re-enabling and more comprehensive event processing.
+  - **Date**: 2023-07-31
+
 ## Background Processing Issues
 - ✅ Signal connections not working properly
   - Fixed connections between DataManager and MainWindow
