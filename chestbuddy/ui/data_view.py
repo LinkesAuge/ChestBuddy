@@ -228,8 +228,12 @@ class DataView(QWidget):
                 self._is_updating = False
                 return
 
-            # Get data from model - get a shallow copy to avoid modifying original
+            # Temporarily disable sorting and selection during population
+            self._table_view.setSortingEnabled(False)
+            self._table_view.setEnabled(False)
+
             try:
+                # Get data from model - get a shallow copy to avoid modifying original
                 data = self._data_model.data
                 print(f"Got data from model: {len(data)} rows, columns: {list(data.columns)}")
 
@@ -243,12 +247,98 @@ class DataView(QWidget):
                 # Set headers
                 self._table_model.setHorizontalHeaderLabels(column_names)
 
-                # Populate table with data - direct access for performance
-                for row_idx in range(len(data)):
-                    for col_idx, col_name in enumerate(column_names):
-                        value = data.iloc[row_idx, col_idx]
-                        text = "" if pd.isna(value) else str(value)
-                        self._table_model.setItem(row_idx, col_idx, QStandardItem(text))
+                # Update status to show we're populating the table
+                self._status_label.setText(f"Populating table with {len(data)} records...")
+                QApplication.processEvents()  # Process events to update status
+
+                # Define chunk size for table population
+                CHUNK_SIZE = 500  # Number of rows to process before yielding to UI
+                UPDATE_FREQUENCY = 50  # Update progress display every N rows
+
+                # Populate table with data in chunks
+                total_rows = len(data)
+                processed_rows = 0
+
+                # Process data in chunks to maintain UI responsiveness
+                try:
+                    # Check visibility once at the beginning and store it
+                    should_continue = True
+                    print(
+                        f"Initial widget visibility check: Widget exists={bool(self)}, isVisible={self.isVisible() if self else False}"
+                    )
+
+                    # Track if application is shutting down
+                    app = QApplication.instance()
+
+                    for chunk_start in range(0, total_rows, CHUNK_SIZE):
+                        # Check if application is shutting down
+                        if not app or app.closingDown():
+                            print("Application is shutting down, stopping table population")
+                            should_continue = False
+                            break
+
+                        # Calculate end of chunk (bounded by total rows)
+                        chunk_end = min(chunk_start + CHUNK_SIZE, total_rows)
+
+                        print(f"Processing chunk from {chunk_start} to {chunk_end}")
+
+                        # Process this chunk of rows
+                        for row_idx in range(chunk_start, chunk_end):
+                            # Only do emergency visibility checks every 100 rows to avoid overhead
+                            if row_idx % 100 == 0:
+                                # Check if application is shutting down
+                                if not app or app.closingDown():
+                                    print("Application is shutting down, stopping table population")
+                                    should_continue = False
+                                    break
+
+                                # Use a much more conservative check - only abort for complete widget destruction
+                                if not self:
+                                    print("Widget completely destroyed, stopping population")
+                                    should_continue = False
+                                    break
+
+                            try:
+                                for col_idx, col_name in enumerate(column_names):
+                                    value = data.iloc[row_idx, col_idx]
+                                    text = "" if pd.isna(value) else str(value)
+                                    self._table_model.setItem(row_idx, col_idx, QStandardItem(text))
+
+                                # Update processed count
+                                processed_rows += 1
+
+                                # Update progress display at regular intervals
+                                if (
+                                    processed_rows % UPDATE_FREQUENCY == 0
+                                    or processed_rows == total_rows
+                                ):
+                                    progress_pct = int((processed_rows / total_rows) * 100)
+                                    self._status_label.setText(
+                                        f"Populating table: {progress_pct}% ({processed_rows}/{total_rows})"
+                                    )
+                                    # Let the UI update more frequently for progress display
+                                    QApplication.processEvents()
+                            except Exception as row_error:
+                                print(f"Error processing row {row_idx}: {row_error}")
+                                # Continue with next row
+                                continue
+
+                        # Check if we should continue after this chunk
+                        if not should_continue:
+                            break
+
+                        # Let the UI update between chunks
+                        QApplication.processEvents()
+                        print(f"Finished chunk, processed {processed_rows}/{total_rows} rows")
+
+                except Exception as chunk_error:
+                    print(f"Error during chunk processing: {chunk_error}")
+                    import traceback
+
+                    traceback.print_exc()
+                    # Continue with what we have
+
+                print(f"Table population complete. Processed {processed_rows}/{total_rows} rows")
 
                 # Store filtered rows
                 self._filtered_rows = list(range(len(data)))
@@ -258,11 +348,12 @@ class DataView(QWidget):
                 self._filter_column.addItems(column_names)
 
                 # Update status
-                self._status_label.setText(f"Loaded {len(data)} records")
-
-                print(
-                    f"Finished populating table with {len(data)} rows and {len(column_names)} columns"
-                )
+                if processed_rows < total_rows:
+                    self._status_label.setText(
+                        f"Loaded {processed_rows} of {total_rows} records (incomplete)"
+                    )
+                else:
+                    self._status_label.setText(f"Loaded {processed_rows} records")
 
             except Exception as e:
                 print(f"Error getting/displaying data: {e}")
@@ -270,9 +361,20 @@ class DataView(QWidget):
                 import traceback
 
                 traceback.print_exc()
+            finally:
+                # ALWAYS re-enable the table view when done, even if there was an error
+                if self:  # Just check if the widget still exists
+                    try:
+                        self._table_view.setEnabled(True)
+                        self._table_view.setSortingEnabled(True)
+                        print("Table view re-enabled")
+                    except Exception as enable_error:
+                        print(f"Error re-enabling table: {enable_error}")
+                        traceback.print_exc()
 
         finally:
             self._is_updating = False
+            print("_update_view completed")
 
     def _apply_filter(self) -> None:
         """Apply the current filter to the data."""

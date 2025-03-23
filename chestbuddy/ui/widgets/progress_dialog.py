@@ -103,14 +103,14 @@ class ProgressDialog(QDialog):
         # Apply additional styling to match app theme
         self._progress_bar.setStyleSheet(f"""
             QProgressBar {{
-                background-color: {Colors.BACKGROUND_DARK};
+                background-color: {Colors.BG_DARK};
                 border-radius: 4px;
                 height: 12px;
                 text-align: center;
             }}
             
             QProgressBar::chunk {{
-                background-color: {Colors.PRIMARY};
+                background-color: {Colors.ACCENT};
                 border-radius: 4px;
             }}
         """)
@@ -130,7 +130,7 @@ class ProgressDialog(QDialog):
         self._cancel_button.setStyleSheet(f"""
             QPushButton {{
                 background-color: {Colors.PRIMARY};
-                color: white;
+                color: {Colors.TEXT_LIGHT};
                 border: none;
                 border-radius: 4px;
                 padding: 8px 16px;
@@ -138,11 +138,11 @@ class ProgressDialog(QDialog):
             }}
             
             QPushButton:hover {{
-                background-color: {Colors.PRIMARY_DARK};
+                background-color: {Colors.ACCENT};
             }}
             
             QPushButton:pressed {{
-                background-color: {Colors.PRIMARY_DARKER};
+                background-color: {Colors.BG_MEDIUM};
             }}
         """)
 
