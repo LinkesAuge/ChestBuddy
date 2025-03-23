@@ -781,15 +781,9 @@ class MainWindow(QMainWindow):
             # Change button to Close for final state
             self._progress_dialog.setCancelButtonText("Close")
 
-            # Disconnect any previous signal connections to prevent issues
-            try:
-                # Disconnect all signals from the canceled signal
-                self._progress_dialog.canceled.disconnect()
-            except:
-                pass
-
-            # Connect cancel button to close dialog
-            self._progress_dialog.canceled.connect(self._progress_dialog.close)
+            # Don't disconnect or reconnect signals for the cancel button
+            # The ProgressDialog._on_cancel_clicked method will handle both
+            # emitting the signal and closing the dialog
 
             # Make sure button is enabled
             if hasattr(self._progress_dialog, "setCancelButtonEnabled"):

@@ -214,8 +214,16 @@ class ProgressDialog(QDialog):
 
     def _on_cancel_clicked(self):
         """Handle when the cancel button is clicked."""
+        logger.debug("Cancel button clicked in progress dialog")
         self._was_canceled = True
+
+        # Emit the canceled signal for any connected slots
         self.canceled.emit()
+
+        # Always close the dialog when the button is clicked
+        # This ensures the button works even if signal connections are broken
+        logger.debug("Directly closing dialog after cancel button clicked")
+        self.close()
 
     def setValue(self, value: int) -> None:
         """
@@ -420,16 +428,19 @@ class ProgressDialog(QDialog):
         """
         logger.debug("Progress dialog close called")
 
-        # Ensure button signals are disconnected
-        try:
-            if hasattr(self, "_cancel_button") and self._cancel_button:
-                # Keep the disconnect from throwing if no connections
-                try:
-                    self._cancel_button.clicked.disconnect()
-                except:
-                    pass
-        except Exception as e:
-            logger.error(f"Error disconnecting cancel button: {e}")
+        # Don't disconnect the cancel button's clicked signal
+        # This is the most critical connection that ensures the dialog can close
+        # Only disconnect other signals if they exist
 
-        # Call parent close
-        super().close()
+        # Call parent close to actually close the dialog
+        try:
+            super().close()
+            logger.debug("Progress dialog successfully closed")
+        except Exception as e:
+            logger.error(f"Error closing progress dialog: {e}")
+            # Try again with force if normal close fails
+            try:
+                self.hide()  # In case close() failed, at least hide the dialog
+                logger.debug("Forced hide of progress dialog after close failure")
+            except:
+                pass
