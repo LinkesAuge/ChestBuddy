@@ -139,6 +139,31 @@ alwaysApply: false
 
 ## Recent Fixes
 
+### 2025-03-24: Fixed UI Blocking Issue After First Import (Second Attempt)
+
+**Issue**: The UI still remained blocked after closing the progress dialog on the first import, despite our previous fix of adding _update_ui() to the _close_progress_dialog method.
+
+**Root Cause**: After further investigation, we found that we were setting self._progress_dialog = None before processing events with QApplication.processEvents(). This was causing dialog-related events to not be fully processed because we lost the reference to the dialog too early.
+
+**Fix**:
+1. Reordered operations in MainWindow._close_progress_dialog:
+   - First hide and accept the dialog
+   - Then call QApplication.processEvents() to process dialog events
+   - Then update the UI with _update_ui()
+   - FINALLY set self._progress_dialog = None after all processing is complete
+2. Added detailed comments explaining the importance of this sequence
+
+**Validation**:
+- Verified that the UI becomes interactive immediately after clicking "Confirm" on the first import
+- Confirmed that subsequent imports continue to work correctly
+- Tested multiple file import scenarios to ensure consistent behavior
+
+**File(s) Modified**:
+- `chestbuddy/ui/main_window.py`
+
+**Technical Insight**: 
+In Qt, it's important to maintain object references until after all their related events have been processed. Setting an object to None before processing events can interrupt its normal cleanup cycle.
+
 ### 2025-03-24: Fixed UI Blocking Issue After First Import
 
 **Issue**: When importing files for the first time and the progress window finished, clicking "Confirm" would not unblock the UI for the user. However, subsequent imports worked correctly.

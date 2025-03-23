@@ -175,5 +175,5 @@ We've addressed several critical bugs in the import functionality:
 
 4. **Logger integration** - Added proper logging to the dashboard adapter to provide better debugging information.
 
-5. **Progress dialog confirmation UI blocking** - Fixed issue where the UI would remain blocked after clicking "Confirm" on the import progress dialog (only on first import). Added explicit _update_ui() call to ensure all UI elements are properly enabled after dialog closes.
+5. **Progress dialog confirmation UI blocking** - Fixed issue where the UI would remain blocked after clicking "Confirm" on the import progress dialog (only on first import). Improved the fix by properly sequencing event processing and dialog reference cleanup to ensure the dialog's events are fully processed before removing the reference.
 
