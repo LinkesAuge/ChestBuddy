@@ -34,7 +34,7 @@ from PySide6.QtGui import QAction, QIcon, QKeySequence
 
 from chestbuddy.core.models import ChestDataModel
 from chestbuddy.core.services import CSVService, ValidationService, CorrectionService, ChartService
-from chestbuddy.ui.resources.style import Colors
+from chestbuddy.ui.resources.style import Colors, apply_application_style
 from chestbuddy.ui.resources.icons import Icons
 from chestbuddy.ui.resources.resource_manager import ResourceManager
 from chestbuddy.ui.widgets.sidebar_navigation import SidebarNavigation, NavigationSection
@@ -45,6 +45,7 @@ from chestbuddy.ui.views.data_view_adapter import DataViewAdapter
 from chestbuddy.ui.views.validation_view_adapter import ValidationViewAdapter
 from chestbuddy.ui.views.correction_view_adapter import CorrectionViewAdapter
 from chestbuddy.ui.views.chart_view_adapter import ChartViewAdapter
+from chestbuddy.ui.views.dashboard_view_adapter import DashboardViewAdapter
 from chestbuddy.ui.widgets import ProgressDialog, ProgressBar
 from chestbuddy.ui.data_view import DataView
 import pandas as pd
@@ -218,9 +219,11 @@ class MainWindow(QMainWindow):
         self._views: Dict[str, BaseView] = {}
 
         # Create Dashboard view
-        dashboard_view = DashboardView(self._data_model)
+        dashboard_view = DashboardViewAdapter(self._data_model)
         dashboard_view.action_triggered.connect(self._on_dashboard_action)
         dashboard_view.file_selected.connect(self._on_recent_file_selected)
+        dashboard_view.chart_selected.connect(self._on_chart_selected)
+        dashboard_view.data_requested.connect(self._open_file)
         self._content_stack.addWidget(dashboard_view)
         self._views["Dashboard"] = dashboard_view
 
@@ -399,7 +402,7 @@ class MainWindow(QMainWindow):
 
         # Update dashboard
         dashboard_view = self._views.get("Dashboard")
-        if dashboard_view and isinstance(dashboard_view, DashboardView):
+        if dashboard_view and isinstance(dashboard_view, DashboardViewAdapter):
             dashboard_view.set_recent_files(self._recent_files)
 
     def _update_recent_files_menu(self) -> None:
@@ -560,16 +563,17 @@ class MainWindow(QMainWindow):
 
     @Slot()
     def _on_data_changed(self) -> None:
-        """Handle when the data model changes."""
-        # Update data loaded state
-        self._data_loaded = not self._data_model.is_empty
+        """Handle data change event."""
+        # Update UI elements
+        self._update_ui()
 
-        # Update UI
-        self._update_navigation_based_on_data_state()
+        # Update table population progress
+        self._update_table_population_progress()
 
-        # Update export action
-        if hasattr(self, "_export_action"):
-            self._export_action.setEnabled(self._data_loaded)
+        # Update dashboard
+        dashboard_view = self._views.get("Dashboard")
+        if dashboard_view and isinstance(dashboard_view, DashboardViewAdapter):
+            dashboard_view.on_data_updated()
 
     @Slot(object)
     def _on_validation_changed(self, validation_status: Any) -> None:
@@ -1355,15 +1359,36 @@ class MainWindow(QMainWindow):
         file_toolbar.addAction(export_action)
 
     def _clear_data(self) -> None:
-        """Clear all loaded data."""
-        # Clear data model
-        self._data_model.clear()
-
-        # Update state
+        """Clear the current dataset."""
+        # Update flag
         self._data_loaded = False
 
-        # Update UI
+        # Update views
+        self._update_views_data_availability()
+
+        # Update navigation
         self._update_navigation_based_on_data_state()
 
-        # Update status
-        self._status_bar.set_status("All data cleared")
+        # Update dashboard
+        dashboard_view = self._views.get("Dashboard")
+        if dashboard_view and isinstance(dashboard_view, DashboardViewAdapter):
+            dashboard_view.on_data_cleared()
+
+    @Slot(str)
+    def _on_chart_selected(self, chart_id: str) -> None:
+        """
+        Handle chart selection from dashboard.
+
+        Args:
+            chart_id (str): The chart identifier
+        """
+        # Switch to Charts view
+        self._set_active_view("Charts")
+
+        # Activate specific chart if needed
+        chart_view = self._views.get("Charts")
+        if chart_view and isinstance(chart_view, ChartViewAdapter):
+            # This requires ChartViewAdapter to have a method to select specific chart
+            # Uncomment and implement if this functionality is needed
+            # chart_view.select_chart(chart_id)
+            pass

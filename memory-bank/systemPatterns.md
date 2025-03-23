@@ -99,13 +99,26 @@ ChestBuddy implements a custom UI component library designed for consistency and
   - Responsive layout adjustments
 
 #### ActionCard
-- **Purpose**: Group related actions with context
+- **Purpose**: Interactive card for dashboard actions
 - **Features**:
-  - Multiple action buttons in a consistent layout
-  - Section grouping for related actions
-  - Status indicators for action state
-  - Description text for context
-  - Action tracking for frequently used actions
+  - Title and description display
+  - Icon support for visual context
+  - Hover and click effects for better UX
+  - Signal emission for action triggering
+  - Callback support for direct function calls
+  - Consistent styling with application theme
+  - Located at: `chestbuddy/ui/widgets/action_card.py`
+
+#### ChartCard
+- **Purpose**: Display chart thumbnails with context
+- **Features**:
+  - Chart thumbnail with proper sizing and scaling
+  - Title and description for context
+  - Chart identifier for navigation
+  - Signal emission for chart selection
+  - Interactive hover and click states
+  - Placeholder for missing thumbnails
+  - Located at: `chestbuddy/ui/widgets/chart_card.py`
 
 #### Enhanced RecentFilesList
 - **Purpose**: Display recent files with metadata and actions
@@ -1437,107 +1450,189 @@ classDiagram
 
 ## UI Component Architecture
 
-### Core UI Components
+### Card Components
 
-The application uses a component-based architecture with reusable UI elements:
+We've implemented new card components for the dashboard view to create a modern, visually appealing interface:
 
-1. **ActionButton**: A versatile button component with customizable appearance and behavior
-   - Properties: text, icon, size, style, enabled state
-   - Signals: clicked
-   - Features: hover effects, different styles, icon positioning
+1. **ActionCard**
+   - **Purpose**: Interactive cards for dashboard actions
+   - **Implementation**: `chestbuddy/ui/widgets/action_card.py`
+   - **Features**:
+     - Title, description, and icon display
+     - Hover and click effects
+     - Signal emissions for actions
+     - Visual feedback for interaction
+   - **Usage Pattern**: 
+     ```python
+     action_card = ActionCard(
+         title="Import Data",
+         description="Load your CSV files",
+         icon=Icons.IMPORT,
+         action_id="import_data"
+     )
+     action_card.clicked.connect(self.on_action_triggered)
+     ```
 
-2. **ActionToolbar**: A container for organizing buttons with consistent spacing
-   - Layout: horizontal or vertical arrangement of buttons
-   - Properties: spacing, alignment, orientation
-   - Methods: add_button, add_spacer, clear
+2. **ChartCard**
+   - **Purpose**: Display chart thumbnails with context
+   - **Implementation**: `chestbuddy/ui/widgets/chart_card.py`
+   - **Features**:
+     - Title, description, and thumbnail display
+     - Chart identifier for navigation
+     - Interactive navigation to detailed chart
+   - **Usage Pattern**:
+     ```python
+     chart_card = ChartCard(
+         title="Revenue Trends", 
+         description="Monthly revenue by category",
+         chart_id="revenue_trends",
+         thumbnail=thumbnail_pixmap
+     )
+     chart_card.chart_selected.connect(self.on_chart_selected)
+     ```
 
-3. **EmptyStateWidget**: Widget displayed when a view has no content
-   - Properties: title, message, icon, action_text
-   - Signals: action_clicked
-   - Methods: set_title, set_message, set_icon, set_action_text
+3. **StatCard**
+   - **Purpose**: Display key metrics with visual indicators
+   - **Implementation**: `chestbuddy/ui/widgets/stat_card.py`
+   - **Features**:
+     - Metric title, value, and icon
+     - Support for trend indicators
+     - Color customization based on status
+   - **Usage Pattern**:
+     ```python
+     stat_card = StatCard(
+         title="Total Records",
+         value="1,245",
+         icon=Icons.DATABASE,
+         trend="+5%",
+         trend_positive=True
+     )
+     ```
 
-4. **FilterBar**: Search and filter interface for data views
-   - Properties: search_text, expanded state, filter categories
-   - Signals: search_changed, filter_changed, expanded_changed
-   - Methods: add_filter_category, clear_filters, set_expanded
+4. **ChartPreview**
+   - **Purpose**: Display chart previews with interaction
+   - **Implementation**: `chestbuddy/ui/widgets/chart_preview.py`
+   - **Features**:
+     - Title, subtitle, and thumbnail
+     - Interactive navigation
+     - Support for different chart types
+   - **Usage Pattern**:
+     ```python
+     chart_preview = ChartPreview(
+         title="Sales Distribution",
+         subtitle="By product category",
+         chart_id="sales_dist",
+         thumbnail=thumbnail_pixmap
+     )
+     chart_preview.clicked.connect(self.on_preview_clicked)
+     ```
 
-5. **ActionCard**: Card-style widget for dashboard actions
-   - Properties: title, description, icon, action_callback
-   - Features: hover effects, click handling, visual feedback
-   - Used in the dashboard for quick actions
+### Dashboard Structure
 
-6. **ChartCard**: Card-style widget for chart previews
-   - Properties: title, description, chart_id, thumbnail
-   - Signals: clicked, chart_selected
-   - Used in the dashboard for chart previews
+The Dashboard has been redesigned with a modern card-based layout:
 
-### View Adapter Pattern
+1. **DashboardViewAdapter**
+   - **Implementation**: `chestbuddy/ui/views/dashboard_view_adapter.py`
+   - **Structure**:
+     - Uses a `QScrollArea` with a main container widget
+     - Organized into distinct sections with headers
+     - Handles empty state for each section independently
+     - Uses grid layouts for card organization
 
-The application follows a View Adapter pattern to separate UI components from data handling:
+2. **Dashboard Sections**:
+   - **Quick Actions**: Grid of ActionCards for common tasks
+     ```python
+     self._create_action_section("Quick Actions", [
+         ActionCard("Import Data", "Load CSV files", Icons.IMPORT, "import"),
+         ActionCard("Export", "Save as CSV or Excel", Icons.EXPORT, "export"),
+         ActionCard("Analyze", "Run data analysis", Icons.CHART, "analyze"),
+         ActionCard("Settings", "Configure application", Icons.SETTINGS, "settings")
+     ])
+     ```
+   
+   - **Recent Files**: List of recently opened files
+     ```python
+     self._create_recent_files_section("Recent Files", recent_files)
+     ```
+   
+   - **Charts & Analytics**: Grid of ChartCards for analytics
+     ```python
+     self._create_charts_section("Charts & Analytics", [
+         ChartCard("Revenue Trends", "Monthly revenue", "revenue", thumbnail1),
+         ChartCard("Product Distribution", "By category", "products", thumbnail2)
+     ])
+     ```
 
-1. **BaseView**: Abstract base class for all view adapters
-   - Properties: title, data_required
-   - Methods: set_data_available, get_content_layout
-   - Features: empty state handling, header configuration
+3. **Empty States**:
+   - Each section has its own empty state handling
+   - Dashboard shows appropriate messaging when data isn't available
+   - Action buttons guide users to load data or perform initial actions
 
-2. **ViewAdapters**: Specific implementations for each major view
-   - **DashboardViewAdapter**: Connects dashboard UI to data model
-   - **DataViewAdapter**: Connects data view to data model
-   - **ValidationViewAdapter**: Connects validation view to validation service
-   - **CorrectionViewAdapter**: Connects correction view to correction service
-   - **ChartViewAdapter**: Connects chart view to chart service
+## Navigation Pattern
 
-3. **Data Flow**:
-   ```
-   DataModel <-> Service <-> ViewAdapter <-> UI Components
-   ```
+The application uses a view adapter pattern for navigation:
 
-4. **Signal Handling**:
-   - ViewAdapters emit signals for user actions
-   - MainWindow connects these signals to appropriate handlers
-   - Services process data and emit result signals
-   - ViewAdapters update UI based on service results
+1. **ViewAdapter Base Class**
+   - **Implementation**: `chestbuddy/ui/views/view_adapter.py`
+   - **Responsibilities**:
+     - Get/set view title and icon
+     - Handle data requirements
+     - Manage view lifecycle
+     - Support data availability state
 
-### Dashboard Architecture
+2. **Specialized View Adapters**
+   - **DashboardViewAdapter**: Main dashboard with card-based UI
+   - **DataViewAdapter**: Tabular data display with filtering
+   - **ValidationViewAdapter**: Data validation interfaces
+   - **CorrectionViewAdapter**: Data correction workflows
+   - **ChartViewAdapter**: Detailed chart visualization
 
-The dashboard follows a card-based architecture with distinct sections:
+3. **Navigation Flow**:
+   - Dashboard is always accessible regardless of data state
+   - Other views require data to be loaded
+   - `MainWindow` manages navigation state
+   - Navigation sidebar reflects data availability
+   - Empty states guide users to appropriate actions
 
-1. **Quick Actions**: Grid layout of ActionCard components
-   - Import Data, Export Data, Validate Data
-   - Generate Report, Settings, Help
+## Data Management
 
-2. **Recent Files**: Vertical list of ActionCard components
-   - Each card represents a recently opened file
-   - Empty state shown when no recent files exist
+### Data Loading Pattern
 
-3. **Charts & Analytics**: Horizontal layout of ChartCard components
-   - Player Distribution, Chest Sources charts
-   - Empty state shown when no data is available
+1. **DataManager**
+   - Central data handling service
+   - Responsible for loading, processing, and providing data
+   - Emits signals for data state changes
 
-4. **Layout Structure**:
-   ```
-   Dashboard
-   ├── Header (Title + Actions)
-   ├── ScrollArea
-   │   ├── Quick Actions Section
-   │   │   └── Grid of ActionCards
-   │   ├── Divider
-   │   ├── Recent Files Section
-   │   │   └── List of ActionCards
-   │   ├── Divider
-   │   └── Charts Section
-   │       └── Row of ChartCards
-   └── Empty State (shown when no data)
-   ```
+2. **MultiCSVLoadTask**
+   - Handles loading multiple CSV files
+   - Reports progress for each file
+   - Manages memory efficiently for large datasets
 
-5. **Data Availability Handling**:
-   - Dashboard displays content even when no data is loaded
-   - Charts section shows empty state when no data is available
-   - Recent files section shows empty state when no files have been opened
+3. **Data Access Pattern**
+   - Views request data through DataManager
+   - Data availability is checked before operations
+   - Empty states shown when data is not available
 
-This component-based architecture provides several benefits:
-- Consistent UI patterns across the application
-- Reusable components reduce code duplication
-- Easier maintenance and testing
-- Clear separation of concerns between UI and data handling
+## UI Component Patterns
+
+1. **Consistent Signal Pattern**:
+   - Components use Qt's signal/slot mechanism
+   - Signals emit clear information about user actions
+   - Components don't make assumptions about handling
+
+2. **Style Consistency**:
+   - Components use shared style variables
+   - Common visual language across the application
+   - Components adapt to application theme
+
+3. **Component Hierarchy**:
+   - Basic components (buttons, inputs)
+   - Composite components (cards, toolbars)
+   - View components (organized layouts)
+   - Screen components (full views)
+
+4. **State Management**:
+   - Components handle their own internal state
+   - Parent components manage child component state
+   - Application state managed by service classes
 ``` 

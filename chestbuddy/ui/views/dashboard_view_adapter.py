@@ -10,7 +10,7 @@ from typing import List, Optional
 from datetime import datetime
 
 from PySide6.QtCore import Qt, Signal, QSize
-from PySide6.QtGui import QIcon, QPixmap
+from PySide6.QtGui import QIcon, QPixmap, QPainter
 from PySide6.QtWidgets import (
     QVBoxLayout,
     QHBoxLayout,
@@ -344,7 +344,10 @@ class DashboardViewAdapter(BaseView):
         if player_chart:
             player_pixmap = QPixmap(300, 180)
             player_pixmap.fill(Qt.white)
-            player_chart.render(player_pixmap)
+            # Use QPainter to render the chart to the pixmap
+            painter = QPainter(player_pixmap)
+            player_chart.scene().render(painter)
+            painter.end()
 
             # Create chart card
             player_card = ChartCard(
@@ -362,7 +365,10 @@ class DashboardViewAdapter(BaseView):
         if chest_chart:
             chest_pixmap = QPixmap(300, 180)
             chest_pixmap.fill(Qt.white)
-            chest_chart.render(chest_pixmap)
+            # Use QPainter to render the chart to the pixmap
+            painter = QPainter(chest_pixmap)
+            chest_chart.scene().render(painter)
+            painter.end()
 
             # Create chart card
             chest_card = ChartCard(
