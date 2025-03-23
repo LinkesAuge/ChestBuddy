@@ -10,10 +10,12 @@ Usage:
 import logging
 import os
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Tuple, Any, Union
+from typing import Callable, Dict, List, Optional, Tuple, Any, Union, Generator
+import inspect
 
 import pandas as pd
 from PySide6.QtCore import QObject, Signal
+from PySide6.QtWidgets import QApplication
 
 from chestbuddy.utils.config import ConfigManager
 from chestbuddy.utils.background_processing import BackgroundWorker, MultiCSVLoadTask
@@ -54,6 +56,10 @@ class DataManager(QObject):
     load_started = Signal()
     load_finished = Signal()
 
+    # Add new signals for chunk processing phase
+    chunk_processing_started = Signal()
+    chunk_processed = Signal(int, int)  # current_chunk, total_chunks
+
     def __init__(self, data_model, csv_service) -> None:
         """
         Initialize the DataManager service.
@@ -81,59 +87,45 @@ class DataManager(QObject):
 
     def load_csv(self, file_paths: Union[str, List[str]]) -> None:
         """
-        Load one or more CSV files and update the data model.
+        Load data from one or more CSV files.
 
         Args:
-            file_paths: Path to single CSV file or list of paths
+            file_paths: Path or list of paths to CSV files to load
         """
-        # Convert single file path to list for consistent handling
+        # Convert single path to list for unified handling
         if isinstance(file_paths, str):
             file_paths = [file_paths]
 
-        if not file_paths:
-            logger.warning("No files provided to load")
-            return
+        # Convert to list of strings if any are Path objects
+        file_paths = [str(path) for path in file_paths]
 
-        logger.info(f"Loading {len(file_paths)} CSV file(s)")
+        logger.info(f"Loading CSV files: {file_paths}")
 
-        # Store the most recent file path
-        self._current_file_path = file_paths[0]
+        # Create a task for loading the CSV files
+        self._current_task = "load_csv"
+        self._current_file_path = file_paths[0] if file_paths else None
 
-        # Add files to the list of recent files
-        for file_path in file_paths:
-            self._update_recent_files(file_path)
-
-        # Temporarily disconnect data_changed signals during import to prevent cascading updates
+        # Block signals during load to prevent multiple updates
         self._data_model.blockSignals(True)
 
-        try:
-            # Emit load started signal
-            self.load_started.emit()
+        # Create a task for loading multiple CSV files
+        task = MultiCSVLoadTask(
+            csv_service=self._csv_service,
+            file_paths=file_paths,
+            chunk_size=100,  # Use 100 as requested
+            normalize_text=True,
+            robust_mode=True,
+            task_id="load_csv",
+        )
 
-            # Create and configure the task
-            task = MultiCSVLoadTask(
-                file_paths=file_paths,
-                csv_service=self._csv_service,
-                chunk_size=1000,  # Default chunk size
-                normalize_text=True,
-                robust_mode=True,
-            )
+        # Connect to chunk processed signal
+        task.chunk_processed.connect(self._on_chunk_processed)
 
-            # Connect file progress signal
-            task.file_progress.connect(self._on_file_progress)
+        # Emit load started signal
+        self.load_started.emit()
 
-            # Store the task for potential cancellation
-            self._current_task = task
-
-            # Execute the task
-            self._worker.execute_task(task)
-
-        except Exception as e:
-            # Ensure signals are unblocked even if an error occurs
-            self._data_model.blockSignals(False)
-            logger.error(f"Error during CSV import: {e}")
-            self.load_error.emit(f"Error loading files: {str(e)}")
-            self.load_finished.emit()
+        # Run the task in a background worker
+        self._worker.execute_task(task)
 
     def cancel_loading(self) -> None:
         """
@@ -237,86 +229,173 @@ class DataManager(QObject):
             logger.error(f"Error combining DataFrames: {e}")
             return None, f"Error combining files: {str(e)}"
 
-    def _on_csv_load_success(self, result_tuple: Tuple[pd.DataFrame, str]):
+    def _on_csv_load_success(self, result: Union[Tuple[bool, Union[pd.DataFrame, Generator, str]], Tuple[pd.DataFrame, str]]) -> None:
         """
-        Handle successful CSV load from background thread.
-
+        Handle successful CSV loading.
+        
         Args:
-            result_tuple: Tuple containing (success, data_or_error_message)
-                success: Boolean indicating if the operation was successful
-                data_or_error_message: DataFrame if successful, error message if not
+            result: Tuple containing load result information. Can be either:
+                   - (success_flag, data_or_error_message)
+                   - (dataframe, message) [legacy format]
         """
         try:
-            logger.debug("CSV load success callback triggered")
-
-            # Check if the result tuple is in the expected format
-            if not isinstance(result_tuple, tuple) or len(result_tuple) != 2:
-                logger.error(f"Invalid result format from CSV load: {type(result_tuple)}")
-                self.load_error.emit("Invalid result format from CSV service")
-                return
-
-            success, data_or_message = result_tuple
-
-            # Handle the case where the operation failed
-            if not success:
-                error_message = (
-                    data_or_message
-                    if isinstance(data_or_message, str)
-                    else "Failed to load CSV data"
-                )
-                logger.error(f"CSV load returned error: {error_message}")
-                self.load_error.emit(error_message)
-                return
-
-            # At this point, data_or_message should be the DataFrame
-            data = data_or_message
-
-            # Validate the DataFrame
-            if data is None or not isinstance(data, pd.DataFrame):
-                logger.error(f"CSV load did not return valid DataFrame: {type(data)}")
-                self.load_error.emit("Failed to load CSV data: Invalid data format")
-                return
-
-            if data.empty:
-                logger.warning("CSV load returned empty DataFrame")
-                self.load_error.emit("CSV file is empty")
-                return
-
-            logger.info(f"CSV loaded successfully with {len(data)} rows")
-
-            # Store the file path that was successfully loaded
-            if self._current_file_path:
-                self._update_recent_files(self._current_file_path)
-
-            # Attempt to map columns
-            mapped_data = self._map_columns(data)
-
-            # Update the data model with the new data
-            self._data_model.update_data(mapped_data)
-
-            # Emit success signal with message
-            self.load_success.emit(f"CSV loaded successfully with {len(data)} rows")
-
-            # Finally, unblock signals and emit a controlled change notification
-            self._data_model.blockSignals(False)
-            self._data_model.data_changed.emit()
-
-            # Clear the current task
+            # Stop the task to clean up resources
             self._current_task = None
-
-            # Emit load finished signal
-            self.load_finished.emit()
-
+            
+            # Extract result based on format (handle both formats for compatibility)
+            success = True
+            message = ""
+            data_or_generator = None
+            
+            # Check the result format and extract data accordingly
+            if isinstance(result, tuple) and len(result) == 2:
+                if isinstance(result[0], bool):
+                    # New format: (success_flag, data_or_error_message)
+                    success, data_or_generator = result
+                    message = "Data loaded successfully" if success else str(data_or_generator)
+                else:
+                    # Legacy format: (dataframe, message)
+                    data_or_generator, message = result
+                    success = True if isinstance(data_or_generator, (pd.DataFrame, Generator)) else False
+            else:
+                # Invalid format
+                success = False
+                message = "Invalid result format from CSV loading task"
+            
+            # Check if the operation was successful
+            if not success:
+                logger.error(f"CSV load failed: {message if message else 'Unknown error'}")
+                self.load_error.emit(message if message else "Failed to load CSV data")
+                self.load_finished.emit()
+                return
+                
+            # If we received a generator, process chunks incrementally
+            if inspect.isgenerator(data_or_generator):
+                logger.debug("Received a generator of data chunks, processing incrementally")
+                # Signal the start of the processing phase
+                self.chunk_processing_started.emit()
+                
+                # Process in a background thread to keep UI responsive
+                self._process_chunks(data_or_generator)
+                return
+                
+            # Otherwise process as a single DataFrame
+            elif isinstance(data_or_generator, pd.DataFrame):
+                logger.debug(f"Received DataFrame with {len(data_or_generator)} rows")
+                # Set the new data
+                self._data_model.update_data(data_or_generator)
+                # Update the model
+                self._data_model.data_changed.emit()
+                # Emit signals
+                self.load_success.emit(message)
+                self.load_finished.emit()
+            else:
+                # Unknown data type
+                error_msg = f"Unknown data type from CSV loading task: {type(data_or_generator)}"
+                logger.error(error_msg)
+                self.load_error.emit(error_msg)
+                self.load_finished.emit()
+                
         except Exception as e:
-            # Ensure signals are unblocked
-            self._data_model.blockSignals(False)
-
-            # Log and emit error
-            logger.error(f"Error in CSV load success handler: {e}")
-            self.load_error.emit(f"Error processing CSV data: {str(e)}")
-
-            # Emit load finished signal
+            logger.error(f"Error handling CSV load success: {e}")
+            self.load_error.emit(f"Error processing CSV data: {e}")
             self.load_finished.emit()
+
+    def _process_chunks(self, chunks_generator: Generator) -> None:
+        """
+        Process data chunks from the generator.
+        
+        Args:
+            chunks_generator: Generator yielding DataFrame chunks
+        """
+        try:
+            # Create a local copy of the views list to avoid modification during iteration
+            data_views = self._data_model.views.copy() if hasattr(self._data_model, "views") else []
+            
+            # Clear any existing data in views
+            for view in data_views:
+                if hasattr(view, "clear_table"):
+                    view.clear_table()
+                    
+            # Initialize counters
+            chunk_count = 0
+            total_chunks = 0  # This will be updated if available
+            combined_data = None
+            
+            # Process each chunk
+            try:
+                # Initialize combined data for aggregation
+                all_chunks = []
+                
+                # Process each chunk from the generator
+                for result in chunks_generator:
+                    # Ensure we haven't been cancelled
+                    if self._current_task is None:
+                        logger.info("Chunk processing cancelled")
+                        break
+                        
+                    # Check if this is a progress update or a data chunk
+                    if isinstance(result, tuple) and len(result) == 3 and isinstance(result[0], str):
+                        # This is a progress update (file_path, current, total)
+                        continue
+                        
+                    # This is a data chunk
+                    chunk = result
+                    chunk_count += 1
+                    
+                    # Add to combined data
+                    all_chunks.append(chunk)
+                    
+                    # Update data views with this chunk
+                    for view in data_views:
+                        if hasattr(view, "append_data_chunk"):
+                            view.append_data_chunk(chunk)
+                    
+                    # Emit chunk processed signal
+                    total_chunks = max(total_chunks, chunk_count)
+                    self.chunk_processed.emit(chunk_count, total_chunks)
+                    
+                    # Process events to keep UI responsive
+                    QApplication.processEvents()
+                    
+                # Combine all chunks into a single DataFrame
+                if all_chunks:
+                    combined_data = pd.concat(all_chunks, ignore_index=True)
+                    
+            except Exception as e:
+                logger.error(f"Error processing data chunks: {e}")
+                self.load_error.emit(f"Error processing data chunks: {e}")
+                combined_data = None
+                
+            # Final processing after all chunks
+            if combined_data is not None and not combined_data.empty:
+                # Set the combined data
+                self._data_model.update_data(combined_data)
+                # Update the model with combined data
+                self._data_model.data_changed.emit()
+                # Emit success signal
+                self.load_success.emit(f"Loaded {len(combined_data)} records")
+            else:
+                # No data or error occurred
+                self.load_error.emit("No data loaded or processing was cancelled")
+                
+        except Exception as e:
+            logger.error(f"Error in chunk processing: {e}")
+            self.load_error.emit(f"Error processing data chunks: {e}")
+        finally:
+            # Always emit load finished
+            self.load_finished.emit()
+
+    def _on_chunk_processed(self, current_chunk: int, total_chunks: int) -> None:
+        """
+        Handle chunk processed signal from MultiCSVLoadTask.
+
+        Args:
+            current_chunk: Current chunk number being processed
+            total_chunks: Total number of chunks to process
+        """
+        # Forward the signal to any listeners (like MainWindow)
+        self.chunk_processed.emit(current_chunk, total_chunks)
 
     def _update_recent_files(self, file_path: str) -> None:
         """

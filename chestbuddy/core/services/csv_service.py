@@ -8,7 +8,7 @@ import csv
 import logging
 import io
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union, Any, Callable
+from typing import Dict, List, Optional, Tuple, Union, Any, Callable, Generator
 
 import pandas as pd
 import chardet
@@ -694,30 +694,34 @@ class CSVService:
     def read_csv_chunked(
         self,
         file_path: Union[str, Path],
-        chunk_size: int = 1000,
+        chunk_size: int = 100,  # Default to 100 as requested
         encoding: Optional[str] = None,
         normalize_text: bool = True,
         robust_mode: bool = False,
         progress_callback: Optional[Callable[[int, int], None]] = None,
-    ) -> Tuple[Optional[pd.DataFrame], Optional[str]]:
+    ) -> Generator[pd.DataFrame, None, Tuple[bool, Union[int, str]]]:
         """
         Read a CSV file in chunks to avoid memory issues with large files.
+        Returns chunks as they are processed rather than combining them.
 
         Args:
             file_path: Path to the CSV file
-            chunk_size: Number of rows to read in each chunk
+            chunk_size: Number of rows to read in each chunk (default 100)
             encoding: Optional encoding to use (auto-detected if None)
             normalize_text: Whether to normalize text in the CSV
             robust_mode: Whether to use robust mode for reading
             progress_callback: Optional callback for progress reporting
 
+        Yields:
+            DataFrame chunks as they are processed
+
         Returns:
-            Tuple containing DataFrame and error message (if any)
+            After all chunks are yielded, returns a tuple (success, rows_processed or error_message)
         """
         try:
             file_path = Path(file_path)
             if not file_path.exists():
-                return None, f"File not found: {file_path}"
+                return False, f"File not found: {file_path}"
 
             # Detect encoding if not provided
             if encoding is None:
@@ -760,7 +764,6 @@ class CSVService:
                 on_bad_lines="skip" if robust_mode else None,
             )
 
-            all_chunks = []
             rows_processed = 0
 
             for chunk_idx, chunk in enumerate(chunks):
@@ -768,9 +771,6 @@ class CSVService:
                 for col in chunk.columns:
                     # Convert all values to string to ensure consistent handling
                     chunk[col] = chunk[col].astype(str)
-
-                # Add processed chunk to the list
-                all_chunks.append(chunk)
 
                 # Update progress counter
                 rows_processed += len(chunk)
@@ -784,24 +784,16 @@ class CSVService:
                     except Exception as e:
                         logger.error(f"Error in progress callback: {e}")
 
-            # Combine all chunks into a single DataFrame
-            if all_chunks:
-                # Concatenate all chunks, but avoid type inference again
-                final_df = pd.concat(all_chunks, ignore_index=True)
+                # Yield the chunk instead of collecting all chunks
+                yield chunk
 
-                # To further avoid recursion issues, ensure all column data is string
-                # This is especially important for date columns
-                for col in final_df.columns:
-                    final_df[col] = final_df[col].astype(str)
-
-                logger.info(f"Successfully read CSV file with {len(final_df)} rows")
-                return final_df, None
-            else:
-                return None, "No data read from CSV file"
+            # After all chunks are yielded, return success and total rows processed
+            logger.info(f"Successfully read CSV file with {rows_processed} rows")
+            return True, rows_processed
 
         except Exception as e:
             logger.error(f"Error reading CSV file: {e}")
-            return None, f"Error reading CSV file: {str(e)}"
+            return False, f"Error reading CSV file: {str(e)}"
 
     def read_csv_background(
         self,

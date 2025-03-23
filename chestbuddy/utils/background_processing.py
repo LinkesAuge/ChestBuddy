@@ -84,76 +84,54 @@ class BackgroundTask(QObject, Generic[T]):
 
 class MultiCSVLoadTask(BackgroundTask):
     """
-    Task to load multiple CSV files, with progress reporting.
+    A task for loading multiple CSV files with progress reporting.
 
-    This task loads each CSV file in sequence, emitting progress signals
-    along the way. It handles cancellation and error reporting.
+    This task loads multiple CSV files in background, combines them into a single
+    DataFrame, and provides progress updates.
     """
 
-    # Additional signal for file-specific progress
-    file_progress = Signal(str, int, int)  # file_path, current, total
+    # Add signal for chunk processing phase
+    chunk_processed = Signal(int, int)  # current_chunk, total_chunks
 
-    def __init__(self, *args, **kwargs):
+    def __init__(
+        self,
+        csv_service: Any,
+        file_paths: List[Union[str, Path]],
+        chunk_size: int = 100,  # Default to 100 as requested
+        normalize_text: bool = False,
+        robust_mode: bool = False,
+        task_id: str = None,
+    ) -> None:
         """
-        Initialize the task with multiple CSV files to load.
+        Initialize the task.
 
         Args:
-            Can be called in two ways:
-            1. (csv_service, file_paths, chunk_size=1000, ...)
-            2. (file_paths=paths, csv_service=service, chunk_size=size, ...)
-
-            csv_service: The CSVService instance to use for loading
+            csv_service: The CSV service to use for loading files
             file_paths: List of paths to CSV files to load
-            chunk_size: Size of chunks to use when loading CSV files
-            normalize_text: Whether to normalize text in CSV files (passed to CSVService)
-            robust_mode: Whether to use robust mode for handling corrupt files (passed to CSVService)
-            encoding: Optional encoding to use for CSV files (passed to CSVService)
+            chunk_size: Number of rows to read in each chunk (default 100)
+            normalize_text: Whether to normalize text in the CSV files
+            robust_mode: Whether to use robust mode for reading CSV files
+            task_id: Optional identifier for the task
         """
-        # Handle different ways this can be called (positional or keyword)
-        if args and len(args) >= 2:
-            # Called as (csv_service, file_paths, ...)
-            csv_service = args[0]
-            file_paths = args[1]
-            chunk_size = args[2] if len(args) > 2 else kwargs.get("chunk_size", 1000)
-        else:
-            # Called with keywords: (file_paths=paths, csv_service=service, ...)
-            csv_service = kwargs.get("csv_service")
-            file_paths = kwargs.get("file_paths")
-            chunk_size = kwargs.get("chunk_size", 1000)
-
-        if not csv_service:
-            raise ValueError("csv_service is required")
-        if not file_paths:
-            raise ValueError("file_paths is required")
-
-        # Get other parameters with defaults
-        normalize_text = kwargs.get("normalize_text", True)
-        robust_mode = kwargs.get("robust_mode", False)
-        encoding = kwargs.get("encoding", None)
-
-        # Initialize with task_id based on number of files
-        super().__init__(f"load_multi_csv_{len(file_paths)}_files")
-
-        # Store parameters
+        super().__init__(task_id)
         self.csv_service = csv_service
         self.file_paths = file_paths
         self.chunk_size = chunk_size
         self.normalize_text = normalize_text
         self.robust_mode = robust_mode
-        self.encoding = encoding
 
-        # Initialize other attributes
-        self.dataframes = []
-        self._throttle_timer = None
-        self._last_update_time = time.time()
-        # Min time between progress updates to avoid overloading the UI
-        self._min_update_interval = 0.1  # seconds
-
-        # Initialize progress tracking variables
+        # Counters for progress tracking
         self._total_rows_loaded = 0
-        self._total_rows_estimated = 0
+        self._num_files = len(file_paths) if file_paths else 0
+        self._current_file_index = 0
         self._current_file_rows = 0
-        self._current_file_total_rows = 0
+        self._current_file_total_rows = 1
+
+        # For two-phase progress tracking
+        self._loading_phase_complete = False
+        self._processing_chunks = []
+        self._total_chunks = 0
+        self._processed_chunks = 0
 
     def _throttled_progress_update(self, current, total):
         """
@@ -229,52 +207,54 @@ class MultiCSVLoadTask(BackgroundTask):
         # Continue processing
         return not self.is_cancelled
 
-    def _on_file_progress(self, current, total):
+    def _on_file_progress(self, current: int, total: int, phase: str = "loading") -> None:
         """
-        Handle progress updates from the CSV service for the current file.
+        Handle progress updates for a specific file.
 
         Args:
-            current: Current rows processed in the file
-            total: Total rows estimated in the file
-
-        Returns:
-            False if the task was cancelled, True otherwise
+            current: Current progress value
+            total: Total progress value
+            phase: Current processing phase ('loading' or 'processing')
         """
-        # Update current file progress
+        # Update file-specific counters
         self._current_file_rows = current
-        self._current_file_total_rows = total
+        self._current_file_total_rows = max(total, 1)  # Avoid division by zero
 
-        # Update total progress
-        if self._total_rows_estimated == 0:
-            # If this is the first progress update, initialize total estimate
-            self._total_rows_estimated = total * self._num_files
+        # Calculate overall progress
+        if phase == "loading":
+            # Loading phase (0-50%)
+            file_fraction = self._current_file_index / max(self._num_files, 1)
+            chunk_fraction = current / max(total, 1)
+            progress = int(50 * (file_fraction + chunk_fraction / self._num_files))
+        else:
+            # Processing phase (50-100%)
+            progress = 50 + int(50 * (self._processed_chunks / max(self._total_chunks, 1)))
 
-        # Calculate overall progress percentage
-        if self._num_files > 0:
-            # Calculate what percentage one file represents
-            file_weight = 1.0 / self._num_files
+        # Ensure progress stays within bounds
+        progress = max(0, min(100, progress))
 
-            # Calculate current file's progress (0.0-1.0)
-            file_progress = min(1.0, current / total) if total > 0 else 0
+        # Update progress
+        self._throttled_progress_update(progress, 100)
 
-            # Calculate overall progress
-            # Previous files (100% each) + current file's progress
-            overall_progress = (self._current_file_index * file_weight) + (
-                file_progress * file_weight
-            )
+    def report_chunk_processed(self):
+        """Report that a chunk has been processed in the second phase."""
+        self._processed_chunks += 1
+        chunk_progress = int(50 * (self._processed_chunks / max(self._total_chunks, 1)))
+        total_progress = 50 + chunk_progress  # 50% for loading + chunk progress
 
-            # Convert to percentage (0-100)
-            progress_percent = int(overall_progress * 100)
+        # Update progress for the processing phase
+        self._throttled_progress_update(total_progress, 100)
 
-            # Update the UI
-            self._throttled_progress_update(progress_percent, 100)
-
-        # Return not cancelled
-        return not self.is_cancelled
+        # Emit the chunk processed signal
+        self.chunk_processed.emit(self._processed_chunks, self._total_chunks)
 
     def run(self):
         """
-        Execute the task, loading and combining multiple CSV files.
+        Execute the task, loading and combining multiple CSV files in chunks.
+
+        This implementation processes data in two phases:
+        1. Loading phase (50% of progress): Reading all files from disk in chunks
+        2. Processing phase (50% of progress): Combining and preparing data for display
 
         Returns:
             (True, combined_df) on success,
@@ -283,9 +263,9 @@ class MultiCSVLoadTask(BackgroundTask):
         if not self.file_paths:
             return False, "No CSV files provided to load"
 
-        # Initialize counters and storage
+        # Initialize data storage
+        all_chunks = []
         self._total_rows_loaded = 0
-        combined_df = None
         self._num_files = len(self.file_paths)
 
         # Create parameters dict for read_csv_chunked calls
@@ -299,7 +279,7 @@ class MultiCSVLoadTask(BackgroundTask):
         if hasattr(self, "encoding") and self.encoding:
             csv_params["encoding"] = self.encoding
 
-        # Process each file
+        # Process each file - Loading Phase (50% of progress)
         for i, file_path in enumerate(self.file_paths):
             # Check for cancellation before starting each file
             if self.is_cancelled:
@@ -313,116 +293,103 @@ class MultiCSVLoadTask(BackgroundTask):
             self._current_file_total_rows = 1  # Will be updated by callback
             file_path_str = str(file_path)
 
+            # Calculate progress as a percentage of the loading phase (0-50%)
+            loading_progress = min(50, int((i * 50) / self._num_files))
+
             # Send an initial progress update for this file
-            self._throttled_progress_update(i * (100 // self._num_files), 100)
+            self._throttled_progress_update(loading_progress, 100)
 
             try:
                 # Create a progress callback for this file
                 def file_progress_callback(current, total):
                     # Update file-specific progress information
-                    return self._on_file_progress(current, total)
+                    return self._on_file_progress(current, total, phase="loading")
 
                 # Add progress callback to parameters
                 csv_params["progress_callback"] = file_progress_callback
 
-                # Try to read the file - returns tuple of (dataframe, error_message)
-                result_tuple = self.csv_service.read_csv_chunked(file_path_str, **csv_params)
+                # Use the chunked generator from csv_service
+                chunk_generator = self.csv_service.read_csv_chunked(file_path_str, **csv_params)
 
-                # Unpack the tuple
-                file_df, error_msg = result_tuple
+                # Collect all chunks from this file
+                file_chunks = []
+                for chunk in chunk_generator:
+                    # Check for cancellation during chunk processing
+                    if self.is_cancelled:
+                        logger.info(f"CSV load task cancelled during chunk processing")
+                        gc.collect()
+                        return False, "Operation cancelled"
+
+                    # Store chunk for later processing
+                    file_chunks.append(chunk)
+
+                    # Update progress within the loading phase (0-50%)
+                    # This is approximate since we don't know exactly how many chunks there are yet
+                    file_progress = min(50, int(((i + 0.5) * 50) / self._num_files))
+                    self._throttled_progress_update(file_progress, 100)
+
+                # Get the final result from the generator
+                success, result = next(
+                    chunk_generator, (False, "No result returned from generator")
+                )
 
                 # Handle file read result
-                if error_msg is not None:
-                    error_msg = f"Error reading CSV file {file_path_str}: {error_msg}"
+                if not success:
+                    error_msg = f"Error reading CSV file {file_path_str}: {result}"
                     logger.error(error_msg)
-
-                    # Clean up and return error
-                    if combined_df is not None:
-                        del combined_df
                     gc.collect()
                     return False, error_msg
 
-                # Get the DataFrame from successful read
-                if file_df is None:
-                    error_msg = f"No data returned from CSV file {file_path_str}"
-                    logger.error(error_msg)
-                    continue
+                # Add file chunks to the overall collection
+                all_chunks.extend(file_chunks)
 
-                # Update total rows loaded
-                file_rows = len(file_df)
-                self._total_rows_loaded += file_rows
+                # Update total rows from this file
+                rows_processed = result if isinstance(result, int) else 0
+                self._total_rows_loaded += rows_processed
 
-                # First file becomes the initial combined DataFrame
-                if combined_df is None:
-                    combined_df = file_df
-                else:
-                    # Combine with existing data
-                    try:
-                        # Use pandas concat
-                        combined_df = pd.concat([combined_df, file_df], ignore_index=True)
+                # Update progress to show completion of this file
+                loading_progress = min(50, int(((i + 1) * 50) / self._num_files))
+                self._throttled_progress_update(loading_progress, 100)
 
-                        # Clean up individual file DataFrame to save memory
-                        del file_df
-                        gc.collect()
-                    except Exception as e:
-                        error_msg = f"Error combining DataFrame {file_path_str}: {str(e)}"
-                        logger.error(error_msg)
-
-                        # We'll continue with what we have, but report the error
-                        if i == len(self.file_paths) - 1:
-                            # If this was the last file, log warning and return partial data
-                            logger.warning(
-                                f"Loaded {self._total_rows_loaded} rows with errors: Error combining data: {str(e)}"
-                            )
-                            if combined_df is not None and len(combined_df) > 0:
-                                return True, combined_df
-                            else:
-                                return False, f"Error combining data: {str(e)}"
-
-                # Check for cancellation after each file
-                if self.is_cancelled:
-                    logger.info(f"CSV load task cancelled after processing {i + 1} files")
-                    if combined_df is not None:
-                        del combined_df
-                    gc.collect()
-                    return False, "Operation cancelled"
-
+            except StopIteration:
+                # This is normal - we've consumed all chunks
+                pass
             except Exception as e:
                 # Catch any unexpected errors
                 error_msg = f"Unexpected error processing {file_path_str}: {str(e)}"
                 logger.error(error_msg)
                 traceback.print_exc()
-
-                # Clean up and return
-                if combined_df is not None:
-                    del combined_df
                 gc.collect()
                 return False, error_msg
 
-        # Final cleanup and check
+        # Mark loading phase as complete
+        self._loading_phase_complete = True
+        self._throttled_progress_update(50, 100)  # Loading phase complete (50%)
+
+        # Prepare for processing phase
+        self._processing_chunks = all_chunks
+        self._total_chunks = len(all_chunks)
+        self._processed_chunks = 0
+
+        # Processing Phase (50-100% of progress)
         try:
-            # Return success if we have data
-            if combined_df is not None and len(combined_df) > 0:
+            # Return success with the collected chunks
+            if len(all_chunks) > 0:
                 logger.info(
-                    f"Successfully loaded {self._total_rows_loaded} rows from {len(self.file_paths)} files"
+                    f"Successfully loaded {self._total_rows_loaded} rows from {len(self.file_paths)} files in {self._total_chunks} chunks"
                 )
 
-                # Final progress update - show 100% with total rows loaded
-                self._throttled_progress_update(100, 100)
+                # Final progress update before returning chunks
+                self._throttled_progress_update(50, 100)  # Start of processing phase
 
-                return True, combined_df
+                return True, all_chunks
             else:
                 return False, "No data loaded from CSV files"
 
         except Exception as e:
             error_msg = f"Error in final data processing: {str(e)}"
             logger.error(error_msg)
-
-            # Clean up
-            if combined_df is not None:
-                del combined_df
             gc.collect()
-
             return False, error_msg
 
 

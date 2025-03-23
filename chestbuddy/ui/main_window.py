@@ -163,6 +163,7 @@ class MainWindow(QMainWindow):
             "current_file": "",  # Path of current file
             "processed_files": [],  # List of processed file paths
             "total_rows": 0,  # Total rows processed so far
+            "phase": "loading",  # Track current phase (loading or processing)
         }
 
         # Update UI
@@ -304,257 +305,31 @@ class MainWindow(QMainWindow):
 
     def _connect_signals(self) -> None:
         """Connect signals and slots."""
-        # Connect data model signals
-        self._data_model.data_changed.connect(self._on_data_changed)
-        self._data_model.validation_changed.connect(self._on_validation_changed)
-        self._data_model.correction_applied.connect(self._on_correction_applied)
+        # Connect navigation signals
+        self._sidebar.navigation_changed.connect(self._on_navigation_changed)
 
-        # Connect data manager signals for progress reporting
+        # Connect dashboard signals
+        self._dashboard_view.action_triggered.connect(self._on_dashboard_action)
+
+        # Connect data manager signals if available
         if self._data_manager:
-            logger.debug("Connecting data_manager signals in MainWindow")
             self._data_manager.load_started.connect(self._on_load_started)
-            self._data_manager.load_progress.connect(self._on_load_progress)
             self._data_manager.load_finished.connect(self._on_load_finished)
-            self._data_manager.load_success.connect(lambda msg: self._status_bar.set_status(msg))
             self._data_manager.load_error.connect(self._on_load_error)
-            logger.debug("All data_manager signals connected successfully")
-        else:
-            logger.warning("No data_manager available, progress signals will not be connected")
+            self._data_manager.load_success.connect(self._on_data_load_success)
+            # Connect to new chunk processing signals
+            self._data_manager.chunk_processing_started.connect(self._on_chunk_processing_started)
+            self._data_manager.chunk_processed.connect(self._on_chunk_processed)
 
-    def _load_settings(self) -> None:
-        """Load application settings."""
-        settings = QSettings("ChestBuddy", "ChestBuddy")
-        geometry = settings.value("geometry")
-        if geometry:
-            self.restoreGeometry(geometry)
+        # Connect model signals
+        self._data_model.data_changed.connect(self._on_data_changed)
+        if hasattr(self._data_model, "validation_changed"):
+            self._data_model.validation_changed.connect(self._on_validation_changed)
+        if hasattr(self._data_model, "correction_applied"):
+            self._data_model.correction_applied.connect(self._on_correction_applied)
 
-    def _save_settings(self) -> None:
-        """Save application settings."""
-        settings = QSettings("ChestBuddy", "ChestBuddy")
-        settings.setValue("geometry", self.saveGeometry())
-        settings.sync()
+        # Connect other signals as needed
 
-    def _load_recent_files(self) -> None:
-        """Load the list of recent files."""
-        settings = QSettings("ChestBuddy", "ChestBuddy")
-        self._recent_files = settings.value("recentFiles", [])
-        if not isinstance(self._recent_files, list):
-            self._recent_files = []
-        self._update_recent_files_menu()
-
-    def _save_recent_files(self) -> None:
-        """Save the list of recent files."""
-        settings = QSettings("ChestBuddy", "ChestBuddy")
-        settings.setValue("recentFiles", self._recent_files)
-        settings.sync()
-
-    def _add_recent_file(self, file_path: str) -> None:
-        """
-        Add a file to the recent files list.
-
-        Args:
-            file_path: The path of the file to add.
-        """
-        # Remove if already exists
-        if file_path in self._recent_files:
-            self._recent_files.remove(file_path)
-
-        # Add to the beginning of the list
-        self._recent_files.insert(0, file_path)
-
-        # Limit to 10 recent files
-        if len(self._recent_files) > 10:
-            self._recent_files = self._recent_files[:10]
-
-        # Update menu and save
-        self._update_recent_files_menu()
-        self._save_recent_files()
-
-        # Update dashboard
-        dashboard_view = self._views.get("Dashboard")
-        if dashboard_view and isinstance(dashboard_view, DashboardView):
-            dashboard_view.set_recent_files(self._recent_files)
-
-    def _update_recent_files_menu(self) -> None:
-        """Update the recent files menu."""
-        self._recent_files_menu.clear()
-
-        for file_path in self._recent_files:
-            action = QAction(os.path.basename(file_path), self)
-            action.setData(file_path)
-            action.triggered.connect(
-                lambda checked=False, path=file_path: self._open_recent_file(path)
-            )
-            self._recent_files_menu.addAction(action)
-
-        if not self._recent_files:
-            no_files_action = QAction("No recent files", self)
-            no_files_action.setEnabled(False)
-            self._recent_files_menu.addAction(no_files_action)
-
-    def _update_ui(self) -> None:
-        """Update the UI based on the current state."""
-        has_data = not self._data_model.is_empty
-
-        # Update actions
-        self._save_action.setEnabled(has_data)
-        self._save_as_action.setEnabled(has_data)
-        self._validate_action.setEnabled(has_data)
-        self._correct_action.setEnabled(has_data)
-
-        # Update status bar
-        if has_data:
-            row_count = len(self._data_model.data)
-            self._status_bar.set_record_count(row_count)
-
-            # Get the current file path
-            try:
-                current_file = self._data_model.file_path
-                if current_file:
-                    self._status_bar.set_status(f"Loaded: {os.path.basename(current_file)}")
-                else:
-                    self._status_bar.set_status("Data loaded (unsaved)")
-            except Exception as e:
-                logger.error(f"Error updating UI with file path: {e}")
-                self._status_bar.set_status("Data loaded")
-        else:
-            self._status_bar.clear_all()
-            self._status_bar.set_status("No data loaded")
-
-    @Slot(str)
-    def _set_active_view(self, view_name: str) -> None:
-        """
-        Set the active view.
-
-        Args:
-            view_name: The name of the view to activate.
-        """
-        try:
-            logger.info(f"Setting active view to: {view_name}")
-            view = self._views.get(view_name)
-            if view:
-                self._content_stack.setCurrentWidget(view)
-                self._sidebar.set_active_item(view_name)
-                logger.info(f"View '{view_name}' activated successfully")
-            else:
-                logger.warning(f"View '{view_name}' not found in available views")
-        except Exception as e:
-            logger.error(f"Error setting active view to {view_name}: {e}")
-
-    # ===== Slots =====
-
-    @Slot(str, str)
-    def _on_navigation_changed(self, section: str, subsection: Optional[str] = None) -> None:
-        """
-        Handle navigation changes.
-
-        Args:
-            section: The selected section.
-            subsection: The selected subsection, if any.
-        """
-        logger.debug(f"Navigation changed: {section} - {subsection}")
-
-        if subsection:
-            # Handle subsections
-            if section == "Data":
-                if subsection == "Import":
-                    self._open_file()
-                elif subsection == "Validate":
-                    self._set_active_view("Validation")
-                elif subsection == "Correct":
-                    self._set_active_view("Correction")
-                elif subsection == "Export":
-                    self._save_file_as()
-            elif section == "Analysis":
-                if subsection == "Charts":
-                    self._set_active_view("Charts")
-                elif subsection == "Tables":
-                    # TODO: Handle tables view
-                    pass
-            elif section == "Settings":
-                # TODO: Handle settings subsections
-                pass
-        else:
-            # Handle main sections
-            if section == "Dashboard":
-                self._set_active_view("Dashboard")
-            elif section == "Data":
-                self._set_active_view("Data")
-            elif section == "Analysis":
-                self._set_active_view("Charts")
-            elif section == "Reports":
-                # TODO: Handle reports view
-                pass
-            elif section == "Settings":
-                # TODO: Handle settings view
-                pass
-            elif section == "Help":
-                # TODO: Handle help view
-                pass
-
-    @Slot(str)
-    def _on_dashboard_action(self, action: str) -> None:
-        """
-        Handle actions triggered from the dashboard.
-
-        Args:
-            action: The action name.
-        """
-        if action == "import":
-            self._open_file()
-        elif action == "validate":
-            self._validate_data()
-            self._set_active_view("Validation")
-        elif action == "analyze":
-            self._set_active_view("Charts")
-        elif action == "report":
-            # TODO: Handle report generation
-            pass
-
-    @Slot(str)
-    def _on_recent_file_selected(self, file_path: str) -> None:
-        """
-        Handle selection of a recent file.
-
-        Args:
-            file_path: The path of the selected file.
-        """
-        self._open_recent_file(file_path)
-
-    @Slot()
-    def _on_data_changed(self) -> None:
-        """Handle data model changes."""
-        self._update_ui()
-
-    @Slot(object)
-    def _on_validation_changed(self, validation_status: Any) -> None:
-        """
-        Handle validation status changes.
-
-        Args:
-            validation_status: The new validation status.
-        """
-        if not validation_status.empty:
-            issue_count = len(validation_status)
-            self._status_bar.set_status(f"Found {issue_count} validation issues")
-        else:
-            self._status_bar.set_status("Validation completed: No issues found")
-
-    @Slot(object)
-    def _on_correction_applied(self, correction_status: Any) -> None:
-        """
-        Handle correction status changes.
-
-        Args:
-            correction_status: The new correction status.
-        """
-        if not correction_status.empty:
-            row_count = len(correction_status)
-            self._status_bar.set_status(f"Corrections applied to {row_count} rows")
-        else:
-            self._status_bar.set_status("No corrections were applied")
-
-    @Slot()
     def _on_load_started(self) -> None:
         """Handle the start of a loading operation."""
         logger.debug("Load operation started")
@@ -566,6 +341,7 @@ class MainWindow(QMainWindow):
             "processed_files": [],
             "total_files": 0,
             "total_rows": 0,
+            "phase": "loading",  # Track current phase (loading or processing)
         }
 
         # Reset row counter
@@ -599,9 +375,63 @@ class MainWindow(QMainWindow):
         # Process events to ensure UI updates
         QApplication.processEvents()
 
+    def _on_chunk_processing_started(self) -> None:
+        """Handle the start of the chunk processing phase."""
+        logger.debug("Chunk processing phase started")
+
+        # Update loading state
+        self._loading_state["phase"] = "processing"
+
+        # Update progress dialog
+        if hasattr(self, "_progress_dialog") and self._progress_dialog:
+            self._progress_dialog.setLabelText("Processing data chunks...")
+            self._progress_dialog.setValue(50)  # Loading phase is 50% complete
+            self._progress_dialog.setStatusText("Populating table...")
+
+            # Process events to ensure UI updates
+            QApplication.processEvents()
+
+    def _on_chunk_processed(self, current_chunk: int, total_chunks: int) -> None:
+        """
+        Handle progress updates during chunk processing.
+
+        Args:
+            current_chunk: Current chunk being processed
+            total_chunks: Total number of chunks to process
+        """
+        # Ensure progress dialog exists
+        if not hasattr(self, "_progress_dialog") or not self._progress_dialog:
+            return
+
+        try:
+            # Calculate progress percentage for processing phase (50-100%)
+            percentage = 50 + min(50, int((current_chunk * 50) / total_chunks))
+
+            # Update the dialog
+            self._progress_dialog.setLabelText(
+                f"Processing data ({current_chunk}/{total_chunks} chunks)..."
+            )
+            self._progress_dialog.setValue(percentage)
+            self._progress_dialog.setStatusText(
+                f"Populating table with {self._total_rows_loaded:,} rows..."
+            )
+
+            # Only make visibility adjustments if the dialog is not already visible
+            if not self._progress_dialog.isVisible():
+                self._progress_dialog.show()
+                self._progress_dialog.raise_()
+                self._progress_dialog.activateWindow()
+
+            # Process events to ensure UI updates, but limit this to avoid excessive refreshing
+            QApplication.processEvents()
+
+        except Exception as e:
+            # Add error handling to prevent crashes
+            logger.error(f"Error updating progress dialog during chunk processing: {e}")
+
     def _on_load_progress(self, file_path: str, current: int, total: int) -> None:
         """
-        Handle progress updates during loading.
+        Handle progress updates during loading phase.
 
         Args:
             file_path: Path of the file being processed (empty for overall progress)
@@ -613,6 +443,10 @@ class MainWindow(QMainWindow):
             return
 
         try:
+            # Only process file loading updates during the loading phase
+            if self._loading_state["phase"] != "loading":
+                return
+
             # Update loading state based on signal type
             if file_path:
                 # This is a file-specific progress update
@@ -654,8 +488,9 @@ class MainWindow(QMainWindow):
                 else:
                     self._last_progress_current = current
 
-            # Calculate progress percentage safely
-            percentage = min(100, int((current * 100 / total) if total > 0 else 0))
+            # Calculate progress percentage for loading phase (0-50%)
+            file_percentage = min(100, int((current * 100 / total) if total > 0 else 0))
+            loading_percentage = min(50, int(file_percentage / 2))  # Scale to 0-50% range
 
             # Create a simple progress message with actual counts, no estimates
             filename = (
@@ -686,7 +521,7 @@ class MainWindow(QMainWindow):
 
             # Update the dialog
             self._progress_dialog.setLabelText(message)
-            self._progress_dialog.setValue(percentage)
+            self._progress_dialog.setValue(loading_percentage)
 
             # Only make visibility adjustments if the dialog is not already visible
             if not self._progress_dialog.isVisible():
@@ -696,7 +531,7 @@ class MainWindow(QMainWindow):
 
             # Process events to ensure UI updates, but limit this to avoid excessive refreshing
             # Only process events if the percentage changes significantly
-            if percentage % 5 == 0 or percentage >= 100:
+            if loading_percentage % 5 == 0 or loading_percentage >= 50:
                 QApplication.processEvents()
 
         except Exception as e:

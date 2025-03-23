@@ -207,72 +207,193 @@ class DataView(QWidget):
         self._table_model.itemChanged.connect(self._on_item_changed)
 
     def _update_view(self) -> None:
-        """Update the view with current data."""
-        # Guard against recursive calls
-        if self._is_updating:
-            print("Skipping recursive _update_view call")
+        """Update the view to reflect the current model state."""
+        try:
+            # Get the data from the model
+            if not self._data_model:
+                logger.warning("Cannot update view, no model available")
+                return
+
+            data = self._data_model.data
+
+            # Set the data in the table
+            self._setup_table_model(data)
+
+        except Exception as e:
+            logger.error(f"Error updating view: {e}")
+
+    def clear_table(self) -> None:
+        """Clear the table view completely."""
+        # Reset the table model
+        if hasattr(self, "_table_model") and self._table_model:
+            if hasattr(self._table_model, "clear"):
+                self._table_model.clear()
+            else:
+                # Create empty model with same columns
+                columns = []
+                for col in range(self._table_model.columnCount()):
+                    columns.append(self._table_model.headerData(col, Qt.Horizontal))
+
+                self._table_model = QStandardItemModel(0, len(columns))
+                for col, name in enumerate(columns):
+                    self._table_model.setHeaderData(col, Qt.Horizontal, name)
+
+                # Set empty model to view
+                self._table_view.setModel(self._table_model)
+
+        # Process events to ensure UI updates
+        QApplication.processEvents()
+
+    def append_data_chunk(self, data_chunk: pd.DataFrame) -> None:
+        """
+        Append a chunk of data to the existing table.
+
+        Args:
+            data_chunk: DataFrame containing the data chunk to append
+        """
+        if data_chunk.empty:
+            return
+
+        # If table doesn't exist yet, create it
+        if not hasattr(self, "_table_model") or not self._table_model:
+            self._setup_table_model(data_chunk)
             return
 
         try:
-            self._is_updating = True
-            print("Starting _update_view method")
+            # Get current row count
+            current_row_count = self._table_model.rowCount()
 
-            # Clear the table model
-            self._table_model.clear()
+            # Get the headers/column names if available
+            columns = []
+            if hasattr(self._table_model, "horizontalHeaderItem"):
+                for col in range(self._table_model.columnCount()):
+                    header_item = self._table_model.horizontalHeaderItem(col)
+                    if header_item:
+                        columns.append(header_item.text())
+                    else:
+                        columns.append(str(col))
 
-            # Check if data is empty
-            if self._data_model.is_empty:
-                print("Data model is empty, no data to display")
-                self._status_label.setText("No data loaded")
-                self._filtered_rows = []  # Initialize to empty list when no data
-                self._is_updating = False
+            # If headers don't match, we need to recreate the model
+            if len(columns) != len(data_chunk.columns) or not all(
+                c1 == str(c2) for c1, c2 in zip(columns, data_chunk.columns)
+            ):
+                # Get all data currently in the model
+                current_data = []
+                for row in range(current_row_count):
+                    row_data = []
+                    for col in range(self._table_model.columnCount()):
+                        item = self._table_model.item(row, col)
+                        value = item.text() if item else ""
+                        row_data.append(value)
+                    current_data.append(row_data)
+
+                # Create a DataFrame from current data
+                if current_data:
+                    current_df = pd.DataFrame(current_data, columns=columns)
+                    # Combine with new chunk
+                    combined_df = pd.concat([current_df, data_chunk], ignore_index=True)
+                    # Reset the model with combined data
+                    self._setup_table_model(combined_df)
+                else:
+                    # Just use the new chunk
+                    self._setup_table_model(data_chunk)
                 return
 
-            # Get data from model - get a shallow copy to avoid modifying original
-            try:
-                data = self._data_model.data
-                print(f"Got data from model: {len(data)} rows, columns: {list(data.columns)}")
+            # Append rows to existing model
+            for _, row in data_chunk.iterrows():
+                items = []
+                for value in row:
+                    # Convert the value to a string and create a QStandardItem
+                    item = QStandardItem(str(value) if pd.notna(value) else "")
+                    items.append(item)
 
-                # Get column names
-                column_names = list(data.columns)
+                # Add the row to the model
+                self._table_model.appendRow(items)
 
-                # Set table dimensions
-                self._table_model.setColumnCount(len(column_names))
-                self._table_model.setRowCount(len(data))
+            # Update the view to show new data
+            self._table_view.scrollToBottom()
 
-                # Set headers
-                self._table_model.setHorizontalHeaderLabels(column_names)
+            # Process events every few rows to keep UI responsive
+            QApplication.processEvents()
 
-                # Populate table with data - direct access for performance
-                for row_idx in range(len(data)):
-                    for col_idx, col_name in enumerate(column_names):
-                        value = data.iloc[row_idx, col_idx]
-                        text = "" if pd.isna(value) else str(value)
-                        self._table_model.setItem(row_idx, col_idx, QStandardItem(text))
+        except Exception as e:
+            logger.error(f"Error appending data chunk: {e}")
 
-                # Store filtered rows
-                self._filtered_rows = list(range(len(data)))
+    def _setup_table_model(self, data: pd.DataFrame) -> None:
+        """
+        Set up the table model with the given data.
 
-                # Update filter column combo
-                self._filter_column.clear()
-                self._filter_column.addItems(column_names)
+        Args:
+            data: DataFrame containing the data to display
+        """
+        try:
+            if data is None or data.empty:
+                # Create empty model
+                self._table_model = QStandardItemModel(0, 0)
+                self._table_view.setModel(self._table_model)
+                return
 
-                # Update status
-                self._status_label.setText(f"Loaded {len(data)} records")
+            # Create model with the right dimensions
+            self._table_model = QStandardItemModel(0, len(data.columns))
 
-                print(
-                    f"Finished populating table with {len(data)} rows and {len(column_names)} columns"
-                )
+            # Set column headers
+            for col, name in enumerate(data.columns):
+                self._table_model.setHeaderData(col, Qt.Horizontal, str(name))
 
-            except Exception as e:
-                print(f"Error getting/displaying data: {e}")
-                self._status_label.setText("Error loading data")
-                import traceback
+            # Add data rows (batch for better performance)
+            self._batch_add_rows(data)
 
-                traceback.print_exc()
+            # Set model on the view
+            self._table_view.setModel(self._table_model)
 
-        finally:
-            self._is_updating = False
+            # Connect selection signal if not already connected
+            if not getattr(self, "_selection_connected", False):
+                selection_model = self._table_view.selectionModel()
+                if selection_model:
+                    selection_model.selectionChanged.connect(self._on_selection_changed)
+                    self._selection_connected = True
+
+            # Resize columns to content
+            self._table_view.resizeColumnsToContents()
+
+            # Emit data loaded signal
+            self.data_loaded.emit()
+
+        except Exception as e:
+            logger.error(f"Error setting up table model: {e}")
+
+    def _batch_add_rows(self, data: pd.DataFrame, batch_size: int = 100) -> None:
+        """
+        Add rows to the model in batches for better performance.
+
+        Args:
+            data: DataFrame containing the data to add
+            batch_size: Number of rows to add in each batch
+        """
+        try:
+            total_rows = len(data)
+
+            # Process in batches
+            for start_idx in range(0, total_rows, batch_size):
+                end_idx = min(start_idx + batch_size, total_rows)
+                batch = data.iloc[start_idx:end_idx]
+
+                # Add each row in the batch
+                for _, row in batch.iterrows():
+                    items = []
+                    for value in row:
+                        # Convert the value to a string and create a QStandardItem
+                        item = QStandardItem(str(value) if pd.notna(value) else "")
+                        items.append(item)
+
+                    # Add the row to the model
+                    self._table_model.appendRow(items)
+
+                # Process events every batch to keep UI responsive
+                QApplication.processEvents()
+
+        except Exception as e:
+            logger.error(f"Error adding rows in batches: {e}")
 
     def _apply_filter(self) -> None:
         """Apply the current filter to the data."""
