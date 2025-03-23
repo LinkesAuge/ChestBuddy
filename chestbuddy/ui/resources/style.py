@@ -17,6 +17,7 @@ class Colors:
 
     # Main colors
     PRIMARY = "#1A2C42"  # Dark blue
+    PRIMARY_LIGHTER = "#1D324A"  # Slightly lighter variant of PRIMARY
     SECONDARY = "#D4AF37"  # Gold
     ACCENT = "#4A90E2"  # Light blue
 
