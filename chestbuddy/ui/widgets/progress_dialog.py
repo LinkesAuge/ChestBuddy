@@ -100,16 +100,57 @@ class ProgressDialog(QDialog):
         self._progress_bar = ProgressBar(self)
         self._progress_bar.setMaximum(self._maximum)
 
-        # Cancel button
+        # Apply additional styling to match app theme
+        self._progress_bar.setStyleSheet(f"""
+            QProgressBar {{
+                background-color: {Colors.BACKGROUND_DARK};
+                border-radius: 4px;
+                height: 12px;
+                text-align: center;
+            }}
+            
+            QProgressBar::chunk {{
+                background-color: {Colors.PRIMARY};
+                border-radius: 4px;
+            }}
+        """)
+
+        # Cancel/confirm button layout - centered
         button_layout = QHBoxLayout()
         button_layout.setContentsMargins(0, 0, 0, 0)
 
-        spacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
-        button_layout.addItem(spacer)
+        # Add spacers on both sides to center the button
+        left_spacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
+        button_layout.addItem(left_spacer)
 
         self._cancel_button = QPushButton(self._cancel_button_text)
         self._cancel_button.clicked.connect(self._on_cancel_clicked)
+
+        # Apply consistent button styling
+        self._cancel_button.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {Colors.PRIMARY};
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 8px 16px;
+                font-weight: bold;
+            }}
+            
+            QPushButton:hover {{
+                background-color: {Colors.PRIMARY_DARK};
+            }}
+            
+            QPushButton:pressed {{
+                background-color: {Colors.PRIMARY_DARKER};
+            }}
+        """)
+
         button_layout.addWidget(self._cancel_button)
+
+        # Add right spacer to ensure centering
+        right_spacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
+        button_layout.addItem(right_spacer)
 
         # Add widgets to layout
         main_layout.addWidget(self._label)

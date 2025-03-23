@@ -47,6 +47,7 @@ from chestbuddy.ui.views.correction_view_adapter import CorrectionViewAdapter
 from chestbuddy.ui.views.chart_view_adapter import ChartViewAdapter
 from chestbuddy.ui.widgets import ProgressDialog, ProgressBar
 from chestbuddy.ui.data_view import DataView
+import pandas as pd
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -304,6 +305,19 @@ class MainWindow(QMainWindow):
 
     def _connect_signals(self) -> None:
         """Connect signals and slots."""
+        # Data manager signals
+        self._data_manager.load_started.connect(self._on_load_started)
+        self._data_manager.load_progress.connect(self._on_load_progress)
+        self._data_manager.load_finished.connect(self._on_load_finished)
+        self._data_manager.load_error.connect(self._on_load_error)
+        self._data_manager.load_success.connect(self.refresh_ui)
+        self._data_manager.populate_table_requested.connect(self._on_populate_table_requested)
+
+        # Data model signals
+        self._data_model.data_changed.connect(self._on_data_changed)
+        self._data_model.validation_changed.connect(self._on_validation_changed)
+        self._data_model.correction_applied.connect(self._on_correction_applied)
+
         # Connect data model signals
         self._data_model.data_changed.connect(self._on_data_changed)
         self._data_model.validation_changed.connect(self._on_validation_changed)
@@ -600,6 +614,39 @@ class MainWindow(QMainWindow):
         # Process events to ensure UI updates
         QApplication.processEvents()
 
+    def _on_populate_table_requested(self, data: pd.DataFrame) -> None:
+        """
+        Handle request to populate table during data loading.
+        This synchronizes table population with file import.
+
+        Args:
+            data: The data to populate in the table
+        """
+        logger.debug("Received request to populate table during data loading")
+
+        # Update progress dialog to show table population
+        if hasattr(self, "_progress_dialog") and self._progress_dialog:
+            self._progress_dialog.setLabelText(f"Populating table with {len(data):,} rows...")
+            self._progress_dialog.setValue(0)  # Reset progress for table population
+            QApplication.processEvents()
+
+        # Get the data view
+        if hasattr(self, "_content_stack"):
+            # Find the data view
+            for i in range(self._content_stack.count()):
+                widget = self._content_stack.widget(i)
+                if hasattr(widget, "_update_view"):
+                    # Update the view with progress tracking
+                    try:
+                        # Call update view to populate table (it has its own chunking)
+                        widget._update_view()
+                        break
+                    except Exception as e:
+                        logger.error(f"Error populating table: {e}")
+
+        # Allow UI to process after table population attempt
+        QApplication.processEvents()
+
     def _on_load_progress(self, file_path: str, current: int, total: int) -> None:
         """
         Handle progress updates during loading.
@@ -703,31 +750,36 @@ class MainWindow(QMainWindow):
                 else "files"
             )
 
-            # Build a descriptive progress message
+            # Standardized progress message format: "File X of Y - Z rows processed"
             if self._loading_state["total_files"] > 0:
-                # File count information
+                # Format file information
                 if self._loading_state["total_files"] > 1:
-                    message = f"Loading file {self._loading_state['current_file_index']}/{self._loading_state['total_files']}: {filename}"
+                    file_info = f"File {self._loading_state['current_file_index']} of {self._loading_state['total_files']}"
                 else:
-                    message = f"Loading file: {filename}"
+                    file_info = "File 1 of 1"
 
-                # Row count information
+                # Add filename
+                file_info += f": {filename}"
+
+                # Format rows with commas for readability
                 if total > 0:
-                    # Format numbers with commas for readability
                     current_formatted = f"{current:,}"
                     total_formatted = f"{total:,}"
+                    row_info = f"{current_formatted} of {total_formatted} rows"
 
+                    # Create combined message with standardized format
+                    message = f"{file_info} - {row_info}"
+
+                    # Add total rows information as status text
                     if hasattr(self, "_total_rows_loaded") and self._total_rows_estimated > 0:
-                        # Show both file-specific and overall progress
-                        message += f" ({current_formatted}/{total_formatted} rows)"
-
-                        # Add total rows information as status text
                         total_progress = f"Total: {self._total_rows_loaded:,} of ~{self._total_rows_estimated:,} rows"
                         self._progress_dialog.setStatusText(total_progress)
                     else:
-                        # Fall back to just file-specific progress
-                        message += f" ({current_formatted}/{total_formatted} rows)"
                         self._progress_dialog.setStatusText("")
+                else:
+                    # If we don't have row information yet
+                    message = file_info
+                    self._progress_dialog.setStatusText("")
             else:
                 # Fallback if we don't have file count yet
                 message = f"Loading {filename}..."
@@ -1086,6 +1138,21 @@ class MainWindow(QMainWindow):
         Args:
             event: The close event.
         """
+        # Cancel any ongoing data loading operations
+        if hasattr(self, "_data_manager") and self._data_manager:
+            try:
+                logger.info("Cancelling any ongoing operations before closing")
+                self._data_manager.cancel_loading()
+            except Exception as e:
+                logger.error(f"Error cancelling operations during shutdown: {e}")
+
+        # Close progress dialog if it exists
+        if hasattr(self, "_progress_dialog") and self._progress_dialog:
+            try:
+                self._progress_dialog.close()
+            except Exception as e:
+                logger.error(f"Error closing progress dialog during shutdown: {e}")
+
         # Save settings
         self._save_settings()
         self._save_recent_files()

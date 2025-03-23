@@ -55,6 +55,9 @@ class DataManager(QObject):
     load_started = Signal()
     load_finished = Signal(str)  # Include a message parameter
 
+    # Signal for synchronous table population
+    populate_table_requested = Signal(pd.DataFrame)  # DataFrame to populate in the table
+
     def __init__(self, data_model, csv_service) -> None:
         """
         Initialize the DataManager service.
@@ -326,21 +329,28 @@ class DataManager(QObject):
             if self._current_file_path:
                 self._update_recent_files(self._current_file_path)
 
-            # FIRST emit the load_finished signal to let the UI finish progress reporting
-            # before we update the data model (which can trigger resource-intensive UI updates)
-            success_message = f"Successfully loaded {len(data)} rows of data"
-            self.load_finished.emit(success_message)
+            # Emit load_finished signal with a processing message
+            processing_message = f"Processing {len(data):,} rows of data..."
+            self.load_finished.emit(processing_message)
 
             # Allow UI to process the completion event
             QApplication.processEvents()
 
-            # THEN attempt to map columns
+            # Map columns
             mapped_data = self._map_columns(data)
 
             # Update the data model with the new data
             self._data_model.update_data(mapped_data)
 
+            # Signal to populate the table synchronously
+            # This allows the table to be populated before continuing
+            self.populate_table_requested.emit(mapped_data)
+
+            # Process events to allow UI to update during table population
+            QApplication.processEvents()
+
             # Emit success signal with message
+            success_message = f"Successfully loaded {len(data):,} rows of data"
             self.load_success.emit(message or "CSV loaded successfully")
 
             # Unblock signals and emit a controlled change notification
