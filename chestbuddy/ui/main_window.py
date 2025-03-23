@@ -939,10 +939,15 @@ class MainWindow(QMainWindow):
 
                 logger.debug("[UNBLOCK_COMPLETE] Dialog closure and UI unblocking complete")
 
-                # Schedule a final UI check with a delay to catch any elements that might have been
-                # disabled during data population after dialog closure
-                logger.debug("[FINAL_CHECK] Scheduling final UI check with 500ms delay")
-                QTimer.singleShot(500, self._perform_final_ui_check)
+                # Schedule multiple final UI checks with increasing delays to ensure we catch
+                # the end of table population, especially for the first import with large datasets
+                logger.debug(
+                    "[FINAL_CHECK] Scheduling multiple final UI checks with increasing delays"
+                )
+                QTimer.singleShot(500, lambda: self._perform_final_ui_check(500))
+                QTimer.singleShot(1500, lambda: self._perform_final_ui_check(1500))
+                QTimer.singleShot(3000, lambda: self._perform_final_ui_check(3000))
+                QTimer.singleShot(5000, lambda: self._perform_final_ui_check(5000))
 
         except Exception as e:
             logger.error(f"[DIALOG_CLOSE_ERROR] Error closing progress dialog: {e}")
@@ -950,12 +955,17 @@ class MainWindow(QMainWindow):
 
             logger.error(f"[TRACEBACK] {traceback.format_exc()}")
 
-    def _perform_final_ui_check(self) -> None:
+    def _perform_final_ui_check(self, delay_ms: int = 500) -> None:
         """
         Perform a final check of UI elements after import.
         This runs after a delay to ensure all processes (dialog closure, table population) are complete.
+
+        Args:
+            delay_ms: The delay in milliseconds after which this check is running
         """
-        logger.debug("[FINAL_CHECK] Performing final UI elements check")
+        logger.debug(
+            f"[FINAL_CHECK_{delay_ms}ms] Performing final UI elements check after {delay_ms}ms delay"
+        )
 
         try:
             # Process events again
@@ -968,7 +978,17 @@ class MainWindow(QMainWindow):
                 and hasattr(data_view, "_data_view")
                 and hasattr(data_view._data_view, "_table_view")
             ):
-                logger.debug("[FINAL_TABLE_CHECK] Ensuring table is fully enabled")
+                logger.debug(f"[FINAL_TABLE_CHECK_{delay_ms}ms] Ensuring table is fully enabled")
+
+                # Check if DataView is still updating (if we can access that information)
+                is_updating = False
+                if hasattr(data_view._data_view, "_is_updating"):
+                    is_updating = data_view._data_view._is_updating
+                    logger.debug(
+                        f"[TABLE_UPDATE_STATE_{delay_ms}ms] DataView is currently updating: {is_updating}"
+                    )
+
+                # Force enable the table regardless of update state
                 data_view._data_view._table_view.setEnabled(True)
                 data_view._data_view._table_view.setSortingEnabled(True)
 
@@ -976,8 +996,30 @@ class MainWindow(QMainWindow):
                 table_enabled = data_view._data_view._table_view.isEnabled()
                 sorting_enabled = data_view._data_view._table_view.isSortingEnabled()
                 logger.debug(
-                    f"[FINAL_TABLE_STATE] Table enabled: {table_enabled}, "
+                    f"[FINAL_TABLE_STATE_{delay_ms}ms] Table enabled: {table_enabled}, "
                     f"Sorting enabled: {sorting_enabled}"
+                )
+
+            # Also check and enable any other UI elements that might be blocked
+            # This is especially important for the first import
+            try:
+                # Ensure sidebar is enabled
+                if hasattr(self, "_sidebar") and self._sidebar:
+                    logger.debug(f"[SIDEBAR_CHECK_{delay_ms}ms] Ensuring sidebar is enabled")
+                    self._sidebar.setEnabled(True)
+
+                # Ensure main menu is enabled
+                if hasattr(self, "menuBar") and self.menuBar():
+                    logger.debug(f"[MENU_CHECK_{delay_ms}ms] Ensuring menu bar is enabled")
+                    self.menuBar().setEnabled(True)
+
+                # Ensure content stack is enabled
+                if hasattr(self, "_content_stack") and self._content_stack:
+                    logger.debug(f"[CONTENT_CHECK_{delay_ms}ms] Ensuring content stack is enabled")
+                    self._content_stack.setEnabled(True)
+            except Exception as ui_error:
+                logger.error(
+                    f"[UI_ENABLE_ERROR_{delay_ms}ms] Error enabling UI elements: {ui_error}"
                 )
 
             # Final UI update
@@ -986,13 +1028,13 @@ class MainWindow(QMainWindow):
             # Process events one last time
             QApplication.processEvents()
 
-            logger.debug("[FINAL_CHECK] Final UI check and unblocking complete")
+            logger.debug(f"[FINAL_CHECK_{delay_ms}ms] Final UI check and unblocking complete")
 
         except Exception as e:
-            logger.error(f"[FINAL_CHECK_ERROR] Error during final UI check: {e}")
+            logger.error(f"[FINAL_CHECK_ERROR_{delay_ms}ms] Error during final UI check: {e}")
             import traceback
 
-            logger.error(f"[TRACEBACK] {traceback.format_exc()}")
+            logger.error(f"[TRACEBACK_{delay_ms}ms] {traceback.format_exc()}")
 
     def _capture_snapshot(self, name: str) -> None:
         """

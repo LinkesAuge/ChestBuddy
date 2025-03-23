@@ -45,6 +45,10 @@ The active development focus is UI enhancement with a particular emphasis on das
    - Seventh attempt solution: Added a delayed final UI check to handle race conditions between dialog closure and table population
    - Implemented two-phase UI unblocking (immediate at closure + delayed check 500ms later)
    - This ensures UI elements remain enabled even if they get temporarily disabled during table population
+   - Eighth attempt solution: Implemented multiple delayed UI checks at increasing intervals (500ms, 1500ms, 3000ms, 5000ms)
+   - This significantly increases our chances of catching the end of the table population process, especially for large datasets
+   - Enhanced the checks to re-enable all UI elements, not just the table view
+   - Added better diagnostic logging to track when each check runs and what it finds
 
 ## Recent Improvements
 

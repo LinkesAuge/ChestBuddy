@@ -108,6 +108,18 @@ alwaysApply: false
   - **Date**: 2025-03-24
   - **Notes**: This approach handles the timing issue without requiring changes to the DataView class or its internal table population process.
 
+- ✅ UI remaining blocked after first import confirmation (eighth attempt)
+  - **Issue**: The UI was still getting blocked after the first import despite previous fix attempts.
+  - **Cause**: After detailed analysis, we found that the DataView's table population process is particularly lengthy during the first import (can take several seconds), and our single 500ms delayed check was not sufficient to catch the end of this process. On the first import, DataView temporarily disables the table while populating it in chunks, and our UI unblocking attempts were being overridden by the ongoing population process.
+  - **Fix**: Implemented multiple delayed UI checks at increasing intervals:
+    1. Kept the original 500ms check
+    2. Added additional checks at 1500ms, 3000ms, and 5000ms
+    3. Enhanced the check to explicitly re-enable all UI elements, not just the DataView table
+    4. Added check to detect if DataView is still in the process of updating
+    5. Improved logging to track when each check runs and what it finds
+  - **Date**: 2025-03-24
+  - **Notes**: This solution increases the chances of catching the end of the table population process, particularly for large datasets on the first import. The multiple checks at different intervals ensure we have multiple opportunities to re-enable the UI.
+
 ## Background Processing Issues
 - ✅ Signal connections not working properly
   - Fixed connections between DataManager and MainWindow
