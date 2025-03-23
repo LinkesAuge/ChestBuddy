@@ -449,7 +449,7 @@ class DataManager(QObject):
                 self.save_success.emit(file_path)
             else:
                 self.save_error.emit(f"Error saving file: {file_path}")
-        elif task_id == "load_csv":
+        elif task_id == "load_csv" or task_id.startswith("load_multi_csv_"):
             # Handle load_csv task completion
             self._on_csv_load_success(result)
 
@@ -463,7 +463,7 @@ class DataManager(QObject):
         """
         logger.error(f"Background task failed: {task_id}, error: {error}")
 
-        if task_id == "load_csv":
+        if task_id == "load_csv" or task_id.startswith("load_multi_csv_"):
             # Unblock signals
             self._data_model.blockSignals(False)
 

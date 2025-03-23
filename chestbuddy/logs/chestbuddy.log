@@ -134,3 +134,122 @@
 2025-03-23 03:38:17,605 - __main__ - INFO - Saving configuration
 2025-03-23 03:38:17,605 - __main__ - INFO - Application shutdown complete
 2025-03-23 03:47:10,512 - root - INFO - Logging initialized to D:\Projekte\ChestBuddy\chestbuddy\logs\chestbuddy.log
+2025-03-23 03:48:22,814 - root - INFO - Logging initialized to D:\Projekte\ChestBuddy\chestbuddy\logs\chestbuddy.log
+2025-03-23 03:49:03,962 - root - INFO - Logging initialized to D:\Projekte\ChestBuddy\chestbuddy\logs\chestbuddy.log
+2025-03-23 03:53:00,369 - root - INFO - Logging initialized to D:\Projekte\ChestBuddy\chestbuddy\logs\chestbuddy.log
+2025-03-23 03:53:00,931 - __main__ - INFO - Logging initialized at level INFO to D:\Projekte\ChestBuddy\chestbuddy\logs\chestbuddy.log
+2025-03-23 03:53:00,952 - chestbuddy.ui.main_window - ERROR - MainWindow initialized WITHOUT data_manager
+2025-03-23 03:53:00,980 - chestbuddy.ui.data_view - INFO - Installed event filter on table view
+2025-03-23 03:53:00,980 - chestbuddy.ui.data_view - INFO - Registered Ctrl+C shortcut for copying (table-specific)
+2025-03-23 03:53:00,980 - chestbuddy.ui.data_view - INFO - Registered widget-level Ctrl+V shortcut for pasting (widget hierarchy)
+2025-03-23 03:53:00,989 - chestbuddy.ui.main_window - INFO - Setting active view to: Dashboard
+2025-03-23 03:53:00,990 - chestbuddy.ui.main_window - INFO - View 'Dashboard' activated successfully
+2025-03-23 03:53:00,990 - chestbuddy.ui.main_window - WARNING - No data_manager available, progress signals will not be connected
+2025-03-23 03:53:00,991 - __main__ - INFO - Autosave enabled with interval of 5 minutes
+2025-03-23 03:53:00,992 - chestbuddy.ui.resources.resource_manager - WARNING - Failed to load Qt resources. Using file-based resources.
+2025-03-23 03:53:01,012 - __main__ - INFO - ChestBuddy application initialized
+2025-03-23 03:53:01,073 - __main__ - INFO - Starting application main event loop
+2025-03-23 03:53:31,335 - chestbuddy.core.services.data_manager - INFO - Loading 3 CSV file(s)
+2025-03-23 03:53:35,336 - chestbuddy.ui.main_window - INFO - Setting active view to: Data
+2025-03-23 03:53:35,337 - chestbuddy.ui.main_window - INFO - View 'Data' activated successfully
+2025-03-23 03:53:36,326 - chestbuddy.ui.main_window - INFO - Setting active view to: Dashboard
+2025-03-23 03:53:36,327 - chestbuddy.ui.main_window - INFO - View 'Dashboard' activated successfully
+2025-03-23 03:53:37,273 - __main__ - INFO - Application shutdown
+2025-03-23 03:55:27,717 - root - INFO - Logging initialized to D:\Projekte\ChestBuddy\chestbuddy\logs\chestbuddy.log
+2025-03-23 03:55:28,155 - __main__ - INFO - Logging initialized at level INFO to d:\Projekte\ChestBuddy\chestbuddy\logs\chestbuddy.log
+2025-03-23 03:55:28,172 - chestbuddy.ui.main_window - ERROR - MainWindow initialized WITHOUT data_manager
+2025-03-23 03:55:28,198 - chestbuddy.ui.data_view - INFO - Installed event filter on table view
+2025-03-23 03:55:28,198 - chestbuddy.ui.data_view - INFO - Registered Ctrl+C shortcut for copying (table-specific)
+2025-03-23 03:55:28,198 - chestbuddy.ui.data_view - INFO - Registered widget-level Ctrl+V shortcut for pasting (widget hierarchy)
+2025-03-23 03:55:28,206 - chestbuddy.ui.main_window - INFO - Setting active view to: Dashboard
+2025-03-23 03:55:28,206 - chestbuddy.ui.main_window - INFO - View 'Dashboard' activated successfully
+2025-03-23 03:55:28,207 - chestbuddy.ui.main_window - WARNING - No data_manager available, progress signals will not be connected
+2025-03-23 03:55:28,209 - __main__ - INFO - Autosave enabled with interval of 5 minutes
+2025-03-23 03:55:28,209 - chestbuddy.ui.resources.resource_manager - WARNING - Failed to load Qt resources. Using file-based resources.
+2025-03-23 03:55:28,229 - __main__ - INFO - ChestBuddy application initialized
+2025-03-23 03:55:28,288 - __main__ - INFO - Starting application main event loop
+2025-03-23 03:55:37,808 - chestbuddy.core.services.data_manager - INFO - Loading 3 CSV file(s)
+2025-03-23 03:55:40,228 - __main__ - INFO - Application shutdown
+2025-03-23 03:59:24,680 - root - INFO - Logging initialized to D:\Projekte\ChestBuddy\chestbuddy\logs\chestbuddy.log
+2025-03-23 03:59:25,193 - __main__ - INFO - Logging initialized at level INFO to D:\Projekte\ChestBuddy\chestbuddy\logs\chestbuddy.log
+2025-03-23 03:59:25,210 - chestbuddy.ui.main_window - ERROR - MainWindow initialized WITHOUT data_manager
+2025-03-23 03:59:25,235 - chestbuddy.ui.data_view - INFO - Installed event filter on table view
+2025-03-23 03:59:25,235 - chestbuddy.ui.data_view - INFO - Registered Ctrl+C shortcut for copying (table-specific)
+2025-03-23 03:59:25,236 - chestbuddy.ui.data_view - INFO - Registered widget-level Ctrl+V shortcut for pasting (widget hierarchy)
+2025-03-23 03:59:25,244 - chestbuddy.ui.main_window - INFO - Setting active view to: Dashboard
+2025-03-23 03:59:25,244 - chestbuddy.ui.main_window - INFO - View 'Dashboard' activated successfully
+2025-03-23 03:59:25,245 - chestbuddy.ui.main_window - WARNING - No data_manager available, progress signals will not be connected
+2025-03-23 03:59:25,246 - __main__ - INFO - Autosave enabled with interval of 5 minutes
+2025-03-23 03:59:25,246 - chestbuddy.ui.resources.resource_manager - WARNING - Failed to load Qt resources. Using file-based resources.
+2025-03-23 03:59:25,271 - __main__ - INFO - ChestBuddy application initialized
+2025-03-23 03:59:25,335 - __main__ - INFO - Starting application main event loop
+2025-03-23 03:59:54,216 - chestbuddy.core.services.data_manager - INFO - Loading 3 CSV file(s)
+2025-03-23 03:59:54,225 - chestbuddy.core.services.csv_service - INFO - Detected encoding: utf-8
+2025-03-23 03:59:54,226 - chestbuddy.core.services.csv_service - INFO - Reading CSV file in chunks: D:\Projekte\ChestBuddy\chestbuddy\data\input\Chests_input_2025_03_11.csv, chunk size: 1000
+2025-03-23 03:59:54,237 - chestbuddy.core.services.csv_service - INFO - Successfully read CSV file with 3497 rows
+2025-03-23 03:59:54,244 - chestbuddy.core.services.csv_service - INFO - Detected encoding: utf-8
+2025-03-23 03:59:54,245 - chestbuddy.core.services.csv_service - INFO - Reading CSV file in chunks: D:\Projekte\ChestBuddy\chestbuddy\data\input\Chests_input_2025_03_12.csv, chunk size: 1000
+2025-03-23 03:59:54,266 - chestbuddy.core.services.csv_service - INFO - Successfully read CSV file with 7959 rows
+2025-03-23 03:59:54,280 - chestbuddy.core.services.csv_service - INFO - Detected encoding: utf-8
+2025-03-23 03:59:54,282 - chestbuddy.core.services.csv_service - INFO - Reading CSV file in chunks: D:\Projekte\ChestBuddy\chestbuddy\data\input\Chests_input_test.csv, chunk size: 1000
+2025-03-23 03:59:54,312 - chestbuddy.core.services.csv_service - INFO - Successfully read CSV file with 12387 rows
+2025-03-23 03:59:54,323 - chestbuddy.utils.background_processing - INFO - Successfully loaded 23843 rows from 3 files
+2025-03-23 04:00:00,309 - chestbuddy.ui.main_window - INFO - Setting active view to: Data
+2025-03-23 04:00:00,310 - chestbuddy.ui.main_window - INFO - View 'Data' activated successfully
+2025-03-23 04:00:01,537 - __main__ - INFO - Application shutdown
+2025-03-23 04:00:30,677 - root - INFO - Logging initialized to D:\Projekte\ChestBuddy\chestbuddy\logs\chestbuddy.log
+2025-03-23 04:00:31,128 - __main__ - INFO - Logging initialized at level INFO to d:\Projekte\ChestBuddy\chestbuddy\logs\chestbuddy.log
+2025-03-23 04:00:31,145 - chestbuddy.ui.main_window - ERROR - MainWindow initialized WITHOUT data_manager
+2025-03-23 04:00:31,171 - chestbuddy.ui.data_view - INFO - Installed event filter on table view
+2025-03-23 04:00:31,171 - chestbuddy.ui.data_view - INFO - Registered Ctrl+C shortcut for copying (table-specific)
+2025-03-23 04:00:31,171 - chestbuddy.ui.data_view - INFO - Registered widget-level Ctrl+V shortcut for pasting (widget hierarchy)
+2025-03-23 04:00:31,182 - chestbuddy.ui.main_window - INFO - Setting active view to: Dashboard
+2025-03-23 04:00:31,182 - chestbuddy.ui.main_window - INFO - View 'Dashboard' activated successfully
+2025-03-23 04:00:31,183 - chestbuddy.ui.main_window - WARNING - No data_manager available, progress signals will not be connected
+2025-03-23 04:00:31,184 - __main__ - INFO - Autosave enabled with interval of 5 minutes
+2025-03-23 04:00:31,184 - chestbuddy.ui.resources.resource_manager - WARNING - Failed to load Qt resources. Using file-based resources.
+2025-03-23 04:00:31,204 - __main__ - INFO - ChestBuddy application initialized
+2025-03-23 04:00:31,264 - __main__ - INFO - Starting application main event loop
+2025-03-23 04:00:37,676 - chestbuddy.core.services.data_manager - INFO - Loading 3 CSV file(s)
+2025-03-23 04:00:37,684 - chestbuddy.core.services.csv_service - INFO - Detected encoding: utf-8
+2025-03-23 04:00:37,686 - chestbuddy.core.services.csv_service - INFO - Reading CSV file in chunks: D:\Projekte\ChestBuddy\chestbuddy\data\input\Chests_input_2025_03_11.csv, chunk size: 1000
+2025-03-23 04:00:37,697 - chestbuddy.core.services.csv_service - INFO - Successfully read CSV file with 3497 rows
+2025-03-23 04:00:37,703 - chestbuddy.core.services.csv_service - INFO - Detected encoding: utf-8
+2025-03-23 04:00:37,705 - chestbuddy.core.services.csv_service - INFO - Reading CSV file in chunks: D:\Projekte\ChestBuddy\chestbuddy\data\input\Chests_input_2025_03_12.csv, chunk size: 1000
+2025-03-23 04:00:37,724 - chestbuddy.core.services.csv_service - INFO - Successfully read CSV file with 7959 rows
+2025-03-23 04:00:37,738 - chestbuddy.core.services.csv_service - INFO - Detected encoding: utf-8
+2025-03-23 04:00:37,740 - chestbuddy.core.services.csv_service - INFO - Reading CSV file in chunks: D:\Projekte\ChestBuddy\chestbuddy\data\input\Chests_input_test.csv, chunk size: 1000
+2025-03-23 04:00:37,769 - chestbuddy.core.services.csv_service - INFO - Successfully read CSV file with 12387 rows
+2025-03-23 04:00:37,780 - chestbuddy.utils.background_processing - INFO - Successfully loaded 23843 rows from 3 files
+2025-03-23 04:00:41,252 - chestbuddy.ui.main_window - INFO - Setting active view to: Data
+2025-03-23 04:00:41,254 - chestbuddy.ui.main_window - INFO - View 'Data' activated successfully
+2025-03-23 04:00:42,091 - __main__ - INFO - Application shutdown
+2025-03-23 04:06:22,496 - root - INFO - Logging initialized to D:\Projekte\ChestBuddy\chestbuddy\logs\chestbuddy.log
+2025-03-23 04:06:23,038 - __main__ - INFO - Logging initialized at level INFO to D:\Projekte\ChestBuddy\chestbuddy\logs\chestbuddy.log
+2025-03-23 04:06:23,057 - chestbuddy.ui.main_window - ERROR - MainWindow initialized WITHOUT data_manager
+2025-03-23 04:06:23,082 - chestbuddy.ui.data_view - INFO - Installed event filter on table view
+2025-03-23 04:06:23,082 - chestbuddy.ui.data_view - INFO - Registered Ctrl+C shortcut for copying (table-specific)
+2025-03-23 04:06:23,082 - chestbuddy.ui.data_view - INFO - Registered widget-level Ctrl+V shortcut for pasting (widget hierarchy)
+2025-03-23 04:06:23,090 - chestbuddy.ui.main_window - INFO - Setting active view to: Dashboard
+2025-03-23 04:06:23,090 - chestbuddy.ui.main_window - INFO - View 'Dashboard' activated successfully
+2025-03-23 04:06:23,091 - chestbuddy.ui.main_window - WARNING - No data_manager available, progress signals will not be connected
+2025-03-23 04:06:23,092 - __main__ - INFO - Autosave enabled with interval of 5 minutes
+2025-03-23 04:06:23,092 - chestbuddy.ui.resources.resource_manager - WARNING - Failed to load Qt resources. Using file-based resources.
+2025-03-23 04:06:23,112 - __main__ - INFO - ChestBuddy application initialized
+2025-03-23 04:06:23,170 - __main__ - INFO - Starting application main event loop
+2025-03-23 04:06:48,432 - chestbuddy.core.services.data_manager - INFO - Loading 3 CSV file(s)
+2025-03-23 04:06:48,446 - chestbuddy.core.services.csv_service - INFO - Detected encoding: utf-8
+2025-03-23 04:06:48,447 - chestbuddy.core.services.csv_service - INFO - Reading CSV file in chunks: D:\Projekte\ChestBuddy\chestbuddy\data\input\Chests_input_2025_03_11.csv, chunk size: 1000
+2025-03-23 04:06:48,457 - chestbuddy.core.services.csv_service - INFO - Successfully read CSV file with 3497 rows
+2025-03-23 04:06:48,464 - chestbuddy.core.services.csv_service - INFO - Detected encoding: utf-8
+2025-03-23 04:06:48,465 - chestbuddy.core.services.csv_service - INFO - Reading CSV file in chunks: D:\Projekte\ChestBuddy\chestbuddy\data\input\Chests_input_2025_03_12.csv, chunk size: 1000
+2025-03-23 04:06:48,485 - chestbuddy.core.services.csv_service - INFO - Successfully read CSV file with 7959 rows
+2025-03-23 04:06:48,500 - chestbuddy.core.services.csv_service - INFO - Detected encoding: utf-8
+2025-03-23 04:06:48,502 - chestbuddy.core.services.csv_service - INFO - Reading CSV file in chunks: D:\Projekte\ChestBuddy\chestbuddy\data\input\Chests_input_test.csv, chunk size: 1000
+2025-03-23 04:06:48,532 - chestbuddy.core.services.csv_service - INFO - Successfully read CSV file with 12387 rows
+2025-03-23 04:06:48,543 - chestbuddy.utils.background_processing - INFO - Successfully loaded 23843 rows from 3 files
+2025-03-23 04:06:48,543 - chestbuddy.core.services.data_manager - INFO - Background task completed: load_multi_csv_3_files
+2025-03-23 04:06:48,543 - chestbuddy.core.services.data_manager - ERROR - CSV load did not return valid DataFrame: <class 'bool'>
+2025-03-23 04:06:48,543 - chestbuddy.core.services.data_manager - ERROR - Error in CSV load success handler: The truth value of a DataFrame is ambiguous. Use a.empty, a.bool(), a.item(), a.any() or a.all().
+2025-03-23 04:06:48,544 - __main__ - ERROR - Error processing CSV data: The truth value of a DataFrame is ambiguous. Use a.empty, a.bool(), a.item(), a.any() or a.all().
+2025-03-23 04:06:52,478 - __main__ - INFO - Application shutdown

@@ -61,6 +61,12 @@ alwaysApply: false
   - Updated to use correct get_list() and set_list() methods with proper section/option parameters
   - Improved error handling in get_recent_files method to skip invalid paths
 
+- ✅ Task ID mismatch in background processing
+  - Fixed mismatch between MultiCSVLoadTask's task ID format and what DataManager expects
+  - Added task ID recognition for "load_multi_csv_*" pattern in DataManager
+  - Added missing signal connections in BackgroundWorker.execute_task method
+  - Ensured proper propagation of task_completed and task_failed signals
+
 - **App crashes during CSV file import**: The application would crash in the middle of processing CSV files, particularly with large files.
   - Fixed by improving the memory management in `csv_service.py`, particularly the `read_csv_chunked` method which now incrementally processes chunks instead of storing all in memory.
   - Added robust error handling for memory errors, allowing partial data recovery.

@@ -530,6 +530,11 @@ class BackgroundWorker(QObject):
         # Connect task signals
         task.progress.connect(self.progress)
 
+        # Connect the finished and error signals to task_completed and task_failed
+        # These connections will be automatically removed when the thread finishes
+        self.finished.connect(lambda result: self.task_completed.emit(task.task_id, result))
+        self.error.connect(lambda error: self.task_failed.emit(task.task_id, error))
+
         # Start the thread
         self._thread.start()
 
