@@ -13,6 +13,8 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Optional, Union, Any, Set, Tuple
 
+import pandas as pd
+
 from PySide6.QtCore import Qt, Signal, Slot, QSettings, QSize, QTimer
 from PySide6.QtWidgets import (
     QMainWindow,
@@ -32,8 +34,11 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtGui import QAction, QIcon, QKeySequence
 
-from chestbuddy.core.models import ChestDataModel
-from chestbuddy.core.services import CSVService, ValidationService, CorrectionService, ChartService
+from chestbuddy.core.models.chest_data_model import ChestDataModel
+from chestbuddy.core.services.chart_service import ChartService
+from chestbuddy.core.services.csv_service import CSVService
+from chestbuddy.core.services.validation_service import ValidationService
+from chestbuddy.core.services.correction_service import CorrectionService
 from chestbuddy.ui.resources.style import Colors, apply_application_style
 from chestbuddy.ui.resources.icons import Icons
 from chestbuddy.ui.resources.resource_manager import ResourceManager
@@ -48,8 +53,7 @@ from chestbuddy.ui.views.chart_view_adapter import ChartViewAdapter
 from chestbuddy.ui.views.dashboard_view_adapter import DashboardViewAdapter
 from chestbuddy.ui.widgets import ProgressDialog, ProgressBar
 from chestbuddy.ui.data_view import DataView
-import pandas as pd
-from chestbuddy.settings import CONFIG_FILE
+from chestbuddy.utils.config import ConfigManager
 from chestbuddy.debugging import measure_time, StateSnapshot, install_debug_hooks
 
 # Set up logger
@@ -371,57 +375,68 @@ class MainWindow(QMainWindow):
 
     def _load_settings(self) -> None:
         """Load application settings."""
-        settings = QSettings("ChestBuddy", "ChestBuddy")
-        geometry = settings.value("geometry")
-        if geometry:
-            self.restoreGeometry(geometry)
+        config = ConfigManager()
+
+        # Load window geometry
+        self.resize(
+            config.get_int("UI", "window_width", 1024), config.get_int("UI", "window_height", 768)
+        )
+
+        # Load other settings as needed
+        logger.debug("Application settings loaded")
 
     def _save_settings(self) -> None:
         """Save application settings."""
-        settings = QSettings("ChestBuddy", "ChestBuddy")
-        settings.setValue("geometry", self.saveGeometry())
-        settings.sync()
+        config = ConfigManager()
+
+        # Save window geometry
+        config.set("UI", "window_width", self.width())
+        config.set("UI", "window_height", self.height())
+
+        # Save other settings as needed
+        logger.debug("Application settings saved")
 
     def _load_recent_files(self) -> None:
-        """Load the list of recent files."""
-        settings = QSettings("ChestBuddy", "ChestBuddy")
-        self._recent_files = settings.value("recentFiles", [])
-        if not isinstance(self._recent_files, list):
-            self._recent_files = []
+        """Load recent files from settings."""
+        config = ConfigManager()
+        self._recent_files = [str(p) for p in config.get_recent_files()]
         self._update_recent_files_menu()
+        logger.debug(f"Loaded {len(self._recent_files)} recent files")
 
     def _save_recent_files(self) -> None:
-        """Save the list of recent files."""
-        settings = QSettings("ChestBuddy", "ChestBuddy")
-        settings.setValue("recentFiles", self._recent_files)
-        settings.sync()
+        """Save recent files to settings."""
+        # Using ConfigManager to save recent files
+        # (This is handled automatically by add_recent_file)
+        logger.debug(f"Saved {len(self._recent_files)} recent files")
 
     def _add_recent_file(self, file_path: str) -> None:
         """
         Add a file to the recent files list.
 
         Args:
-            file_path: The path of the file to add.
+            file_path: Path to the file to add.
         """
-        # Remove if already exists
+        # Convert to absolute path if not already
+        file_path = os.path.abspath(file_path)
+
+        # Remove if already in list
         if file_path in self._recent_files:
             self._recent_files.remove(file_path)
 
-        # Add to the beginning of the list
+        # Add to start of list
         self._recent_files.insert(0, file_path)
 
-        # Limit to 10 recent files
-        if len(self._recent_files) > 10:
-            self._recent_files = self._recent_files[:10]
+        # Keep only the most recent 10 files
+        self._recent_files = self._recent_files[:10]
 
-        # Update menu and save
+        # Update the menu
         self._update_recent_files_menu()
-        self._save_recent_files()
 
-        # Update dashboard
-        dashboard_view = self._views.get("Dashboard")
-        if dashboard_view and isinstance(dashboard_view, DashboardViewAdapter):
-            dashboard_view.set_recent_files(self._recent_files)
+        # Save to config
+        config = ConfigManager()
+        config.add_recent_file(file_path)
+
+        logger.debug(f"Added {file_path} to recent files")
 
     def _update_recent_files_menu(self) -> None:
         """Update the recent files menu."""
