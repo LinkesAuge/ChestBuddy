@@ -27,6 +27,8 @@ from PySide6.QtWidgets import (
     QSpacerItem,
 )
 
+from chestbuddy.ui.resources.style import Colors
+
 
 class EmptyStateWidget(QWidget):
     """
@@ -100,6 +102,7 @@ class EmptyStateWidget(QWidget):
         self._title_label.setFont(title_font)
         self._title_label.setAlignment(Qt.AlignCenter)
         self._title_label.setWordWrap(True)
+        self._title_label.setStyleSheet(f"color: {Colors.TEXT_LIGHT};")
         main_layout.addWidget(self._title_label)
 
         # Message
@@ -109,6 +112,7 @@ class EmptyStateWidget(QWidget):
         self._message_label.setFont(message_font)
         self._message_label.setAlignment(Qt.AlignCenter)
         self._message_label.setWordWrap(True)
+        self._message_label.setStyleSheet(f"color: {Colors.TEXT_MUTED};")
         main_layout.addWidget(self._message_label)
 
         # Action button (if text provided)
@@ -117,20 +121,20 @@ class EmptyStateWidget(QWidget):
             self._action_button.setMinimumWidth(180)
 
             # Style the button
-            self._action_button.setStyleSheet("""
-                QPushButton {
+            self._action_button.setStyleSheet(f"""
+                QPushButton {{
                     padding: 8px 16px;
-                    background-color: #3498DB;
-                    color: white;
+                    background-color: {Colors.ACCENT};
+                    color: {Colors.TEXT_LIGHT};
                     border-radius: 4px;
                     border: none;
-                }
-                QPushButton:hover {
-                    background-color: #2980B9;
-                }
-                QPushButton:pressed {
-                    background-color: #2471A3;
-                }
+                }}
+                QPushButton:hover {{
+                    background-color: {Colors.ACCENT_HOVER};
+                }}
+                QPushButton:pressed {{
+                    background-color: {Colors.ACCENT_ACTIVE};
+                }}
             """)
 
             # Connect the button click signal
@@ -232,20 +236,20 @@ class EmptyStateWidget(QWidget):
             self._action_button.setMinimumWidth(180)
 
             # Style the button
-            self._action_button.setStyleSheet("""
-                QPushButton {
+            self._action_button.setStyleSheet(f"""
+                QPushButton {{
                     padding: 8px 16px;
-                    background-color: #3498DB;
-                    color: white;
+                    background-color: {Colors.ACCENT};
+                    color: {Colors.TEXT_LIGHT};
                     border-radius: 4px;
                     border: none;
-                }
-                QPushButton:hover {
-                    background-color: #2980B9;
-                }
-                QPushButton:pressed {
-                    background-color: #2471A3;
-                }
+                }}
+                QPushButton:hover {{
+                    background-color: {Colors.ACCENT_HOVER};
+                }}
+                QPushButton:pressed {{
+                    background-color: {Colors.ACCENT_ACTIVE};
+                }}
             """)
 
             # Connect the button click signal
@@ -257,25 +261,21 @@ class EmptyStateWidget(QWidget):
 
     def set_icon(self, icon: QIcon):
         """
-        Set the icon.
+        Set or change the icon.
 
         Args:
             icon (QIcon): The new icon
         """
         self._icon = icon
-
-        # Refresh the UI to show the new icon
-        # This is simplistic - in a real implementation we would just update the icon label
-        # But for simplicity, we'll just rebuild the UI
         self._refresh_ui()
 
     def _refresh_ui(self):
-        """Rebuild the UI to reflect current properties."""
+        """Rebuild the UI with current properties."""
         # Clear the current layout
         while self.layout().count():
             item = self.layout().takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
 
-        # Rebuild the UI
+        # Set up the UI again
         self._setup_ui()
