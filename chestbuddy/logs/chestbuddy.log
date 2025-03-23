@@ -101,3 +101,17 @@
 2025-03-23 03:37:15,768 - chestbuddy.ui.resources.resource_manager - WARNING - Failed to load Qt resources. Using file-based resources.
 2025-03-23 03:37:15,789 - __main__ - INFO - ChestBuddy application initialized
 2025-03-23 03:37:15,851 - __main__ - INFO - Starting application main event loop
+2025-03-23 05:10:42,163 - root - INFO - Logging initialized to D:\Projekte\ChestBuddy\chestbuddy\logs\chestbuddy.log
+2025-03-23 05:10:42,631 - __main__ - INFO - Logging initialized at level DEBUG to d:\Projekte\ChestBuddy\chestbuddy\logs\chestbuddy.log
+2025-03-23 05:10:42,673 - chestbuddy.ui.data_view - INFO - Installed event filter on table view
+2025-03-23 05:10:42,674 - chestbuddy.ui.data_view - INFO - Registered Ctrl+C shortcut for copying (table-specific)
+2025-03-23 05:10:42,674 - chestbuddy.ui.data_view - INFO - Registered widget-level Ctrl+V shortcut for pasting (widget hierarchy)
+2025-03-23 05:10:42,682 - chestbuddy.ui.main_window - INFO - Setting active view to: Dashboard
+2025-03-23 05:10:42,683 - chestbuddy.ui.main_window - INFO - View 'Dashboard' activated successfully
+2025-03-23 05:10:42,685 - __main__ - INFO - Autosave enabled with interval of 5 minutes
+2025-03-23 05:10:42,685 - chestbuddy.ui.resources.resource_manager - WARNING - Failed to load Qt resources. Using file-based resources.
+2025-03-23 05:10:42,707 - __main__ - INFO - ChestBuddy application initialized
+2025-03-23 05:10:42,766 - __main__ - INFO - Starting application main event loop
+2025-03-23 05:10:44,300 - __main__ - INFO - Starting application shutdown sequence
+2025-03-23 05:10:44,300 - __main__ - INFO - Saving configuration
+2025-03-23 05:10:44,301 - __main__ - INFO - Application shutdown complete
