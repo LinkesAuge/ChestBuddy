@@ -43,25 +43,25 @@ class ProgressDialog(QDialog):
 
     def __init__(
         self,
-        parent=None,
+        label_text,
+        cancel_button_text,
         minimum=0,
         maximum=100,
+        parent=None,
         title="Progress",
-        label_text="Processing...",
         show_cancel_button=True,
-        cancel_button_text="Cancel",
     ):
         """
         Initialize the progress dialog.
 
         Args:
-            parent: The parent widget
+            label_text: The text to display above the progress bar
+            cancel_button_text: The text for the cancel button
             minimum: The minimum value of the progress bar
             maximum: The maximum value of the progress bar
+            parent: The parent widget
             title: The title of the dialog
-            label_text: The text to display above the progress bar
             show_cancel_button: Whether to show a cancel button
-            cancel_button_text: The text for the cancel button
         """
         super().__init__(parent)
 
