@@ -34,6 +34,7 @@ The active development focus is UI enhancement with a particular emphasis on das
 ### Major Bugfixes
 
 - **UI Blocking After Progress Dialog (First Import)**: Fixed persistent issue where the UI remained blocked after confirming the progress dialog on first import. The solution involved a comprehensive rework of the event processing sequence in the `_close_progress_dialog()` method to ensure proper event handling during view transitions. Multiple strategic calls to `QApplication.processEvents()` and `self._update_ui()` were added before, during, and after dialog closure to ensure all UI components are fully unblocked.
+- Fixed UI blocking issue after first import (third attempt) - Addressed the race condition between dialog closure and data table population during the first import. Implemented a direct approach to explicitly re-enable the DataView's table after dialog closure, ensuring UI responsiveness regardless of timing issues.
 
 ## Recent Improvements
 

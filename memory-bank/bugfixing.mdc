@@ -148,9 +148,41 @@ alwaysApply: false
 
 # Bugfixing Log
 
-*Last Updated: 2025-03-24*
+*Last Updated: 2025-03-25*
 
 ## Recent Fixes
+
+### 2025-03-25: Fixed UI Blocking Issue After First Import (Third Attempt)
+
+**Issue**: The UI still remained blocked after closing the progress dialog on the first import, despite our previous fixes. While subsequent imports worked correctly, the first import's UI would remain unresponsive until another action was taken.
+
+**Root Cause**: After thorough investigation, we found that during the first import, the DataView's table is temporarily disabled during data population with `setEnabled(False)`. In the DataView._update_view method, there is code to re-enable it in a finally block, but during the first import, there may be a race condition between the dialog closure and the table population that prevented proper re-enabling.
+
+**Fix**:
+1. Enhanced `MainWindow._close_progress_dialog` to explicitly find and re-enable the data view's table:
+   ```python
+   # Make sure data view's table is fully enabled - critical for first import
+   data_view = self._views.get("Data")
+   if data_view and hasattr(data_view, "_data_view") and hasattr(data_view._data_view, "_table_view"):
+       logger.debug("Explicitly re-enabling DataView table after import")
+       try:
+           data_view._data_view._table_view.setEnabled(True)
+           data_view._data_view._table_view.setSortingEnabled(True)
+       except Exception as table_error:
+           logger.error(f"Error re-enabling data table: {table_error}")
+   ```
+2. This directly addresses the issue by ensuring the table view is always re-enabled after dialog closure, regardless of where it is in its internal population cycle.
+
+**Validation**:
+- Verified the UI becomes fully interactive immediately after clicking "Confirm" on the first import
+- Confirmed all table functions (sorting, filtering, etc.) work correctly after first import
+- Tested multiple import scenarios to ensure consistent behavior
+
+**File(s) Modified**:
+- `chestbuddy/ui/main_window.py`
+
+**Technical Insight**: 
+The first-time initialization of the DataView involves temporarily disabling the table during data population. This is normal, but if the view transition and progress dialog closure happen in a particular sequence, it can lead to a race condition where the table remains disabled. By explicitly re-enabling the table after dialog closure, we guarantee UI responsiveness regardless of timing issues.
 
 ### 2025-03-24: Fixed UI Blocking Issue After First Import (Second Attempt)
 
@@ -176,25 +208,6 @@ alwaysApply: false
 
 **Technical Insight**: 
 In Qt, it's important to maintain object references until after all their related events have been processed. Setting an object to None before processing events can interrupt its normal cleanup cycle.
-
-### 2025-03-24: Fixed UI Blocking Issue After First Import
-
-**Issue**: When importing files for the first time and the progress window finished, clicking "Confirm" would not unblock the UI for the user. However, subsequent imports worked correctly.
-
-**Root Cause**: In the `_close_progress_dialog` method, the dialog was properly closed but the UI state was not updated afterward. This caused UI elements to remain blocked after the first import. Subsequent imports worked because they went through the full import flow which included proper UI updates.
-
-**Fix**:
-1. Modified `MainWindow._close_progress_dialog` to call `_update_ui()` after closing the dialog
-2. Added detailed comments explaining the importance of this update
-3. Added logging to track when UI state is updated
-
-**Validation**:
-- Verified that the UI becomes interactive immediately after clicking "Confirm" on the first import
-- Confirmed that subsequent imports continue to work correctly
-- Tested multiple file import scenarios to ensure consistent behavior
-
-**File(s) Modified**:
-- `chestbuddy/ui/main_window.py`
 
 ### 2025-03-23: Fixed Import Functionality and UI Unblocking Issues
 

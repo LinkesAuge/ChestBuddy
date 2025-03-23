@@ -750,6 +750,21 @@ class MainWindow(QMainWindow):
                 # This allows the dialog's events to be properly processed
                 QApplication.processEvents()
 
+                # Make sure data view's table is fully enabled - critical for first import
+                # This ensures the table view gets re-enabled even if _update_view hasn't completed
+                data_view = self._views.get("Data")
+                if (
+                    data_view
+                    and hasattr(data_view, "_data_view")
+                    and hasattr(data_view._data_view, "_table_view")
+                ):
+                    logger.debug("Explicitly re-enabling DataView table after import")
+                    try:
+                        data_view._data_view._table_view.setEnabled(True)
+                        data_view._data_view._table_view.setSortingEnabled(True)
+                    except Exception as table_error:
+                        logger.error(f"Error re-enabling data table: {table_error}")
+
                 # Final UI update to ensure consistent state
                 self._update_ui()
 
