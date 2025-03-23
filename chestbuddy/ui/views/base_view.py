@@ -17,10 +17,13 @@ from PySide6.QtWidgets import (
     QStackedWidget,
     QSizePolicy,
 )
+import logging
 
 from chestbuddy.ui.widgets.empty_state_widget import EmptyStateWidget
 from chestbuddy.ui.resources.icons import Icons
 from chestbuddy.ui.resources.style import Colors
+
+logger = logging.getLogger(__name__)
 
 
 class ViewHeader(QFrame):
@@ -223,11 +226,13 @@ class BaseView(QWidget):
             data_required (bool): Whether this view requires data to function
         """
         super().__init__(parent)
+        logger.debug(f"[BASE_VIEW] Initializing {self.__class__.__name__}")
         self._title = title
         self._data_required = data_required
         self._setup_ui()
         self._connect_signals()
         self._add_action_buttons()
+        logger.debug(f"[BASE_VIEW] {self.__class__.__name__} initialized with empty view visible")
 
     def _setup_ui(self):
         """Set up the UI components."""
@@ -321,20 +326,49 @@ class BaseView(QWidget):
         """
         return self._content_layout
 
-    def set_data_available(self, data_available):
+    def set_data_available(self, data_available: bool) -> None:
         """
-        Set whether data is available for this view.
+        Update the view based on data availability.
 
         Args:
             data_available (bool): Whether data is available
         """
+        logger.debug(
+            f"[BASE_VIEW] {self.__class__.__name__} - Setting data available: {data_available}"
+        )
         if not self._data_required:
+            logger.debug(
+                f"[BASE_VIEW] {self.__class__.__name__} - Data not required for this view, skipping"
+            )
             return
 
+        # Log the current state
+        current_widget = self._content_stack.currentWidget()
+        current_widget_name = "content" if current_widget == self._content else "empty_state"
+        logger.debug(
+            f"[BASE_VIEW] {self.__class__.__name__} - Before change: Current widget: {current_widget_name}"
+        )
+
+        # Update visibility based on data availability
         if data_available:
+            logger.debug(f"[BASE_VIEW] {self.__class__.__name__} - Switching to content widget")
             self._content_stack.setCurrentWidget(self._content)
         else:
+            logger.debug(f"[BASE_VIEW] {self.__class__.__name__} - Switching to empty state widget")
             self._content_stack.setCurrentWidget(self._empty_state)
+
+        # Log the new state
+        new_widget = self._content_stack.currentWidget()
+        new_widget_name = "content" if new_widget == self._content else "empty_state"
+        logger.debug(
+            f"[BASE_VIEW] {self.__class__.__name__} - After change: Current widget: {new_widget_name}"
+        )
+
+        # Ensure the view is properly updated
+        self.update()
+        logger.debug(
+            f"[BASE_VIEW] {self.__class__.__name__} - View updated after data availability change"
+        )
 
     def set_empty_state_props(self, title=None, message=None, action_text=None, icon=None):
         """
@@ -399,3 +433,35 @@ class BaseView(QWidget):
     def _add_action_buttons(self):
         """Add action buttons to the header. To be implemented by subclasses."""
         pass
+
+    def has_changed(self, force_rescan: bool = False) -> bool:
+        """
+        Check if the view has changed.
+
+        Args:
+            force_rescan: Whether to force a rescan
+
+        Returns:
+            True if the view has changed, False otherwise
+        """
+        logger.debug(
+            f"[BASE_VIEW] {self.__class__.__name__} - Checking if view has changed (force_rescan: {force_rescan})"
+        )
+        # If force_rescan is True, always treat as changed
+        if force_rescan:
+            logger.debug(
+                f"[BASE_VIEW] {self.__class__.__name__} - Force rescan requested, returning True"
+            )
+            return True
+
+        # If parent is None, the view has not changed
+        if self._parent is None:
+            logger.debug(f"[BASE_VIEW] {self.__class__.__name__} - No parent, view hasn't changed")
+            return False
+
+        # Otherwise, delegate to the parent's has_changed method
+        parent_changed = self._parent.has_changed(force_rescan)
+        logger.debug(
+            f"[BASE_VIEW] {self.__class__.__name__} - Parent has changed: {parent_changed}"
+        )
+        return parent_changed

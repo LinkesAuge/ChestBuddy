@@ -182,3 +182,43 @@ We've addressed several critical bugs in the import functionality:
 
 5. **Progress dialog confirmation UI blocking** - Fixed issue where the UI would remain blocked after clicking "Confirm" on the import progress dialog (only on first import). Improved the fix by properly sequencing event processing and dialog reference cleanup to ensure the dialog's events are fully processed before removing the reference.
 
+## Current Development Focus
+
+### UI Blocking Issue Investigation
+
+We've identified a persistent UI blocking issue that occurs specifically after the first import of data but not in subsequent imports. To address this issue, we've implemented an enhanced debugging plan:
+
+1. **Enhanced Logging Strategy**
+   - Added detailed timestamped logs across the import flow
+   - Implemented logging for dialog visibility states
+   - Added logging for UI component states, particularly the DataView table
+   - Added contextual tags to log messages for easier filtering and analysis
+
+2. **State Tracking and Comparison**
+   - Implemented a `StateSnapshot` system to capture application state at key points
+   - Added comparison functionality to identify state differences between snapshots
+   - Capturing snapshots before/after each import and dialog closure
+
+3. **Performance and Event Monitoring**
+   - Added timing metrics for performance-critical operations
+   - Implemented event tracing to identify blocked or delayed UI events
+   - Created tooling to inspect event processing and UI component states
+
+4. **Debugging Tools**
+   - Added an emergency "rescue" functionality via F12 hotkey that opens a debugger dialog
+   - Implemented a UI component inspector to examine widget hierarchy and states
+   - Added tools to force-enable UI components and process pending events
+
+The debugging strategy aims to identify the exact differences between the first and subsequent imports that cause the UI to remain blocked after the first import but work correctly in subsequent imports.
+
+### Current Hypotheses
+
+Based on investigation so far, we have several hypotheses:
+
+1. **Table Enabling Timing**: The DataView's table may be disabled during data population but not properly re-enabled during the first import.
+2. **Event Processing**: There may be pending events that aren't properly processed during the first import sequence.
+3. **Modal Dialog Issues**: The progress dialog's modality may be affecting the UI differently on first vs. subsequent imports.
+4. **View Transition Race Condition**: The transition to the Data view may be occurring before the UI is fully ready during the first import.
+
+Our enhanced logging should help identify which of these is the root cause.
+

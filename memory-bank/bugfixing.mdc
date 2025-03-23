@@ -377,3 +377,53 @@ In Qt, it's important to maintain object references until after all their relate
 - `chestbuddy/ui/widgets/action_button.py`
 - `chestbuddy/ui/styles/style_constants.py`
 - Multiple view adapter files
+
+## Current Issues
+
+### UI Blocking After First Import
+
+**Status**: Investigating  
+**Priority**: High  
+**Component**: UI/DataView  
+**First Noticed**: Recent build  
+
+**Description**:  
+The UI becomes blocked (unresponsive) after the first data import, but works correctly on subsequent imports.
+
+**Reproduction Steps**:
+1. Start the application
+2. Click "Import" in the Dashboard view
+3. Complete the import process
+4. Observe that the UI is blocked/unresponsive after the import completes
+5. Do a second import
+6. Observe that the UI works correctly after the second import
+
+**Diagnostic Information**:  
+- Issue only occurs on the first import, subsequent imports work fine
+- The DataView table is temporarily disabled during data population
+- The issue appears to be a race condition between the progress dialog closing and the UI updating
+- Previous fix attempts improved but did not fully resolve the issue
+
+**Debugging Strategy**:
+1. **Enhanced Logging**: Implemented detailed logging with timestamps and contextual tags to track the sequence of operations during import.
+2. **State Snapshots**: Added capability to capture application state at key points for comparison.
+3. **Real-time Inspection**: Created tools to inspect the UI hierarchy, component states, and event processing in real-time.
+4. **Emergency Recovery**: Added F12 hotkey to force-unblock the UI during testing and development.
+
+**Hypotheses**:
+1. The DataView's table may not be properly re-enabled after the first import
+2. Event processing sequence may differ between first and subsequent imports
+3. The progress dialog's modality may affect the UI differently on first vs. subsequent imports
+4. There may be a race condition in the view transition process
+
+**Current Investigation**:
+- Added detailed logging throughout the import flow
+- Capturing state snapshots before/after import and dialog closure
+- Monitoring UI component states, especially the DataView table
+- Tracking event processing during the transition
+
+**Potential Solutions**:
+1. Ensure table is explicitly re-enabled after dialog closure
+2. Add additional event processing steps during critical transitions
+3. Delay view transition until after all UI components are confirmed enabled
+4. Implement a safety timer to force-enable UI components if blocking is detected
