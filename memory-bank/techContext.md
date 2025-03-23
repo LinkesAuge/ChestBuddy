@@ -140,6 +140,14 @@ Date,Player Name,Source/Location,Chest Type,Value,Clan
 - Embedded data tables and SVG charts
 - Summary statistics sections
 - User-customizable report elements
+- PDF export capability using a dedicated library (planned)
+
+### PDF Generation Libraries (Under Evaluation)
+- **WeasyPrint**: HTML to PDF conversion with CSS styling support
+- **ReportLab**: Comprehensive PDF generation framework
+- **PyFPDF**: Lightweight PDF generation library
+- **Qt's QPdfWriter**: Native Qt-based PDF creation (via PySide6)
+- Final selection will be based on chart embedding capability, styling options, and integration with existing code
 
 ## Performance Optimization
 
@@ -148,6 +156,8 @@ Date,Player Name,Source/Location,Chest Type,Value,Clan
 - Background thread for loading large files
 - Progress indication for long operations
 - Chunked reading for memory efficiency
+- Multi-file loading with consolidated progress reporting
+- Two-level progress tracking (overall and per-file)
 
 ### Background Processing
 - Worker-based threading model using QThread
@@ -155,6 +165,10 @@ Date,Player Name,Source/Location,Chest Type,Value,Clan
 - Signal-based progress reporting mechanism
 - Proper error handling and cancellation support
 - Thread-safe UI updates
+- Improved thread cleanup with error handling
+- Graceful thread termination during application shutdown
+- Support for hierarchical progress reporting (task → subtask)
+- Callback mechanism for detailed operation status updates
 
 ### UI Responsiveness
 - Separate threads for data processing
@@ -162,6 +176,9 @@ Date,Player Name,Source/Location,Chest Type,Value,Clan
 - Signal/slot mechanism for thread communication
 - Batch updates to UI elements
 - Pagination for large datasets
+- Enhanced progress dialog with detailed status information
+- Consistent progress reporting scale (0-100) across all operations
+- Cancellation support with proper cleanup
 
 ### Memory Management
 - Chunked data processing for large files
@@ -169,6 +186,8 @@ Date,Player Name,Source/Location,Chest Type,Value,Clan
 - Cleanup of temporary files and resources
 - Worker cleanup after task completion
 - Memory usage monitoring
+- Improved reference handling during thread termination
+- Prevention of memory leaks during error conditions
 
 ## Testing Strategy
 
@@ -248,256 +267,101 @@ Date,Player Name,Source/Location,Chest Type,Value,Clan
 - Edge case datasets for validation testing
 - Corrupted data samples for error handling
 - Large datasets for performance testing
-- Reference files for validation verification
-- Various file formats and structures
-- International character sets in test data
-- Malformed data for robustness testing
 
-### Test Infrastructure
-- Fixtures for common test setup and teardown
-- Helper functions for repetitive testing operations
-- Custom assertions for common verification patterns
-- Resource cleanup utilities
-- Thread-safe test helpers
-- Test data generators
-- Mock factory for external dependencies
+## Logging System
 
-### Planned Test Files
-- test_main_window.py: Tests for the main application window
-- test_integration.py: Tests for cross-component interactions
-- test_workflows.py: End-to-end workflow tests
-- test_performance.py: Performance and memory usage tests
-- Enhancements to existing test files for more comprehensive coverage 
+### Log Configuration
+- Log level is configurable (default: DEBUG)
+- Log rotation enabled (5 files of 1MB each)
+- Both file and console logging available
+- Log format includes timestamp, level, and module name
+- Detailed exception reporting with traceback
+- Log handlers for both application and Qt warnings
 
-## UI Technologies and Framework
-
-### UI Framework: PySide6
-
-The ChestBuddy application uses PySide6 as its primary UI framework, which provides Qt6 bindings for Python. This modern framework offers:
-
-- Native-looking widgets across platforms
-- Rich set of UI components
-- Style customization capabilities
-- Signal-slot mechanism for event handling
-- Efficient rendering with hardware acceleration
-
-Key PySide6 components we use:
-
-| Component | Usage in ChestBuddy |
-|-----------|---------------------|
-| `QMainWindow` | Main application window structure |
-| `QWidget` | Base for all custom UI components |
-| `QVBoxLayout`/`QHBoxLayout` | Layout management for components |
-| `QStackedWidget` | Content view switching mechanism |
-| `QTableView` | Display of tabular data |
-| `QListWidget` | Lists in sidebar navigation |
-| `QPushButton` | Action buttons throughout the UI |
-| `QLabel` | Text and image display |
-| `QComboBox` | Dropdown selections |
-| `QScrollArea` | Scrollable content containers |
-| `QSplitter` | Resizable panel divisions |
-
-### Styling System
-
-The UI employs a custom styling system with:
-
-1. **CSS-like Styling**: PySide6's QSS (Qt Style Sheets) for visual styling
-2. **Custom Style Class**: Central management of colors and styles
-3. **Theme Variables**: Consistent color definitions for UI components
-4. **Icon System**: SVG icons with color customization
-
-Example QSS usage:
-```python
-def get_sidebar_style():
-    return f"""
-        QListWidget {{
-            background-color: {Colors.PRIMARY_DARK};
-            border: none;
-            border-radius: 0px;
-            outline: 0;
-            padding: 5px;
-        }}
-        QListWidget::item {{
-            color: {Colors.TEXT_LIGHT};
-            border-radius: 4px;
-            padding: 8px;
-            margin: 2px 5px;
-        }}
-        QListWidget::item:selected {{
-            background-color: {Colors.ACCENT};
-            color: {Colors.TEXT_DARK};
-        }}
-    """
-```
-
-### Resource Management
-
-Resources are managed through:
-
-1. **ResourceManager Class**: Central handler for loading and caching resources
-2. **File-based Resources**: Icons and images stored as files in the resource directory
-3. **Qt Resource System**: For compiled resources (optional)
-
-```python
-class ResourceManager:
-    def __init__(self):
-        self._resource_cache = {}
-        self._resource_dir = Path(__file__).parent.parent / "resources"
-        
-    def get_icon(self, name):
-        # Implementation for getting icons with caching
-```
-
-## UI Architecture Implementation
-
-### Component Structure
-
-The UI components are organized in a hierarchical structure:
-
-```
-chestbuddy/ui/
-├── base_view.py            # Base class for content views
-├── chart_tab.py            # Original chart component
-├── colors.py               # Color definitions
-├── correction_tab.py       # Original correction component
-├── dashboard_view.py       # Dashboard landing page
-├── data_view.py            # Original data component
-├── icons.py                # Icon provider
-├── main_window.py          # Main application window
-├── resource_manager.py     # Resource loading and caching
-├── sidebar_navigation.py   # Sidebar navigation
-├── status_bar.py           # Enhanced status bar
-├── style.py                # Style definitions and helpers
-├── validation_tab.py       # Original validation component
-└── views/                  # Adapter views for existing components
-    ├── chart_view_adapter.py
-    ├── correction_view_adapter.py
-    ├── data_view_adapter.py
-    └── validation_view_adapter.py
-```
-
-### Adapter Pattern Implementation
-
-The adapter pattern is used to integrate existing components with the new UI structure:
-
-```python
-class DataViewAdapter(BaseView):
-    """
-    Adapter for the DataView component to integrate with the new UI structure.
-    """
-    def __init__(self, parent=None):
-        super().__init__(title="Data View", parent=parent)
-        self._data_view = None
-        self._setup_ui()
-        
-    def _setup_ui(self):
-        super()._setup_ui()
-        self._data_view = DataView(self)
-        self.content_layout.addWidget(self._data_view)
-        
-        # Set up connection to the DataView's signals
-        self._setup_connections()
-        
-    def _setup_connections(self):
-        # Connect DataView signals to adapter methods
-        pass
-```
-
-### Signal-Slot Communication
-
-The UI components communicate through Qt's signal-slot mechanism:
-
-```python
-# Signal definitions in MainWindow
-class MainWindow(QMainWindow):
-    # Signals that will be connected to app.py
-    file_opened = Signal(str)
-    load_csv_triggered = Signal(str)
-    file_saved = Signal(str)
-    save_csv_triggered = Signal(str)
-    validation_requested = Signal()
-    validate_data_triggered = Signal()
-    correction_requested = Signal()
-    apply_corrections_triggered = Signal()
-    export_validation_issues_triggered = Signal(str)
-```
-
-## Development Tools
-
-| Tool | Purpose | Usage |
-|------|---------|-------|
-| Visual Studio Code | Primary IDE | Code editing, debugging |
-| Qt Designer | UI Layout Design | Layout design for complex widgets |
-| Git | Version Control | Track changes to UI components |
-| PyTest | Testing | UI component testing |
-| Python Type Hints | Code Assistance | Type annotations for UI classes |
-
-## UI Technical Decisions
-
-### 1. Adapter Pattern Choice
-
-**Decision**: Use adapter pattern rather than rewriting existing components
-
-**Rationale**:
-- Minimizes changes to existing code
-- Reduces risk of introducing bugs
-- Allows incremental UI improvements
-- Maintains compatibility with existing functionality
-
-### 2. CSS-based Styling
-
-**Decision**: Use QSS (Qt Style Sheets) for styling rather than hard-coded properties
-
-**Rationale**:
-- Centralizes styling in one place
-- Makes theme changes easier
-- Consistent appearance across components
-- Familiar syntax for web developers
-
-### 3. Dashboard-centric Navigation
-
-**Decision**: Implement a dashboard as the main landing page
-
-**Rationale**:
-- Provides quick access to common functions
-- Shows application status at a glance
-- Offers shortcuts to recent files
-- Improves user experience with visual guidance
-
-### 4. Icon System Implementation
-
-**Decision**: Use SVG icons with dynamic coloring
-
-**Rationale**:
-- Scales cleanly at any resolution
-- Allows color changes for themes
-- Reduces file size compared to bitmap formats
-- Supports accessibility features
-
-## UI Technical Dependencies
-
-| Dependency | Version | Purpose |
-|------------|---------|---------|
-| PySide6 | 6.5.2+ | UI framework |
-| Python | 3.10+ | Core language |
-| Qt | 6.5+ | Underlying UI framework |
-| matplotlib | 3.7+ | Charts and visualizations |
-| pandas | 2.0+ | Data manipulation |
-
-## UI Performance Considerations
-
-1. **Resource Caching**: Icons and styles are cached to reduce loading times
-2. **Lazy Loading**: Views are created only when needed
-3. **Efficient Updates**: Only changed parts of the UI are redrawn
-4. **Memory Management**: Resources are freed when no longer needed
-5. **Responsive Design**: UI remains responsive during long operations 
-
-## Logging
-
-The application uses Python's built-in logging module for logging messages. Logs are written to both the console and a log file.
-
-- Log files are stored in `chestbuddy/logs/chestbuddy.log`
-- The default log level is INFO, but can be configured in the application settings
-- Each log message includes a timestamp, the module name, the log level, and the message
+### Log File Organization
+- All logs are stored in chestbuddy/logs/
 - The logs directory is automatically created if it doesn't exist
 - The log path is determined relative to the app.py file location, ensuring consistency regardless of where the application is launched from 
+
+## Progress Dialog System
+
+### Dialog Features
+- Consistent modal dialog for all long-running operations
+- Clear title indicating the current operation
+- Progress bar with percentage display (0-100%)
+- Detailed status message showing:
+  - Current file being processed (x of y)
+  - File name and path
+  - Current operation details (rows processed, etc.)
+- Cancel button for operation termination
+- Minimum width to ensure readability of paths and messages
+- Proper cleanup on cancellation or completion
+
+### Progress Reporting Protocol
+- Operations report progress on a consistent 0-100 scale
+- Multi-step operations provide hierarchical progress:
+  - Overall operation progress (e.g., files 2/10)
+  - Current step progress (e.g., rows 150/500)
+- Each progress update includes:
+  - Numeric progress value (0-100)
+  - Contextual information (current file, operation details)
+  - Optional status message override
+
+### Implementation
+- MainWindow manages the ProgressDialog instance
+- DataManager coordinates between UI and background workers
+- BackgroundWorker manages the thread and signal connections
+- Tasks emit progress signals with detailed information
+- Signal chain: Task → BackgroundWorker → DataManager → MainWindow → ProgressDialog
+
+### Progress State Tracking
+- MainWindow maintains a _loading_state dictionary with:
+  - Total number of files being processed
+  - Current file index and path
+  - List of processed files
+  - Current operation details
+- This state ensures consistent progress reporting across loading phases
+- Provides context for progress dialog messages
+- Enables proper handling of cancellation and cleanup
+
+## Report Generation System (Planned)
+
+### Report Templates
+- HTML-based templates using Jinja2
+- Configurable sections and layouts
+- Ability to include or exclude specific data sections
+- Support for embedded charts and visualizations
+- Custom styling options
+
+### Report Elements
+- **DataTable**: Tabular representation of data
+- **Chart**: Embedded visualization
+- **Summary**: Statistical summary of data
+- **Header**: Report identification and metadata
+- **Footer**: Notes and additional information
+- **Custom**: User-defined content sections
+
+### PDF Generation
+- HTML to PDF conversion
+- Support for embedded SVG charts
+- Page sizing and layout options
+- Header and footer on each page
+- Proper handling of page breaks
+- Bookmarks for navigation
+- Metadata support (title, author, keywords)
+
+### Report Generation Workflow
+1. User selects report template
+2. User configures included data and charts
+3. User customizes report layout and styling
+4. System generates HTML report preview
+5. User can make adjustments
+6. System exports final report (HTML or PDF)
+
+### Implementation Considerations
+- Support for large datasets in reports
+- Memory optimization during report generation
+- Progress reporting during report creation
+- PDF library selection based on feature requirements
+- Chart embedding approach that maintains quality
+- Support for interactive elements in HTML reports
