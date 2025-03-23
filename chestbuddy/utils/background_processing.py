@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, Optional, Callable, TypeVar, Generic, Dict, List, Tuple, Type, Union
 
 from PySide6.QtCore import QObject, Signal, Slot, QThread, QRunnable, QThreadPool
+from PySide6.QtWidgets import QApplication
 
 # Setup logger
 logger = logging.getLogger(__name__)
@@ -122,6 +123,7 @@ class MultiCSVLoadTask(BackgroundTask):
         self.normalize_text = normalize_text
         self.robust_mode = robust_mode
         self.encoding = encoding
+        self.dataframes = []
         self._processed_files = 0
         self._total_files = len(file_paths)
 
@@ -146,8 +148,8 @@ class MultiCSVLoadTask(BackgroundTask):
         if total_files == 0:
             return None, "No files to load"
 
-        # Initial progress report
-        self.progress.emit(0, total_files)
+        # Initial progress report - using consistent scale
+        self.progress.emit(0, 100)  # Always use 0-100 scale for better UI experience
 
         # Process each file
         for i, file_path in enumerate(self.file_paths):
@@ -158,48 +160,151 @@ class MultiCSVLoadTask(BackgroundTask):
             try:
                 logger.info(f"Processing file {i + 1}/{total_files}: {file_path}")
 
-                # Report overall progress
-                self._processed_files = i
-                self.progress.emit(i, total_files)
+                # Calculate progress percentage for this file
+                file_progress_percentage = int((i / total_files) * 100)
 
-                # Define a progress callback that emits file progress signals
-                def file_progress_callback(current: int, total: int) -> None:
-                    # Emit file-specific progress signal
-                    self.file_progress.emit(str(file_path), current, total)
+                # Emit overall progress at start of file (percentage of files completed)
+                try:
+                    self.progress.emit(file_progress_percentage, 100)
+                except RuntimeError as e:
+                    # Handle case where the Qt object has been deleted
+                    logger.warning(f"Could not emit progress signal: {e}")
+                    if "C++ object" in str(e):
+                        return None, "Process interrupted - application is shutting down"
 
-                    # Check for cancellation frequently during file processing
+                # Define a progress callback for file-specific progress
+                def file_progress_callback(current: int, total: int) -> bool:
+                    # Check for cancellation first
                     if self.is_cancelled:
-                        raise InterruptedError("CSV read operation cancelled")
+                        return False  # Signal to stop processing
+
+                    # Reduce UI update frequency - update only every 1% change or every 100 rows
+                    # to avoid overwhelming the event queue with progress updates
+                    if total > 0:
+                        last_percentage = getattr(file_progress_callback, "last_percentage", -1)
+                        current_percentage = int((current / total) * 100)
+
+                        last_row_update = getattr(file_progress_callback, "last_row_update", 0)
+                        row_update_interval = min(
+                            100, max(1, int(total / 100))
+                        )  # Update at least every 1% of rows
+
+                        # Only update if percentage changed or we've processed enough rows
+                        should_update = (
+                            current_percentage != last_percentage
+                            or (current - last_row_update) >= row_update_interval
+                        )
+
+                        if not should_update:
+                            # Skip this update but continue processing
+                            return True
+
+                        # Remember values for next time
+                        file_progress_callback.last_percentage = current_percentage
+                        file_progress_callback.last_row_update = current
+
+                    # Safe signal emission with error handling
+                    try:
+                        # Emit file-specific progress signal
+                        self.file_progress.emit(str(file_path), current, total)
+
+                        # Calculate overall progress combining file count and row progress
+                        if total > 0:
+                            file_fraction = 1 / total_files
+                            row_progress = current / total
+
+                            # Calculate overall progress: completed files + progress within current file
+                            overall_progress = int(
+                                ((i / total_files) + (file_fraction * row_progress)) * 100
+                            )
+
+                            # Ensure progress is in valid range
+                            overall_progress = max(
+                                0, min(99, overall_progress)
+                            )  # Cap at 99% until complete
+                            self.progress.emit(overall_progress, 100)
+                    except RuntimeError as e:
+                        # Handle case where the Qt object has been deleted or other thread errors
+                        logger.warning(f"Runtime error during progress signal emission: {e}")
+                        if "C++ object" in str(e):
+                            logger.error("Qt object deletion detected during CSV processing")
+                            return False  # Signal to stop processing
+                    except Exception as e:
+                        # Log but don't crash on other errors
+                        logger.error(f"Error in progress callback: {e}")
+
+                    # Give the event loop a chance to process cancellation
+                    # Reduce frequency of processEvents calls to avoid reentrancy issues
+                    if current % 10 == 0:  # Only process events occasionally
+                        try:
+                            QApplication.processEvents()
+                        except Exception as e:
+                            logger.warning(f"Error processing events: {e}")
+
+                    # Continue unless cancelled
+                    return not self.is_cancelled
 
                 # Read the file with chunking and progress reporting
-                df, message = self.csv_service.read_csv_chunked(
-                    file_path=file_path,
-                    chunk_size=self.chunk_size,
-                    encoding=self.encoding,
-                    normalize_text=self.normalize_text,
-                    robust_mode=self.robust_mode,
-                    progress_callback=file_progress_callback,
-                )
+                try:
+                    df, message = self.csv_service.read_csv_chunked(
+                        file_path=file_path,
+                        chunk_size=self.chunk_size,
+                        encoding=self.encoding,
+                        normalize_text=self.normalize_text,
+                        robust_mode=self.robust_mode,
+                        progress_callback=file_progress_callback,
+                    )
+                except InterruptedError:
+                    # Re-raise interruption exceptions to be handled by the outer try-except
+                    raise
+                except Exception as e:
+                    # Log and treat as a file-specific error but continue processing other files
+                    logger.error(f"Error reading file {file_path}: {e}")
+                    error_files.append(f"{os.path.basename(str(file_path))}: {str(e)}")
+                    continue
+
+                # File completed, update overall progress
+                try:
+                    file_completed_progress = int(((i + 1) / total_files) * 100)
+                    self.progress.emit(file_completed_progress, 100)
+                except RuntimeError as e:
+                    # Handle case where the Qt object has been deleted
+                    logger.warning(f"Could not emit progress signal after file completion: {e}")
+                    if "C++ object" in str(e):
+                        return None, "Process interrupted - application is shutting down"
 
                 if df is not None and not df.empty:
                     dfs.append(df)
+                    self.dataframes.append(df)
+                    self._processed_files += 1
+                    logger.info(f"Successfully processed file {i + 1}/{total_files}")
                 else:
                     logger.warning(f"File {file_path} returned empty DataFrame or error: {message}")
                     error_files.append(f"{os.path.basename(str(file_path))}: {message}")
 
-            except InterruptedError:
+            except InterruptedError as ie:
                 # Task was cancelled
-                logger.info(f"CSV read operation cancelled during file: {file_path}")
-                return None, "Operation cancelled"
+                logger.info(f"CSV read operation interrupted: {ie}")
+                return None, str(ie)
+
+            except RuntimeError as e:
+                # Handle Qt-specific runtime errors (like C++ object deleted)
+                logger.error(f"RuntimeError processing file {file_path}: {e}")
+                if "C++ object" in str(e):
+                    return None, "Process interrupted - application is shutting down"
+                error_files.append(f"{os.path.basename(str(file_path))}: {str(e)}")
 
             except Exception as e:
                 # Log and record the error, but continue with other files
                 logger.error(f"Error processing file {file_path}: {e}")
                 error_files.append(f"{os.path.basename(str(file_path))}: {str(e)}")
 
-        # Final progress update
-        self._processed_files = total_files
-        self.progress.emit(total_files, total_files)
+        # Final progress update - all files completed
+        try:
+            self.progress.emit(100, 100)
+        except RuntimeError as e:
+            # Just log the error, but don't return - we still want to combine the DataFrames we have
+            logger.warning(f"Could not emit final progress signal: {e}")
 
         # Check if we have any valid DataFrames
         if not dfs:
@@ -399,36 +504,72 @@ class BackgroundWorker(QObject):
         if self._task is not None:
             try:
                 self._task.progress.disconnect(self.progress)
-            except TypeError:
-                # Signal wasn't connected
-                pass
 
-        # Clear the task
+                # Check for and disconnect any other signals that might be connected
+                if hasattr(self._task, "file_progress") and isinstance(
+                    getattr(self._task, "file_progress", None), Signal
+                ):
+                    try:
+                        # Find and disconnect any connections
+                        receivers = getattr(self._task.file_progress, "_receivers", [])
+                        if receivers:
+                            logger.debug(
+                                f"Disconnecting file_progress signal with {len(receivers)} receivers"
+                            )
+                            self._task.file_progress.disconnect()
+                    except (TypeError, RuntimeError) as e:
+                        logger.debug(f"Error disconnecting file_progress signal: {e}")
+
+            except (TypeError, RuntimeError) as e:
+                # Signal wasn't connected or Qt object deleted
+                logger.debug(f"Error disconnecting signals: {e}")
+
+        # Clear the task reference to allow garbage collection
         self._task = None
+
+        # Log completion
+        logger.debug("Thread finished and task cleanup completed")
 
     def __del__(self) -> None:
         """Clean up resources when the worker is deleted."""
         try:
             # Check if thread still exists and is running
             if hasattr(self, "_thread") and self._thread is not None:
+                thread = self._thread  # Keep a reference
                 logger.debug("Cleaning up BackgroundWorker thread")
-                if self._thread.isRunning():
-                    # Cancel any running task
+
+                try:
+                    # Cancel any running task first
                     if hasattr(self, "_task") and self._task is not None:
-                        self._task.cancel()
+                        task = self._task  # Keep a reference
+                        try:
+                            task.cancel()
+                        except RuntimeError as e:
+                            # It's ok if we can't cancel the task during shutdown
+                            logger.debug(f"Could not cancel task during cleanup: {e}")
 
-                    # Try to quit the thread gracefully first
-                    self._thread.quit()
+                    # Only try to quit if the thread exists and is running
+                    if thread.isRunning():
+                        # Try to quit the thread gracefully first
+                        thread.quit()
 
-                    # Wait for thread to finish with a timeout
-                    if not self._thread.wait(1000):  # 1 second timeout
-                        logger.warning("Thread did not quit gracefully, forcing termination")
-                        self._thread.terminate()
-                        self._thread.wait(500)  # Give it a bit more time
+                        # Brief wait
+                        if not thread.wait(500):  # 500ms timeout
+                            logger.debug(
+                                "Thread did not quit immediately, allowing application to handle it"
+                            )
+                            # During application shutdown, it's better to not force termination
+                            # as this can cause the "Internal C++ object already deleted" error
+                except RuntimeError as e:
+                    # This is normal during application shutdown
+                    logger.debug(f"RuntimeError during thread cleanup (likely shutdown): {e}")
+                except Exception as e:
+                    # Other exceptions should be logged
+                    logger.warning(f"Error during thread cleanup: {e}")
         except Exception as e:
             # Just log any errors during cleanup, don't raise
-            logger.error(f"Error cleaning up BackgroundWorker: {e}")
-            logger.debug(traceback.format_exc())
+            logger.debug(f"Error cleaning up BackgroundWorker (likely during shutdown): {e}")
+            # Don't log the traceback during shutdown as it may cause more errors
 
     def run_task(self, func, *args, task_id=None, on_success=None, on_error=None, **kwargs):
         """

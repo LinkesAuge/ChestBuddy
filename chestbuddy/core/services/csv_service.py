@@ -760,44 +760,93 @@ class CSVService:
                 on_bad_lines="skip" if robust_mode else None,
             )
 
-            all_chunks = []
+            # Memory-efficient approach: Instead of storing all chunks,
+            # initialize DataFrame with the first chunk and append to it
+            final_df = None
             rows_processed = 0
 
+            # Process chunks incrementally
             for chunk_idx, chunk in enumerate(chunks):
-                # Force all data to be processed as strings to avoid type inference issues
-                for col in chunk.columns:
-                    # Convert all values to string to ensure consistent handling
-                    chunk[col] = chunk[col].astype(str)
+                try:
+                    # Handle first chunk specially to get structure
+                    if final_df is None:
+                        final_df = chunk.copy()
+                    else:
+                        # Append chunk to the final DataFrame
+                        # Using a more memory-efficient approach
+                        try:
+                            final_df = pd.concat([final_df, chunk], ignore_index=True)
+                        except MemoryError as me:
+                            # If we run out of memory, log it and attempt to recover
+                            logger.error(f"Memory error during chunk concatenation: {me}")
 
-                # Add processed chunk to the list
-                all_chunks.append(chunk)
+                            # Emergency fallback: try to work with what we have
+                            if rows_processed > 0:
+                                return (
+                                    final_df,
+                                    f"Partial data loaded ({rows_processed} rows). Memory limit reached.",
+                                )
+                            else:
+                                return (
+                                    None,
+                                    "Memory error while processing file. Try a smaller chunk size.",
+                                )
 
-                # Update progress counter
-                rows_processed += len(chunk)
+                    # Update processed rows count
+                    rows_processed += len(chunk)
 
-                # Call progress callback if provided
-                if progress_callback and total_rows > 0:
-                    # Prevent division by zero and progress > 100%
-                    progress_pct = min(100, int((rows_processed / total_rows) * 100))
-                    try:
-                        progress_callback(rows_processed, total_rows)
-                    except Exception as e:
-                        logger.error(f"Error in progress callback: {e}")
+                    # Call progress callback if provided - with improved error handling
+                    if progress_callback and total_rows > 0:
+                        # Prevent division by zero and progress > 100%
+                        progress_pct = min(100, int((rows_processed / total_rows) * 100))
 
-            # Combine all chunks into a single DataFrame
-            if all_chunks:
-                # Concatenate all chunks, but avoid type inference again
-                final_df = pd.concat(all_chunks, ignore_index=True)
+                        # Wrap callback in try-except to prevent crashes
+                        try:
+                            # Check if callback wants to continue (returns False to stop)
+                            continue_processing = progress_callback(rows_processed, total_rows)
+                            if continue_processing is False:
+                                logger.info("CSV processing cancelled by callback")
+                                return final_df, "Operation cancelled"
+                        except RuntimeError as re:
+                            # Handle Qt object deletion errors gracefully
+                            if "C++ object" in str(re):
+                                logger.warning("Qt object deleted during progress callback")
+                                return (
+                                    final_df,
+                                    "Operation interrupted - UI components no longer available",
+                                )
+                        except Exception as e:
+                            logger.error(f"Error in progress callback: {e}")
+                            # Continue processing even if callback fails
 
-                # To further avoid recursion issues, ensure all column data is string
-                # This is especially important for date columns
-                for col in final_df.columns:
-                    final_df[col] = final_df[col].astype(str)
+                except MemoryError as me:
+                    # Handle memory errors in chunk processing
+                    logger.error(f"Memory error processing chunk {chunk_idx}: {me}")
+                    if final_df is not None and not final_df.empty:
+                        return (
+                            final_df,
+                            f"Partial data loaded ({rows_processed} rows). Memory limit reached.",
+                        )
+                    else:
+                        return None, "Memory error while processing file. Try a smaller chunk size."
 
-                logger.info(f"Successfully read CSV file with {len(final_df)} rows")
-                return final_df, None
-            else:
+                except Exception as e:
+                    # Handle other errors in chunk processing
+                    logger.error(f"Error processing chunk {chunk_idx}: {e}")
+                    if final_df is not None and not final_df.empty:
+                        return (
+                            final_df,
+                            f"Partial data loaded ({rows_processed} rows). Error: {str(e)}",
+                        )
+                    else:
+                        return None, f"Error processing file: {str(e)}"
+
+            # Check if we have any data
+            if final_df is None or final_df.empty:
                 return None, "No data read from CSV file"
+
+            logger.info(f"Successfully read CSV file with {len(final_df)} rows")
+            return final_df, None
 
         except Exception as e:
             logger.error(f"Error reading CSV file: {e}")
