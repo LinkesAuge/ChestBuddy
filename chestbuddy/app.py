@@ -159,11 +159,9 @@ class ChestBuddyApp(QObject):
         """
         logger.info(f"Data loaded successfully with {row_count} rows")
 
-        # Switch to the Data view in the main window using a thread-safe approach
-        if self._main_window:
-            # Use QTimer.singleShot for thread-safety in PySide6
-            QTimer.singleShot(0, lambda: self._main_window._set_active_view("Data"))
-            logger.info("Requested switch to Data view (thread-safe)")
+        # We no longer automatically switch to the Data view
+        # This allows the user to stay on their current view
+        # and prevents UI freezing during view transitions
 
     def _setup_autosave(self) -> None:
         """Set up periodic autosave functionality."""

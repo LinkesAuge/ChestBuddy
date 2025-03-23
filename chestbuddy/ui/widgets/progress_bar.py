@@ -13,7 +13,7 @@ from enum import Enum, auto
 from typing import Optional
 
 from PySide6.QtCore import Qt, Property, Signal
-from PySide6.QtGui import QPainter, QColor, QBrush, QPen, QGradient, QLinearGradient
+from PySide6.QtGui import QPainter, QColor, QBrush, QPen, QGradient, QLinearGradient, QFont
 from PySide6.QtWidgets import QProgressBar, QWidget, QStyleOptionProgressBar, QStyle
 
 from chestbuddy.ui.resources.style import Colors
@@ -59,7 +59,7 @@ class ProgressBar(QProgressBar):
         self.setMinimumHeight(20)
 
         # Set style
-        self.setTextVisible(True)
+        self.setTextVisible(False)  # Hide default text
         self.setAlignment(Qt.AlignCenter)
         self.setFormat("%p%")
 
@@ -117,11 +117,11 @@ class ProgressBar(QProgressBar):
 
         # Determine color based on state
         if self._state == self.State.SUCCESS:
-            color = QColor(Colors.SUCCESS)
+            base_color = QColor(Colors.SUCCESS)
         elif self._state == self.State.ERROR:
-            color = QColor(Colors.ERROR)
+            base_color = QColor(Colors.ERROR)
         else:
-            color = QColor(Colors.PRIMARY)
+            base_color = QColor("#4287f5")  # Bright blue color for normal state
 
         # Draw background
         bg_color = QColor(Colors.BACKGROUND_LIGHT)
@@ -132,13 +132,17 @@ class ProgressBar(QProgressBar):
         # Draw progress bar with gradient
         if percent > 0:
             gradient = QLinearGradient(0, 0, self.width(), 0)
-            darker_color = QColor(color)
-            darker_color.setAlpha(230)
-            lighter_color = QColor(color)
-            lighter_color.setAlpha(180)
 
-            gradient.setColorAt(0, darker_color)
-            gradient.setColorAt(1, lighter_color)
+            # Create nice blue gradient for normal state
+            if self._state == self.State.NORMAL:
+                gradient.setColorAt(0, QColor("#4287f5"))  # Bright blue
+                gradient.setColorAt(1, QColor("#64a1f4"))  # Lighter blue
+            else:
+                # Use state colors for other states
+                darker_color = QColor(base_color).darker(110)
+                lighter_color = base_color
+                gradient.setColorAt(0, darker_color)
+                gradient.setColorAt(1, lighter_color)
 
             painter.setBrush(QBrush(gradient))
 
@@ -147,20 +151,24 @@ class ProgressBar(QProgressBar):
                 0, 0, progress_width, self.height(), self._border_radius, self._border_radius
             )
 
-        # Draw text
-        text_option = QStyleOptionProgressBar()
-        text_option.initFrom(self)
-        text_option.minimum = self.minimum()
-        text_option.maximum = self.maximum()
-        text_option.progress = progress
-        text_option.text = self.format().replace("%p", str(int(percent * 100)))
-        text_option.textVisible = self.isTextVisible()
-        text_option.rect = self.rect()
+        # Draw percentage text on the right side
+        percent_text = f"{int(percent * 100)}%"
 
-        # Use different text color based on progress
-        if percent > 0.5:
-            painter.setPen(QColor(Colors.TEXT_LIGHT))
+        # Set font for percentage text
+        font = QFont()
+        font.setBold(True)
+        font.setPointSize(9)
+        painter.setFont(font)
+
+        # Calculate text placement - right aligned
+        text_rect = self.rect()
+        text_rect.setLeft(text_rect.right() - 45)  # Reserve space on the right
+
+        # Set text color (white on filled portion, dark on empty)
+        if percent > 0.7:  # If progress bar covers the text area
+            painter.setPen(QColor(Colors.TEXT_LIGHT))  # White text
         else:
-            painter.setPen(QColor(Colors.TEXT_DARK))
+            painter.setPen(QColor(Colors.TEXT_DARK))  # Dark text
 
-        self.style().drawControl(QStyle.CE_ProgressBarLabel, text_option, painter, self)
+        # Draw the text
+        painter.drawText(text_rect, Qt.AlignRight | Qt.AlignVCenter, percent_text)

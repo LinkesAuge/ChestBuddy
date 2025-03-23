@@ -14,7 +14,7 @@ from enum import Enum
 from typing import Optional, Union, Any
 
 from PySide6.QtCore import Qt, Signal, Slot, QSize
-from PySide6.QtGui import QFont, QCloseEvent
+from PySide6.QtGui import QFont, QCloseEvent, QColor
 from PySide6.QtWidgets import (
     QDialog,
     QVBoxLayout,
@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
     QWidget,
     QFrame,
     QApplication,
+    QGraphicsDropShadowEffect,
 )
 
 from chestbuddy.ui.widgets.progress_bar import ProgressBar
@@ -83,9 +84,24 @@ class ProgressDialog(QDialog):
         # Set window properties
         self.setWindowTitle("Operation in Progress")
         self.setWindowFlags(Qt.Dialog | Qt.CustomizeWindowHint | Qt.WindowTitleHint)
-        self.setMinimumWidth(400)
-        self.setMinimumHeight(150)
+        self.setMinimumWidth(450)
+        self.setMinimumHeight(180)
         self.setModal(True)
+
+        # Apply shadow to make dialog pop
+        shadow = QGraphicsDropShadowEffect(self)
+        shadow.setBlurRadius(15)
+        shadow.setColor(QColor(0, 0, 0, 80))
+        shadow.setOffset(0, 2)
+        self.setGraphicsEffect(shadow)
+
+        # Set dialog style
+        self.setStyleSheet("""
+            QDialog {
+                background-color: white;
+                border-radius: 8px;
+            }
+        """)
 
         # Set up the UI
         self._setup_ui()
@@ -99,22 +115,35 @@ class ProgressDialog(QDialog):
         """Set up the UI components."""
         # Create main layout
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(10)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(12)
+
+        # Create header
+        header_layout = QHBoxLayout()
+        header_layout.setContentsMargins(0, 0, 0, 0)
+        header_layout.setSpacing(0)
 
         # Create label
         self._label = QLabel(self._label_text)
         self._label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         font = QFont()
-        font.setPointSize(10)
+        font.setPointSize(11)
+        font.setBold(True)
         self._label.setFont(font)
-        layout.addWidget(self._label)
+        self._label.setStyleSheet(f"color: {Colors.TEXT_DARK};")
+        header_layout.addWidget(self._label)
+
+        # Add header stretch
+        header_layout.addStretch()
+
+        layout.addLayout(header_layout)
 
         # Create progress bar
         self._progress_bar = ProgressBar(self)
         self._progress_bar.setMinimum(self._minimum)
         self._progress_bar.setMaximum(self._maximum)
         self._progress_bar.setValue(self._minimum)
+        self._progress_bar.setMinimumHeight(24)
         layout.addWidget(self._progress_bar)
 
         # Create status text label
@@ -127,7 +156,7 @@ class ProgressDialog(QDialog):
         layout.addWidget(self._status_label)
 
         # Add spacer
-        layout.addSpacing(10)
+        layout.addSpacing(16)
 
         # Create button layout
         button_layout = QHBoxLayout()
@@ -139,7 +168,24 @@ class ProgressDialog(QDialog):
 
         # Create cancel button
         self._cancel_button = QPushButton(self._cancel_button_text)
-        self._cancel_button.setMinimumWidth(80)
+        self._cancel_button.setMinimumWidth(100)
+        self._cancel_button.setMinimumHeight(32)
+        self._cancel_button.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {Colors.BACKGROUND_LIGHT};
+                color: {Colors.TEXT_DARK};
+                border: 1px solid #D0D5DD;
+                border-radius: 6px;
+                padding: 8px 16px;
+                font-weight: 500;
+            }}
+            QPushButton:hover {{
+                background-color: #EAECF0;
+            }}
+            QPushButton:pressed {{
+                background-color: #D7DAE2;
+            }}
+        """)
         button_layout.addWidget(self._cancel_button)
 
         # Add button layout to main layout
@@ -275,4 +321,4 @@ class ProgressDialog(QDialog):
         Returns:
             The recommended size.
         """
-        return QSize(400, 150)
+        return QSize(450, 180)
