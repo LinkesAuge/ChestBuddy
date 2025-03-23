@@ -175,19 +175,5 @@ We've addressed several critical bugs in the import functionality:
 
 4. **Logger integration** - Added proper logging to the dashboard adapter to provide better debugging information.
 
-### Next Steps
+5. **Progress dialog confirmation UI blocking** - Fixed issue where the UI would remain blocked after clicking "Confirm" on the import progress dialog (only on first import). Added explicit _update_ui() call to ensure all UI elements are properly enabled after dialog closes.
 
-1. **Performance optimization** - We need to address the performance issues with large datasets (>100,000 rows) by implementing:
-   - Virtual scrolling in the table view
-   - Improved memory management for data operations
-   - Batched UI updates
-
-2. **Chart export quality** - Improve the resolution and formatting of exported charts, focusing on:
-   - Consistent font rendering
-   - Proper color reproduction
-   - Correct legend positioning
-
-3. **Continued UI responsiveness improvements** - Further optimize background processing to prevent UI freezes:
-   - Move more operations to background threads
-   - Implement task prioritization
-   - Add more granular progress reporting

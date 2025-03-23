@@ -33,6 +33,12 @@ alwaysApply: false
   - Improved visibility handling to ensure dialog stays visible throughout the loading process
   - Added more descriptive messages showing file progress (x/y) and row count
 
+- ✅ UI not unblocking after first import when confirming progress dialog
+  - Fixed in MainWindow._close_progress_dialog by adding a call to _update_ui() after closing the dialog
+  - Added detailed comments explaining the importance of this update
+  - This ensures all UI elements are properly enabled after the user clicks "Confirm"
+  - Only affected the first import operation, subsequent imports worked correctly
+
 - ✅ SyntaxError in progress_bar.py
   - Fixed by removing extraneous backticks (```) at the end of the file
   - This was causing the application to fail at startup
@@ -129,9 +135,28 @@ alwaysApply: false
 
 # Bugfixing Log
 
-*Last Updated: 2025-03-23*
+*Last Updated: 2025-03-24*
 
 ## Recent Fixes
+
+### 2025-03-24: Fixed UI Blocking Issue After First Import
+
+**Issue**: When importing files for the first time and the progress window finished, clicking "Confirm" would not unblock the UI for the user. However, subsequent imports worked correctly.
+
+**Root Cause**: In the `_close_progress_dialog` method, the dialog was properly closed but the UI state was not updated afterward. This caused UI elements to remain blocked after the first import. Subsequent imports worked because they went through the full import flow which included proper UI updates.
+
+**Fix**:
+1. Modified `MainWindow._close_progress_dialog` to call `_update_ui()` after closing the dialog
+2. Added detailed comments explaining the importance of this update
+3. Added logging to track when UI state is updated
+
+**Validation**:
+- Verified that the UI becomes interactive immediately after clicking "Confirm" on the first import
+- Confirmed that subsequent imports continue to work correctly
+- Tested multiple file import scenarios to ensure consistent behavior
+
+**File(s) Modified**:
+- `chestbuddy/ui/main_window.py`
 
 ### 2025-03-23: Fixed Import Functionality and UI Unblocking Issues
 

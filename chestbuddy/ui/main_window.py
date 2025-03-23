@@ -650,87 +650,73 @@ class MainWindow(QMainWindow):
 
         # Create and show progress dialog
         try:
-            # Create progress dialog if it doesn't exist
-            if not hasattr(self, "_progress_dialog") or not self._progress_dialog:
-                logger.debug("Creating new progress dialog")
-                self._progress_dialog = ProgressDialog(
-                    "Importing data...", "Cancel", 0, 100, self, "Loading Data", True
-                )
-                # Connect cancel signal
-                self._progress_dialog.canceled.connect(self._cancel_loading)
+            # Always close any existing dialog first
+            if hasattr(self, "_progress_dialog") and self._progress_dialog:
+                logger.debug("Closing existing progress dialog")
+                try:
+                    self._progress_dialog.accept()
+                except Exception as e:
+                    logger.error(f"Error closing existing dialog: {e}")
+                self._progress_dialog = None
+
+            # Always create a fresh dialog
+            logger.debug("Creating new progress dialog")
+
+            # Create with non-modal setup to avoid blocking issues
+            self._progress_dialog = ProgressDialog(
+                "Importing data...", "Cancel", 0, 100, self, "Loading Data", True
+            )
+
+            # Modify window flags to avoid modal state issues
+            self._progress_dialog.setWindowModality(Qt.NonModal)  # Use non-modal to avoid blocking
+
+            # Connect signals
+            self._progress_dialog.canceled.connect(self._cancel_loading)
+            self._progress_dialog.confirmed.connect(self._close_progress_dialog)
 
             # Update dialog properties
             self._progress_dialog.setValue(0)
             self._progress_dialog.setRange(0, 100)
             self._progress_dialog.setLabelText("Preparing to import data...")
 
-            # Make sure dialog is visible
-            if not self._progress_dialog.isVisible():
-                logger.debug("Showing progress dialog")
-                self._progress_dialog.show()
+            # Show dialog in a non-blocking way
+            logger.debug("Showing progress dialog")
+            self._progress_dialog.show()
+            self._progress_dialog.raise_()
+            self._progress_dialog.activateWindow()
+
+            # Process events to ensure UI updates
+            QApplication.processEvents()
         except Exception as e:
             logger.error(f"Error creating progress dialog: {e}")
 
-    def _on_load_finished(self, message: str) -> None:
+    def _on_load_finished(self, success: bool, message: str = "") -> None:
         """
-        Handle when a loading operation is finished.
+        Handle load finished signal.
 
         Args:
-            message: Message to display
+            success: Whether the loading was successful
+            message: Additional message with details
         """
-        logger.debug(f"MainWindow._on_load_finished called with message: {message}")
+        logger.debug(f"Load finished, success={success}, message={message}")
+
+        # Make sure we have a progress dialog to finalize
+        if not self._progress_dialog:
+            # Create one if needed to ensure UI is unblocked
+            logger.warning("Missing progress dialog in _on_load_finished, creating one to finalize")
+            self._progress_dialog = ProgressDialog(self, "Loading Data")
 
         try:
-            # Log success message
-            if not message.startswith("Error"):
-                logger.info(f"Data loading finished: {message}")
+            # Disable further updates - this should be final state
+            self._progress_dialog_finalized = True
 
-            # Check if we have data and set _data_loaded flag
-            if not self._data_model.is_empty:
-                self._data_loaded = True
-                logger.debug("Setting _data_loaded to True as data model has content")
-                # Update UI based on data state
-                self._update_ui()
-                # Update navigation
-                self._update_navigation_based_on_data_state()
+            if success:
+                self._finalize_loading(message, None)
             else:
-                logger.debug("Data model is empty after loading")
-
-            # Log status for debug
-            logger.debug(f"UI data loaded state: {self._data_loaded}")
-
-            # Check for progress dialog - if we can't find it, create one to ensure proper UI state
-            if not hasattr(self, "_progress_dialog") or not self._progress_dialog:
-                logger.warning("No progress dialog found in _on_load_finished, creating one")
-                # Create a temporary progress dialog to ensure proper UI unblocking
-                from chestbuddy.ui.widgets.progress_dialog import ProgressDialog
-
-                self._progress_dialog = ProgressDialog("Loading Files", "Finishing...", self)
-                self._progress_dialog.set_progress(100, 100)
-                self._progress_dialog.set_status("Complete")
-                self._progress_dialog.set_can_cancel(True)
-                self._progress_dialog.cancel_button.setText("Close")
-                # Process events to ensure dialog updates are visible
-                QApplication.processEvents()
-
-            # Call UI finalization handler regardless of dialog existence
-            is_error = message.startswith("Error") or "error" in message.lower()
-            self._finalize_loading(message, is_error)
-
+                self._finalize_loading(None, message)
         except Exception as e:
-            # Catch any errors to ensure we finalize loading
             logger.error(f"Error in _on_load_finished: {e}")
-            self._finalize_loading(f"Error: {str(e)}", True)
-
-        # Always set loaded status after any loading operation (success or failure)
-        # This ensures navigation and UI elements are properly updated
-        if not self._data_model.is_empty:
-            self._data_loaded = True
-            # Force a complete UI update
-            self.refresh_ui()
-
-        # Log final state
-        logger.debug(f"_on_load_finished completed. Data loaded state: {self._data_loaded}")
+            self._finalize_loading(None, f"Error: {str(e)}")
 
     def _close_progress_dialog(self) -> None:
         """
@@ -740,75 +726,76 @@ class MainWindow(QMainWindow):
         try:
             # Only proceed if dialog exists
             if hasattr(self, "_progress_dialog") and self._progress_dialog:
-                logger.debug("Closing progress dialog after load completion")
+                logger.debug("Closing progress dialog after completion")
 
-                # Close the dialog
-                self._progress_dialog.close()
+                # Hide and close the dialog (accept for consistency)
+                self._progress_dialog.hide()
+                self._progress_dialog.accept()
 
                 # Set to None to prevent further updates
                 self._progress_dialog = None
+
+                # Process events to ensure UI updates
+                QApplication.processEvents()
+
+                # Update UI state to ensure all elements are properly enabled
+                # This is critical to prevent UI elements from remaining blocked
+                # especially after first-time imports
+                logger.debug("Updating UI state after closing progress dialog")
+                self._update_ui()
         except Exception as e:
             logger.error(f"Error closing progress dialog: {e}")
 
-    def _finalize_loading(self, message: str, is_error: bool) -> None:
+    def _finalize_loading(self, success_message: str, error_message: str = None) -> None:
         """
-        Finalize the loading process and update the progress dialog accordingly.
+        Finalize the loading process after completion.
 
         Args:
-            message: The message to display in the dialog
-            is_error: Whether this is an error state
+            success_message: The success message to log
+            error_message: The error message to log, if any
         """
-        logger.debug(f"Finalizing loading process: {message}, is_error={is_error}")
+        logger.debug("Finalizing loading process")
 
-        # Early return if progress dialog doesn't exist
-        if not hasattr(self, "_progress_dialog") or not self._progress_dialog:
-            logger.debug("No progress dialog to update for finalization")
-            return
+        # Always set the progress dialog to 100%
+        if self._progress_dialog:
+            self._progress_dialog.setValue(100)
 
-        try:
-            # Set flag to indicate dialog has been finalized
-            self._progress_dialog_finalized = True
-
-            # Set appropriate dialog state based on success/error
-            if is_error:
-                # Set error styling
-                if hasattr(self._progress_dialog, "setState") and hasattr(ProgressBar, "State"):
-                    self._progress_dialog.setState(ProgressBar.State.ERROR)
-                self._progress_dialog.setLabelText("Loading failed")
+            # Handle errors if there are any
+            if error_message:
+                self._progress_dialog.setState(ProgressDialog.State.ERROR)
+                self._progress_dialog.setStatusText(error_message)
+                self._progress_dialog.setCancelButtonText("Close")
+                logger.error(f"Loading failed: {error_message}")
+                success = False  # Define success as False for error case
             else:
-                # Set success styling
-                self._progress_dialog.setLabelText("Loading complete")
+                # Otherwise set success state
+                self._progress_dialog.setState(ProgressDialog.State.SUCCESS)
+                self._progress_dialog.setStatusText(success_message)
+                self._progress_dialog.setCancelButtonText("Confirm")
+                self._progress_dialog.set_confirm_button_style()
+                logger.info(f"Loading successful: {success_message}")
+                success = True  # Define success as True for success case
 
-            # Set status message
-            self._progress_dialog.setStatusText(message)
-
-            # Always set progress to max on finalization
-            self._progress_dialog.setValue(self._progress_dialog.maximum())
-
-            # Change button to Close for final state
-            self._progress_dialog.setCancelButtonText("Close")
-
-            # Don't disconnect or reconnect signals for the cancel button
-            # The ProgressDialog._on_cancel_clicked method will handle both
-            # emitting the signal and closing the dialog
-
-            # Make sure button is enabled
-            if hasattr(self._progress_dialog, "setCancelButtonEnabled"):
-                self._progress_dialog.setCancelButtonEnabled(True)
-
-            # Process events for UI responsiveness
-            QApplication.processEvents()
-
-            logger.debug("Progress dialog updated for finalization")
+        # Safely check if there are rows in the data model
+        has_data_rows = False
+        try:
+            if hasattr(self._data_model, "data") and self._data_model.data is not None:
+                has_data_rows = len(self._data_model.data) > 0
+                logger.debug(f"Data model has {len(self._data_model.data)} rows")
+            else:
+                logger.warning("Data model doesn't have 'data' attribute or it's None")
         except Exception as e:
-            logger.error(f"Error finalizing progress dialog: {e}")
-            # Try to ensure dialog can be closed
-            try:
-                if hasattr(self._progress_dialog, "_cancel_button"):
-                    self._progress_dialog._cancel_button.setEnabled(True)
-                    self._progress_dialog._cancel_button.setText("Close")
-            except:
-                pass
+            logger.error(f"Error checking data rows: {e}")
+
+        # Update data loaded flag based on success and data availability
+        self._data_loaded = success and has_data_rows
+
+        # Enable navigation based on data state
+        self._update_navigation_based_on_data_state()
+
+        # If data was successfully loaded, switch to Data view
+        if self._data_loaded:
+            self._set_active_view("Data")
 
     def _on_populate_table_requested(self, data: pd.DataFrame) -> None:
         """
@@ -988,111 +975,21 @@ class MainWindow(QMainWindow):
             logger.error(f"Error updating progress dialog: {e}")
             # Don't crash the application if there's an error updating the progress
 
-    def _on_load_error(self, message: str) -> None:
+    def _on_load_error(self, error_message: str) -> None:
         """
-        Handle errors during the loading process.
+        Handle load error signal.
 
         Args:
-            message: Error message
+            error_message: The error message to display
         """
-        logger.error(f"Load error: {message}")
+        logger.error(f"Load error: {error_message}")
+        self._status_bar.set_error(error_message)
 
-        # Update the status bar
-        self._status_bar.set_status(f"Error: {message}")
-
-        # Check if loading is already complete or in progress with data
-        data_loaded = False
-        try:
-            if self._data_model and not self._data_model.is_empty:
-                data_loaded = True
-                logger.warning(f"Error occurred but data model has data: {message}")
-        except:
-            pass
-
-        # Check if there's a progress signal that has been received
-        has_progress = False
-        try:
-            if hasattr(self, "_loading_state") and self._loading_state.get("total_rows", 0) > 0:
-                has_progress = True
-                logger.warning(f"Error occurred after progress was received: {message}")
-        except:
-            pass
-
-        # If showing error dialog flag is set, don't show another error
-        if hasattr(self, "_showing_error_dialog") and self._showing_error_dialog:
-            logger.debug("Already showing an error dialog, skipping additional error dialog")
-            return
-
-        # If we have data loaded or progress, skip closing everything, just log the error
-        if data_loaded or has_progress:
-            logger.warning(f"Non-critical error during loading, continuing: {message}")
-            return
-
-        # Set flag to prevent multiple error dialogs
-        self._showing_error_dialog = True
-
-        # If the progress dialog exists, update it to show the error
-        if hasattr(self, "_progress_dialog") and self._progress_dialog:
-            try:
-                # Set error state
-                if hasattr(self._progress_dialog, "setState") and hasattr(ProgressBar, "State"):
-                    self._progress_dialog.setState(ProgressBar.State.ERROR)
-
-                # Update labels
-                self._progress_dialog.setLabelText("Loading failed")
-                self._progress_dialog.setStatusText(f"Error: {message}")
-
-                # Change button to Close
-                self._progress_dialog.setCancelButtonText("Close")
-
-                # Disconnect previous signal connections
-                try:
-                    self._progress_dialog.canceled.disconnect()
-                except:
-                    pass
-
-                # Connect cancel button to close the dialog
-                self._progress_dialog.canceled.connect(self._progress_dialog.close)
-
-                # Ensure button is enabled
-                if hasattr(self._progress_dialog, "setCancelButtonEnabled"):
-                    self._progress_dialog.setCancelButtonEnabled(True)
-
-                # Make sure dialog is visible
-                if not self._progress_dialog.isVisible():
-                    self._progress_dialog.show()
-                    self._progress_dialog.raise_()
-                    self._progress_dialog.activateWindow()
-
-                # Process events to update the UI
-                QApplication.processEvents()
-
-                logger.debug("Progress dialog updated to show error")
-            except Exception as e:
-                logger.error(f"Error updating progress dialog for error state: {e}")
-                # Try to show a message box as fallback
-                QMessageBox.critical(self, "Error", f"Loading failed: {message}")
-        else:
-            # If no progress dialog exists, show a message box
-            QMessageBox.critical(self, "Error", f"Loading failed: {message}")
-
-        # Reset loading state
-        self._loading_state = {
-            "total_files": 0,
-            "current_file_index": 0,
-            "current_file": "",
-            "processed_files": [],
-            "total_rows": 0,
-        }
-
-        # Clear error dialog flag after showing
-        self._showing_error_dialog = False
-
-        # Reset data loaded state if no data available
-        if self._data_model.is_empty:
-            self._data_loaded = False
-            # Update UI based on data state
-            self._update_navigation_based_on_data_state()
+        # Show error in progress dialog if it exists
+        if self._progress_dialog:
+            self._progress_dialog.setState(ProgressDialog.State.ERROR)
+            self._progress_dialog.setStatusText(error_message)
+            self._progress_dialog.setCancelButtonText("Close")
 
     def _cancel_loading(self) -> None:
         """Cancel the current loading operation."""
@@ -1113,8 +1010,12 @@ class MainWindow(QMainWindow):
         if hasattr(self, "_progress_dialog") and self._progress_dialog:
             try:
                 logger.debug("Closing progress dialog on cancel")
-                self._progress_dialog.close()
+                self._progress_dialog.hide()
+                self._progress_dialog.reject()
                 self._progress_dialog = None
+
+                # Process events to ensure UI updates
+                QApplication.processEvents()
             except Exception as e:
                 logger.error(f"Error closing progress dialog on cancel: {e}")
 
