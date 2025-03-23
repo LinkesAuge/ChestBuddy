@@ -329,11 +329,11 @@ class DataManager(QObject):
             if self._current_file_path:
                 self._update_recent_files(self._current_file_path)
 
-            # Emit load_finished signal with a processing message
-            processing_message = f"Processing {len(data):,} rows of data..."
+            # Emit a transitional message to indicate we're moving to table population
+            processing_message = f"Preparing to populate table with {len(data):,} rows..."
             self.load_finished.emit(processing_message)
 
-            # Allow UI to process the completion event
+            # Allow UI to update before proceeding with table population
             QApplication.processEvents()
 
             # Map columns
@@ -346,19 +346,18 @@ class DataManager(QObject):
             # This allows the table to be populated before continuing
             self.populate_table_requested.emit(mapped_data)
 
-            # Process events to allow UI to update during table population
-            QApplication.processEvents()
-
-            # Emit success signal with message
-            success_message = f"Successfully loaded {len(data):,} rows of data"
-            self.load_success.emit(message or "CSV loaded successfully")
-
-            # Unblock signals and emit a controlled change notification
+            # Unblock signals after table population
             self._data_model.blockSignals(False)
+
+            # Emit normal data_changed notification after all processing is complete
             self._data_model.data_changed.emit()
 
             # Clear the current task
             self._current_task = None
+
+            # Emit final success signal
+            success_message = f"Successfully loaded {len(data):,} rows of data"
+            self.load_success.emit(success_message)
 
         except Exception as e:
             # Ensure signals are unblocked
