@@ -28,6 +28,11 @@ alwaysApply: false
   - Improved visibility handling to ensure dialog stays visible throughout the loading process
   - Added more descriptive messages showing file progress (x/y) and row count
 
+- ✅ Progress dialog not being shown during CSV import
+  - Fixed by passing the DataManager instance to MainWindow in app.py
+  - The MainWindow was being initialized without the data_manager parameter
+  - This prevented the connection of load_started and load_progress signals
+
 - ✅ SyntaxError in progress_bar.py
   - Fixed by removing extraneous backticks (```) at the end of the file
   - This was causing the application to fail at startup
@@ -66,6 +71,13 @@ alwaysApply: false
   - Added task ID recognition for "load_multi_csv_*" pattern in DataManager
   - Added missing signal connections in BackgroundWorker.execute_task method
   - Ensured proper propagation of task_completed and task_failed signals
+
+- ✅ CSV import data handling error
+  - Fixed mismatch between MultiCSVLoadTask return format and DataManager expectation
+  - MultiCSVLoadTask.run() returns (success_boolean, data_or_error_message)
+  - DataManager was expecting (DataFrame, message)
+  - Updated _on_csv_load_success to correctly handle this format
+  - Improved error handling for failed import operations
 
 - **App crashes during CSV file import**: The application would crash in the middle of processing CSV files, particularly with large files.
   - Fixed by improving the memory management in `csv_service.py`, particularly the `read_csv_chunked` method which now incrementally processes chunks instead of storing all in memory.
