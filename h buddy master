@@ -1,0 +1,17 @@
+[33mcommit 1a6974fe1042fff9cefe84f6c1d7f9e573026f30[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmaster[m[33m)[m
+Author: ChestBuddy Developer <dev@chestbuddy.example.com>
+Date:   Sun Mar 23 06:13:07 2025 +0100
+
+    Fix startup error: Replace deprecated QDesktopWidget with QGuiApplication.primaryScreen()
+
+[33mcommit 1f979e9b0e1c88bcb4172a77d9652476a4e73bb6[m[33m ([m[1;31mbuddy/master[m[33m)[m
+Author: ChestBuddy Developer <dev@chestbuddy.example.com>
+Date:   Sun Mar 23 06:10:14 2025 +0100
+
+    Fix progress dialog issues: 1) Update dialog UI with better styling 2) Fix button state after table population 3) Ensure table population updates progress dialog properly
+
+[33mcommit 92ed30f8d41973b4274f37fe8ee5bc44ea250e53[m
+Author: ChestBuddy Developer <dev@chestbuddy.example.com>
+Date:   Sun Mar 23 06:02:52 2025 +0100
+
+    Fix progress dialog issues: 1) Fix styling attribute errors 2) Properly detect application shutdown to stop table population

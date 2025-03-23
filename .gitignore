@@ -6,3 +6,4 @@ dist/
 wheels/
 *.egg-info
 
+chestbuddy/logs/chestbuddy.log

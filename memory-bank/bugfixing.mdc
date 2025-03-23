@@ -1,4 +1,9 @@
 ---
+description: 
+globs: 
+alwaysApply: false
+---
+---
 description: Tracking of bugs, fixes, and ongoing issues
 globs: 
 alwaysApply: false
