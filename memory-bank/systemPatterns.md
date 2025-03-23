@@ -1,6 +1,101 @@
-# System Patterns
+---
+title: System Patterns - ChestBuddy Application
+date: 2023-04-02
+---
 
-This document outlines the key architectural patterns and design decisions for the ChestBuddy application.
+# System Architecture and Design Patterns
+
+This document outlines the major architectural decisions, design patterns, and component relationships within the ChestBuddy application.
+
+## Application Architecture
+
+ChestBuddy follows a layered architecture with clear separation of concerns:
+
+1. **Presentation Layer**: UI components built with PySide6
+2. **Application Layer**: Application logic and controllers
+3. **Domain Layer**: Business rules and domain models
+4. **Infrastructure Layer**: Data access, file operations, and utilities
+
+## UI Component Library
+
+We've established a consistent UI component library that follows these principles:
+
+### Reusable UI Components
+
+1. **ActionButton**
+   - Purpose: Consistent button styling for all actions in the application
+   - Features:
+     - Support for text, icon, or both
+     - Primary styling for prominent actions
+     - Compact mode for space efficiency
+     - Tooltip support for better usability
+   - Implementation:
+     - Extends QPushButton with consistent styling
+     - Uses signals/slots for action handling
+     - Maintains consistent sizing and spacing
+
+2. **ActionToolbar**
+   - Purpose: Organize related action buttons into logical groups
+   - Features:
+     - Horizontal or vertical orientation
+     - Button grouping with separators
+     - Consistent spacing between button groups
+     - Flexibility for different screen sizes
+   - Implementation:
+     - Container for ActionButton components
+     - Manages button layout and grouping
+     - Provides API for adding/removing buttons
+
+3. **EmptyStateWidget**
+   - Purpose: Display informative content when no data is available
+   - Features:
+     - Title and descriptive message
+     - Optional icon for visual context
+     - Call-to-action button for primary action
+     - Customizable appearance
+   - Implementation:
+     - Composite widget with layout management
+     - Signal emission for action button clicks
+     - Accessibility support for screen readers
+
+4. **FilterBar**
+   - Purpose: Provide search and filtering functionality for data views
+   - Features:
+     - Search field with clear button
+     - Expandable filter section
+     - Support for multiple filter categories
+     - Signals for search/filter changes
+   - Implementation:
+     - Composite widget with expandable sections
+     - Manages filter state internally
+     - Emits signals when search text or filters change
+
+### Component Design Principles
+
+1. **Signal-Based Communication**
+   - Components emit signals when state changes
+   - Parent components connect to signals to handle events
+   - Reduces tight coupling between components
+
+2. **Consistent Styling**
+   - Application-wide style sheet for visual consistency
+   - Reuse of colors, fonts, and spacing values
+   - Style inheritance to maintain look and feel
+
+3. **Property-Based Configuration**
+   - Components expose properties for configuration
+   - Changes to properties update component appearance
+   - Default values ensure components work out-of-the-box
+
+4. **Composition Over Inheritance**
+   - Build complex widgets by composing simpler ones
+   - Limit inheritance to cases where it adds clear value
+   - Use QWidget containment for complex components
+
+5. **Test-Driven Development**
+   - Comprehensive test suite for all UI components
+   - Tests validate component behavior and edge cases
+   - Changes must pass all tests before integration
 
 ## Application Architecture
 
@@ -125,6 +220,34 @@ Key UI widgets:
 - `ProgressDialog`: Dialog wrapping ProgressBar with enhanced functionality
 - `StatusBar`: Custom status bar with multiple information sections
 - `ViewHeader`: Standardized header for application views
+- `ActionButton`: Customizable button with consistent styling for actions
+  - Supports text, icon, or both
+  - Offers primary and secondary styling variants
+  - Configurable for compact mode (icon only with tooltip)
+  - Manages enabled/disabled state with appropriate visual feedback
+  - Provides hover and pressed state styling
+  - Emits clicked signal for action handling
+  
+- `ActionToolbar`: Container for organizing related ActionButtons
+  - Supports horizontal or vertical orientation
+  - Can group buttons with separators for logical organization
+  - Manages button visibility and enabled states
+  - Handles button addition, removal and retrieval
+  - Allows spacing customization between buttons
+  
+- `EmptyStateWidget`: Configurable empty state display with call-to-action
+  - Displays title, message, and optional action button
+  - Supports custom icons for visual context
+  - Provides centralized layout with proper spacing
+  - Emits signals when action button is clicked
+  - Visually consistent representation of empty states across the application
+  
+- `FilterBar`: Compact search and filtering interface
+  - Combines search field with expandable advanced filters
+  - Supports multiple filter categories with options
+  - Emits signals for filter and search text changes
+  - Collapsible design to maximize content space when not in use
+  - Provides clear visual feedback on active filters
 
 ### 8. Adapter Pattern for Views
 
@@ -960,4 +1083,61 @@ graph TD
     CHS --> CDM
     DM --> CDM
     UI[UI Components] --> App
+```
+
+## Key UI Implementation Notes
+
+### Data-Dependent UI Pattern
+
+This pattern handles UI state based on data availability:
+
+1. **State Tracking**: Track data loading state in central location (MainWindow)
+2. **State Propagation**: Notify components of state changes through signals
+3. **UI Adaptation**: Adapt UI based on data state (empty states, disabled controls)
+4. **Visual Feedback**: Provide clear visual indication of data-dependent features
+5. **User Guidance**: Guide users toward actions needed to enable functionality
+
+Example implementation:
+```python
+# State tracking in MainWindow
+self._data_loaded = False
+
+# Method to update state
+def set_data_loaded(self, is_loaded):
+    if self._data_loaded != is_loaded:
+        self._data_loaded = is_loaded
+        self.data_state_changed.emit(is_loaded)
+        self._update_navigation_state()
+
+# UI adaptation in SidebarNavigation
+def update_data_dependent_sections(self, data_loaded):
+    for section_name in ["Data", "Analysis", "Reports"]:
+        section = self._sections.get(section_name)
+        if section:
+            section.set_enabled(data_loaded)
+```
+
+### Empty State Pattern
+
+For handling UI when no data is available:
+
+1. **Empty Detection**: Logic to determine when an empty state should be shown
+2. **Empty Widget**: Dedicated widget for empty state display
+3. **Call-to-Action**: Clear guidance on how to proceed from empty state
+4. **Visual Design**: Visually distinct appearance for empty state
+5. **Transition**: Smooth transition between empty and populated states
+
+Example implementation:
+```python
+# Empty state detection
+def _update_content_state(self):
+    if self._data_model.is_empty():
+        self._show_empty_state()
+    else:
+        self._show_content()
+
+# Empty state widget
+def _show_empty_state(self):
+    self._empty_widget.setVisible(True)
+    self._content_widget.setVisible(False)
 ``` 
