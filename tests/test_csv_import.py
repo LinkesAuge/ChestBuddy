@@ -1,162 +1,183 @@
+#!/usr/bin/env python
 """
 test_csv_import.py
 
-Description: Test script for CSV import functionality
-Usage:
-    python -m tests.test_csv_import
+Description: Test script for CSV import functionality in ChestBuddy application
+This script tests loading multiple CSV files, memory management, and thread safety
 """
 
 import os
 import sys
 import logging
+import tempfile
 import time
 from pathlib import Path
 
-# Add project root to path to ensure imports work correctly
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
+# Add the parent directory to the path so we can import the chestbuddy package
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-# Configure logging
+# Set up logging
 logging.basicConfig(
     level=logging.DEBUG,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler(project_root / "tests" / "csv_import_test.log"),
-    ],
+    filename="tests/csv_import_test.log",
+    filemode="w",
 )
-
 logger = logging.getLogger("csv_import_test")
 
+# Add console handler for immediate feedback
+console = logging.StreamHandler()
+console.setLevel(logging.INFO)
+console.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
+logger.addHandler(console)
+
 # Import required modules
-from PySide6.QtCore import QCoreApplication
 from PySide6.QtWidgets import QApplication
+from PySide6.QtCore import QTimer, QEventLoop
+
 from chestbuddy.core.services.csv_service import CSVService
-from chestbuddy.core.services.data_manager import DataManager
-from chestbuddy.core.models.chest_data_model import ChestDataModel
-from chestbuddy.utils.config import ConfigManager
+from chestbuddy.utils.background_processing import BackgroundWorker, MultiCSVLoadTask
 
 
 def test_csv_import():
-    """Test CSV import functionality directly."""
+    """Test CSV import functionality."""
     logger.info("Starting CSV import test")
 
-    # Create Qt application (needed for signals)
-    app = QApplication([])
+    # Create Qt application for proper signal handling
+    app = QApplication.instance() or QApplication(sys.argv)
 
-    # Create services and model
-    logger.info("Creating services and model")
+    # Set up test files
+    logger.info("Setting up test files")
+    test_files = []
+
+    # Check for existing test files first
+    data_dir = Path("data")
+    if data_dir.exists():
+        csv_files = list(data_dir.glob("*.csv"))
+        if csv_files:
+            logger.info(f"Found {len(csv_files)} existing CSV files in data directory")
+            test_files = csv_files
+
+    # If no test files found, create temporary test files
+    if not test_files:
+        logger.info("Creating temporary test files")
+        temp_dir = Path(tempfile.gettempdir())
+
+        # Create a simple test CSV file
+        test_file1 = temp_dir / "test1.csv"
+        with open(test_file1, "w") as f:
+            f.write("id,name,value\n")
+            for i in range(1000):
+                f.write(f"{i},Item {i},{i * 10}\n")
+
+        # Create another test CSV file
+        test_file2 = temp_dir / "test2.csv"
+        with open(test_file2, "w") as f:
+            f.write("id,name,value\n")
+            for i in range(1000, 2000):
+                f.write(f"{i},Item {i},{i * 10}\n")
+
+        test_files = [test_file1, test_file2]
+        logger.info(f"Created temporary test files: {test_files}")
+
+    # Create services
     csv_service = CSVService()
-    data_model = ChestDataModel()
-    data_manager = DataManager(data_model, csv_service)
 
-    # Add progress monitoring
-    data_manager.load_started.connect(lambda: logger.info("Load started"))
-    data_manager.load_progress.connect(
-        lambda file_path, current, total: logger.info(
-            f"Progress: {file_path or 'Overall'} - {current}/{total} ({int(current / total * 100) if total else 0}%)"
-        )
-    )
-    data_manager.load_success.connect(lambda msg: logger.info(f"Load success: {msg}"))
-    data_manager.load_error.connect(lambda msg: logger.error(f"Load error: {msg}"))
-    data_manager.load_finished.connect(lambda msg: logger.info(f"Load finished: {msg}"))
+    # Results storage
+    results = {"progress": [], "status": [], "success": False, "data": None, "error": None}
 
-    # Find CSV files
-    input_dir = project_root / "chestbuddy" / "data" / "input"
-    csv_files = list(input_dir.glob("*.csv"))
+    # Progress callback
+    def on_progress(current, total):
+        logger.info(f"Progress: {current}/{total} ({int((current / max(1, total)) * 100)}%)")
+        results["progress"].append((current, total))
 
-    if not csv_files:
-        logger.error(f"No CSV files found in {input_dir}")
-        return
+    # Status callback
+    def on_status(status):
+        logger.info(f"Status: {status}")
+        results["status"].append(status)
 
-    logger.info(f"Found {len(csv_files)} CSV files: {[f.name for f in csv_files]}")
+    # Success callback
+    def on_success(data):
+        logger.info(f"Success! Loaded data with {len(data)} rows")
+        results["success"] = True
+        results["data"] = data
 
-    # Start import
-    try:
-        logger.info("Starting CSV import")
-        data_manager.load_csv([str(f) for f in csv_files])
+        # Check the data to make sure it's valid
+        logger.info(f"Data columns: {data.columns.tolist()}")
+        logger.info(f"Data types: {data.dtypes}")
+        logger.info(f"First few rows: \n{data.head(5)}")
 
-        # Process events to allow signals to be delivered
-        for _ in range(600):  # Run for up to 60 seconds (100ms checks)
-            app.processEvents()
-            if not data_manager._worker.is_running:
-                logger.info("CSV import completed")
-                break
-            time.sleep(0.1)
+        # Exit the event loop if we're using it
+        if "loop" in results and results["loop"]:
+            results["loop"].quit()
 
-            # Debug output every 10 iterations
-            if _ % 100 == 0:
-                logger.debug(f"Still waiting for import to complete... ({_ // 10} seconds)")
+    # Error callback
+    def on_error(error):
+        logger.error(f"Error: {error}")
+        results["success"] = False
+        results["error"] = error
 
-        # Check result
-        if data_manager._worker.is_running:
-            logger.warning("CSV import still running after timeout")
-            data_manager.cancel_loading()
+        # Exit the event loop if we're using it
+        if "loop" in results and results["loop"]:
+            results["loop"].quit()
 
-            # Give it time to cancel properly
-            for _ in range(20):  # Wait another 2 seconds
-                app.processEvents()
-                time.sleep(0.1)
+    # Create the background worker
+    logger.info("Creating background worker")
+    worker = BackgroundWorker()
 
-        # Wait a bit to make sure callbacks have completed
-        logger.info("Waiting for all callbacks to complete...")
-        for _ in range(20):  # Additional 2 second delay
-            app.processEvents()
-            time.sleep(0.1)
+    # Create the task
+    logger.info(f"Creating MultiCSVLoadTask with {len(test_files)} files")
+    task = MultiCSVLoadTask(csv_service, test_files, chunk_size=500)
 
-        if data_model.data is not None and not data_model.data.empty:
-            row_count = len(data_model.data)
-            col_count = len(data_model.data.columns)
-            logger.info(f"Data loaded successfully: {row_count} rows, {col_count} columns")
-            logger.info(f"Columns: {list(data_model.data.columns)}")
-            logger.info(f"First 5 rows: {data_model.data.head(5)}")
-        else:
-            logger.error("No data loaded")
+    # Connect signals
+    task.progress.connect(on_progress)
+    task.status_signal.connect(on_status)
 
-    except Exception as e:
-        logger.exception(f"Error during CSV import: {e}")
+    # Start the task
+    logger.info("Starting CSV import task")
+    worker.run_task(task, on_success=on_success, on_error=on_error)
 
-    finally:
-        # Clean up
-        logger.info("Clean-up and shutdown")
+    # Create an event loop to wait for the task to complete
+    logger.info("Waiting for task completion")
+    loop = QEventLoop()
+    results["loop"] = loop
 
-        # Ensure worker is properly stopped
-        if hasattr(data_manager, "_worker") and data_manager._worker:
-            if data_manager._worker.is_running:
-                logger.info("Cancelling any running tasks")
-                try:
-                    data_manager.cancel_loading()
+    # Add a timeout as a safety measure
+    timeout_timer = QTimer()
+    timeout_timer.setSingleShot(True)
+    timeout_timer.timeout.connect(lambda: loop.quit())
+    timeout_timer.start(30000)  # 30 second timeout
 
-                    # Process events to allow cancellation to complete
-                    for _ in range(20):  # 2 seconds
-                        app.processEvents()
-                        time.sleep(0.1)
-                except Exception as e:
-                    logger.error(f"Error during worker cancellation: {e}")
+    # Run the event loop until the task completes or times out
+    loop.exec()
 
-        # Ensure signals are disconnected
-        try:
-            logger.info("Disconnecting signals")
-            data_manager.load_started.disconnect()
-            data_manager.load_progress.disconnect()
-            data_manager.load_success.disconnect()
-            data_manager.load_error.disconnect()
-            data_manager.load_finished.disconnect()
-        except Exception as e:
-            logger.error(f"Error disconnecting signals: {e}")
+    # Check results
+    if results["success"]:
+        logger.info("CSV import test succeeded!")
+    else:
+        logger.error(f"CSV import test failed: {results['error']}")
 
-        # Process events one final time
-        app.processEvents()
+    # Clean up
+    logger.info("Cleaning up")
 
-        # Exit the app
-        logger.info("Shutting down application")
-        app.quit()
+    # Clean up the worker thread
+    del worker
 
-        # Allow time for application to clean up
-        time.sleep(1)
+    # Process events one last time to ensure clean shutdown
+    app.processEvents()
+
+    # Return results
+    return results["success"], results.get("data"), results.get("error")
 
 
 if __name__ == "__main__":
-    logger.info("CSV Import Test Script")
-    test_csv_import()
-    logger.info("Test completed")
+    # Run the test
+    success, data, error = test_csv_import()
+
+    # Print results
+    if success:
+        print(f"SUCCESS: Loaded CSV data with {len(data)} rows")
+        sys.exit(0)
+    else:
+        print(f"FAILURE: {error}")
+        sys.exit(1)

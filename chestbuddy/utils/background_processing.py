@@ -11,6 +11,7 @@ import logging
 import traceback
 from pathlib import Path
 from typing import Any, Optional, Callable, TypeVar, Generic, Dict, List, Tuple, Type, Union
+import time
 
 from PySide6.QtCore import QObject, Signal, Slot, QThread, QRunnable, QThreadPool
 from PySide6.QtWidgets import QApplication
@@ -35,11 +36,13 @@ class BackgroundTask(QObject, Generic[T]):
 
     # Signals
     progress = Signal(int, int)  # current, total
+    status_signal = Signal(str)  # status message
 
-    def __init__(self) -> None:
+    def __init__(self, task_id: str = None) -> None:
         """Initialize the background task."""
         super().__init__()
         self._is_cancelled = False
+        self.task_id = task_id or str(id(self))
 
     @property
     def is_cancelled(self) -> bool:
@@ -79,266 +82,248 @@ class BackgroundTask(QObject, Generic[T]):
 
 class MultiCSVLoadTask(BackgroundTask):
     """
-    Background task for loading multiple CSV files with progress reporting.
+    Task to load multiple CSV files, with progress reporting.
 
-    This task handles loading multiple CSV files in sequence, combining them,
-    and reporting progress both for individual files and overall progress.
-
-    Attributes:
-        file_paths: List of paths to CSV files to load
-        csv_service: Service for CSV operations
-        chunk_size: Number of rows to read in each chunk
-        normalize_text: Whether to normalize text in the CSV
-        robust_mode: Whether to use robust mode for reading
-        encoding: Optional encoding to use (auto-detected if None)
+    This task loads each CSV file in sequence, emitting progress signals
+    along the way. It handles cancellation and error reporting.
     """
 
-    # Additional signal for file-specific progress
-    file_progress = Signal(str, int, int)  # file_path, current, total
-
-    def __init__(
-        self,
-        file_paths: List[Union[str, Path]],
-        csv_service: Any,
-        chunk_size: int = 1000,
-        normalize_text: bool = True,
-        robust_mode: bool = False,
-        encoding: Optional[str] = None,
-    ) -> None:
+    def __init__(self, csv_service, file_paths, chunk_size=1000):
         """
-        Initialize the multi-CSV load task.
+        Initialize the task with multiple CSV files to load.
 
         Args:
+            csv_service: The CSVService instance to use for loading
             file_paths: List of paths to CSV files to load
-            csv_service: Service for CSV operations
-            chunk_size: Number of rows to read in each chunk
-            normalize_text: Whether to normalize text in the CSV
-            robust_mode: Whether to use robust mode for reading
-            encoding: Optional encoding to use (auto-detected if None)
+            chunk_size: Size of chunks to use when loading CSV files
         """
-        super().__init__()
-        self.file_paths = [Path(path) if isinstance(path, str) else path for path in file_paths]
+        super().__init__(f"load_multi_csv_{len(file_paths)}_files")
         self.csv_service = csv_service
+        self.file_paths = file_paths
         self.chunk_size = chunk_size
-        self.normalize_text = normalize_text
-        self.robust_mode = robust_mode
-        self.encoding = encoding
         self.dataframes = []
-        self._processed_files = 0
-        self._total_files = len(file_paths)
+        self._throttle_timer = None
+        self._last_update_time = time.time()
+        # Min time between progress updates to avoid overloading the UI
+        self._min_update_interval = 0.1  # seconds
 
-    def run(self) -> Tuple[Optional[Any], str]:
+    def _throttled_progress_update(self, current, total):
         """
-        Run the multi-CSV load task.
+        Update progress signals with throttling to avoid UI overload.
 
-        This method loads multiple CSV files in sequence, combines them,
-        and reports progress both for individual files and overall progress.
+        Args:
+            current: Current progress value
+            total: Total expected value for 100% progress
 
         Returns:
-            A tuple containing the combined DataFrame and a success/error message
+            False if the task was cancelled, True otherwise
         """
-        import pandas as pd
-        import os
+        # Check cancellation first - return immediately if cancelled
+        if self.is_cancelled:
+            return False
 
-        dfs = []
-        error_files = []
+        # Handle division by zero and calculate percentage
+        if total <= 0:
+            percentage = 0
+        else:
+            percentage = min(100, int((current / total) * 100))
 
-        # Calculate total files for overall progress
-        total_files = len(self.file_paths)
-        if total_files == 0:
-            return None, "No files to load"
+        # Get current time for throttling check
+        current_time = time.time()
+        time_since_last = current_time - self._last_update_time
 
-        # Initial progress report - using consistent scale
-        self.progress.emit(0, 100)  # Always use 0-100 scale for better UI experience
-
-        # Process each file
-        for i, file_path in enumerate(self.file_paths):
-            # Check for cancellation
-            if self.is_cancelled:
-                return None, "Operation cancelled"
-
+        # Only update if sufficient time has passed or we're at 100%
+        if time_since_last >= self._min_update_interval or percentage >= 100:
             try:
-                logger.info(f"Processing file {i + 1}/{total_files}: {file_path}")
+                # Update status with file info if we have it
+                status_suffix = ""
+                if hasattr(self, "_current_file_index") and hasattr(self, "_num_files"):
+                    status_suffix = f" (File {self._current_file_index + 1}/{self._num_files})"
 
-                # Calculate progress percentage for this file
-                file_progress_percentage = int((i / total_files) * 100)
+                # Emit progress and status signals within try block to catch Qt errors
+                self.progress.emit(percentage, 100)
+                self.status_signal.emit(f"Loading CSV data: {percentage}%{status_suffix}")
 
-                # Emit overall progress at start of file (percentage of files completed)
-                try:
-                    self.progress.emit(file_progress_percentage, 100)
-                except RuntimeError as e:
-                    # Handle case where the Qt object has been deleted
-                    logger.warning(f"Could not emit progress signal: {e}")
-                    if "C++ object" in str(e):
-                        return None, "Process interrupted - application is shutting down"
-
-                # Define a progress callback for file-specific progress
-                def file_progress_callback(current: int, total: int) -> bool:
-                    # Check for cancellation first
-                    if self.is_cancelled:
-                        return False  # Signal to stop processing
-
-                    # Reduce UI update frequency - update only every 1% change or every 100 rows
-                    # to avoid overwhelming the event queue with progress updates
-                    if total > 0:
-                        last_percentage = getattr(file_progress_callback, "last_percentage", -1)
-                        current_percentage = int((current / total) * 100)
-
-                        last_row_update = getattr(file_progress_callback, "last_row_update", 0)
-                        row_update_interval = min(
-                            100, max(1, int(total / 100))
-                        )  # Update at least every 1% of rows
-
-                        # Only update if percentage changed or we've processed enough rows
-                        should_update = (
-                            current_percentage != last_percentage
-                            or (current - last_row_update) >= row_update_interval
-                        )
-
-                        if not should_update:
-                            # Skip this update but continue processing
-                            return True
-
-                        # Remember values for next time
-                        file_progress_callback.last_percentage = current_percentage
-                        file_progress_callback.last_row_update = current
-
-                    # Safe signal emission with error handling
-                    try:
-                        # Emit file-specific progress signal
-                        self.file_progress.emit(str(file_path), current, total)
-
-                        # Calculate overall progress combining file count and row progress
-                        if total > 0:
-                            file_fraction = 1 / total_files
-                            row_progress = current / total
-
-                            # Calculate overall progress: completed files + progress within current file
-                            overall_progress = int(
-                                ((i / total_files) + (file_fraction * row_progress)) * 100
-                            )
-
-                            # Ensure progress is in valid range
-                            overall_progress = max(
-                                0, min(99, overall_progress)
-                            )  # Cap at 99% until complete
-                            self.progress.emit(overall_progress, 100)
-                    except RuntimeError as e:
-                        # Handle case where the Qt object has been deleted or other thread errors
-                        logger.warning(f"Runtime error during progress signal emission: {e}")
-                        if "C++ object" in str(e):
-                            logger.error("Qt object deletion detected during CSV processing")
-                            return False  # Signal to stop processing
-                    except Exception as e:
-                        # Log but don't crash on other errors
-                        logger.error(f"Error in progress callback: {e}")
-
-                    # Give the event loop a chance to process cancellation
-                    # Reduce frequency of processEvents calls to avoid reentrancy issues
-                    if current % 10 == 0:  # Only process events occasionally
-                        try:
-                            QApplication.processEvents()
-                        except Exception as e:
-                            logger.warning(f"Error processing events: {e}")
-
-                    # Continue unless cancelled
-                    return not self.is_cancelled
-
-                # Read the file with chunking and progress reporting
-                try:
-                    df, message = self.csv_service.read_csv_chunked(
-                        file_path=file_path,
-                        chunk_size=self.chunk_size,
-                        encoding=self.encoding,
-                        normalize_text=self.normalize_text,
-                        robust_mode=self.robust_mode,
-                        progress_callback=file_progress_callback,
-                    )
-                except InterruptedError:
-                    # Re-raise interruption exceptions to be handled by the outer try-except
-                    raise
-                except Exception as e:
-                    # Log and treat as a file-specific error but continue processing other files
-                    logger.error(f"Error reading file {file_path}: {e}")
-                    error_files.append(f"{os.path.basename(str(file_path))}: {str(e)}")
-                    continue
-
-                # File completed, update overall progress
-                try:
-                    file_completed_progress = int(((i + 1) / total_files) * 100)
-                    self.progress.emit(file_completed_progress, 100)
-                except RuntimeError as e:
-                    # Handle case where the Qt object has been deleted
-                    logger.warning(f"Could not emit progress signal after file completion: {e}")
-                    if "C++ object" in str(e):
-                        return None, "Process interrupted - application is shutting down"
-
-                if df is not None and not df.empty:
-                    dfs.append(df)
-                    self.dataframes.append(df)
-                    self._processed_files += 1
-                    logger.info(f"Successfully processed file {i + 1}/{total_files}")
-                else:
-                    logger.warning(f"File {file_path} returned empty DataFrame or error: {message}")
-                    error_files.append(f"{os.path.basename(str(file_path))}: {message}")
-
-            except InterruptedError as ie:
-                # Task was cancelled
-                logger.info(f"CSV read operation interrupted: {ie}")
-                return None, str(ie)
-
-            except RuntimeError as e:
-                # Handle Qt-specific runtime errors (like C++ object deleted)
-                logger.error(f"RuntimeError processing file {file_path}: {e}")
+                # Update last update time
+                self._last_update_time = current_time
+            except (RuntimeError, AttributeError, ReferenceError) as e:
+                # Handle a deleted C++ object gracefully - just log and continue
                 if "C++ object" in str(e):
-                    return None, "Process interrupted - application is shutting down"
-                error_files.append(f"{os.path.basename(str(file_path))}: {str(e)}")
+                    logger.debug("Qt C++ object already deleted during progress update")
+                else:
+                    logger.warning(f"Error during progress update: {e}")
+                # Continue processing even if we can't update progress
 
-            except Exception as e:
-                # Log and record the error, but continue with other files
-                logger.error(f"Error processing file {file_path}: {e}")
-                error_files.append(f"{os.path.basename(str(file_path))}: {str(e)}")
+        # Continue processing
+        return not self.is_cancelled
 
-        # Final progress update - all files completed
+    def run(self):
+        """
+        Load multiple CSV files and combine them into a single result.
+
+        This method processes each file in sequence, handling errors and
+        reporting progress along the way.
+
+        Returns:
+            A tuple with (True, combined_dataframe) on success or
+            (False, error_message) on failure
+        """
+        import gc  # Import garbage collector for memory management
+
+        if not self.file_paths:
+            return False, "No CSV files provided to load"
+
+        # Track combined data from all files
+        combined_df = None
+        total_rows = 0
+        error_messages = []
+
         try:
-            self.progress.emit(100, 100)
-        except RuntimeError as e:
-            # Just log the error, but don't return - we still want to combine the DataFrames we have
-            logger.warning(f"Could not emit final progress signal: {e}")
+            # Track number of files for progress reporting
+            self._num_files = len(self.file_paths)
 
-        # Check if we have any valid DataFrames
-        if not dfs:
-            error_message = "No valid data found in the selected files"
-            if error_files:
-                error_message += f": {', '.join(error_files)}"
-            return None, error_message
+            # Process each file
+            for i, file_path in enumerate(self.file_paths):
+                # Store current file index for progress reporting
+                self._current_file_index = i
 
-        # Combine all DataFrames
-        try:
-            combined_df = pd.concat(dfs, ignore_index=True)
+                # Update status with file info
+                try:
+                    file_name = Path(file_path).name
+                    self.status_signal.emit(
+                        f"Loading CSV file {i + 1}/{len(self.file_paths)}: {file_name}"
+                    )
+                except (RuntimeError, AttributeError, ReferenceError) as e:
+                    # Handle Qt object deleted gracefully
+                    if "C++ object" in str(e):
+                        logger.debug("Qt C++ object already deleted during status update")
+                    else:
+                        logger.warning(f"Error updating status: {e}")
 
-            # Generate success message
-            if error_files:
-                message = f"Successfully loaded {len(dfs)} file(s). Some files had errors: {', '.join(error_files)}"
+                # Check if cancelled before each file
+                if self.is_cancelled:
+                    return False, "Operation cancelled"
+
+                # Load the current file with progress callback
+                try:
+                    df, error = self.csv_service.read_csv_chunked(
+                        file_path,
+                        chunk_size=self.chunk_size,
+                        progress_callback=self._throttled_progress_update,
+                    )
+
+                    # If cancelled during file read, return early
+                    if self.is_cancelled:
+                        # Clean up to free memory
+                        if df is not None:
+                            del df
+                        gc.collect()
+                        return False, "Operation cancelled"
+
+                    # Handle errors reading the file
+                    if error:
+                        error_messages.append(f"Error loading {Path(file_path).name}: {error}")
+                        logger.error(f"Error loading CSV file {file_path}: {error}")
+                        continue  # Skip this file and try the next
+
+                    # Handle empty file
+                    if df is None or len(df) == 0:
+                        logger.warning(f"CSV file {file_path} is empty")
+                        continue  # Skip empty files
+
+                    # Append to combined result
+                    if combined_df is None:
+                        combined_df = df
+                    else:
+                        # Combine dataframes
+                        try:
+                            combined_df = pd.concat([combined_df, df], ignore_index=True)
+
+                            # Clean up individual DataFrame to free memory
+                            del df
+                            gc.collect()
+                        except Exception as e:
+                            error_messages.append(f"Error combining data: {str(e)}")
+                            logger.error(f"Error combining DataFrame {file_path}: {e}")
+
+                            # If we can't combine, at least keep what we have
+                            if df is not None:
+                                del df
+                            gc.collect()
+
+                    # Update total row count
+                    if combined_df is not None:
+                        total_rows = len(combined_df)
+
+                    # Check if cancelled after each file
+                    if self.is_cancelled:
+                        # Clean up to free memory
+                        if combined_df is not None:
+                            del combined_df
+                        gc.collect()
+                        return False, "Operation cancelled"
+
+                except MemoryError as me:
+                    error_msg = f"Memory error processing {Path(file_path).name}: {str(me)}"
+                    error_messages.append(error_msg)
+                    logger.error(error_msg)
+
+                    # If we have partial data but ran out of memory, return what we have
+                    if combined_df is not None and not combined_df.empty:
+                        return True, combined_df
+                    else:
+                        return False, "Memory error while processing files"
+                except Exception as e:
+                    error_msg = f"Error processing {Path(file_path).name}: {str(e)}"
+                    error_messages.append(error_msg)
+                    logger.error(error_msg)
+
+                    # Continue to the next file
+
+                # Run garbage collection between files
+                gc.collect()
+
+            # Final check for cancellation
+            if self.is_cancelled:
+                # Clean up to free memory before returning
+                if combined_df is not None:
+                    del combined_df
+                gc.collect()
+                return False, "Operation cancelled"
+
+            # Final status update
+            try:
+                percentage = 100
+                self.progress.emit(percentage, 100)
+                self.status_signal.emit(f"CSV import complete: {total_rows} rows loaded")
+            except (RuntimeError, AttributeError, ReferenceError) as e:
+                logger.debug(f"Error in final status update (likely shutdown): {e}")
+
+            # Handle final result
+            if combined_df is None or combined_df.empty:
+                if error_messages:
+                    return False, "\n".join(error_messages)
+                else:
+                    return False, "No data loaded from CSV files"
+
+            # Handle partial success
+            if error_messages:
+                logger.warning(f"Loaded {total_rows} rows with errors: {'; '.join(error_messages)}")
             else:
-                message = (
-                    f"Successfully loaded {len(dfs)} file(s) with {len(combined_df)} total rows."
+                logger.info(
+                    f"Successfully loaded {total_rows} rows from {len(self.file_paths)} CSV files"
                 )
 
-            return combined_df, message
+            return True, combined_df
 
         except Exception as e:
-            logger.error(f"Error combining DataFrames: {e}")
-            return None, f"Error combining files: {str(e)}"
-
-    def get_progress(self) -> Tuple[int, int]:
-        """
-        Get the current progress of the task.
-
-        Returns:
-            A tuple containing (current progress, total)
-        """
-        return self._processed_files, self._total_files
+            logger.error(f"Unexpected error in MultiCSVLoadTask: {e}")
+            return False, f"Error loading CSV files: {str(e)}"
+        finally:
+            # Ensure we clean up all DataFrames to free memory
+            if "combined_df" in locals() and combined_df is not None:
+                del combined_df
+            gc.collect()
 
 
 class FunctionTask(BackgroundTask):
@@ -362,11 +347,10 @@ class FunctionTask(BackgroundTask):
             kwargs: Keyword arguments for the function
             task_id: Optional identifier for the task
         """
-        super().__init__()
+        super().__init__(task_id)
         self.func = func
         self.args = args or ()
         self.kwargs = kwargs or {}
-        self.task_id = task_id or str(id(self))
 
     def run(self) -> Any:
         """
@@ -506,19 +490,19 @@ class BackgroundWorker(QObject):
                 self._task.progress.disconnect(self.progress)
 
                 # Check for and disconnect any other signals that might be connected
-                if hasattr(self._task, "file_progress") and isinstance(
-                    getattr(self._task, "file_progress", None), Signal
+                if hasattr(self._task, "status_signal") and isinstance(
+                    getattr(self._task, "status_signal", None), Signal
                 ):
                     try:
                         # Find and disconnect any connections
-                        receivers = getattr(self._task.file_progress, "_receivers", [])
+                        receivers = getattr(self._task.status_signal, "_receivers", [])
                         if receivers:
                             logger.debug(
-                                f"Disconnecting file_progress signal with {len(receivers)} receivers"
+                                f"Disconnecting status_signal signal with {len(receivers)} receivers"
                             )
-                            self._task.file_progress.disconnect()
+                            self._task.status_signal.disconnect()
                     except (TypeError, RuntimeError) as e:
-                        logger.debug(f"Error disconnecting file_progress signal: {e}")
+                        logger.debug(f"Error disconnecting status_signal signal: {e}")
 
             except (TypeError, RuntimeError) as e:
                 # Signal wasn't connected or Qt object deleted
@@ -530,46 +514,50 @@ class BackgroundWorker(QObject):
         # Log completion
         logger.debug("Thread finished and task cleanup completed")
 
-    def __del__(self) -> None:
-        """Clean up resources when the worker is deleted."""
+    def __del__(self):
+        """
+        Properly clean up resources when the worker is destroyed.
+        This handles Qt thread cleanup even if the application is shutting down.
+        """
         try:
-            # Check if thread still exists and is running
+            # First try to cancel any running task
+            try:
+                if hasattr(self, "_task") and self._task:
+                    self._task.cancel()
+                    logger.debug(
+                        f"Cancelled task during BackgroundWorker cleanup: {self._task.__class__.__name__}"
+                    )
+            except (RuntimeError, AttributeError, ReferenceError) as e:
+                # Don't raise errors during cleanup - just log them
+                logger.debug(f"Error cancelling task during cleanup: {e}")
+                pass
+
+            # Check if thread exists and is running before trying to quit it
             if hasattr(self, "_thread") and self._thread is not None:
-                thread = self._thread  # Keep a reference
-                logger.debug("Cleaning up BackgroundWorker thread")
-
                 try:
-                    # Cancel any running task first
-                    if hasattr(self, "_task") and self._task is not None:
-                        task = self._task  # Keep a reference
-                        try:
-                            task.cancel()
-                        except RuntimeError as e:
-                            # It's ok if we can't cancel the task during shutdown
-                            logger.debug(f"Could not cancel task during cleanup: {e}")
+                    if self._thread.isRunning():
+                        logger.debug("Quitting thread during BackgroundWorker cleanup")
+                        self._thread.quit()
 
-                    # Only try to quit if the thread exists and is running
-                    if thread.isRunning():
-                        # Try to quit the thread gracefully first
-                        thread.quit()
+                        # Reduced wait time for faster app shutdown
+                        if not self._thread.wait(100):  # Wait 100ms instead of 500ms
+                            logger.debug("Thread did not respond to quit in time")
+                    else:
+                        logger.debug("Thread was not running during cleanup")
+                except (RuntimeError, AttributeError, ReferenceError) as e:
+                    # Handle the case where the C++ object is deleted
+                    if "C++ object" in str(e):
+                        logger.debug("Qt C++ object already deleted during thread cleanup")
+                    else:
+                        logger.debug(f"Error during thread cleanup: {e}")
+            else:
+                logger.debug("No thread to clean up")
 
-                        # Brief wait
-                        if not thread.wait(500):  # 500ms timeout
-                            logger.debug(
-                                "Thread did not quit immediately, allowing application to handle it"
-                            )
-                            # During application shutdown, it's better to not force termination
-                            # as this can cause the "Internal C++ object already deleted" error
-                except RuntimeError as e:
-                    # This is normal during application shutdown
-                    logger.debug(f"RuntimeError during thread cleanup (likely shutdown): {e}")
-                except Exception as e:
-                    # Other exceptions should be logged
-                    logger.warning(f"Error during thread cleanup: {e}")
         except Exception as e:
-            # Just log any errors during cleanup, don't raise
-            logger.debug(f"Error cleaning up BackgroundWorker (likely during shutdown): {e}")
-            # Don't log the traceback during shutdown as it may cause more errors
+            # Catch all other exceptions during cleanup - we don't want to raise
+            # exceptions in __del__ as they can cause unpredictable behavior
+            logger.error(f"Error cleaning up BackgroundWorker: {e}")
+            # Don't raise the error - just log it
 
     def run_task(self, func, *args, task_id=None, on_success=None, on_error=None, **kwargs):
         """
