@@ -30,10 +30,12 @@ class Colors:
     BG_DARK = "#2D3748"  # Dark gray
     BG_MEDIUM = "#4A5568"  # Medium gray
     BG_LIGHT = "#718096"  # Light gray
+    BACKGROUND_LIGHT = "#EBEEF2"  # Very light gray/blue for progress bars and light elements
 
     # Text colors
     TEXT_LIGHT = "#FFFFFF"  # White
     TEXT_MUTED = "#E2E8F0"  # Light gray
+    TEXT_DARK = "#2D3748"  # Dark gray for text on light backgrounds
 
     # Border colors
     BORDER = "#4A5568"  # Medium gray
