@@ -349,12 +349,9 @@ class DataManager(QObject):
             if self._current_file_path:
                 self._update_recent_files(self._current_file_path)
 
-            # Emit a transitional message to indicate we're moving to table population
-            processing_message = f"Preparing to populate table with {len(data):,} rows..."
-            self.load_finished.emit(processing_message)
-
-            # Allow UI to update before proceeding with table population
-            QApplication.processEvents()
+            # Complete the file loading phase with a success message
+            success_message = f"Successfully loaded {len(data):,} rows of data"
+            self.load_finished.emit(success_message)
 
             # Map columns
             mapped_data = self._map_columns(data)
@@ -363,7 +360,7 @@ class DataManager(QObject):
             self._data_model.update_data(mapped_data)
 
             # Signal to populate the table synchronously
-            # This allows the table to be populated before continuing
+            # This allows the table to be populated in the background without showing progress
             self.populate_table_requested.emit(mapped_data)
 
             # Unblock signals after table population
@@ -375,8 +372,7 @@ class DataManager(QObject):
             # Clear the current task
             self._current_task = None
 
-            # Emit final success signal
-            success_message = f"Successfully loaded {len(data):,} rows of data"
+            # Emit final success signal - but don't emit another load_finished to avoid new dialog
             self.load_success.emit(success_message)
 
         except Exception as e:
