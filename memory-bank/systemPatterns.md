@@ -58,6 +58,7 @@ The Chest Buddy application follows a Model-View-Controller (MVC) architecture w
 - **BackgroundWorker**: Manages execution of tasks in separate threads
 - **BackgroundTask**: Base class for defining asynchronous operations
 - **CSVReadTask**: Specific implementation for CSV reading operations
+- **MultiCSVLoadTask**: Handles loading of multiple CSV files with progress tracking
 
 ### 6. Configuration Layer
 - **ConfigManager**: Manages application settings and user preferences
@@ -237,6 +238,175 @@ chestbuddy/
 - Cancellation support for long-running operations
 - Resource cleanup on task completion or cancellation
 - Chunked processing for memory-intensive operations
+- Improved thread management with graceful cleanup during application shutdown
+- Two-level progress reporting for multi-file operations (overall progress and per-file progress)
+- Consistent progress reporting on a 0-100 scale for all background tasks
+- Callbacks for detailed progress reporting during complex operations
+
+### Progress Dialog Architecture
+
+The progress dialog system implements a comprehensive approach to providing feedback during long-running operations:
+
+```mermaid
+sequenceDiagram
+    participant UI as MainWindow
+    participant DM as DataManager
+    participant BW as BackgroundWorker
+    participant Task as MultiCSVLoadTask
+    participant Dialog as ProgressDialog
+
+    UI->>DM: load_csv_files(files)
+    DM->>BW: start_task(MultiCSVLoadTask)
+    BW->>Task: run()
+    BW-->>DM: load_started
+    DM-->>UI: load_started
+    UI->>Dialog: show()
+    
+    loop For each file
+        Task->>Task: process_file()
+        Task-->>BW: progress_updated(file_index, file_count, file_progress)
+        BW-->>DM: load_progress
+        DM-->>UI: load_progress
+        UI->>Dialog: update(overall_progress, file_info)
+        
+        UI->>DM: check_cancel
+        DM->>BW: check_cancel
+        BW->>Task: check_cancel
+    end
+    
+    Task-->>BW: task_finished(result)
+    BW-->>DM: load_finished
+    DM-->>UI: load_finished
+    UI->>Dialog: complete()
+```
+
+The progress reporting follows a consistent pattern:
+1. Task initialization triggers load_started signal
+2. Regular progress updates during processing with contextual information
+3. Completion triggers load_finished signal with results
+4. Cancellation can be checked and applied at any point in the process
+
+### Multi-File Processing Pattern
+
+For operations involving multiple files:
+
+```mermaid
+graph TD
+    Start[Start Task] --> Init[Initialize Progress Tracking]
+    Init --> FileLoop[Process Next File]
+    FileLoop --> FileProgress[Update File Progress]
+    FileProgress --> OverallProgress[Calculate & Update Overall Progress]
+    OverallProgress --> Cancel{Check Cancel}
+    Cancel -->|Yes| CleanupCancel[Cleanup Resources]
+    Cancel -->|No| NextFile{More Files?}
+    NextFile -->|Yes| FileLoop
+    NextFile -->|No| CompleteProcess[Complete Processing]
+    CompleteProcess --> EmitResult[Emit Final Result]
+    EmitResult --> Cleanup[Cleanup Resources]
+    CleanupCancel --> EmitCancelled[Emit Cancelled]
+    EmitCancelled --> Cleanup
+```
+
+## Planned Report Generation Architecture
+
+For the upcoming Report Generation phase, we're planning to implement the following architecture:
+
+### 1. Report Service Components
+
+```mermaid
+classDiagram
+    class ReportService {
+        +generate_report(template, data, charts)
+        +export_to_pdf(report)
+        +list_templates()
+        +preview_report(report)
+    }
+    
+    class ReportTemplate {
+        +String name
+        +String description
+        +Dict sections
+        +apply(data, charts)
+    }
+    
+    class PDFExporter {
+        +export(report_html)
+        -setup_page_settings()
+        -embed_charts()
+        -apply_styling()
+    }
+    
+    class ReportElement {
+        +String type
+        +Dict properties
+        +render()
+    }
+    
+    ReportService --> ReportTemplate : uses
+    ReportService --> PDFExporter : uses
+    ReportTemplate --> ReportElement : contains
+```
+
+### 2. Report Generation Flow
+
+```mermaid
+graph TD
+    UserRequest[User Request] --> SelectTemplate[Select Template]
+    SelectTemplate --> ConfigureReport[Configure Report]
+    ConfigureReport --> DataSelection[Select Data to Include]
+    DataSelection --> ChartSelection[Select Charts to Include]
+    ChartSelection --> GenerateReport[Generate Report]
+    GenerateReport --> PreviewReport[Preview Report]
+    PreviewReport --> Export{Export?}
+    Export -->|Yes| ExportPDF[Export to PDF]
+    Export -->|No| Return[Return to Editor]
+```
+
+### 3. Report View Architecture
+
+```mermaid
+classDiagram
+    class ReportView {
+        +init_ui()
+        +setup_connections()
+        +update_preview()
+        +export_report()
+    }
+    
+    class TemplateSelector {
+        +List templates
+        +selection_changed()
+    }
+    
+    class ReportConfigPanel {
+        +setup_options()
+        +apply_config()
+    }
+    
+    class DataSelectionPanel {
+        +show_available_data()
+        +get_selected_data()
+    }
+    
+    class ChartSelectionPanel {
+        +show_available_charts()
+        +get_selected_charts()
+    }
+    
+    class ReportPreview {
+        +update_preview(html)
+        +zoom_in()
+        +zoom_out()
+    }
+    
+    ReportView --> TemplateSelector : contains
+    ReportView --> ReportConfigPanel : contains
+    ReportView --> DataSelectionPanel : contains
+    ReportView --> ChartSelectionPanel : contains
+    ReportView --> ReportPreview : contains
+```
+
+This architecture will allow for flexible, customizable report generation with a focus on user experience and high-quality output. The components are designed to be modular and extensible, enabling easy addition of new report templates and export formats in the future.
 
 ## UI Architecture
 
@@ -248,295 +418,143 @@ The UI architecture of ChestBuddy follows a component-based design with clear se
 classDiagram
     class MainWindow {
         -SidebarNavigation _sidebar
-        -QStackedWidget _content_stack
-        -StatusBar _status_bar
-        -Dict[str, BaseView] _views
-        +_create_views()
-        +_set_active_view(view_name)
+        -ContentStack _contentStack
+        -StatusBar _statusBar
+        +init_ui()
+        +setup_connections()
     }
     
-    class BaseView {
-        -String _title
-        -ViewHeader _header
-        -QWidget _content
-        -QVBoxLayout _content_layout
-        +_setup_ui()
-        +_connect_signals()
-        +_add_action_buttons()
-        +get_content_widget()
-        +get_content_layout()
-    }
-    
-    class ViewHeader {
-        -String _title
-        -QLabel _title_label
-        -Dict _action_buttons
-        +add_action_button(name, text, button_type)
-        +get_action_button(name)
+    class ContentStack {
+        -Widget[] _views
+        +add_view(view)
+        +show_view(index)
     }
     
     class SidebarNavigation {
-        -List _sections
-        -String _active_item
-        +navigation_changed signal
-        +set_active_item(item_name)
+        -Button[] _buttons
+        +add_button(icon, text, index)
+        +set_active(index)
+    }
+    
+    class BaseView {
+        +String name
+        +QWidget widget
+        +Signal viewActivated
+        +Signal viewDeactivated
+        +on_activate()
+        +on_deactivate()
+    }
+    
+    class ViewAdapter {
+        -BaseView _baseView
+        -Widget _contentWidget
+        +adapt(widget)
+        +on_widget_signal()
     }
     
     class DashboardView {
-        -StatsCard _dataset_card
-        -StatsCard _validation_card
-        -StatsCard _correction_card
-        -RecentFilesWidget _recent_files
-        -QuickActionsWidget _quick_actions
-        +action_triggered signal
-        +file_selected signal
+        +init_ui()
+        +setup_connections()
+        +update_stats()
     }
     
-    class AdapterView {
-        -OriginalComponent _component
-        +_setup_ui()
-        +_connect_signals()
-    }
-    
-    MainWindow *-- SidebarNavigation
-    MainWindow *-- "many" BaseView
-    BaseView <|-- DashboardView
-    BaseView <|-- AdapterView
-    BaseView *-- ViewHeader
-    
-    note for AdapterView "Abstract representation of all adapter views:\n- DataViewAdapter\n- ValidationViewAdapter\n- CorrectionViewAdapter\n- ChartViewAdapter"
+    MainWindow *-- ContentStack : contains
+    MainWindow *-- SidebarNavigation : contains
+    ContentStack o-- BaseView : contains
+    BaseView <|-- ViewAdapter : extends
+    BaseView <|-- DashboardView : extends
+    ViewAdapter o-- "1" Widget : adapts
 ```
 
-### Key UI Patterns
+### UI Design Principles
 
-#### 1. Adapter Pattern
+1. **Consistency**: Standardized color scheme, button sizes, and spacing
+2. **Modularity**: Views encapsulated in self-contained components
+3. **Responsiveness**: All operations provide appropriate feedback
+4. **Accessibility**: Clear contrast and sufficient text size
+5. **Visual Hierarchy**: Important elements have greater visual weight
+6. **Error Prevention**: Validation and confirmation before destructive actions
+7. **User Feedback**: Loading indicators and progress reporting for all operations
+8. **State Clarity**: Current application state is always visible
 
-For integrating existing UI components with the new UI structure, we use the adapter pattern:
-
-```mermaid
-graph TD
-    BV[BaseView] --> Adapter[AdapterView]
-    Adapter --> OC[Original Component]
-    
-    style BV fill:#1a3055,color:#fff
-    style Adapter fill:#234a87,color:#fff
-    style OC fill:#2e62b5,color:#fff
-```
-
-**Implementation Example:**
-```python
-class DataViewAdapter(BaseView):
-    def __init__(self, data_model, parent=None):
-        # Store references
-        self._data_model = data_model
-        
-        # Create the original component
-        self._data_view = DataView(data_model)
-        
-        # Initialize the base view
-        super().__init__("Data View", parent)
-        
-    def _setup_ui(self):
-        # First call the parent class's _setup_ui method
-        super()._setup_ui()
-        
-        # Add the original component to the content widget
-        self.get_content_layout().addWidget(self._data_view)
-```
-
-#### 2. Content View Pattern
-
-For consistent UI components with standardized structure:
-
-```mermaid
-graph TD
-    BV[BaseView] --> H[Header]
-    BV --> C[Content]
-    H --> T[Title]
-    H --> A[Action Buttons]
-    
-    style BV fill:#1a3055,color:#fff
-    style H fill:#234a87,color:#fff
-    style C fill:#234a87,color:#fff
-    style T fill:#2e62b5,color:#fff
-    style A fill:#2e62b5,color:#fff
-```
-
-#### 3. Navigation Pattern
-
-For consistent and organized application navigation:
-
-```mermaid
-graph LR
-    MW[MainWindow] --> SN[SidebarNavigation]
-    SN -- navigation_changed --> MW
-    MW -- set_active_item --> SN
-    MW -- setCurrentWidget --> CS[ContentStack]
-    
-    style MW fill:#1a3055,color:#fff
-    style SN fill:#234a87,color:#fff
-    style CS fill:#234a87,color:#fff
-```
-
-#### 4. Dashboard Pattern
-
-```mermaid
-graph TD
-    DB[DashboardView] --> SC[Stats Cards]
-    DB --> RF[Recent Files]
-    DB --> QA[Quick Actions]
-    DB --> CH[Charts]
-    QA -- action_triggered --> MW[MainWindow]
-    RF -- file_selected --> MW
-    
-    style DB fill:#1a3055,color:#fff
-    style SC fill:#234a87,color:#fff
-    style RF fill:#234a87,color:#fff
-    style QA fill:#234a87,color:#fff
-    style CH fill:#234a87,color:#fff
-    style MW fill:#2e62b5,color:#fff
-```
-
-## UI Component Interactions
-
-### Signal-Slot Mechanism
-
-The UI components communicate primarily through the Qt Signal-Slot mechanism:
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant SidebarNav
-    participant MainWindow
-    participant ContentViews
-    
-    User->>SidebarNav: Click navigation item
-    SidebarNav->>MainWindow: navigation_changed signal
-    MainWindow->>ContentViews: Switch active view
-    ContentViews-->>User: Display view
-```
-
-### UI Update Flow
-
-```mermaid
-sequenceDiagram
-    participant DM as DataModel
-    participant MW as MainWindow
-    participant SB as StatusBar
-    participant DV as DataView
-    
-    DM->>DM: Data changes
-    DM->>MW: data_changed signal
-    MW->>SB: Update status
-    MW->>DV: Reflect changes
-    DV-->>User: Display updated data
-```
-
-## UI Visual Style
-
-### Color Scheme
-
-We've selected a professional dark blue theme with gold accents:
+### UI Color Scheme
 
 ```
-PRIMARY: #1a3055 (Dark Blue)
-SECONDARY: #ffc107 (Gold)
-ACCENT: #f8c760 (Light Gold)
-BACKGROUND: #141e30 (Darker Blue)
-TEXT_LIGHT: #ffffff (White)
-TEXT_MUTED: #a0aec0 (Light Gray)
-BORDER: #2d4a77 (Medium Blue)
+Primary: #1a3055 (Dark Blue)
+Secondary: #ffc107 (Gold)
+Background: #f8f9fa (Light Gray)
+Text: #212529 (Dark Gray)
+Accent: #0d6efd (Bright Blue)
+Warning: #dc3545 (Red)
+Success: #28a745 (Green)
 ```
 
-### Visual Mockup
+### Validation Color Mapping
 
 ```
-┌────────────────────────────────────────────────────────────────────┐
-│ ChestBuddy - Chest Data Analysis Tool                         _ □ X │
-├────────┬───────────────────────────────────────────────────────────┤
-│        │ ┌─────────────────────────────────────────────────────┐   │
-│        │ │ Dashboard                                           │   │
-│        │ ├─────────────────────────────────────────────────────┤   │
-│        │ │                                                     │   │
-│        │ │ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐     │   │
-│        │ │ │Current  │ │Validation│ │Correction│ │Last    │     │   │
-│Dashboard│ │ │Dataset │ │Status   │ │Status   │ │Import  │     │   │
-│        │ │ │0 rows   │ │N/A      │ │0 corrected│ │Never   │     │   │
-│  Data  │ │ └─────────┘ └─────────┘ └─────────┘ └─────────┘     │   │
-│        │ │                                                     │   │
-│Validation│ │ ┌─────────────────┐ ┌─────────────────┐           │   │
-│        │ │ │                 │ │                 │           │   │
-│Correction│ │ │  Recent Files    │ │  Top Players     │           │   │
-│        │ │ │                 │ │                 │           │   │
-│ Charts │ │ │                 │ │                 │           │   │
-│        │ │ └─────────────────┘ └─────────────────┘           │   │
-│ Reports│ │                                                     │   │
-│        │ │ ┌─────────────────┐ ┌─────────────────┐           │   │
-│Settings│ │ │                 │ │ ┌────┐  ┌────┐  │           │   │
-│        │ │ │ Top Chest       │ │ │Imp.│  │Val.│  │           │   │
-│  Help  │ │ │ Sources         │ │ └────┘  └────┘  │           │   │
-│        │ │ │                 │ │ ┌────┐  ┌────┐  │           │   │
-│        │ │ │                 │ │ │Ana.│  │Rep.│  │           │   │
-│        │ │ └─────────────────┘ └─────────────────┘           │   │
-│        │ │                                                     │   │
-│        │ └─────────────────────────────────────────────────────┘   │
-├────────┴───────────────────────────────────────────────────────────┤
-│ 0 records | No data loaded                                          │
-└────────────────────────────────────────────────────────────────────┘
+Valid: #28a745 (Green)
+Warning: #ffc107 (Gold)
+Error: #dc3545 (Red)
+Fixed: #0d6efd (Bright Blue)
 ```
 
-### Component Styling
+### UI Layout Structure
 
-Each component is styled with consistent properties:
+- Consistent margins: 16px
+- Padding: 8px
+- Button height: 36px
+- Icon size: 24px
+- Sidebar width: 200px
+- Dialog minimum width: 420px
 
-```css
-/* Example styling for cards */
-{
-    background-color: #1a3055;
-    border-radius: 6px;
-    border: 1px solid #2d4a77;
-}
+### Responsive Design Approach
 
-/* Text styling for headers */
-{
-    color: #ffffff;
-    font-size: 22px;
-    font-weight: 500;
-}
+1. **Layout Adaptability**: Fluid layouts that adjust to window size
+2. **Content Scaling**: Tables and charts scale with available space
+3. **Priority Elements**: Critical UI elements always visible
+4. **Scroll Areas**: Content areas scroll when needed
+5. **Responsive Dialogs**: Dialog sizing based on content and screen size
+6. **Minimum Dimensions**: Application enforces minimum window size
+7. **Table Column Resizing**: Table columns adjust to available space
 
-/* Action buttons */
-{
-    background-color: #ffc107;
-    color: #1a3055;
-    border-radius: 4px;
-    padding: 6px 12px;
-}
+### UI Pattern Consistency
+
+- All dialog buttons follow same order: Primary action → Secondary action → Cancel
+- All tables follow the same styling and selection behavior
+- All charts have consistent typography and color schemes
+- All forms follow the same layout patterns and validation style
+- All error messages follow the same notification pattern and style
+
+## Logging Strategy
+
+The application uses a hierarchical logging system with the following levels:
+
+- **DEBUG**: Detailed information for diagnosing problems
+- **INFO**: General application flow information
+- **WARNING**: Unexpected but non-critical issues
+- **ERROR**: Errors that prevent specific operations but allow continued execution
+- **CRITICAL**: Severe errors that may prevent the application from continuing
+
+Logs are stored in a dedicated logs directory with the following organization:
+
+```
+chestbuddy/logs/
+├── chestbuddy.log       # Current log file
+└── chestbuddy.log.N     # Rotated log files (N = 1,2,3,...)
 ```
 
-## Service Layer Architecture
+Logs include the following information:
+- Timestamp with millisecond precision
+- Log level
+- Source module/component
+- Thread ID
+- Message
+- Optional exception traceback
 
-The application follows a service-oriented architecture with specialized services for different functionality domains:
-
-- **CSVService**: Handles low-level CSV file operations (reading, writing, encoding detection)
-- **ValidationService**: Validates chest data against rules and patterns
-- **CorrectionService**: Applies corrections to invalid chest data
-- **ChartService**: Generates charts and visualizations from chest data
-- **DataManager**: Handles high-level data operations including loading, saving, and column mapping
-
-Each service is responsible for a specific domain of functionality and interacts with other components through well-defined interfaces and signals.
-
-### Service Dependencies
-
-```mermaid
-graph TD
-    App[ChestBuddyApp] --> DM[DataManager]
-    App --> VS[ValidationService]
-    App --> CS[CorrectionService]
-    App --> CHS[ChartService]
-    DM --> CSV[CSVService]
-    VS --> CDM[ChestDataModel]
-    CS --> CDM
-    CHS --> CDM
-    DM --> CDM
-    UI[UI Components] --> App
-``` 
+Key logging events include:
+- Application startup and shutdown
+- File operations (load, save)
+- Background task start/completion/error
+- User-initiated actions
+- Validation and correction operations
+- Critical errors and exceptions
