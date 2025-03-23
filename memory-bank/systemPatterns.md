@@ -7,6 +7,165 @@ date: 2023-04-02
 
 *Last Updated: 2023-10-18*
 
+## Core Architecture
+
+ChestBuddy follows a layered architecture with clear separation of concerns:
+
+### Layer Structure
+1. **UI Layer**: PySide6-based user interface components
+   - Views (Dashboard, Data, Reports, Settings)
+   - Widgets (custom UI components)
+   - **UI State Management System** (for managing UI blocking/unblocking)
+2. **Application Layer**: Business logic and coordination
+   - Services (DataService, ValidationService, etc.)
+   - Controllers (coordinating between UI and data)
+3. **Domain Layer**: Core business logic
+   - Models (data structures and business rules)
+   - Validators (data validation logic)
+4. **Data Layer**: Data persistence and retrieval
+   - Repositories (data access)
+   - CSV handling and persistence
+
+### Pattern: UI State Management System
+
+We've implemented a centralized UI State Management system to handle UI blocking and unblocking during long-running operations. This replaces the previous ad-hoc approach with a systematic, reference-counted solution.
+
+#### Components
+1. **UIStateManager**: Singleton class that manages the UI state
+   - Tracks blockable UI elements and element groups
+   - Manages blocking operations with reference counting
+   - Emits signals for UI state changes
+   - Thread-safe implementation
+
+2. **BlockableElementMixin**: Mixin for UI elements that can be blocked
+   - Provides standard methods for blocking/unblocking
+   - Tracks which operations are blocking an element
+   - Allows custom block/unblock behavior
+
+3. **OperationContext**: Context manager for UI blocking operations
+   - Automatically blocks elements when entering context
+   - Unblocks elements when exiting (even if exceptions occur)
+   - Supports operation naming and status tracking
+
+4. **UIOperations & UIElementGroups**: Enums for standardizing operations and element groups
+   - Provides consistency in naming operations (IMPORT, EXPORT, etc.)
+   - Standardizes element group definitions (MAIN_WINDOW, DATA_VIEW, etc.)
+
+#### Key Design Principles
+1. **Centralized Control**: Single source of truth for UI state
+2. **Reference Counting**: Properly handles nested operations
+3. **Thread Safety**: Mutex-protected for concurrent access
+4. **Declarative API**: Simple and clear interface for blocking/unblocking
+5. **Automatic Cleanup**: Context managers ensure proper unblocking
+
+#### Usage Pattern
+```python
+# Block UI elements during an operation
+with OperationContext(ui_state_manager, UIOperations.IMPORT, groups=[UIElementGroups.MAIN_WINDOW]):
+    # Perform long-running operation
+    import_data()
+    
+    # UI elements are automatically unblocked when context exits
+```
+
+## Design Patterns
+
+### Singleton Pattern
+Used for global managers and services that should have only one instance:
+- ConfigManager
+- LogManager
+- DataManager
+- **UIStateManager**
+
+### Observer Pattern
+Implemented through Qt's signal/slot mechanism:
+- UI components observe data model changes
+- Progress updates from background workers
+- **UI state changes from UIStateManager**
+
+### Factory Pattern
+Used for creating UI components and data structures:
+- ViewFactory for creating view instances
+- WidgetFactory for custom widgets
+- DialogFactory for standard dialogs
+
+### Strategy Pattern
+Used for interchangeable algorithms:
+- Validation strategies for different data types
+- Import strategies for different file formats
+- Export strategies for different output formats
+
+### Command Pattern
+Used for undoable operations:
+- Data edits
+- Validation rule changes
+- Configuration changes
+
+## Threading Model
+
+### Background Processing
+- BackgroundWorker class manages threading
+- QThread for UI-independent operations
+- Signals/slots for thread communication
+- **Integration with UIStateManager for UI blocking during background operations**
+
+### Thread Safety
+- Mutex locks for shared resources
+- Thread-local storage for thread-specific data
+- Signals/slots for safe cross-thread communication
+- **UIStateManager uses QMutex for thread-safe operation**
+
+## State Management
+
+### Application State
+- ConfigManager for persistent settings
+- DataManager for data loading state
+- **UIStateManager for UI blocking state**
+
+### UI State
+- View-specific state management
+- Coordinated through MainWindow
+- **Centralized blocking/unblocking through UIStateManager**
+
+## Component Communication
+
+### Signal-based Communication
+- Qt signals/slots between components
+- Custom signals for application-specific events
+- **UIStateManager signals for UI state changes**
+
+### Service-based Communication
+- Services as intermediaries between components
+- Injectable services for dependency management
+
+## Error Handling
+
+### Exception Management
+- Try/except blocks at appropriate boundaries
+- Error logging and reporting
+- User-friendly error messages
+- **OperationContext ensures UI unblocking even when exceptions occur**
+
+### Validation
+- Input validation in UI layer
+- Business rule validation in domain layer
+- Data integrity validation in data layer
+
+## Logging and Diagnostics
+
+### Logging Levels
+- DEBUG: Detailed information for debugging
+- INFO: General operational information
+- WARNING: Potential issues that don't affect operation
+- ERROR: Errors that affect operation but allow recovery
+- CRITICAL: Errors that prevent operation
+
+### Log Categories
+- UI events
+- Data operations
+- Background processing
+- **UI state changes**
+
 ## Application Architecture
 
 The ChestBuddy application follows a layered architecture pattern with these key layers:

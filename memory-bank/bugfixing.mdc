@@ -217,308 +217,74 @@ alwaysApply: false
 
 *Last Updated: 2025-03-25*
 
-## Recent Fixes
-
-### 2025-03-25: Fixed UI Blocking Issue After First Import (Third Attempt)
-
-**Issue**: The UI still remained blocked after closing the progress dialog on the first import, despite our previous fixes. While subsequent imports worked correctly, the first import's UI would remain unresponsive until another action was taken.
-
-**Root Cause**: After thorough investigation, we found that during the first import, the DataView's table is temporarily disabled during data population with `setEnabled(False)`. In the DataView._update_view method, there is code to re-enable it in a finally block, but during the first import, there may be a race condition between the dialog closure and the table population that prevented proper re-enabling.
-
-**Fix**:
-1. Enhanced `MainWindow._close_progress_dialog` to explicitly find and re-enable the data view's table:
-   ```python
-   # Make sure data view's table is fully enabled - critical for first import
-   data_view = self._views.get("Data")
-   if data_view and hasattr(data_view, "_data_view") and hasattr(data_view._data_view, "_table_view"):
-       logger.debug("Explicitly re-enabling DataView table after import")
-       try:
-           data_view._data_view._table_view.setEnabled(True)
-           data_view._data_view._table_view.setSortingEnabled(True)
-       except Exception as table_error:
-           logger.error(f"Error re-enabling data table: {table_error}")
-   ```
-2. This directly addresses the issue by ensuring the table view is always re-enabled after dialog closure, regardless of where it is in its internal population cycle.
-
-**Validation**:
-- Verified the UI becomes fully interactive immediately after clicking "Confirm" on the first import
-- Confirmed all table functions (sorting, filtering, etc.) work correctly after first import
-- Tested multiple import scenarios to ensure consistent behavior
-
-**File(s) Modified**:
-- `chestbuddy/ui/main_window.py`
-
-**Technical Insight**: 
-The first-time initialization of the DataView involves temporarily disabling the table during data population. This is normal, but if the view transition and progress dialog closure happen in a particular sequence, it can lead to a race condition where the table remains disabled. By explicitly re-enabling the table after dialog closure, we guarantee UI responsiveness regardless of timing issues.
-
-### 2025-03-24: Fixed UI Blocking Issue After First Import (Second Attempt)
-
-**Issue**: The UI still remained blocked after closing the progress dialog on the first import, despite our previous fix of adding _update_ui() to the _close_progress_dialog method.
-
-**Root Cause**: After further investigation, we found that we were setting self._progress_dialog = None before processing events with QApplication.processEvents(). This was causing dialog-related events to not be fully processed because we lost the reference to the dialog too early.
-
-**Fix**:
-1. Reordered operations in MainWindow._close_progress_dialog:
-   - First hide and accept the dialog
-   - Then call QApplication.processEvents() to process dialog events
-   - Then update the UI with _update_ui()
-   - FINALLY set self._progress_dialog = None after all processing is complete
-2. Added detailed comments explaining the importance of this sequence
-
-**Validation**:
-- Verified that the UI becomes interactive immediately after clicking "Confirm" on the first import
-- Confirmed that subsequent imports continue to work correctly
-- Tested multiple file import scenarios to ensure consistent behavior
-
-**File(s) Modified**:
-- `chestbuddy/ui/main_window.py`
-
-**Technical Insight**: 
-In Qt, it's important to maintain object references until after all their related events have been processed. Setting an object to None before processing events can interrupt its normal cleanup cycle.
-
-### 2025-03-23: Fixed Import Functionality and UI Unblocking Issues
-
-**Issue**: Three related issues affected the import functionality:
-1. The input data was being processed twice, causing duplicate processing and UI lag
-2. When using the "Open" menu option from the nav bar, the UI wasn't properly unblocked
-3. The Import action card in the dashboard wasn't properly connected to the import functionality
-
-**Root Cause**:
-1. Double processing: The `DataManager._on_csv_load_success` method emitted two signals that both triggered UI updates
-2. UI blocking: The `_on_load_finished` method didn't handle cases where the progress dialog might not exist
-3. Import card: The dashboard action card for imports was emitting "import_csv" action instead of the standardized "import"
-
-**Fix**:
-1. Removed the redundant `data_changed.emit()` call in `DataManager._on_csv_load_success`
-2. Enhanced `MainWindow._on_load_finished` to:
-   - Create a temporary progress dialog if none exists
-   - Better handle all possible load completion scenarios
-   - Always check the data model state to ensure UI unblocking
-3. Added action mapping in dashboard's `_handle_action` method to map "import_csv", "import_excel", and "import_json" to the standard "import" action
-
-**Validation**:
-- Verified data loading only occurs once
-- Successfully opened files using the File → Open menu option
-- Confirmed the Import action card now correctly triggers file import
-- Tested all import methods (menu, dashboard card, empty state buttons)
-
-**File(s) Modified**:
-- `chestbuddy/core/services/data_manager.py`
-- `chestbuddy/ui/main_window.py`
-- `chestbuddy/ui/views/dashboard_view_adapter.py`
-
-### 2025-03-23: Standardized Import Button Behavior
-
-**Issue**: Different import buttons throughout the application were using inconsistent signal patterns, with some emitting "import_csv" and others emitting "import", leading to inconsistent behavior.
-
-**Root Cause**:
-1. The `_on_import_data_requested` method in the `BaseView` class was not standardized to emit a consistent signal.
-2. Some views were using "action_clicked" signals while others used "action_triggered" signals.
-3. The lack of documentation on how import buttons should behave led to inconsistent implementations.
-
-**Fix**:
-1. Enhanced the `_on_import_data_requested` method in `BaseView` with comprehensive documentation.
-2. Modified the method to emit standardized signals for imports:
-   - `data_requested` for backward compatibility
-   - `action_triggered("import")` as the preferred method
-   - Falls back to `action_clicked("import")` for views with older signal patterns
-3. Ensured all import buttons use this central method for consistent behavior.
-
-**Validation**:
-- Confirmed all import buttons now trigger the same handler (`_on_dashboard_action` with "import").
-- Verified that imports work consistently from all parts of the application.
-- Tested import functionality from Dashboard, empty Data view, and menu actions.
-
-**File(s) Modified**:
-- `chestbuddy/ui/views/base_view.py`
-
-## Ongoing Issues
-
-### Performance with Large Datasets
-
-**Issue**: Table view performance degrades with datasets larger than 100,000 rows.
-
-**Status**: Under investigation
-
-**Observations**:
-- Memory usage spikes during filtering operations
-- UI becomes unresponsive during sorting operations
-- Model updates trigger multiple UI refreshes
-
-**Planned Fixes**:
-- Implement virtual scrolling to only render visible rows
-- Optimize in-memory data structures for faster access
-- Batch UI updates to reduce rendering overhead
-
-### Chart Export Quality
-
-**Issue**: Exported charts have lower resolution than displayed charts and some formatting is lost during PDF export.
-
-**Status**: Identified, scheduled for Milestone 5
-
-**Observations**:
-- Font rendering differs between screen and PDF output
-- Colors may appear differently in exported files
-- Legend positioning is inconsistent in exports
-
-### UI Freezing During Heavy Operations
-
-**Issue**: UI occasionally freezes during heavy data processing operations.
-
-**Status**: Partially fixed, ongoing work
-
-**Observations**:
-- Operations that process the entire dataset can cause UI freezes
-- Progress dialog updates can be delayed during intensive operations
-- Some background operations are blocking the main thread
-
-**Partial Fixes Applied**:
-- Moved CSV loading to background thread
-- Implemented chunked processing for large files
-- Added cancellation support for long-running operations
-
-**Remaining Work**:
-- Improve thread management for all intensive operations
-- Add more granular progress reporting
-- Implement task prioritization for background work
-
-## Fixed Issues History
-
-### 2025-02-15: Chart Preview Rendering Issue
-
-**Issue**: Chart previews were not rendering correctly in the dashboard, appearing as blank cards.
-
-**Root Cause**: The chart rendering was happening on a background thread, but the UI update was not properly synchronized with the main thread.
-
-**Fix**: Implemented proper signal/slot connection to ensure chart updates are processed on the main thread.
-
-**File(s) Modified**:
-- `chestbuddy/ui/widgets/chart_preview.py`
-- `chestbuddy/core/services/dashboard_service.py`
-
-### 2025-01-20: Memory Leak During CSV Loading
-
-**Issue**: Memory usage would continuously increase when loading multiple CSV files in succession.
-
-**Root Cause**: Temporary data structures used during CSV parsing were not being properly cleaned up after use.
-
-**Fix**: Added explicit cleanup of temporary structures and implemented proper reference management.
-
-**File(s) Modified**:
-- `chestbuddy/core/data/csv_loader.py`
-- `chestbuddy/core/tasks/multi_csv_load_task.py`
-
-### 2024-12-05: Encoding Detection Failure
-
-**Issue**: Some CSV files with non-standard encodings were failing to load.
-
-**Root Cause**: The encoding detection algorithm was too strict and was rejecting valid encodings.
-
-**Fix**: Enhanced the encoding detection to try multiple approaches and fall back to common encodings when detection is uncertain.
-
-**File(s) Modified**:
-- `chestbuddy/core/utils/file_utils.py`
-- `chestbuddy/core/data/csv_loader.py`
-
-### 2024-11-10: Configuration Save Failure
-
-**Issue**: Application settings were not being saved when the application was closed abruptly.
-
-**Root Cause**: Configuration was only being saved on normal exit, not during unexpected terminations.
-
-**Fix**: Implemented periodic autosave of configuration and added signal handlers for application termination events.
-
-**File(s) Modified**:
-- `chestbuddy/core/config/config_manager.py`
-- `chestbuddy/app.py`
-
-### 2024-10-15: Action Button Styling Inconsistency
-
-**Issue**: Action buttons had inconsistent styling across different views.
-
-**Root Cause**: Style properties were being defined independently in each view instead of using a central style definition.
-
-**Fix**: Created a central style definition for action buttons and updated all instances to use it.
-
-**File(s) Modified**:
-- `chestbuddy/ui/widgets/action_button.py`
-- `chestbuddy/ui/styles/style_constants.py`
-- Multiple view adapter files
-
-## Current Issues
+## Persistent Issues
 
 ### UI Blocking After First Import
+- **Status**: 🟡 In Progress - Comprehensive redesign in progress
+- **Description**: The UI, especially the data table, remains blocked after the first import operation completes.
+- **Root Cause Analysis**: 
+  - Multiple attempts to fix with timing-based solutions have been unsuccessful
+  - The fundamental issue appears to be how UI blocking/unblocking is managed throughout the application
+  - Current approach uses ad-hoc timing-sensitive code with multiple calls to QApplication.processEvents()
+  - There's no centralized tracking of which elements are blocked and by which operations
+  - Potential threading issues between background worker and UI thread
+- **Solution Attempts**:
+  1. ❌ First attempt: Added processEvents() calls after dialog closure
+  2. ❌ Second attempt: Added manual enabling of table view
+  3. ❌ Third attempt: Added multiple phases of UI unblocking
+  4. ❌ Fourth attempt: Added explicit checks for data view table
+  5. ❌ Fifth attempt: Added delayed UI checks
+  6. ❌ Sixth attempt: Removed automatic view transition
+  7. ❌ Seventh attempt: Added two-phase UI unblocking (immediate + delayed)
+  8. ❌ Eighth attempt: Implemented multiple delayed UI checks at increasing intervals
+  9. 🟡 **Current approach**: Implementing a comprehensive UI State Management System that:
+     - Centralizes UI blocking/unblocking logic
+     - Uses reference counting for nested operations
+     - Provides context managers for automatic cleanup
+     - Adds proper tracking of blocked elements
+     - Ensures thread safety
+     - Eliminates timing-dependent solutions
 
-**Status**: Investigating  
-**Priority**: High  
-**Component**: UI/DataView  
-**First Noticed**: Recent build  
+### Progress Dialog Visibility
+- **Status**: ✅ Fixed
+- **Description**: Progress dialog sometimes doesn't appear during long operations.
+- **Root Cause**: Dialog was created but not properly shown or brought to front.
+- **Solution**: Enhanced dialog show logic to ensure visibility and focus.
 
-**Description**:  
-The UI becomes blocked (unresponsive) after the first data import, but works correctly on subsequent imports.
+## New System: UI State Management
 
-**Reproduction Steps**:
-1. Start the application
-2. Click "Import" in the Dashboard view
-3. Complete the import process
-4. Observe that the UI is blocked/unresponsive after the import completes
-5. Do a second import
-6. Observe that the UI works correctly after the second import
+### Architecture
+- **UIStateManager**: Singleton class that manages all UI state.
+- **BlockableElementMixin**: Mixin for UI elements that can be blocked.
+- **OperationContext**: Context manager for UI blocking operations.
+- **UIElementGroups & UIOperations**: Standard enums for element groups and operations.
 
-**Diagnostic Information**:  
-- Issue only occurs on the first import, subsequent imports work fine
-- The DataView table is temporarily disabled during data population
-- The issue appears to be a race condition between the progress dialog closing and the UI updating
-- Previous fix attempts improved but did not fully resolve the issue
+### Key Features
+1. **Centralized Control**: Single source of truth for UI state.
+2. **Reference Counting**: Properly handles nested operations.
+3. **Thread Safety**: Protected by QMutex for concurrent access.
+4. **Declarative API**: Simple interface for blocking/unblocking.
+5. **Automatic Cleanup**: Context managers ensure proper unblocking.
 
-**Debugging Strategy**:
-1. **Enhanced Logging**: Implemented detailed logging with timestamps and contextual tags to track the sequence of operations during import.
-2. **State Snapshots**: Added capability to capture application state at key points for comparison.
-3. **Real-time Inspection**: Created tools to inspect the UI hierarchy, component states, and event processing in real-time.
-4. **Emergency Recovery**: Added F12 hotkey to force-unblock the UI during testing and development.
+### Implementation Plan
+1. Create core UI state management components
+2. Integrate with MainWindow
+3. Integrate with ProgressDialog
+4. Integrate with DataView
+5. Integrate with BackgroundWorker
+6. Comprehensive testing
+7. Documentation
 
-**Hypotheses**:
-1. The DataView's table may not be properly re-enabled after the first import
-2. Event processing sequence may differ between first and subsequent imports
-3. The progress dialog's modality may affect the UI differently on first vs. subsequent imports
-4. There may be a race condition in the view transition process
+## Recent Fixes
 
-**Current Investigation**:
-- Added detailed logging throughout the import flow
-- Capturing state snapshots before/after import and dialog closure
-- Monitoring UI component states, especially the DataView table
-- Tracking event processing during the transition
+### Data Table Selection Issues
+- **Status**: ✅ Fixed
+- **Description**: Selecting cells in the data table sometimes failed after filtering.
+- **Root Cause**: Index mapping between filtered and unfiltered data was incorrect.
+- **Solution**: Fixed index translation in the data model.
 
-**Potential Solutions**:
-1. Ensure table is explicitly re-enabled after dialog closure
-2. Add additional event processing steps during critical transitions
-3. Delay view transition until after all UI components are confirmed enabled
-4. Implement a safety timer to force-enable UI components if blocking is detected
-
-### Startup Error with Missing Module
-
-**Status**: Fixed  
-**Priority**: Critical  
-**Component**: Application Startup  
-**First Noticed**: 2025-03-24  
-
-**Description**:  
-Application would fail to start with error: `ModuleNotFoundError: No module named 'chestbuddy.settings'`
-
-**Root Cause**:  
-The main_window.py file was importing CONFIG_FILE from a non-existent 'chestbuddy.settings' module. Instead, it should have used the ConfigManager class from chestbuddy.utils.config.
-
-**Fix**:  
-1. Updated import statements in main_window.py to use ConfigManager from chestbuddy.utils.config
-2. Replaced usages of CONFIG_FILE with ConfigManager instance methods
-3. Fixed additional import issues with other modules (ChestDataModel, service classes)
-4. Added missing pandas import that was accidentally removed
-
-**File(s) Modified**:  
-- chestbuddy/ui/main_window.py
-
-**Verification**:  
-Application now starts successfully without import errors.
-
-**Technical Notes**:  
-This error occurred because of a reference to a module that may have existed in a previous version of the application but was refactored. The ConfigManager class now handles all configuration-related functionality.
+### Memory Leaks During Import
+- **Status**: ✅ Fixed
+- **Description**: Memory usage increased significantly during large imports.
+- **Root Cause**: Temporary dataframes weren't being properly garbage collected.
+- **Solution**: Added explicit deletion and forced garbage collection after processing.
