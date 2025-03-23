@@ -79,6 +79,12 @@ alwaysApply: false
   - **Fix**: Improved the event processing sequence in `_close_progress_dialog()` to ensure UI updates happen at the right time. Added multiple strategic calls to `QApplication.processEvents()` and `self._update_ui()` before, during, and after dialog closure to ensure complete UI unblocking.
   - **Date**: 2023-07-25
 
+- ✅ UI remaining blocked after first import confirmation (fourth attempt)
+  - **Issue**: The UI would still remain blocked after confirming the progress dialog on the first import, despite previous fix attempts.
+  - **Cause**: View transition timing issue - switching to Data view in `_finalize_loading` while dialog was still active created an event sequence conflict.
+  - **Fix**: Moved view transition from `_finalize_loading` to `_close_progress_dialog` using a transition flag. This defers the view transition until after dialog is fully closed and all events processed, solving the timing conflict.
+  - **Date**: 2023-07-31
+
 ## Background Processing Issues
 - ✅ Signal connections not working properly
   - Fixed connections between DataManager and MainWindow

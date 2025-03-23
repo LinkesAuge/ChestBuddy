@@ -135,6 +135,9 @@ class MainWindow(QMainWindow):
         # Flag to track if progress dialog has been finalized
         self._progress_dialog_finalized = False
 
+        # Flag to indicate a view transition should occur after dialog closure
+        self._should_transition_to_data_view = False
+
         if self._data_manager:
             logger.debug("MainWindow initialized with data_manager")
         else:
@@ -896,6 +899,24 @@ class MainWindow(QMainWindow):
                 # Capture state after dialog closure
                 self._capture_snapshot("after_dialog_close")
 
+                # Check if we need to transition to the Data view (for first import)
+                if self._should_transition_to_data_view:
+                    logger.debug("[VIEW_TRANSITION] Executing delayed transition to Data view")
+
+                    # Process events again before view transition to ensure UI is responsive
+                    QApplication.processEvents()
+
+                    # Perform the view transition now that dialog is fully closed
+                    self._set_active_view("Data")
+
+                    # Reset the flag
+                    self._should_transition_to_data_view = False
+
+                    # Process events again after view transition
+                    QApplication.processEvents()
+
+                    logger.debug("[VIEW_TRANSITION] Data view transition complete")
+
         except Exception as e:
             logger.error(f"[DIALOG_CLOSE_ERROR] Error closing progress dialog: {e}")
             import traceback
@@ -971,16 +992,20 @@ class MainWindow(QMainWindow):
         logger.debug("[NAV_UPDATE] Updating navigation based on data state")
         self._update_navigation_based_on_data_state()
 
-        # If data was successfully loaded, switch to Data view
+        # If data was successfully loaded, set flag to transition to Data view after dialog closes
         if self._data_loaded:
-            logger.debug("[VIEW_TRANSITION] Switching to Data view after successful import")
+            logger.debug(
+                "[VIEW_TRANSITION] Setting flag to switch to Data view after dialog closure"
+            )
+            self._should_transition_to_data_view = True
+
+            # Log current view for debugging
             current_view = None
             for view_name, view in self._views.items():
                 if self._content_stack.currentWidget() == view:
                     current_view = view_name
                     break
-            logger.debug(f"[CURRENT_VIEW] Current view before transition: {current_view}")
-            self._set_active_view("Data")
+            logger.debug(f"[CURRENT_VIEW] Current view before queued transition: {current_view}")
 
     def _on_populate_table_requested(self, data: pd.DataFrame) -> None:
         """
