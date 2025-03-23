@@ -72,6 +72,7 @@ The active development focus is UI enhancement with a particular emphasis on das
    - ✅ Fixed progress dialog visibility during file imports
    - ✅ Added proper progress indication with cancel button
    - ✅ Enhanced error reporting during import failures
+   - ✅ Fixed progress dialog update issue during table population
 
 3. **UI State Management**:
    - ✅ Fixed UI elements remaining blocked after data loading
@@ -95,11 +96,11 @@ The active development focus is UI enhancement with a particular emphasis on das
 ## Known Issues
 
 ### UI Interaction Issues
-- ⚠️ Status: Partially Resolved
-- Description: Progress dialog wasn't appearing during file imports and UI remained blocked after loading completed
-- Root cause: Improper handling of progress dialog creation and UI updates after data loading
-- Fix: Updated MainWindow methods to properly show progress dialog and unblock UI elements after loading
-- Validation: Progress dialog now appears during imports and UI elements are properly enabled after loading
+- ✅ Resolved
+- Description: Progress dialog wasn't appearing during file imports, UI remained blocked after loading completed, and progress dialog was updated twice during table population
+- Root cause: Improper handling of progress dialog creation, UI updates after data loading, and lack of dialog state tracking
+- Fix: Updated MainWindow methods to properly show progress dialog, unblock UI elements after loading, and added a flag to prevent multiple updates to the dialog
+- Validation: Progress dialog now appears during imports, UI elements are properly enabled after loading, and dialog is only updated once during the import process
 
 ### Performance Issues
 - ⚠️ Status: Investigating
@@ -159,3 +160,34 @@ The active development focus is UI enhancement with a particular emphasis on das
 - UI Development: Enhancing user experience and interface components
 - Data Processing: Optimizing data handling and analysis algorithms
 - Quality Assurance: Ensuring robust error handling and stability
+
+### Major Bugfixes
+We've addressed several critical bugs in the import functionality:
+
+1. **Fixed double data processing** - Data was being processed twice during import, causing UI lag and duplicate operations. Fixed by removing redundant signal emission in the DataManager.
+
+2. **UI unblocking issues** - Improved the MainWindow._on_load_finished method to ensure the UI is properly unblocked after loading data, especially when using the menu bar's "Open" option.
+
+3. **Import action consistency** - Standardized all import actions throughout the application to ensure they all emit consistent "import" signals. This includes:
+   - Dashboard action cards now map "import_csv" to "import"
+   - All empty state widgets use the same signal pattern
+   - Menu actions connect properly to the standard import handler
+
+4. **Logger integration** - Added proper logging to the dashboard adapter to provide better debugging information.
+
+### Next Steps
+
+1. **Performance optimization** - We need to address the performance issues with large datasets (>100,000 rows) by implementing:
+   - Virtual scrolling in the table view
+   - Improved memory management for data operations
+   - Batched UI updates
+
+2. **Chart export quality** - Improve the resolution and formatting of exported charts, focusing on:
+   - Consistent font rendering
+   - Proper color reproduction
+   - Correct legend positioning
+
+3. **Continued UI responsiveness improvements** - Further optimize background processing to prevent UI freezes:
+   - Move more operations to background threads
+   - Implement task prioritization
+   - Add more granular progress reporting

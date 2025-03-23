@@ -349,31 +349,40 @@ class DataManager(QObject):
             if self._current_file_path:
                 self._update_recent_files(self._current_file_path)
 
-            # Complete the file loading phase with a success message
-            success_message = f"Successfully loaded {len(data):,} rows of data"
-            self.load_finished.emit(success_message)
-
             # Map columns
             mapped_data = self._map_columns(data)
 
             # Update the data model with the new data
+            # This will trigger data_changed signal when blockSignals is set to False
             self._data_model.update_data(mapped_data)
 
             # Signal to populate the table synchronously
-            # This allows the table to be populated in the background without showing progress
+            # Note: This no longer triggers a duplicate data_changed signal as we don't emit
+            # the mapped_data again through another channel
             self.populate_table_requested.emit(mapped_data)
 
-            # Unblock signals after table population
+            # Complete the file loading phase with a success message
+            success_message = f"Successfully loaded {len(data):,} rows of data"
+
+            # Unblock signals after all updates are complete
             self._data_model.blockSignals(False)
 
-            # Emit normal data_changed notification after all processing is complete
-            self._data_model.data_changed.emit()
+            # Explicitly set a flag that data has been loaded
+            if hasattr(self._data_model, "set_data_loaded"):
+                self._data_model.set_data_loaded(True)
+                logger.debug("Explicitly set data model loaded state to True")
 
             # Clear the current task
             self._current_task = None
 
-            # Emit final success signal - but don't emit another load_finished to avoid new dialog
+            # Give the UI a moment to process events before emitting final success signal
+            QApplication.processEvents()
+
+            # Emit final success signal without triggering additional data processing
             self.load_success.emit(success_message)
+
+            # Signal completion of loading operation
+            self.load_finished.emit(success_message)
 
         except Exception as e:
             # Ensure signals are unblocked

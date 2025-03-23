@@ -130,6 +130,9 @@ class MainWindow(QMainWindow):
         # Track if data is loaded
         self._data_loaded = False
 
+        # Flag to track if progress dialog has been finalized
+        self._progress_dialog_finalized = False
+
         if self._data_manager:
             logger.debug("MainWindow initialized with data_manager")
         else:
@@ -616,6 +619,9 @@ class MainWindow(QMainWindow):
         """Handle when a loading operation starts."""
         logger.debug("MainWindow._on_load_started called")
 
+        # Reset progress dialog finalized flag
+        self._progress_dialog_finalized = False
+
         # Initialize loading state
         self._loading_state = {
             "current_file": "",
@@ -667,49 +673,64 @@ class MainWindow(QMainWindow):
 
     def _on_load_finished(self, message: str) -> None:
         """
-        Handle when a loading operation completes successfully.
+        Handle when a loading operation is finished.
 
         Args:
-            message: Success message
+            message: Message to display
         """
-        logger.debug(f"MainWindow._on_load_finished called: {message}")
-
-        # Set data loaded state based on data model
-        if self._data_model and not self._data_model.is_empty:
-            self._data_loaded = True
-            logger.debug("Data loaded state set to True")
-        else:
-            self._data_loaded = False
-            logger.debug("Data model is empty, data loaded state remains False")
-
-        # Update UI based on data state - ensures navigation and views are updated
-        self._update_navigation_based_on_data_state()
-
-        # Enable UI elements based on data availability
-        self._update_ui()
-
-        # Early return if progress dialog doesn't exist
-        if not hasattr(self, "_progress_dialog") or not self._progress_dialog:
-            logger.debug("No progress dialog to update")
-            return
+        logger.debug(f"MainWindow._on_load_finished called with message: {message}")
 
         try:
-            # Check if this is an error message
-            is_error = "error" in message.lower() or "failed" in message.lower()
+            # Log success message
+            if not message.startswith("Error"):
+                logger.info(f"Data loading finished: {message}")
 
-            # Update the dialog with the final status
+            # Check if we have data and set _data_loaded flag
+            if not self._data_model.is_empty:
+                self._data_loaded = True
+                logger.debug("Setting _data_loaded to True as data model has content")
+                # Update UI based on data state
+                self._update_ui()
+                # Update navigation
+                self._update_navigation_based_on_data_state()
+            else:
+                logger.debug("Data model is empty after loading")
+
+            # Log status for debug
+            logger.debug(f"UI data loaded state: {self._data_loaded}")
+
+            # Check for progress dialog - if we can't find it, create one to ensure proper UI state
+            if not hasattr(self, "_progress_dialog") or not self._progress_dialog:
+                logger.warning("No progress dialog found in _on_load_finished, creating one")
+                # Create a temporary progress dialog to ensure proper UI unblocking
+                from chestbuddy.ui.widgets.progress_dialog import ProgressDialog
+
+                self._progress_dialog = ProgressDialog("Loading Files", "Finishing...", self)
+                self._progress_dialog.set_progress(100, 100)
+                self._progress_dialog.set_status("Complete")
+                self._progress_dialog.set_can_cancel(True)
+                self._progress_dialog.cancel_button.setText("Close")
+                # Process events to ensure dialog updates are visible
+                QApplication.processEvents()
+
+            # Call UI finalization handler regardless of dialog existence
+            is_error = message.startswith("Error") or "error" in message.lower()
             self._finalize_loading(message, is_error)
 
-            # Process events to ensure the dialog updates are visible
-            QApplication.processEvents()
-
-            # Keep dialog open for user confirmation
-            # Dialog will close when user clicks the "Close" button
-
         except Exception as e:
+            # Catch any errors to ensure we finalize loading
             logger.error(f"Error in _on_load_finished: {e}")
-            # Try to ensure dialog can be closed
             self._finalize_loading(f"Error: {str(e)}", True)
+
+        # Always set loaded status after any loading operation (success or failure)
+        # This ensures navigation and UI elements are properly updated
+        if not self._data_model.is_empty:
+            self._data_loaded = True
+            # Force a complete UI update
+            self.refresh_ui()
+
+        # Log final state
+        logger.debug(f"_on_load_finished completed. Data loaded state: {self._data_loaded}")
 
     def _close_progress_dialog(self) -> None:
         """
@@ -745,6 +766,9 @@ class MainWindow(QMainWindow):
             return
 
         try:
+            # Set flag to indicate dialog has been finalized
+            self._progress_dialog_finalized = True
+
             # Set appropriate dialog state based on success/error
             if is_error:
                 # Set error styling
@@ -814,6 +838,11 @@ class MainWindow(QMainWindow):
         """
         # Ensure progress dialog exists
         if not hasattr(self, "_progress_dialog") or not self._progress_dialog:
+            return
+
+        # If dialog has been finalized, don't update it anymore
+        if self._progress_dialog_finalized:
+            logger.debug("Progress dialog already finalized, ignoring update")
             return
 
         try:
@@ -1290,6 +1319,17 @@ class MainWindow(QMainWindow):
     def refresh_ui(self) -> None:
         """Refresh all UI components."""
         try:
+            # Skip UI refreshes that might affect the progress dialog if it's been finalized
+            # but is still visible (waiting for user to close it)
+            if (
+                self._progress_dialog_finalized
+                and hasattr(self, "_progress_dialog")
+                and self._progress_dialog
+            ):
+                if self._progress_dialog.isVisible():
+                    logger.debug("Skipping UI refresh while finalized progress dialog is visible")
+                    return
+
             # Refresh the current tab if it exists
             if hasattr(self, "_content_stack") and self._content_stack is not None:
                 current_index = self._content_stack.currentIndex()

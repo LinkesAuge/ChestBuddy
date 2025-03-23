@@ -371,8 +371,30 @@ class BaseView(QWidget):
         return self._data_required
 
     def _on_import_data_requested(self):
-        """Handle when the import data button is clicked on the empty state widget."""
+        """
+        Handle when the import data button is clicked on the empty state widget.
+
+        This method ensures a consistent approach to import requests across all views.
+        It emits the appropriate signals to trigger an import action:
+
+        1. Emits data_requested() for backward compatibility with older code
+        2. Emits action_triggered("import") if the view supports it (preferred method)
+        3. Falls back to action_clicked("import") for views using the older signal pattern
+
+        This standardization ensures that all import buttons throughout the application
+        trigger the same handler in MainWindow (_on_dashboard_action) with the "import"
+        parameter, which calls _open_file(). This prevents code duplication and ensures
+        consistent behavior.
+        """
+        # Emit the standard data_requested signal
         self.data_requested.emit()
+
+        # Also emit the action_triggered signal with "import" if it exists
+        # This ensures consistency with dashboard and other views
+        if hasattr(self, "action_triggered") and hasattr(self.action_triggered, "emit"):
+            self.action_triggered.emit("import")
+        elif hasattr(self, "action_clicked") and hasattr(self.action_clicked, "emit"):
+            self.action_clicked.emit("import")
 
     def _add_action_buttons(self):
         """Add action buttons to the header. To be implemented by subclasses."""

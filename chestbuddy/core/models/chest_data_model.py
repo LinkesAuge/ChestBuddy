@@ -83,6 +83,33 @@ class ChestDataModel(QObject):
         except Exception as e:
             logger.error(f"Error calculating data hash: {str(e)}")
 
+    def set_data_loaded(self, is_loaded: bool) -> None:
+        """
+        Explicitly set the data loaded state and ensure UI updates happen.
+        This method is used to guarantee the UI responds to data availability changes.
+
+        Args:
+            is_loaded: Whether data is loaded
+        """
+        logger.debug(f"ChestDataModel.set_data_loaded({is_loaded}) called")
+
+        # Only emit signal if we're setting to True and there's actual data
+        if is_loaded and not self.is_empty:
+            logger.debug("Data is loaded and not empty, triggering data_changed signal")
+            # Emit data_changed signal to trigger UI updates
+            self.data_changed.emit()
+        elif not is_loaded:
+            # If setting to not loaded, clear the data
+            if not self.is_empty:
+                logger.debug("Setting data not loaded, clearing data")
+                self.clear()
+                self.data_changed.emit()
+
+        # Process events to ensure UI updates happen
+        from PySide6.QtWidgets import QApplication
+
+        QApplication.processEvents()
+
     def _calculate_data_hash(self) -> str:
         """
         Calculate a hash of the current data state.

@@ -6,6 +6,7 @@ Usage:
     Used in the MainWindow to bridge the DashboardView with application data and signals.
 """
 
+import logging
 from typing import List, Optional
 from datetime import datetime
 
@@ -35,6 +36,9 @@ from chestbuddy.utils.config import ConfigManager
 from chestbuddy.ui.widgets.stat_card import StatCard
 from chestbuddy.ui.views.dashboard_view import DashboardView
 from chestbuddy.ui.resources.resource_manager import ResourceManager
+
+# Set up logger
+logger = logging.getLogger(__name__)
 
 
 class WelcomePanel(QFrame):
@@ -538,15 +542,28 @@ class DashboardViewAdapter(BaseView):
         """Handle import button click."""
         self.data_requested.emit()
 
-    def _handle_action(self, action):
+    def _handle_action(self, action: str) -> None:
         """
-        Handle action triggered from an ActionCard.
+        Handle action button click.
 
         Args:
-            action (str): The action identifier
+            action: Action identifier
         """
-        # Forward all actions
-        self.action_triggered.emit(action)
+        logger.debug(f"Dashboard action triggered: {action}")
+
+        # Map action card signals to consistent action names
+        # This ensures import works consistently across the application
+        action_mapping = {
+            "import_csv": "import",  # Map import_csv to standard import action
+            "import_excel": "import",  # Map import_excel to standard import action
+            "import_json": "import",  # Map import_json to standard import action
+        }
+
+        # Use mapped action if available, otherwise use original
+        mapped_action = action_mapping.get(action, action)
+
+        # Emit the action signal
+        self.action_triggered.emit(mapped_action)
 
     def _on_file_selected(self, file_path):
         """

@@ -133,53 +133,61 @@ alwaysApply: false
 
 ## Recent Fixes
 
-### 2025-03-23: Progress Dialog Visibility and UI Unblocking Issues
+### 2025-03-23: Fixed Import Functionality and UI Unblocking Issues
 
-**Issue**: Two related issues were affecting the user experience:
-1. The progress dialog was not appearing during file imports, leaving users with no visual feedback.
-2. After successfully importing files, other areas of the UI remained blocked/disabled even though data was available.
+**Issue**: Three related issues affected the import functionality:
+1. The input data was being processed twice, causing duplicate processing and UI lag
+2. When using the "Open" menu option from the nav bar, the UI wasn't properly unblocked
+3. The Import action card in the dashboard wasn't properly connected to the import functionality
 
 **Root Cause**:
-1. The progress dialog was not being properly created and shown in the `_on_load_started` method.
-2. The data loaded state was not being properly propagated to all UI elements after import completion.
+1. Double processing: The `DataManager._on_csv_load_success` method emitted two signals that both triggered UI updates
+2. UI blocking: The `_on_load_finished` method didn't handle cases where the progress dialog might not exist
+3. Import card: The dashboard action card for imports was emitting "import_csv" action instead of the standardized "import"
 
 **Fix**:
-1. Updated `MainWindow._on_load_started` to explicitly create and show the progress dialog.
-2. Enhanced `MainWindow._on_load_finished` to properly set the data loaded state and update all UI elements.
-3. Improved `MainWindow._update_ui` to handle all data-dependent UI elements with proper checks.
-4. Added better error handling and logging throughout the progress dialog lifecycle.
+1. Removed the redundant `data_changed.emit()` call in `DataManager._on_csv_load_success`
+2. Enhanced `MainWindow._on_load_finished` to:
+   - Create a temporary progress dialog if none exists
+   - Better handle all possible load completion scenarios
+   - Always check the data model state to ensure UI unblocking
+3. Added action mapping in dashboard's `_handle_action` method to map "import_csv", "import_excel", and "import_json" to the standard "import" action
 
 **Validation**:
-- Verified that the progress dialog now appears during file import operations.
-- Confirmed that navigation items and menu actions are properly enabled after data is loaded.
-- Successfully tested navigation between different views after data import.
-- Verified that all data-dependent views are accessible after import.
+- Verified data loading only occurs once
+- Successfully opened files using the File → Open menu option
+- Confirmed the Import action card now correctly triggers file import
+- Tested all import methods (menu, dashboard card, empty state buttons)
 
 **File(s) Modified**:
+- `chestbuddy/core/services/data_manager.py`
 - `chestbuddy/ui/main_window.py`
+- `chestbuddy/ui/views/dashboard_view_adapter.py`
 
-### 2025-03-23: Dashboard Layout and Import Button Fix
+### 2025-03-23: Standardized Import Button Behavior
 
-**Issue**: Dashboard layout had a redundant empty state panel at the bottom that was overlaying other UI elements, and the "Get Started" button in the welcome panel was not correctly triggering the file import dialog.
+**Issue**: Different import buttons throughout the application were using inconsistent signal patterns, with some emitting "import_csv" and others emitting "import", leading to inconsistent behavior.
 
 **Root Cause**:
-1. The dashboard view adapter had a redundant empty state section at the bottom that was interfering with other UI elements.
-2. The welcome panel's button was labeled "Get Started" which was unclear about its actual function (importing data).
-3. The welcome panel was emitting the signal "import_csv" instead of "import" which MainWindow was expecting, causing the action to fail.
+1. The `_on_import_data_requested` method in the `BaseView` class was not standardized to emit a consistent signal.
+2. Some views were using "action_clicked" signals while others used "action_triggered" signals.
+3. The lack of documentation on how import buttons should behave led to inconsistent implementations.
 
 **Fix**:
-1. Removed the redundant empty state panel at the bottom of the dashboard layout.
-2. Changed the "Get Started" button to "Import Data" in the welcome panel for better clarity.
-3. Corrected the action signal emitted by the Import Data button from "import_csv" to "import" to match MainWindow's expectations.
+1. Enhanced the `_on_import_data_requested` method in `BaseView` with comprehensive documentation.
+2. Modified the method to emit standardized signals for imports:
+   - `data_requested` for backward compatibility
+   - `action_triggered("import")` as the preferred method
+   - Falls back to `action_clicked("import")` for views with older signal patterns
+3. Ensured all import buttons use this central method for consistent behavior.
 
 **Validation**:
-- Tested the dashboard layout to verify all elements are now visible.
-- Confirmed the Import Data button correctly opens the file dialog.
-- Successfully imported CSV files using the button.
-- Verified that 23,843 rows were loaded from the selected files.
+- Confirmed all import buttons now trigger the same handler (`_on_dashboard_action` with "import").
+- Verified that imports work consistently from all parts of the application.
+- Tested import functionality from Dashboard, empty Data view, and menu actions.
 
 **File(s) Modified**:
-- `chestbuddy/ui/views/dashboard_view_adapter.py`
+- `chestbuddy/ui/views/base_view.py`
 
 ## Ongoing Issues
 
