@@ -31,6 +31,10 @@ The active development focus is UI enhancement with a particular emphasis on das
 - Centralizing style definitions for consistency
 - Using a state management pattern for complex UI states
 
+### Major Bugfixes
+
+- **UI Blocking After Progress Dialog (First Import)**: Fixed persistent issue where the UI remained blocked after confirming the progress dialog on first import. The solution involved a comprehensive rework of the event processing sequence in the `_close_progress_dialog()` method to ensure proper event handling during view transitions. Multiple strategic calls to `QApplication.processEvents()` and `self._update_ui()` were added before, during, and after dialog closure to ensure all UI components are fully unblocked.
+
 ## Recent Improvements
 
 ### Dashboard Components

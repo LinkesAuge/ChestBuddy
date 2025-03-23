@@ -66,6 +66,19 @@ alwaysApply: false
   - Ensured cancel button is renamed to "Close" once loading completes
   - Dialog no longer automatically closes, allowing users to review final status
 
+- ✅ Error dialog displaying when there's no data
+- ✅ Popup error when trying to create a chart with missing data
+- ✅ Table with zero height after first import
+- ✅ Progress dialog not showing during file loading
+- ✅ Data not displaying in table view after loading
+- ✅ Progress dialog not closing properly in some edge cases
+- ✅ UI remaining blocked after first import confirmation (first attempt)
+- ✅ UI remaining blocked after first import confirmation (second attempt)
+  - **Issue**: The UI would remain blocked after confirming the progress dialog on the first import, but worked correctly on subsequent imports.
+  - **Cause**: The sequence of operations in `_close_progress_dialog()` didn't properly account for event processing during view transitions after the first import.
+  - **Fix**: Improved the event processing sequence in `_close_progress_dialog()` to ensure UI updates happen at the right time. Added multiple strategic calls to `QApplication.processEvents()` and `self._update_ui()` before, during, and after dialog closure to ensure complete UI unblocking.
+  - **Date**: 2023-07-25
+
 ## Background Processing Issues
 - ✅ Signal connections not working properly
   - Fixed connections between DataManager and MainWindow

@@ -728,22 +728,37 @@ class MainWindow(QMainWindow):
             if hasattr(self, "_progress_dialog") and self._progress_dialog:
                 logger.debug("Closing progress dialog after completion")
 
-                # Hide and close the dialog (accept for consistency)
+                # Process any pending events first to ensure UI is in a stable state
+                # This particularly helps with the first import sequence
+                QApplication.processEvents()
+
+                # Update UI state BEFORE hiding the dialog
+                # This is critical to prevent UI elements from remaining blocked
+                # especially after first-time imports
+                logger.debug("Updating UI state before closing progress dialog")
+                self._update_ui()
+
+                # Process events again to apply UI updates
+                QApplication.processEvents()
+
+                # Now hide and close the dialog (accept for consistency)
+                logger.debug("Hiding and accepting dialog")
                 self._progress_dialog.hide()
                 self._progress_dialog.accept()
 
-                # Process events to ensure UI updates and dialog cleanup BEFORE nullifying reference
-                # This allows the dialog's events to be properly processed before we lose the reference
+                # Process events to ensure dialog cleanup operations complete
+                # This allows the dialog's events to be properly processed
                 QApplication.processEvents()
 
-                # Update UI state to ensure all elements are properly enabled
-                # This is critical to prevent UI elements from remaining blocked
-                # especially after first-time imports
-                logger.debug("Updating UI state after closing progress dialog")
+                # Final UI update to ensure consistent state
                 self._update_ui()
+
+                # Process events one final time to ensure all UI updates are applied
+                QApplication.processEvents()
 
                 # NOW set to None to prevent further updates - after all processing is complete
                 # This ensures all dialog-related events have been processed before removing the reference
+                logger.debug("Nullifying progress dialog reference")
                 self._progress_dialog = None
         except Exception as e:
             logger.error(f"Error closing progress dialog: {e}")
