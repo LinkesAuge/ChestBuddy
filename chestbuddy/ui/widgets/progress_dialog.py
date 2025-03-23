@@ -24,8 +24,8 @@ from PySide6.QtWidgets import (
     QSpacerItem,
     QProgressBar,
     QStyle,
-    QDesktopWidget,
 )
+from PySide6.QtGui import QGuiApplication
 
 from chestbuddy.ui.widgets.progress_bar import ProgressBar
 from chestbuddy.ui.resources.style import Colors
@@ -98,8 +98,11 @@ class ProgressDialog(QDialog):
                 )
             )
         else:
-            # Center on screen if no parent
-            self.move(QDesktopWidget().availableGeometry().center() - self.rect().center())
+            # Center on screen using QGuiApplication instead of deprecated QDesktopWidget
+            center_point = QGuiApplication.primaryScreen().availableGeometry().center()
+            geometry = self.frameGeometry()
+            geometry.moveCenter(center_point)
+            self.move(geometry.topLeft())
 
     def _setup_ui(self) -> None:
         """Set up the UI components."""
