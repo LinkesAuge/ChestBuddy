@@ -313,3 +313,24 @@ alwaysApply: true
 - Content area with vertical layout
 - Methods for adding action buttons
 - Signal for action button clicks 
+
+## CSV Import Progress Reporting
+
+- Progress dialog should show a clear and simplified message format: "x / y files - z rows processed"
+- Progress reporting should focus on actual counts rather than estimates
+- Include the current file name in the main progress message
+- Show a "Processing data" message during the final data model update phase
+- Use formatted numbers with commas for better readability (e.g., "1,234" instead of "1234")
+- Provide visual success/error indicators at completion
+- Keep progress dialog open until user confirms completion
+- Properly handle cancellation with cleanup
+- Use a single progress dialog for the entire operation
+- Avoid expensive UI operations until all data is processed
+
+### Implementation Details:
+- `MainWindow._on_load_progress` tracks total processed rows across all files
+- `MainWindow._on_load_finished` shows total files and rows processed
+- `DataManager._on_csv_load_success` includes a "Processing data" step before data model updates
+- Progress updates use `QApplication.processEvents()` to keep UI responsive
+- MultiCSVLoadTask reports progress while loading each file chunk
+- Progress dialog remains visible throughout the entire import process 
