@@ -316,6 +316,12 @@ No critical issues at this time. The minor QThread object deletion warning at sh
   - Added total rows tracking across multiple files
   - Implemented formatted numbers with commas for readability
   - Added comprehensive file and progress information
+- [x] Enhance progress dialog behavior for a better user experience
+  - Fixed cancel button functionality issues after table population
+  - Ensured dialog remains open for user confirmation after loading completes
+  - Prevented additional modal dialogs from appearing during table population
+  - Simplified signal flow to prevent circular reference issues
+  - Made cancel option available throughout the entire import process
 
 ## UI Components
 

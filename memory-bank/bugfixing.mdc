@@ -45,6 +45,21 @@ alwaysApply: false
   - Fixed reference to non-existent color constant TEXT_PRIMARY
   - Changed to use TEXT_LIGHT which is available in the Colors class
 
+- ✅ Progress dialog not closing properly after table population
+  - Fixed the ProgressDialog._on_cancel_clicked method to always close the dialog after emitting the canceled signal
+  - Simplified the ProgressDialog.close() method to avoid disconnecting critical signals
+  - Updated MainWindow._finalize_loading to avoid breaking the cancel button functionality
+
+- ✅ Multiple dialogs appearing during CSV import
+  - Fixed by ensuring only one dialog is used throughout the entire import process
+  - Modified DataManager._on_csv_load_success to prevent showing dialog for table population
+  - Updated MainWindow._on_load_finished to keep the dialog open for user confirmation
+
+- ✅ Progress dialog inappropriately showing table population status
+  - Modified MainWindow._on_load_finished to keep the dialog open for explicit user confirmation
+  - Ensured cancel button is renamed to "Close" once loading completes
+  - Dialog no longer automatically closes, allowing users to review final status
+
 ## Background Processing Issues
 - ✅ Signal connections not working properly
   - Fixed connections between DataManager and MainWindow
