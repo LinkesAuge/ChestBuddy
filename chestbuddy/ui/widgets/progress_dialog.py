@@ -171,7 +171,7 @@ class ProgressDialog(QDialog):
         self._status_label.setWordWrap(True)
         self._status_label.setStyleSheet(f"""
             font-size: 12px;
-            color: {Colors.TEXT_SECONDARY};
+            color: {Colors.TEXT_MUTED};
         """)
         main_layout.addWidget(self._status_label)
 

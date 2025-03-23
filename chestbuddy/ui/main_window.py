@@ -570,8 +570,8 @@ class MainWindow(QMainWindow):
 
     @Slot()
     def _on_load_started(self) -> None:
-        """Handle the start of a loading operation."""
-        logger.debug("Load operation started")
+        """Handle when a loading operation starts."""
+        logger.debug("MainWindow._on_load_started called")
 
         # Initialize loading state
         self._loading_state = {
@@ -587,32 +587,55 @@ class MainWindow(QMainWindow):
         self._total_rows_estimated = 0
         self._last_progress_current = 0
 
-        # Show progress dialog if not already visible
-        if hasattr(self, "_progress_dialog") and self._progress_dialog:
-            # Use existing dialog
-            self._progress_dialog.setLabelText("Preparing to load data...")
-            self._progress_dialog.setValue(0)
-            self._progress_dialog.setStatusText("")
-            self._progress_dialog.setCancelButtonText("Cancel")
-            self._progress_dialog.reset()
+        # Flag to track if dialog was successfully created and shown
+        progress_dialog_ready = False
 
-        else:
-            # Create a new progress dialog with our custom implementation
-            self._progress_dialog = ProgressDialog(
-                "Preparing to load data...", "Cancel", 0, 100, self
+        try:
+            # Show progress dialog if not already visible
+            if hasattr(self, "_progress_dialog") and self._progress_dialog:
+                # Use existing dialog
+                self._progress_dialog.setLabelText("Preparing to load data...")
+                self._progress_dialog.setValue(0)
+                self._progress_dialog.setStatusText("")
+                self._progress_dialog.setCancelButtonText("Cancel")
+                self._progress_dialog.reset()
+                progress_dialog_ready = True
+            else:
+                # Create a new progress dialog with our custom implementation
+                self._progress_dialog = ProgressDialog(
+                    "Preparing to load data...", "Cancel", 0, 100, self
+                )
+                self._progress_dialog.setWindowTitle("CSV Import - ChestBuddy")
+
+                # Connect cancel button
+                self._progress_dialog.canceled.connect(self._cancel_loading)
+                progress_dialog_ready = True
+
+            # Make sure dialog is visible and activated
+            self._progress_dialog.show()
+            self._progress_dialog.raise_()
+            self._progress_dialog.activateWindow()
+
+            # Process events to ensure UI updates
+            QApplication.processEvents()
+
+        except Exception as e:
+            logger.error(f"Error creating progress dialog: {e}")
+            self._progress_dialog = None
+            progress_dialog_ready = False
+            # Show error message to user
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Failed to create progress dialog: {e}\nFile loading canceled.",
             )
-            self._progress_dialog.setWindowTitle("CSV Import - ChestBuddy")
+            # Cancel the loading operation
+            self._cancel_loading()
 
-            # Connect cancel button
-            self._progress_dialog.canceled.connect(self._cancel_loading)
-
-        # Make sure dialog is visible and activated
-        self._progress_dialog.show()
-        self._progress_dialog.raise_()
-        self._progress_dialog.activateWindow()
-
-        # Process events to ensure UI updates
-        QApplication.processEvents()
+        # Only proceed if dialog is ready
+        if not progress_dialog_ready:
+            logger.warning("Progress dialog not ready, canceling loading operation")
+            self._cancel_loading()
 
     def _on_populate_table_requested(self, data: pd.DataFrame) -> None:
         """
