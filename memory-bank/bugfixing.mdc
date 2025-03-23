@@ -433,3 +433,31 @@ The UI becomes blocked (unresponsive) after the first data import, but works cor
 2. Add additional event processing steps during critical transitions
 3. Delay view transition until after all UI components are confirmed enabled
 4. Implement a safety timer to force-enable UI components if blocking is detected
+
+### Startup Error with Missing Module
+
+**Status**: Fixed  
+**Priority**: Critical  
+**Component**: Application Startup  
+**First Noticed**: 2025-03-24  
+
+**Description**:  
+Application would fail to start with error: `ModuleNotFoundError: No module named 'chestbuddy.settings'`
+
+**Root Cause**:  
+The main_window.py file was importing CONFIG_FILE from a non-existent 'chestbuddy.settings' module. Instead, it should have used the ConfigManager class from chestbuddy.utils.config.
+
+**Fix**:  
+1. Updated import statements in main_window.py to use ConfigManager from chestbuddy.utils.config
+2. Replaced usages of CONFIG_FILE with ConfigManager instance methods
+3. Fixed additional import issues with other modules (ChestDataModel, service classes)
+4. Added missing pandas import that was accidentally removed
+
+**File(s) Modified**:  
+- chestbuddy/ui/main_window.py
+
+**Verification**:  
+Application now starts successfully without import errors.
+
+**Technical Notes**:  
+This error occurred because of a reference to a module that may have existed in a previous version of the application but was refactored. The ConfigManager class now handles all configuration-related functionality.
