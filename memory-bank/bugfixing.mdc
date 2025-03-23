@@ -98,6 +98,16 @@ alwaysApply: false
   - **Date**: 2025-03-24
   - **Notes**: This simplification approach removes functionality that wasn't needed rather than adding more complexity to fix timing issues.
 
+- ✅ UI remaining blocked after first import confirmation (seventh attempt)
+  - **Issue**: Despite removing the view transition mechanism, the UI was still occasionally blocked after the first import.
+  - **Cause**: Identified a race condition between the progress dialog closure and the DataView's table population process. The DataView temporarily disables its table during population, and our UI unblocking code might execute before the DataView re-enables the table at the end of its population process.
+  - **Fix**: Implemented a two-phase UI unblocking approach:
+    1. Immediate unblocking at dialog closure (existing code)
+    2. Added a new delayed final check using QTimer.singleShot(500ms) that runs after all other processes are complete
+    3. The delayed check ensures all UI elements are truly enabled after DataView has finished any table population
+  - **Date**: 2025-03-24
+  - **Notes**: This approach handles the timing issue without requiring changes to the DataView class or its internal table population process.
+
 ## Background Processing Issues
 - ✅ Signal connections not working properly
   - Fixed connections between DataManager and MainWindow

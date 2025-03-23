@@ -939,8 +939,57 @@ class MainWindow(QMainWindow):
 
                 logger.debug("[UNBLOCK_COMPLETE] Dialog closure and UI unblocking complete")
 
+                # Schedule a final UI check with a delay to catch any elements that might have been
+                # disabled during data population after dialog closure
+                logger.debug("[FINAL_CHECK] Scheduling final UI check with 500ms delay")
+                QTimer.singleShot(500, self._perform_final_ui_check)
+
         except Exception as e:
             logger.error(f"[DIALOG_CLOSE_ERROR] Error closing progress dialog: {e}")
+            import traceback
+
+            logger.error(f"[TRACEBACK] {traceback.format_exc()}")
+
+    def _perform_final_ui_check(self) -> None:
+        """
+        Perform a final check of UI elements after import.
+        This runs after a delay to ensure all processes (dialog closure, table population) are complete.
+        """
+        logger.debug("[FINAL_CHECK] Performing final UI elements check")
+
+        try:
+            # Process events again
+            QApplication.processEvents()
+
+            # Ensure DataView table is fully enabled if present
+            data_view = self._views.get("Data")
+            if (
+                data_view
+                and hasattr(data_view, "_data_view")
+                and hasattr(data_view._data_view, "_table_view")
+            ):
+                logger.debug("[FINAL_TABLE_CHECK] Ensuring table is fully enabled")
+                data_view._data_view._table_view.setEnabled(True)
+                data_view._data_view._table_view.setSortingEnabled(True)
+
+                # Check the state after enabling
+                table_enabled = data_view._data_view._table_view.isEnabled()
+                sorting_enabled = data_view._data_view._table_view.isSortingEnabled()
+                logger.debug(
+                    f"[FINAL_TABLE_STATE] Table enabled: {table_enabled}, "
+                    f"Sorting enabled: {sorting_enabled}"
+                )
+
+            # Final UI update
+            self._update_ui()
+
+            # Process events one last time
+            QApplication.processEvents()
+
+            logger.debug("[FINAL_CHECK] Final UI check and unblocking complete")
+
+        except Exception as e:
+            logger.error(f"[FINAL_CHECK_ERROR] Error during final UI check: {e}")
             import traceback
 
             logger.error(f"[TRACEBACK] {traceback.format_exc()}")

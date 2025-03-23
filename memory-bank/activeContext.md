@@ -42,6 +42,9 @@ The active development focus is UI enhancement with a particular emphasis on das
    - Kept robust UI unblocking with additional event processing and UI element re-enabling
    - Followed a simplification approach rather than adding more complexity
    - Focused solely on ensuring UI responsiveness after dialog closure
+   - Seventh attempt solution: Added a delayed final UI check to handle race conditions between dialog closure and table population
+   - Implemented two-phase UI unblocking (immediate at closure + delayed check 500ms later)
+   - This ensures UI elements remain enabled even if they get temporarily disabled during table population
 
 ## Recent Improvements
 
