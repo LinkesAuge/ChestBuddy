@@ -18,14 +18,33 @@ class Colors:
     # Main colors
     PRIMARY = "#1A2C42"  # Dark blue
     PRIMARY_LIGHTER = "#1D324A"  # Slightly lighter variant of PRIMARY
+    PRIMARY_HOVER = "#2A3C52"  # Hover variant of PRIMARY
+    PRIMARY_ACTIVE = "#142638"  # Active/pressed variant of PRIMARY
+
     SECONDARY = "#D4AF37"  # Gold
+    SECONDARY_HOVER = "#E4BF47"  # Hover variant of SECONDARY
+    SECONDARY_ACTIVE = "#C49F27"  # Active/pressed variant of SECONDARY
+
     ACCENT = "#4A90E2"  # Light blue
+    ACCENT_HOVER = "#5AA0F2"  # Hover variant of ACCENT
+    ACCENT_ACTIVE = "#3A80D2"  # Active/pressed variant of ACCENT
 
     # State colors
     SUCCESS = "#28A745"  # Green
+    SUCCESS_HOVER = "#38B755"  # Hover variant of SUCCESS
+    SUCCESS_ACTIVE = "#1A9735"  # Active/pressed variant of SUCCESS
+
     ERROR = "#DC3545"  # Red
+    ERROR_HOVER = "#EC4555"  # Hover variant of ERROR
+    ERROR_ACTIVE = "#CC2535"  # Active/pressed variant of ERROR
+
     WARNING = "#FFC107"  # Amber/Yellow
+    WARNING_HOVER = "#FFD117"  # Hover variant of WARNING
+    WARNING_ACTIVE = "#EFB100"  # Active/pressed variant of WARNING
+
     INFO = "#17A2B8"  # Cyan
+    INFO_HOVER = "#27B2C8"  # Hover variant of INFO
+    INFO_ACTIVE = "#0792A8"  # Active/pressed variant of INFO
 
     # Background colors
     BG_DARK = "#2D3748"  # Dark gray

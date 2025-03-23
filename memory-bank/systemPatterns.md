@@ -1433,4 +1433,111 @@ classDiagram
             +set_message()
             +set_action()
         }
+```
+
+## UI Component Architecture
+
+### Core UI Components
+
+The application uses a component-based architecture with reusable UI elements:
+
+1. **ActionButton**: A versatile button component with customizable appearance and behavior
+   - Properties: text, icon, size, style, enabled state
+   - Signals: clicked
+   - Features: hover effects, different styles, icon positioning
+
+2. **ActionToolbar**: A container for organizing buttons with consistent spacing
+   - Layout: horizontal or vertical arrangement of buttons
+   - Properties: spacing, alignment, orientation
+   - Methods: add_button, add_spacer, clear
+
+3. **EmptyStateWidget**: Widget displayed when a view has no content
+   - Properties: title, message, icon, action_text
+   - Signals: action_clicked
+   - Methods: set_title, set_message, set_icon, set_action_text
+
+4. **FilterBar**: Search and filter interface for data views
+   - Properties: search_text, expanded state, filter categories
+   - Signals: search_changed, filter_changed, expanded_changed
+   - Methods: add_filter_category, clear_filters, set_expanded
+
+5. **ActionCard**: Card-style widget for dashboard actions
+   - Properties: title, description, icon, action_callback
+   - Features: hover effects, click handling, visual feedback
+   - Used in the dashboard for quick actions
+
+6. **ChartCard**: Card-style widget for chart previews
+   - Properties: title, description, chart_id, thumbnail
+   - Signals: clicked, chart_selected
+   - Used in the dashboard for chart previews
+
+### View Adapter Pattern
+
+The application follows a View Adapter pattern to separate UI components from data handling:
+
+1. **BaseView**: Abstract base class for all view adapters
+   - Properties: title, data_required
+   - Methods: set_data_available, get_content_layout
+   - Features: empty state handling, header configuration
+
+2. **ViewAdapters**: Specific implementations for each major view
+   - **DashboardViewAdapter**: Connects dashboard UI to data model
+   - **DataViewAdapter**: Connects data view to data model
+   - **ValidationViewAdapter**: Connects validation view to validation service
+   - **CorrectionViewAdapter**: Connects correction view to correction service
+   - **ChartViewAdapter**: Connects chart view to chart service
+
+3. **Data Flow**:
+   ```
+   DataModel <-> Service <-> ViewAdapter <-> UI Components
+   ```
+
+4. **Signal Handling**:
+   - ViewAdapters emit signals for user actions
+   - MainWindow connects these signals to appropriate handlers
+   - Services process data and emit result signals
+   - ViewAdapters update UI based on service results
+
+### Dashboard Architecture
+
+The dashboard follows a card-based architecture with distinct sections:
+
+1. **Quick Actions**: Grid layout of ActionCard components
+   - Import Data, Export Data, Validate Data
+   - Generate Report, Settings, Help
+
+2. **Recent Files**: Vertical list of ActionCard components
+   - Each card represents a recently opened file
+   - Empty state shown when no recent files exist
+
+3. **Charts & Analytics**: Horizontal layout of ChartCard components
+   - Player Distribution, Chest Sources charts
+   - Empty state shown when no data is available
+
+4. **Layout Structure**:
+   ```
+   Dashboard
+   ├── Header (Title + Actions)
+   ├── ScrollArea
+   │   ├── Quick Actions Section
+   │   │   └── Grid of ActionCards
+   │   ├── Divider
+   │   ├── Recent Files Section
+   │   │   └── List of ActionCards
+   │   ├── Divider
+   │   └── Charts Section
+   │       └── Row of ChartCards
+   └── Empty State (shown when no data)
+   ```
+
+5. **Data Availability Handling**:
+   - Dashboard displays content even when no data is loaded
+   - Charts section shows empty state when no data is available
+   - Recent files section shows empty state when no files have been opened
+
+This component-based architecture provides several benefits:
+- Consistent UI patterns across the application
+- Reusable components reduce code duplication
+- Easier maintenance and testing
+- Clear separation of concerns between UI and data handling
 ``` 
