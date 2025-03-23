@@ -173,12 +173,32 @@ class DataManager(QObject):
             self.load_finished.emit(f"Error: {str(e)}")
 
     def cancel_loading(self) -> None:
-        """
-        Cancel the current loading operation if one is in progress.
-        """
-        if self._current_task is not None and hasattr(self._worker, "cancel"):
-            logger.info("Cancelling CSV loading operation")
-            self._worker.cancel()
+        """Cancel any ongoing loading operation."""
+        logger.info("DataManager.cancel_loading called")
+
+        # Set the cancellation flag
+        self._cancel_requested = True
+
+        # If there's an active task, try to cancel it
+        if self._current_task:
+            try:
+                logger.debug(f"Cancelling current task: {self._current_task}")
+                # Signal task to cancel
+                self._current_task.cancel()
+
+                # Signal progress completion to clean up any UI
+                self.load_finished.emit("Loading cancelled")
+            except Exception as e:
+                logger.error(f"Error cancelling task: {e}")
+
+        # Reset state variables
+        self._current_file_path = None
+        self._cancel_requested = False
+
+        # Clean up the task reference
+        self._current_task = None
+
+        logger.debug("Loading operation cancelled successfully")
 
     def _on_load_progress(self, current: int, total: int) -> None:
         """
@@ -662,3 +682,49 @@ class DataManager(QObject):
             return len(self._files_to_load)
         # Otherwise return 0
         return 0
+
+    def _handle_generic_error(self, error: Exception, context: str = "") -> None:
+        """
+        Handle a generic error during data operations.
+
+        Args:
+            error: The exception that occurred
+            context: Additional context about where the error occurred
+        """
+        # Create an informative error message
+        error_message = f"{context}: {str(error)}" if context else str(error)
+        logger.error(f"Data manager error: {error_message}")
+
+        # Check if this might be a non-critical error
+        is_critical = True
+
+        # Some errors don't warrant stopping the process
+        if "warning" in str(error).lower() or "non-critical" in str(error).lower():
+            is_critical = False
+            logger.warning(f"Non-critical error encountered: {error_message}")
+
+        # File format warnings or parsing issues might be non-critical if some data was loaded
+        if "format" in str(error).lower() or "parse" in str(error).lower():
+            # Check if we have any data loaded
+            if hasattr(self, "_data_model") and self._data_model and not self._data_model.is_empty:
+                is_critical = False
+                logger.warning(
+                    f"Format error but data exists - treating as non-critical: {error_message}"
+                )
+
+        # Only emit error for critical errors
+        if is_critical:
+            self.load_error.emit(error_message)
+        else:
+            # For non-critical, still log but don't stop the process
+            logger.warning(f"Non-critical error: {error_message}")
+
+        # Always make sure signals are unblocked
+        if hasattr(self, "_data_model"):
+            try:
+                self._data_model.blockSignals(False)
+            except Exception as e:
+                logger.error(f"Error unblocking signals: {e}")
+
+        # Always clear the current task
+        self._current_task = None

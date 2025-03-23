@@ -597,6 +597,9 @@ class MainWindow(QMainWindow):
         self._table_population_complete = False
         self._table_population_in_progress = False
 
+        # Flag to track if we're showing an error
+        self._showing_error_dialog = False
+
         # Close any existing progress dialog to avoid duplicates
         if hasattr(self, "_progress_dialog") and self._progress_dialog:
             try:
@@ -635,8 +638,13 @@ class MainWindow(QMainWindow):
             # but use Qt.ApplicationModal instead of Qt.WindowModal to ensure it stays on top
             self._progress_dialog.setWindowModality(Qt.ApplicationModal)
 
-            # Connect cancel button
-            self._progress_dialog.canceled.connect(self._cancel_loading)
+            # Connect cancel button - ensure this is always connected
+            try:
+                self._progress_dialog.canceled.connect(self._cancel_loading)
+                logger.debug("Cancel button connected successfully")
+            except Exception as e:
+                logger.error(f"Error connecting cancel button: {e}")
+
             progress_dialog_ready = True
 
             # Make sure dialog is visible and activated
@@ -651,7 +659,7 @@ class MainWindow(QMainWindow):
             logger.error(f"Error creating progress dialog: {e}")
             self._progress_dialog = None
             progress_dialog_ready = False
-            # Show error message to user
+            # Only show error message if we couldn't create the dialog
             QMessageBox.critical(
                 self,
                 "Error",
@@ -1107,11 +1115,43 @@ class MainWindow(QMainWindow):
         # Update the status bar
         self._status_bar.set_status(f"Error: {message}")
 
+        # Check if loading is already complete or in progress with data
+        data_loaded = False
+        try:
+            if self._data_model and not self._data_model.is_empty:
+                data_loaded = True
+                logger.warning(f"Error occurred but data model has data: {message}")
+        except:
+            pass
+
+        # Check if there's a progress signal that has been received
+        has_progress = False
+        try:
+            if hasattr(self, "_loading_state") and self._loading_state.get("total_rows", 0) > 0:
+                has_progress = True
+                logger.warning(f"Error occurred after progress was received: {message}")
+        except:
+            pass
+
+        # If showing error dialog flag is set, don't show another error
+        if hasattr(self, "_showing_error_dialog") and self._showing_error_dialog:
+            logger.debug("Already showing an error dialog, skipping additional error dialog")
+            return
+
+        # If we have data loaded or progress, skip closing everything, just log the error
+        if data_loaded or has_progress:
+            logger.warning(f"Non-critical error during loading, continuing: {message}")
+            return
+
+        # Set flag to prevent multiple error dialogs
+        self._showing_error_dialog = True
+
         # If the progress dialog exists, update it to show the error
         if hasattr(self, "_progress_dialog") and self._progress_dialog:
             try:
                 # Set error state
-                self._progress_dialog.setState(ProgressBar.State.ERROR)
+                if hasattr(self._progress_dialog, "setState") and hasattr(ProgressBar, "State"):
+                    self._progress_dialog.setState(ProgressBar.State.ERROR)
 
                 # Update labels
                 self._progress_dialog.setLabelText("Loading failed")
@@ -1129,6 +1169,10 @@ class MainWindow(QMainWindow):
                 # Connect cancel button to close the dialog
                 self._progress_dialog.canceled.connect(self._progress_dialog.close)
 
+                # Ensure button is enabled
+                if hasattr(self._progress_dialog, "setCancelButtonEnabled"):
+                    self._progress_dialog.setCancelButtonEnabled(True)
+
                 # Make sure dialog is visible
                 if not self._progress_dialog.isVisible():
                     self._progress_dialog.show()
@@ -1141,6 +1185,11 @@ class MainWindow(QMainWindow):
                 logger.debug("Progress dialog updated to show error")
             except Exception as e:
                 logger.error(f"Error updating progress dialog for error state: {e}")
+                # Try to show a message box as fallback
+                QMessageBox.critical(self, "Error", f"Loading failed: {message}")
+        else:
+            # If no progress dialog exists, show a message box
+            QMessageBox.critical(self, "Error", f"Loading failed: {message}")
 
         # Reset loading state
         self._loading_state = {
@@ -1150,6 +1199,35 @@ class MainWindow(QMainWindow):
             "processed_files": [],
             "total_rows": 0,
         }
+
+        # Clear error dialog flag after showing
+        self._showing_error_dialog = False
+
+    def _cancel_loading(self) -> None:
+        """
+        Cancel the current loading operation.
+
+        This method is only connected to the progress dialog during active loading,
+        not after loading is complete (when the button becomes "Confirm").
+        """
+        logger.debug("Cancel loading operation requested")
+
+        # Tell the data manager to cancel the operation
+        if self._data_manager:
+            try:
+                logger.debug("Calling data_manager.cancel_loading()")
+                self._data_manager.cancel_loading()
+            except Exception as e:
+                logger.error(f"Error calling cancel_loading: {e}")
+
+        # Close the progress dialog if it exists
+        if hasattr(self, "_progress_dialog") and self._progress_dialog:
+            try:
+                logger.debug("Closing progress dialog on cancel")
+                self._progress_dialog.close()
+                self._progress_dialog = None
+            except Exception as e:
+                logger.error(f"Error closing progress dialog on cancel: {e}")
 
     # ===== Actions =====
 
@@ -1385,14 +1463,3 @@ class MainWindow(QMainWindow):
             import logging
 
             logging.getLogger(__name__).error(f"Error updating status bar: {e}")
-
-    def _cancel_loading(self) -> None:
-        """
-        Cancel the current loading operation.
-
-        This method is only connected to the progress dialog during active loading,
-        not after loading is complete (when the button becomes "Confirm").
-        """
-        # Tell the data manager to cancel the operation
-        if self._data_manager:
-            self._data_manager.cancel_loading()

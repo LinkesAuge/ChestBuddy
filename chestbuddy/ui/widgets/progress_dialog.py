@@ -29,6 +29,9 @@ from PySide6.QtGui import QGuiApplication
 
 from chestbuddy.ui.widgets.progress_bar import ProgressBar
 from chestbuddy.ui.resources.style import Colors
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class ProgressDialog(QDialog):
@@ -290,10 +293,14 @@ class ProgressDialog(QDialog):
         Set the text of the cancel button.
 
         Args:
-            text: The text to set for the cancel button
+            text: The text to set
         """
-        if self._cancel_button:
+        if hasattr(self, "_cancel_button") and self._cancel_button:
+            logger.debug(f"Setting cancel button text: {text}")
             self._cancel_button.setText(text)
+
+            # Make sure button is properly sized for the new text
+            self._cancel_button.adjustSize()
 
     def setButtonText(self, text: str) -> None:
         """
@@ -310,38 +317,21 @@ class ProgressDialog(QDialog):
         Enable or disable the cancel button.
 
         Args:
-            enabled: True to enable the button, False to disable it
+            enabled: Whether the button should be enabled
         """
-        if self._cancel_button:
+        if hasattr(self, "_cancel_button") and self._cancel_button:
+            # Always log when the button state changes
+            current = self._cancel_button.isEnabled()
+            if current != enabled:
+                # Only log when actually changing
+                logger.debug(f"Setting cancel button enabled: {enabled}")
+
+            # Set the button state
             self._cancel_button.setEnabled(enabled)
-            # Update styling based on enabled state
+
+            # If enabling, also make sure it's visible
             if enabled:
-                # Active button style
-                self._cancel_button.setStyleSheet(f"""
-                    QPushButton {{
-                        background-color: {Colors.PRIMARY};
-                        color: {Colors.TEXT_LIGHT};
-                        border: none;
-                        padding: 8px 16px;
-                        border-radius: 4px;
-                        font-weight: bold;
-                    }}
-                    QPushButton:hover {{
-                        background-color: {Colors.ACCENT};
-                    }}
-                """)
-            else:
-                # Disabled button style
-                self._cancel_button.setStyleSheet(f"""
-                    QPushButton {{
-                        background-color: {Colors.BG_DARK};
-                        color: {Colors.TEXT_DISABLED};
-                        border: none;
-                        padding: 8px 16px;
-                        border-radius: 4px;
-                        font-weight: bold;
-                    }}
-                """)
+                self._cancel_button.show()
 
     def wasCanceled(self) -> bool:
         """
@@ -362,14 +352,84 @@ class ProgressDialog(QDialog):
         if hasattr(self._progress_bar, "setState"):
             self._progress_bar.setState(state)
 
-    def reset(self):
-        """Reset the progress dialog to its initial state."""
-        self._was_canceled = False
-        self._progress_bar.setValue(self._minimum)
+    def reset(self) -> None:
+        """
+        Reset the dialog to its initial state.
+        """
+        logger.debug("Resetting progress dialog")
 
-        # Check if these methods exist before calling them (compatibility with QProgressBar)
-        if hasattr(self._progress_bar, "setState"):
-            self._progress_bar.setState(ProgressBar.State.NORMAL)
+        # Reset progress bar state
+        if hasattr(self, "_progress_bar"):
+            # For custom progress bar
+            if hasattr(self._progress_bar, "setState"):
+                try:
+                    self._progress_bar.setState(ProgressBar.State.NORMAL)
+                except Exception as e:
+                    logger.error(f"Error resetting progress bar state: {e}")
 
-        if hasattr(self._progress_bar, "setStatus"):
-            self._progress_bar.setStatus("")
+            # For both custom and standard progress bar
+            try:
+                self._progress_bar.setValue(0)
+            except Exception as e:
+                logger.error(f"Error resetting progress bar value: {e}")
+
+        # Reset status text
+        if hasattr(self, "setStatusText"):
+            try:
+                self.setStatusText("")
+            except Exception as e:
+                logger.error(f"Error resetting status text: {e}")
+
+        # Make sure cancel button is enabled and properly connected
+        if hasattr(self, "_cancel_button") and self._cancel_button:
+            try:
+                self._cancel_button.setEnabled(True)
+                self._cancel_button.setText("Cancel")
+            except Exception as e:
+                logger.error(f"Error resetting cancel button: {e}")
+
+    def exec(self) -> int:
+        """
+        Execute the dialog.
+        Overridden to ensure proper behavior.
+
+        Returns:
+            Dialog result code
+        """
+        logger.debug("Progress dialog exec called")
+
+        # Make sure the cancel button is enabled before showing
+        if hasattr(self, "_cancel_button") and self._cancel_button:
+            self._cancel_button.setEnabled(True)
+
+        # Make sure dialog is visible and at the front
+        self.show()
+        self.raise_()
+        self.activateWindow()
+
+        # Process events to ensure UI is responsive
+        QApplication.processEvents()
+
+        # Call parent exec
+        return super().exec()
+
+    def close(self) -> None:
+        """
+        Close the dialog.
+        Overridden to ensure proper cleanup.
+        """
+        logger.debug("Progress dialog close called")
+
+        # Ensure button signals are disconnected
+        try:
+            if hasattr(self, "_cancel_button") and self._cancel_button:
+                # Keep the disconnect from throwing if no connections
+                try:
+                    self._cancel_button.clicked.disconnect()
+                except:
+                    pass
+        except Exception as e:
+            logger.error(f"Error disconnecting cancel button: {e}")
+
+        # Call parent close
+        super().close()
