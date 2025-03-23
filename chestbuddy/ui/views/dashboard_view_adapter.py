@@ -9,7 +9,7 @@ Usage:
 from typing import List, Optional
 from datetime import datetime
 
-from PySide6.QtCore import Qt, Signal, QSize
+from PySide6.QtCore import Qt, Signal, QSize, Slot
 from PySide6.QtGui import QIcon, QPixmap, QPainter
 from PySide6.QtWidgets import (
     QVBoxLayout,
@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QFrame,
     QSizePolicy,
     QSpacerItem,
+    QPushButton,
 )
 
 from chestbuddy.ui.views.base_view import BaseView
@@ -28,8 +29,247 @@ from chestbuddy.ui.widgets.action_card import ActionCard
 from chestbuddy.ui.widgets.chart_card import ChartCard
 from chestbuddy.ui.widgets.empty_state_widget import EmptyStateWidget
 from chestbuddy.ui.resources.icons import Icons
+from chestbuddy.ui.resources.style import Colors
 from chestbuddy.core.services.chart_service import ChartService
 from chestbuddy.utils.config import ConfigManager
+from chestbuddy.ui.widgets.stat_card import StatCard
+from chestbuddy.ui.views.dashboard_view import DashboardView
+from chestbuddy.ui.resources.resource_manager import ResourceManager
+
+
+class WelcomePanel(QFrame):
+    """
+    A panel for welcoming users and showing getting started information.
+
+    This panel provides an introduction to the application and quick links
+    to get started with common tasks.
+    """
+
+    action_clicked = Signal(str)  # action name
+
+    def __init__(self, parent=None):
+        """
+        Initialize the welcome panel.
+
+        Args:
+            parent (QWidget, optional): The parent widget
+        """
+        super().__init__(parent)
+        self._setup_ui()
+
+    def _setup_ui(self):
+        """Set up the UI components."""
+        # Set frame style
+        self.setFrameShape(QFrame.StyledPanel)
+        self.setFrameShadow(QFrame.Raised)
+        self.setStyleSheet(f"""
+            WelcomePanel {{
+                background-color: {Colors.PRIMARY};
+                border-radius: 8px;
+                border: 1px solid {Colors.BORDER};
+            }}
+        """)
+
+        # Main layout
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(12)
+
+        # Title
+        title = QLabel("Welcome to ChestBuddy")
+        title.setStyleSheet(f"""
+            font-size: 18px;
+            font-weight: bold;
+            color: {Colors.TEXT_LIGHT};
+        """)
+        layout.addWidget(title)
+
+        # Bullet points
+        bullet_widget = QWidget()
+        bullet_layout = QVBoxLayout(bullet_widget)
+        bullet_layout.setContentsMargins(0, 8, 0, 8)
+        bullet_layout.setSpacing(8)
+
+        bullet_points = ["• Import and manage chest data", "• Track performance and statistics"]
+
+        for point in bullet_points:
+            bullet_label = QLabel(point)
+            bullet_label.setStyleSheet(f"color: {Colors.TEXT_MUTED};")
+            bullet_layout.addWidget(bullet_label)
+
+        layout.addWidget(bullet_widget)
+
+        # Import Data button (renamed from Get Started)
+        import_data_btn = QPushButton("Import Data")
+        import_data_btn.setCursor(Qt.PointingHandCursor)
+        import_data_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {Colors.ACCENT};
+                color: {Colors.TEXT_LIGHT};
+                border: none;
+                border-radius: 4px;
+                padding: 8px 16px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: {Colors.ACCENT_HOVER};
+            }}
+            QPushButton:pressed {{
+                background-color: {Colors.ACCENT_ACTIVE};
+            }}
+        """)
+        import_data_btn.clicked.connect(lambda: self.action_clicked.emit("import"))
+
+        layout.addWidget(import_data_btn)
+        layout.addStretch()
+
+
+class RecentFilesPanel(QFrame):
+    """
+    A panel for displaying recent files.
+
+    Provides a list of recently accessed files with the ability to open them.
+    """
+
+    file_selected = Signal(str)  # file path
+
+    def __init__(self, parent=None):
+        """
+        Initialize the recent files panel.
+
+        Args:
+            parent (QWidget, optional): The parent widget
+        """
+        super().__init__(parent)
+        self._file_items = []
+        self._setup_ui()
+
+    def _setup_ui(self):
+        """Set up the UI components."""
+        # Set frame style
+        self.setFrameShape(QFrame.StyledPanel)
+        self.setFrameShadow(QFrame.Raised)
+        self.setStyleSheet(f"""
+            RecentFilesPanel {{
+                background-color: {Colors.PRIMARY};
+                border-radius: 8px;
+                border: 1px solid {Colors.BORDER};
+            }}
+        """)
+
+        # Main layout
+        self._layout = QVBoxLayout(self)
+        self._layout.setContentsMargins(16, 16, 16, 16)
+        self._layout.setSpacing(8)
+
+        # Title
+        title = QLabel("Recent Files")
+        title.setStyleSheet(f"""
+            font-size: 18px;
+            font-weight: bold;
+            color: {Colors.TEXT_LIGHT};
+        """)
+        self._layout.addWidget(title)
+
+        # Files container
+        self._files_container = QWidget()
+        self._files_layout = QVBoxLayout(self._files_container)
+        self._files_layout.setContentsMargins(0, 8, 0, 0)
+        self._files_layout.setSpacing(4)
+
+        # Placeholder text
+        self._placeholder = QLabel("No recent files")
+        self._placeholder.setStyleSheet(f"color: {Colors.TEXT_MUTED};")
+        self._placeholder.setAlignment(Qt.AlignCenter)
+        self._files_layout.addWidget(self._placeholder)
+
+        self._layout.addWidget(self._files_container)
+
+        # View all button
+        self._view_all_btn = QPushButton("View All")
+        self._view_all_btn.setCursor(Qt.PointingHandCursor)
+        self._view_all_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: transparent;
+                color: {Colors.ACCENT};
+                border: none;
+                padding: 4px 0px;
+                text-align: center;
+            }}
+            QPushButton:hover {{
+                color: {Colors.ACCENT_HOVER};
+                text-decoration: underline;
+            }}
+        """)
+        self._view_all_btn.setVisible(False)  # Initially hidden
+        self._layout.addWidget(self._view_all_btn)
+
+    def set_files(self, files):
+        """
+        Set the list of recent files.
+
+        Args:
+            files (list): List of file paths
+        """
+        # Clear existing items
+        for widget in self._file_items:
+            self._files_layout.removeWidget(widget)
+            widget.deleteLater()
+
+        self._file_items = []
+
+        # Show placeholder if no files
+        if not files:
+            self._placeholder.setVisible(True)
+            self._view_all_btn.setVisible(False)
+            return
+
+        # Hide placeholder
+        self._placeholder.setVisible(False)
+
+        # Add file items (max 3 for compact display)
+        display_files = files[:3]
+        for file_path in display_files:
+            file_widget = QFrame()
+            file_widget.setStyleSheet(f"""
+                QFrame {{
+                    border: none;
+                    border-radius: 4px;
+                    padding: 4px;
+                }}
+                QFrame:hover {{
+                    background-color: {Colors.PRIMARY_HOVER};
+                }}
+            """)
+            file_layout = QVBoxLayout(file_widget)
+            file_layout.setContentsMargins(4, 4, 4, 4)
+            file_layout.setSpacing(0)
+
+            # File name
+            import os
+
+            file_name = os.path.basename(file_path)
+            name_label = QLabel(file_name)
+            name_label.setStyleSheet(f"color: {Colors.TEXT_LIGHT}; font-weight: bold;")
+
+            # File path
+            path_label = QLabel(file_path)
+            path_label.setStyleSheet(f"color: {Colors.TEXT_MUTED}; font-size: 11px;")
+
+            file_layout.addWidget(name_label)
+            file_layout.addWidget(path_label)
+
+            file_widget.mousePressEvent = lambda event, path=file_path: self.file_selected.emit(
+                path
+            )
+            file_widget.setCursor(Qt.PointingHandCursor)
+
+            self._files_layout.addWidget(file_widget)
+            self._file_items.append(file_widget)
+
+        # Show view all button if there are more files
+        self._view_all_btn.setVisible(len(files) > 3)
+        self._view_all_btn.clicked.connect(lambda: self.file_selected.emit("view_all_files"))
 
 
 class DashboardViewAdapter(BaseView):
@@ -44,6 +284,7 @@ class DashboardViewAdapter(BaseView):
         action_triggered (Signal): Signal emitted when an action is triggered
         chart_selected (Signal): Signal emitted when a chart is selected
         file_selected (Signal): Signal emitted when a recent file is selected
+        dashboard_updated (Signal): Emitted when dashboard data is updated
     """
 
     # Signals
@@ -51,6 +292,7 @@ class DashboardViewAdapter(BaseView):
     action_triggered = Signal(str)  # action name
     chart_selected = Signal(str)  # chart id
     file_selected = Signal(str)  # file path
+    dashboard_updated = Signal()
 
     def __init__(self, data_model, parent=None):
         """
@@ -65,6 +307,7 @@ class DashboardViewAdapter(BaseView):
 
         self._data_model = data_model
         self._config = ConfigManager()
+        self._resource_manager = ResourceManager()
 
         # Charts dictionary to store chart references
         self._charts = {}
@@ -77,6 +320,14 @@ class DashboardViewAdapter(BaseView):
 
         # Initialize dashboard
         self._initialize_dashboard()
+
+        # Connect signals
+        self._setup_connections()
+
+    def _setup_connections(self):
+        """Set up the signal connections for the dashboard view."""
+        # Connect the dashboard_updated signal to update the view
+        self.dashboard_updated.connect(self._update_stats)
 
     def _setup_ui(self):
         """Set up the UI components."""
@@ -95,15 +346,15 @@ class DashboardViewAdapter(BaseView):
         main_layout.setContentsMargins(20, 20, 20, 20)
         main_layout.setSpacing(20)
 
-        # Section title - Actions
+        # SECTION 1: Quick Actions - Now at the top
         actions_title = QLabel("Quick Actions")
         actions_title.setProperty("class", "section-title")
-        actions_title.setStyleSheet("""
-            QLabel {
+        actions_title.setStyleSheet(f"""
+            QLabel {{
                 font-size: 18px;
                 font-weight: bold;
-                color: #333333;
-            }
+                color: {Colors.TEXT_LIGHT};
+            }}
         """)
         main_layout.addWidget(actions_title)
 
@@ -124,55 +375,44 @@ class DashboardViewAdapter(BaseView):
         divider = QFrame()
         divider.setFrameShape(QFrame.HLine)
         divider.setFrameShadow(QFrame.Sunken)
-        divider.setStyleSheet("background-color: #E0E0E0;")
+        divider.setStyleSheet(f"background-color: {Colors.BORDER};")
         main_layout.addWidget(divider)
 
-        # Recent Files section
-        recent_files_title = QLabel("Recent Files")
-        recent_files_title.setProperty("class", "section-title")
-        recent_files_title.setStyleSheet("""
-            QLabel {
-                font-size: 18px;
-                font-weight: bold;
-                color: #333333;
-            }
-        """)
-        main_layout.addWidget(recent_files_title)
+        # SECTION 2: Welcome & Recent Files - Horizontal layout
+        welcome_files_layout = QHBoxLayout()
+        welcome_files_layout.setSpacing(16)
 
-        # Recent files container
-        self._recent_files_layout = QVBoxLayout()
-        self._recent_files_layout.setSpacing(8)
-        self._recent_files_layout.setContentsMargins(0, 0, 0, 0)
+        # Welcome panel on the left
+        self._welcome_panel = WelcomePanel()
+        self._welcome_panel.action_clicked.connect(self._handle_action)
+        welcome_files_layout.addWidget(self._welcome_panel)
 
-        # Recent files empty state
-        self._recent_files_empty = EmptyStateWidget(
-            title="No Recent Files",
-            message="Your recently opened files will appear here",
-            icon=QIcon(Icons.FILE_DOCUMENT),
-        )
-        self._recent_files_layout.addWidget(self._recent_files_empty)
+        # Recent files panel on the right
+        self._recent_files_panel = RecentFilesPanel()
+        self._recent_files_panel.file_selected.connect(self._on_file_selected)
+        welcome_files_layout.addWidget(self._recent_files_panel)
 
-        # Add recent files layout to main layout
-        recent_files_container = QWidget()
-        recent_files_container.setLayout(self._recent_files_layout)
-        main_layout.addWidget(recent_files_container)
+        # Add welcome/files layout to main layout
+        welcome_files_container = QWidget()
+        welcome_files_container.setLayout(welcome_files_layout)
+        main_layout.addWidget(welcome_files_container)
 
         # Section divider
         divider2 = QFrame()
         divider2.setFrameShape(QFrame.HLine)
         divider2.setFrameShadow(QFrame.Sunken)
-        divider2.setStyleSheet("background-color: #E0E0E0;")
+        divider2.setStyleSheet(f"background-color: {Colors.BORDER};")
         main_layout.addWidget(divider2)
 
-        # Charts section
+        # SECTION 3: Charts & Analytics
         charts_title = QLabel("Charts & Analytics")
         charts_title.setProperty("class", "section-title")
-        charts_title.setStyleSheet("""
-            QLabel {
+        charts_title.setStyleSheet(f"""
+            QLabel {{
                 font-size: 18px;
                 font-weight: bold;
-                color: #333333;
-            }
+                color: {Colors.TEXT_LIGHT};
+            }}
         """)
         main_layout.addWidget(charts_title)
 
@@ -209,54 +449,45 @@ class DashboardViewAdapter(BaseView):
         # Add scroll area to the content layout
         self.get_content_layout().addWidget(scroll_area)
 
-        # Create empty state view for when no data is loaded
-        self._dashboard_empty_state = EmptyStateWidget(
-            title="Welcome to ChestBuddy",
-            message="Import data to get started with your analysis",
-            action_text="Import Data",
-            action_callback=self._on_import_clicked,
-            icon=QIcon(Icons.FOLDER_OPEN),
-        )
-
-        # Initially hidden - will be shown when no data is available
-        self._dashboard_empty_state.setVisible(False)
-        self.get_content_layout().addWidget(self._dashboard_empty_state)
-
     def _create_action_cards(self):
         """Create the action cards for the dashboard."""
         # Import Data card
         import_card = ActionCard(
             title="Import Data",
-            description="Load data from CSV files to analyze",
-            icon=QIcon(Icons.IMPORT),
-            action_callback=self._on_import_clicked,
+            description="Import data from CSV, Excel, or other sources",
+            icon_name="import",
+            actions=["import_csv", "import_excel", "import_json"],
+            tag="Data",
         )
         self._actions_grid.addWidget(import_card, 0, 0)
 
+        # Analyze Data card
+        analyze_card = ActionCard(
+            title="Analyze Data",
+            description="Run analysis on your chest data",
+            icon_name="analyze",
+            actions=["analyze_trend", "analyze_distribution"],
+            tag="Analysis",
+        )
+        self._actions_grid.addWidget(analyze_card, 0, 1)
+
         # Export Data card
         export_card = ActionCard(
-            title="Export Data",
-            description="Export your data in various formats",
-            icon=QIcon(Icons.EXPORT),
-            action_callback=lambda: self._on_action_triggered("export"),
+            title="Export Results",
+            description="Export data to various formats",
+            icon_name="export",
+            actions=["export_csv", "export_pdf", "export_image"],
+            tag="Data",
         )
-        self._actions_grid.addWidget(export_card, 0, 1)
-
-        # Validate Data card
-        validate_card = ActionCard(
-            title="Validate Data",
-            description="Check your data for errors and inconsistencies",
-            icon=QIcon(Icons.CHECK_CIRCLE),
-            action_callback=lambda: self._on_action_triggered("validate"),
-        )
-        self._actions_grid.addWidget(validate_card, 0, 2)
+        self._actions_grid.addWidget(export_card, 0, 2)
 
         # Generate Report card
         report_card = ActionCard(
             title="Generate Report",
-            description="Create reports from your analyzed data",
-            icon=QIcon(Icons.FILE_DOCUMENT),
-            action_callback=lambda: self._on_action_triggered("report"),
+            description="Create detailed reports from your data",
+            icon_name="report",
+            actions=["report_summary", "report_detailed"],
+            tag="Reports",
         )
         self._actions_grid.addWidget(report_card, 1, 0)
 
@@ -264,19 +495,28 @@ class DashboardViewAdapter(BaseView):
         settings_card = ActionCard(
             title="Settings",
             description="Configure application settings",
-            icon=QIcon(Icons.SETTINGS),
-            action_callback=lambda: self._on_action_triggered("settings"),
+            icon_name="settings",
+            actions=["open_settings"],
+            tag="System",
         )
         self._actions_grid.addWidget(settings_card, 1, 1)
 
         # Help card
         help_card = ActionCard(
             title="Help",
-            description="Learn how to use ChestBuddy effectively",
-            icon=QIcon(Icons.HELP_CIRCLE),
-            action_callback=lambda: self._on_action_triggered("help"),
+            description="Get help using the application",
+            icon_name="help",
+            actions=["open_documentation", "contact_support"],
+            tag="Support",
         )
         self._actions_grid.addWidget(help_card, 1, 2)
+
+        # Connect action signals
+        for i in range(self._actions_grid.count()):
+            item = self._actions_grid.itemAt(i)
+            if item and item.widget() and isinstance(item.widget(), ActionCard):
+                card = item.widget()
+                card.action_clicked.connect(self._handle_action)
 
     def _initialize_dashboard(self):
         """Initialize the dashboard state."""
@@ -298,9 +538,9 @@ class DashboardViewAdapter(BaseView):
         """Handle import button click."""
         self.data_requested.emit()
 
-    def _on_action_triggered(self, action):
+    def _handle_action(self, action):
         """
-        Handle action triggered from dashboard.
+        Handle action triggered from an ActionCard.
 
         Args:
             action (str): The action identifier
@@ -401,51 +641,9 @@ class DashboardViewAdapter(BaseView):
         """
         # Convert file paths to strings if they're Path objects
         self._recent_files = [str(file_path) for file_path in files]
-        self._update_recent_files_display()
 
-    def _update_recent_files_display(self):
-        """Update the display of recent files."""
-        # Clear existing widgets
-        while self._recent_files_layout.count():
-            item = self._recent_files_layout.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
-
-        # Show empty state if no recent files
-        if not self._recent_files:
-            self._recent_files_empty = EmptyStateWidget(
-                title="No Recent Files",
-                message="Your recently opened files will appear here",
-                icon=QIcon(Icons.FILE_DOCUMENT),
-            )
-            self._recent_files_layout.addWidget(self._recent_files_empty)
-            return
-
-        # Add file items
-        for file_path in self._recent_files:
-            # Create file card
-            file_card = ActionCard(
-                title=self._get_file_name(file_path),
-                description=file_path,
-                icon=QIcon(Icons.FILE),
-                action_callback=lambda f=file_path: self._on_file_selected(f),
-            )
-            self._recent_files_layout.addWidget(file_card)
-
-    def _get_file_name(self, file_path: str) -> str:
-        """
-        Get the file name from a path.
-
-        Args:
-            file_path (str): The file path
-
-        Returns:
-            str: The file name
-        """
-        # Extract file name from path
-        import os
-
-        return os.path.basename(file_path)
+        # Update recent files panel
+        self._recent_files_panel.set_files(self._recent_files)
 
     def set_data_available(self, available: bool):
         """
@@ -457,7 +655,6 @@ class DashboardViewAdapter(BaseView):
         self._has_data = available
 
         # Update UI visibility
-        self._dashboard_empty_state.setVisible(not available)
         self._charts_empty_container.setVisible(available and not self._charts)
         self._charts_container.setVisible(available and bool(self._charts))
 
@@ -476,3 +673,29 @@ class DashboardViewAdapter(BaseView):
         # Update dashboard to show empty state
         self._clear_charts()
         self.set_data_available(False)
+
+    @Slot()
+    def _update_stats(self):
+        """Update the statistics cards with current data."""
+        # Placeholder for statistics updating
+        pass
+
+    def get_action_cards(self) -> List[ActionCard]:
+        """
+        Get the list of action cards.
+
+        Returns:
+            List[ActionCard]: The list of action cards
+        """
+        return [
+            card for card in self._actions_grid.findChildren(ActionCard) if card.tag() == "Data"
+        ]
+
+    def get_stat_cards(self) -> List[StatCard]:
+        """
+        Get the list of stat cards.
+
+        Returns:
+            List[StatCard]: The list of stat cards
+        """
+        return [card for card in self._actions_grid.findChildren(StatCard)]
