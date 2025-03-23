@@ -159,11 +159,11 @@ class MainWindow(QMainWindow):
 
         # State tracking for file loading progress
         self._loading_state = {
-            "total_files": 0,  # Total number of files being loaded
-            "current_file_index": 0,  # Current file being processed (1-based)
-            "current_file": "",  # Path of current file
-            "processed_files": [],  # List of processed file paths
-            "total_rows": 0,  # Total rows processed so far
+            "current_file": "",
+            "current_file_index": 0,
+            "processed_files": [],
+            "total_files": 0,  # Will be set by the caller via total_files property
+            "total_rows": 0,
         }
 
         # Update UI
@@ -594,8 +594,9 @@ class MainWindow(QMainWindow):
         self._total_rows_estimated = 0
         self._last_progress_current = 0
         self._file_loading_complete = False
-        self._table_population_complete = False
-        self._table_population_in_progress = False
+        # Remove table population state variables
+        # self._table_population_complete = False
+        # self._table_population_in_progress = False
 
         # Flag to track if we're showing an error
         self._showing_error_dialog = False
@@ -733,48 +734,11 @@ class MainWindow(QMainWindow):
             logger.debug("No progress dialog to update on load finished")
             return
 
-        # Exit early if table population is in progress or complete
-        # as we'll handle this in _finalize_loading instead
-        if self._table_population_in_progress or self._table_population_complete:
-            logger.debug("Table population in progress/complete, skipping load_finished handler")
-            return
-
         try:
-            # Check if this is a processing message (which means we're transitioning to table population)
-            is_processing_message = (
-                "processing" in status_message.lower()
-                or "populating" in status_message.lower()
-                or "preparing" in status_message.lower()
-            )
-
             # Check if this is an error message
             is_error = "error" in status_message.lower() or "failed" in status_message.lower()
 
-            # Check if file loading is already marked complete
-            is_file_loading_complete = (
-                hasattr(self, "_file_loading_complete") and self._file_loading_complete
-            )
-
-            # If this is an intermediate processing message, we don't finalize the dialog yet
-            if is_processing_message and not is_file_loading_complete and not is_error:
-                # Set flag to indicate file loading is complete but table population is next
-                self._file_loading_complete = True
-
-                # Update progress dialog for transition to table population
-                if hasattr(self._progress_dialog, "setStatusText"):
-                    self._progress_dialog.setStatusText(status_message)
-
-                # Set progress to 100% to indicate file loading is complete
-                self._progress_dialog.setValue(100)
-
-                # Force UI to process events to prevent dialog from appearing frozen
-                QApplication.processEvents()
-
-                # Early return as we don't want to finalize the dialog yet
-                return
-
-            # If we reach here, this is either a final completion or an error that's not related
-            # to table population (which is handled in _finalize_loading)
+            # Finalize the loading process and close the dialog
             self._finalize_loading(status_message, is_error)
 
         except Exception as e:
@@ -855,165 +819,12 @@ class MainWindow(QMainWindow):
         """
         logger.debug(f"Received request to populate table with {len(data):,} rows")
 
-        # Set flags indicating we've reached table population phase
+        # Set file loading complete flag
         self._file_loading_complete = True
-        self._table_population_complete = False
-        self._table_population_in_progress = True
 
-        # Update progress dialog to show table population
-        if hasattr(self, "_progress_dialog") and self._progress_dialog:
-            try:
-                # Make sure the dialog exists and is visible
-                if not self._progress_dialog.isVisible():
-                    logger.debug("Progress dialog not visible during table population, showing it")
-                    # Don't create a new one, just make sure the existing one is visible
-                    self._progress_dialog.show()
-
-                # Reset the progress bar for table population phase
-                self._progress_dialog.setLabelText(f"Populating table with {len(data):,} rows...")
-                self._progress_dialog.setValue(0)  # Reset progress for table population
-                self._progress_dialog.setStatusText("Building data table...")
-
-                # Make cancel button show "Cancel" during table population
-                self._progress_dialog.setCancelButtonText("Cancel")
-
-                # Disable the cancel button during table population to prevent interruptions
-                # that could leave the UI in an inconsistent state
-                if hasattr(self._progress_dialog, "setCancelButtonEnabled"):
-                    self._progress_dialog.setCancelButtonEnabled(False)
-
-                # Make sure dialog is in front
-                self._progress_dialog.raise_()
-                self._progress_dialog.activateWindow()
-
-                # Force UI to process events to keep dialog responsive
-                QApplication.processEvents()
-            except Exception as e:
-                logger.error(f"Error updating progress dialog for table population: {e}")
-                # Continue anyway
-
-            # Set up a timer to update progress during table population
-            if not hasattr(self, "_table_population_timer") or self._table_population_timer is None:
-                self._table_population_timer = QTimer()
-                self._table_population_timer.timeout.connect(self._update_table_population_progress)
-
-            # Reset table population tracking variables
-            self._table_population_start_time = datetime.now()
-            self._table_population_progress = 0
-
-            # Start the timer with a shorter interval for more responsive updates
-            self._table_population_timer.start(50)  # Update every 50ms for smoother animation
-
-        # Track if table was populated successfully
-        table_populated = False
-
-        # Get the data view
-        if hasattr(self, "_content_stack"):
-            # Find the data view
-            for i in range(self._content_stack.count()):
-                widget = self._content_stack.widget(i)
-                if hasattr(widget, "_update_view"):
-                    # Update the view with progress tracking
-                    try:
-                        logger.debug(f"Starting table population in data view")
-                        # Call update view to populate table (it has its own chunking)
-                        widget._update_view()
-                        table_populated = True
-                        logger.debug(f"Table population completed successfully")
-                        break
-                    except Exception as e:
-                        logger.error(f"Error populating table: {e}")
-
-        # Stop the progress timer
-        if hasattr(self, "_table_population_timer") and self._table_population_timer is not None:
-            if self._table_population_timer.isActive():
-                self._table_population_timer.stop()
-
-        # Update progress to 100% to ensure we show completion
-        if hasattr(self, "_progress_dialog") and self._progress_dialog:
-            self._progress_dialog.setValue(100)
-            QApplication.processEvents()
-
-        # After table population is complete, finalize the progress dialog
-        if table_populated:
-            # Set flag to indicate completion
-            self._table_population_complete = True
-            self._table_population_in_progress = False
-
-            # Call _on_load_finished with a completion message
-            completion_message = f"Successfully loaded and populated table with {len(data):,} rows"
-            # Use False for error flag to indicate success
-            self._finalize_loading(completion_message, False)
-        else:
-            # Handle failed table population
-            self._table_population_complete = False
-            self._table_population_in_progress = False
-            # Use True for error flag to indicate error
-            self._finalize_loading("Error: Failed to populate data table", True)
-
-    def _update_table_population_progress(self):
-        """Update the progress dialog during table population."""
-        if not hasattr(self, "_progress_dialog") or not self._progress_dialog:
-            return
-
-        # Only update if table population is in progress
-        if not self._table_population_in_progress:
-            return
-
-        # Initialize tracking variables if needed
-        if not hasattr(self, "_table_population_start_time"):
-            self._table_population_start_time = datetime.now()
-            self._table_population_progress = 0
-
-        # Calculate elapsed time since table population started
-        elapsed = (datetime.now() - self._table_population_start_time).total_seconds()
-        if elapsed < 0.1:
-            elapsed = 0.1
-
-        # Use a realistic progress curve based on elapsed time
-        # For most tables, population is quick at first then slows down
-        # Progress from 0 to 99 (leave final 1% for completion)
-
-        # For first 3 seconds, progress quickly to 60%
-        if elapsed <= 3:
-            target_progress = min(60, int(elapsed * 20))
-        # For next 7 seconds, progress to 90%
-        elif elapsed <= 10:
-            target_progress = min(90, 60 + int((elapsed - 3) * 4.3))
-        # For next 10 seconds, progress to 95%
-        elif elapsed <= 20:
-            target_progress = min(95, 90 + int((elapsed - 10) * 0.5))
-        # For remaining time, creep to 99%
-        else:
-            # Slow asymptotic approach to 99%
-            target_progress = min(99, 95 + int(min(4, (elapsed - 20) * 0.1)))
-
-        # Update progress only if it's increased (never go backwards)
-        if target_progress > self._table_population_progress:
-            self._table_population_progress = target_progress
-
-            # Update the progress dialog with current progress
-            self._progress_dialog.setValue(self._table_population_progress)
-
-            # Every 10% update the status text to show more detail
-            if self._table_population_progress % 10 == 0:
-                if elapsed > 5:
-                    # After 5 seconds, show elapsed time
-                    self._progress_dialog.setStatusText(
-                        f"Building data table... ({int(elapsed)}s elapsed)"
-                    )
-                else:
-                    # Just show the basic message initially
-                    self._progress_dialog.setStatusText("Building data table...")
-
-            # Process events only occasionally to avoid UI slowdown
-            if self._table_population_progress % 5 == 0:
-                QApplication.processEvents()
-
-        # Stop the timer if we've reached max progress or table population is complete
-        if self._table_population_progress >= 99 or self._table_population_complete:
-            if hasattr(self, "_table_population_timer") and self._table_population_timer.isActive():
-                self._table_population_timer.stop()
+        # The actual table population occurs in the data model and views
+        # No need to show progress dialog for this step anymore
+        # Table population will happen automatically after this method returns
 
     def _on_load_progress(self, file_path: str, current: int, total: int) -> None:
         """
@@ -1029,10 +840,6 @@ class MainWindow(QMainWindow):
             return
 
         try:
-            # Skip progress updates if table population is complete
-            if hasattr(self, "_table_population_complete") and self._table_population_complete:
-                return
-
             # Update loading state based on signal type
             if file_path:
                 # This is a file-specific progress update
@@ -1276,21 +1083,19 @@ class MainWindow(QMainWindow):
         self._showing_error_dialog = False
 
     def _cancel_loading(self) -> None:
-        """
-        Cancel the current loading operation.
+        """Cancel the current loading operation."""
+        logger.debug("Canceling loading operation from MainWindow")
 
-        This method is only connected to the progress dialog during active loading,
-        not after loading is complete (when the button becomes "Confirm").
-        """
-        logger.debug("Cancel loading operation requested")
-
-        # Tell the data manager to cancel the operation
+        # Cancel the data loading in the data manager
         if self._data_manager:
             try:
                 logger.debug("Calling data_manager.cancel_loading()")
                 self._data_manager.cancel_loading()
+                logger.debug("data_manager.cancel_loading() called successfully")
             except Exception as e:
-                logger.error(f"Error calling cancel_loading: {e}")
+                logger.error(f"Error canceling loading in data manager: {e}")
+        else:
+            logger.warning("No data_manager available, can't cancel loading")
 
         # Close the progress dialog if it exists
         if hasattr(self, "_progress_dialog") and self._progress_dialog:
@@ -1300,6 +1105,9 @@ class MainWindow(QMainWindow):
                 self._progress_dialog = None
             except Exception as e:
                 logger.error(f"Error closing progress dialog on cancel: {e}")
+
+        # Clear state
+        self._file_loading_complete = False
 
     # ===== Actions =====
 
@@ -1535,3 +1343,11 @@ class MainWindow(QMainWindow):
             import logging
 
             logging.getLogger(__name__).error(f"Error updating status bar: {e}")
+
+    def _update_table_population_progress(self):
+        """
+        Placeholder for table population progress updates.
+        This method exists for backward compatibility but no longer updates the UI.
+        """
+        # No UI updates for table population progress
+        pass
