@@ -56,6 +56,11 @@ alwaysApply: false
   - Added better error handling for worker cleanup
   - Eliminated forced thread termination during shutdown
 
+- ✅ ConfigManager usage error in DataManager
+  - Fixed incorrect usage of ConfigManager.set() method in _update_recent_files
+  - Updated to use correct get_list() and set_list() methods with proper section/option parameters
+  - Improved error handling in get_recent_files method to skip invalid paths
+
 - **App crashes during CSV file import**: The application would crash in the middle of processing CSV files, particularly with large files.
   - Fixed by improving the memory management in `csv_service.py`, particularly the `read_csv_chunked` method which now incrementally processes chunks instead of storing all in memory.
   - Added robust error handling for memory errors, allowing partial data recovery.
