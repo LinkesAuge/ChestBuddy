@@ -317,7 +317,7 @@ class DataManager(QObject):
         abs_path = str(path.resolve())
 
         # Get the current list of recent files
-        recent_files = self._config.get("recentFiles", [])
+        recent_files = self._config.get_list("Files", "recent_files", [])
         if not isinstance(recent_files, list):
             recent_files = []
 
@@ -332,7 +332,7 @@ class DataManager(QObject):
         recent_files = recent_files[:10]
 
         # Update the config
-        self._config.set("recentFiles", recent_files)
+        self._config.set_list("Files", "recent_files", recent_files)
 
     def get_recent_files(self) -> List[str]:
         """
@@ -341,19 +341,19 @@ class DataManager(QObject):
         Returns:
             List of paths to recent files
         """
-        recent_files = self._config.get("recentFiles", [])
+        recent_files = self._config.get_list("Files", "recent_files", [])
         if not isinstance(recent_files, list):
             return []
 
         # Filter out files that no longer exist
         valid_files = []
         for file_path in recent_files:
-            if Path(file_path).exists():
-                valid_files.append(file_path)
-
-        # Update the config if files were removed
-        if len(valid_files) != len(recent_files):
-            self._config.set("recentFiles", valid_files)
+            try:
+                if Path(file_path).exists():
+                    valid_files.append(file_path)
+            except Exception:
+                # Skip invalid paths
+                pass
 
         return valid_files
 
