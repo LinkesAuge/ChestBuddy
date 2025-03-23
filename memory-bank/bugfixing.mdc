@@ -133,6 +133,31 @@ alwaysApply: false
 
 ## Recent Fixes
 
+### 2025-03-23: Progress Dialog Visibility and UI Unblocking Issues
+
+**Issue**: Two related issues were affecting the user experience:
+1. The progress dialog was not appearing during file imports, leaving users with no visual feedback.
+2. After successfully importing files, other areas of the UI remained blocked/disabled even though data was available.
+
+**Root Cause**:
+1. The progress dialog was not being properly created and shown in the `_on_load_started` method.
+2. The data loaded state was not being properly propagated to all UI elements after import completion.
+
+**Fix**:
+1. Updated `MainWindow._on_load_started` to explicitly create and show the progress dialog.
+2. Enhanced `MainWindow._on_load_finished` to properly set the data loaded state and update all UI elements.
+3. Improved `MainWindow._update_ui` to handle all data-dependent UI elements with proper checks.
+4. Added better error handling and logging throughout the progress dialog lifecycle.
+
+**Validation**:
+- Verified that the progress dialog now appears during file import operations.
+- Confirmed that navigation items and menu actions are properly enabled after data is loaded.
+- Successfully tested navigation between different views after data import.
+- Verified that all data-dependent views are accessible after import.
+
+**File(s) Modified**:
+- `chestbuddy/ui/main_window.py`
+
 ### 2025-03-23: Dashboard Layout and Import Button Fix
 
 **Issue**: Dashboard layout had a redundant empty state panel at the bottom that was overlaying other UI elements, and the "Get Started" button in the welcome panel was not correctly triggering the file import dialog.

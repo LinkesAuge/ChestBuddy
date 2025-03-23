@@ -423,33 +423,41 @@ class MainWindow(QMainWindow):
             self._recent_files_menu.addAction(no_files_action)
 
     def _update_ui(self) -> None:
-        """Update the UI based on the current state."""
-        has_data = not self._data_model.is_empty
+        """Update UI state based on data availability."""
+        logger.debug(f"Updating UI elements based on data state: data_loaded={self._data_loaded}")
 
-        # Update actions
-        self._save_action.setEnabled(has_data)
-        self._save_as_action.setEnabled(has_data)
-        self._validate_action.setEnabled(has_data)
-        self._correct_action.setEnabled(has_data)
+        # Update export action
+        if hasattr(self, "_export_action"):
+            self._export_action.setEnabled(self._data_loaded)
+            logger.debug(f"Export action enabled: {self._data_loaded}")
 
-        # Update status bar
-        if has_data:
-            row_count = len(self._data_model.data)
-            self._status_bar.set_record_count(row_count)
+        # Update menu actions that depend on data availability
+        if hasattr(self, "_save_action"):
+            self._save_action.setEnabled(self._data_loaded)
 
-            # Get the current file path
-            try:
-                current_file = self._data_model.file_path
-                if current_file:
-                    self._status_bar.set_status(f"Loaded: {os.path.basename(current_file)}")
-                else:
-                    self._status_bar.set_status("Data loaded (unsaved)")
-            except Exception as e:
-                logger.error(f"Error updating UI with file path: {e}")
-                self._status_bar.set_status("Data loaded")
-        else:
-            self._status_bar.clear_all()
-            self._status_bar.set_status("No data loaded")
+        if hasattr(self, "_save_as_action"):
+            self._save_as_action.setEnabled(self._data_loaded)
+
+        if hasattr(self, "_validate_action"):
+            self._validate_action.setEnabled(self._data_loaded)
+
+        if hasattr(self, "_correct_action"):
+            self._correct_action.setEnabled(self._data_loaded)
+
+        if hasattr(self, "_export_validation_action"):
+            self._export_validation_action.setEnabled(self._data_loaded)
+
+        # Update status bar based on data state
+        self._update_status_bar()
+
+        # Update all views with data availability
+        self._update_views_data_availability()
+
+        # Update navigation based on data state
+        self._update_navigation_based_on_data_state()
+
+        # Process events to ensure UI updates are applied immediately
+        QApplication.processEvents()
 
     @Slot(str)
     def _set_active_view(self, view_name: str) -> None:
@@ -634,6 +642,29 @@ class MainWindow(QMainWindow):
         # Update UI based on data state
         self._update_navigation_based_on_data_state()
 
+        # Create and show progress dialog
+        try:
+            # Create progress dialog if it doesn't exist
+            if not hasattr(self, "_progress_dialog") or not self._progress_dialog:
+                logger.debug("Creating new progress dialog")
+                self._progress_dialog = ProgressDialog(
+                    "Importing data...", "Cancel", 0, 100, self, "Loading Data", True
+                )
+                # Connect cancel signal
+                self._progress_dialog.canceled.connect(self._cancel_loading)
+
+            # Update dialog properties
+            self._progress_dialog.setValue(0)
+            self._progress_dialog.setRange(0, 100)
+            self._progress_dialog.setLabelText("Preparing to import data...")
+
+            # Make sure dialog is visible
+            if not self._progress_dialog.isVisible():
+                logger.debug("Showing progress dialog")
+                self._progress_dialog.show()
+        except Exception as e:
+            logger.error(f"Error creating progress dialog: {e}")
+
     def _on_load_finished(self, message: str) -> None:
         """
         Handle when a loading operation completes successfully.
@@ -643,7 +674,7 @@ class MainWindow(QMainWindow):
         """
         logger.debug(f"MainWindow._on_load_finished called: {message}")
 
-        # Set data loaded state
+        # Set data loaded state based on data model
         if self._data_model and not self._data_model.is_empty:
             self._data_loaded = True
             logger.debug("Data loaded state set to True")
@@ -651,8 +682,11 @@ class MainWindow(QMainWindow):
             self._data_loaded = False
             logger.debug("Data model is empty, data loaded state remains False")
 
-        # Update UI based on data state
+        # Update UI based on data state - ensures navigation and views are updated
         self._update_navigation_based_on_data_state()
+
+        # Enable UI elements based on data availability
+        self._update_ui()
 
         # Early return if progress dialog doesn't exist
         if not hasattr(self, "_progress_dialog") or not self._progress_dialog:
@@ -1276,22 +1310,31 @@ class MainWindow(QMainWindow):
             logging.getLogger(__name__).error(f"Error refreshing UI: {e}")
 
     def _update_status_bar(self) -> None:
-        """Update the status bar with current information."""
-        try:
-            if (
-                hasattr(self, "_status_bar")
-                and self._status_bar is not None
-                and hasattr(self, "_data_model")
-            ):
-                # Show row count in status bar
-                row_count = (
-                    self._data_model.row_count if hasattr(self._data_model, "row_count") else 0
-                )
-                self._status_bar.showMessage(f"Rows: {row_count}")
-        except Exception as e:
-            import logging
+        """Update the status bar based on the current data state."""
+        logger.debug(f"Updating status bar, data_loaded={self._data_loaded}")
 
-            logging.getLogger(__name__).error(f"Error updating status bar: {e}")
+        try:
+            if self._data_loaded and not self._data_model.is_empty:
+                # Get row count
+                row_count = len(self._data_model.data)
+                self._status_bar.set_record_count(row_count)
+
+                # Get the current file path
+                current_file = (
+                    self._data_model.file_path if hasattr(self._data_model, "file_path") else None
+                )
+                if current_file:
+                    self._status_bar.set_status(f"Loaded: {os.path.basename(current_file)}")
+                else:
+                    self._status_bar.set_status("Data loaded (unsaved)")
+            else:
+                # Clear status bar when no data is loaded
+                self._status_bar.clear_all()
+                self._status_bar.set_status("No data loaded")
+        except Exception as e:
+            logger.error(f"Error updating status bar: {e}")
+            # Fallback status
+            self._status_bar.set_status("Status unknown")
 
     def _update_table_population_progress(self):
         """
