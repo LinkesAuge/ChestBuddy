@@ -89,6 +89,7 @@ class ChestBuddyApp(QObject):
             self._validation_service,
             self._correction_service,
             self._chart_service,
+            data_manager=self._data_manager,
         )
 
         # Connect signals

@@ -242,22 +242,39 @@ class DataManager(QObject):
         Handle successful CSV load from background thread.
 
         Args:
-            result_tuple: Tuple containing (DataFrame, message)
+            result_tuple: Tuple containing (success, data_or_error_message)
+                success: Boolean indicating if the operation was successful
+                data_or_error_message: DataFrame if successful, error message if not
         """
         try:
             logger.debug("CSV load success callback triggered")
-            # Type check the result tuple
+
+            # Check if the result tuple is in the expected format
             if not isinstance(result_tuple, tuple) or len(result_tuple) != 2:
                 logger.error(f"Invalid result format from CSV load: {type(result_tuple)}")
                 self.load_error.emit("Invalid result format from CSV service")
                 return
 
-            data, message = result_tuple
+            success, data_or_message = result_tuple
+
+            # Handle the case where the operation failed
+            if not success:
+                error_message = (
+                    data_or_message
+                    if isinstance(data_or_message, str)
+                    else "Failed to load CSV data"
+                )
+                logger.error(f"CSV load returned error: {error_message}")
+                self.load_error.emit(error_message)
+                return
+
+            # At this point, data_or_message should be the DataFrame
+            data = data_or_message
 
             # Validate the DataFrame
             if data is None or not isinstance(data, pd.DataFrame):
                 logger.error(f"CSV load did not return valid DataFrame: {type(data)}")
-                self.load_error.emit(message or "Failed to load CSV data")
+                self.load_error.emit("Failed to load CSV data: Invalid data format")
                 return
 
             if data.empty:
@@ -278,7 +295,7 @@ class DataManager(QObject):
             self._data_model.update_data(mapped_data)
 
             # Emit success signal with message
-            self.load_success.emit(message or "CSV loaded successfully")
+            self.load_success.emit(f"CSV loaded successfully with {len(data)} rows")
 
             # Finally, unblock signals and emit a controlled change notification
             self._data_model.blockSignals(False)
