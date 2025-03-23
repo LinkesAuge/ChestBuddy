@@ -1,21 +1,19 @@
 """
 action_card.py
 
-Description: A card-style widget for dashboard actions
+Description: Card component for displaying interactive action buttons in the dashboard
 Usage:
-    card = ActionCard(
-        title="Import Data",
-        description="Load new data from CSV files",
-        icon=QIcon(":/icons/import.svg"),
-        action_callback=on_import_clicked
+    action_card = ActionCard(
+        "Import Files",
+        "Import CSV files with chest data",
+        "import",
+        ["import_csv", "import_excel"]
     )
-    layout.addWidget(card)
+    action_card.action_clicked.connect(handle_action)
 """
 
-from typing import Optional, Callable
-
-from PySide6.QtCore import Qt, Signal, QSize
-from PySide6.QtGui import QIcon, QFont, QColor, QPalette, QEnterEvent
+from PySide6.QtCore import Qt, Signal, Property
+from PySide6.QtGui import QIcon, QColor
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -23,269 +21,327 @@ from PySide6.QtWidgets import (
     QLabel,
     QFrame,
     QSizePolicy,
-    QSpacerItem,
+    QGraphicsDropShadowEffect,
+    QPushButton,
 )
-
-from chestbuddy.ui.resources.style import Colors
 
 
 class ActionCard(QFrame):
     """
-    A card-style widget for dashboard actions with title, description, and icon.
-
-    Provides an interactive card that can be used as a clickable action item
-    on the dashboard with visual feedback.
+    A card component for displaying actionable items in the dashboard.
 
     Attributes:
-        clicked (Signal): Signal emitted when the card is clicked
+        action_clicked (Signal): Emitted when the card is clicked, with action name
+
+    Implementation Notes:
+        - Card appears with shadow effect and rounded corners
+        - Can be configured with title, description, icon and action
+        - Provides visual feedback on hover
+        - Supports custom tags for categorization
     """
 
-    # Signal emitted when the card is clicked
-    clicked = Signal()
+    # Signal emitted when the action is clicked
+    action_clicked = Signal(str)
 
     def __init__(
         self,
-        title: str,
-        description: str,
-        icon: Optional[QIcon] = None,
-        action_callback: Optional[Callable] = None,
-        parent=None,
+        title: str = "",
+        description: str = "",
+        icon_name: str = "",
+        actions: list = None,
+        tag: str = "",
+        parent: QWidget = None,
     ):
         """
-        Initialize a new ActionCard.
+        Initialize the action card with title, description, and icon.
 
         Args:
-            title (str): The title text to display
-            description (str): The description text to display
-            icon (QIcon, optional): Icon to display on the card
-            action_callback (Callable, optional): Callback function for when the card is clicked
-            parent: Parent widget
+            title (str): The title of the action
+            description (str): Short description of the action
+            icon_name (str): Name of the icon to display
+            actions (list): List of action names associated with this card
+            tag (str): Optional tag for categorization
+            parent (QWidget): Parent widget
         """
         super().__init__(parent)
 
         # Store properties
         self._title = title
         self._description = description
-        self._icon = icon or QIcon()
-        self._action_callback = action_callback
-        self._hover = False
+        self._icon_name = icon_name
+        self._actions = actions or []
+        self._primary_action = self._actions[0] if self._actions else ""
+        self._tag = tag
+        self._use_count = 0  # Track how often this action is used
 
-        # Set up the UI
+        # Setup UI
         self._setup_ui()
 
-        # Make the card clickable
+        # Set up interaction
         self.setCursor(Qt.PointingHandCursor)
         self.setMouseTracking(True)
 
     def _setup_ui(self):
-        """Set up the widget's UI components."""
-        # Set frame properties
+        """Set up the UI components of the action card."""
+        # Set frame styling
+        self.setObjectName("actionCard")
         self.setFrameShape(QFrame.StyledPanel)
         self.setFrameShadow(QFrame.Raised)
-        self.setLineWidth(1)
-
-        # Apply card styling
-        self.setStyleSheet(f"""
-            ActionCard {{
-                background-color: {Colors.PRIMARY};
-                border: 1px solid {Colors.BORDER};
+        self.setStyleSheet("""
+            #actionCard {
+                background-color: #ffffff;
                 border-radius: 8px;
-            }}
+                border: 1px solid #e0e0e0;
+            }
+            #actionCard:hover {
+                background-color: #f5f5f5;
+                border: 1px solid #d0d0d0;
+            }
         """)
 
-        # Main layout
-        main_layout = QHBoxLayout(self)
+        # Apply drop shadow
+        shadow = QGraphicsDropShadowEffect(self)
+        shadow.setBlurRadius(10)
+        shadow.setColor(QColor(0, 0, 0, 30))
+        shadow.setOffset(0, 2)
+        self.setGraphicsEffect(shadow)
+
+        # Create layouts
+        main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(16, 16, 16, 16)
-        main_layout.setSpacing(16)
+        main_layout.setSpacing(8)
+
+        # Create icon and title layout
+        header_layout = QHBoxLayout()
+        header_layout.setSpacing(12)
 
         # Icon (if provided)
-        if not self._icon.isNull():
-            icon_label = QLabel(self)
-            pixmap = self._icon.pixmap(QSize(48, 48))
-            icon_label.setPixmap(pixmap)
-            icon_label.setFixedSize(48, 48)
-            main_layout.addWidget(icon_label)
+        if self._icon_name:
+            self._icon_label = QLabel()
+            self._icon_label.setObjectName("actionCardIcon")
+            # Placeholder for actual icon loading
+            icon = QIcon(f":/icons/{self._icon_name}.png")  # Adjust path as needed
+            if not icon.isNull():
+                self._icon_label.setPixmap(icon.pixmap(24, 24))
+            header_layout.addWidget(self._icon_label)
 
-        # Text content layout
-        content_layout = QVBoxLayout()
-        content_layout.setSpacing(4)
+        # Create title label
+        self._title_label = QLabel(self._title)
+        self._title_label.setObjectName("actionCardTitle")
+        self._title_label.setStyleSheet("""
+            #actionCardTitle {
+                color: #333333;
+                font-size: 16px;
+                font-weight: 600;
+            }
+        """)
+        header_layout.addWidget(self._title_label, 1)
+        main_layout.addLayout(header_layout)
 
-        # Title
-        self._title_label = QLabel(self._title, self)
-        title_font = QFont()
-        title_font.setPointSize(14)
-        title_font.setBold(True)
-        self._title_label.setFont(title_font)
-        self._title_label.setWordWrap(True)
-        self._title_label.setStyleSheet(f"color: {Colors.TEXT_LIGHT};")
-        content_layout.addWidget(self._title_label)
+        # Create description label if provided
+        if self._description:
+            self._description_label = QLabel(self._description)
+            self._description_label.setObjectName("actionCardDescription")
+            self._description_label.setStyleSheet("""
+                #actionCardDescription {
+                    color: #585858;
+                    font-size: 13px;
+                }
+            """)
+            self._description_label.setWordWrap(True)
+            main_layout.addWidget(self._description_label)
 
-        # Description
-        self._description_label = QLabel(self._description, self)
-        description_font = QFont()
-        description_font.setPointSize(10)
-        self._description_label.setFont(description_font)
-        self._description_label.setWordWrap(True)
+        # Add spacer to push content to the top
+        main_layout.addStretch()
 
-        # Set description color slightly muted
-        self._description_label.setStyleSheet(f"color: {Colors.TEXT_MUTED};")
+        # Add tag if provided
+        if self._tag:
+            tag_layout = QHBoxLayout()
+            tag_layout.setContentsMargins(0, 8, 0, 0)
 
-        content_layout.addWidget(self._description_label)
-        main_layout.addLayout(content_layout, 1)
+            self._tag_label = QLabel(self._tag)
+            self._tag_label.setObjectName("actionCardTag")
+            self._tag_label.setStyleSheet("""
+                #actionCardTag {
+                    color: #757575;
+                    font-size: 11px;
+                    background-color: #f0f0f0;
+                    border-radius: 4px;
+                    padding: 2px 6px;
+                }
+            """)
+            tag_layout.addStretch()
+            tag_layout.addWidget(self._tag_label)
 
-        # Set size policies
+            main_layout.addLayout(tag_layout)
+
+        # Set size policy
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        self.setMinimumHeight(100)
-        self.setMaximumHeight(120)
-
-    def enterEvent(self, event):
-        """Handle mouse enter event for hover effect."""
-        self._hover = True
-        self.setStyleSheet(f"""
-            ActionCard {{
-                background-color: {Colors.PRIMARY_HOVER};
-                border: 1px solid {Colors.ACCENT};
-                border-radius: 8px;
-            }}
-        """)
-        # Handle both Qt5 and Qt6 style events
-        if isinstance(event, QEnterEvent):
-            super().enterEvent(event)
-        else:
-            # For compatibility with tests
-            pass
-
-    def leaveEvent(self, event):
-        """Handle mouse leave event for hover effect."""
-        self._hover = False
-        self.setStyleSheet(f"""
-            ActionCard {{
-                background-color: {Colors.PRIMARY};
-                border: 1px solid {Colors.BORDER};
-                border-radius: 8px;
-            }}
-        """)
-        # Pass the event to the parent class
-        try:
-            super().leaveEvent(event)
-        except TypeError:
-            # For compatibility with tests
-            pass
+        self.setMinimumSize(180, 120)
+        self.setMaximumSize(300, 180)
 
     def mousePressEvent(self, event):
-        """Handle mouse press events."""
+        """
+        Handle mouse press events to emit action signal.
+
+        Args:
+            event: The mouse event
+        """
         if event.button() == Qt.LeftButton:
-            self.setStyleSheet(f"""
-                ActionCard {{
-                    background-color: {Colors.PRIMARY_ACTIVE};
-                    border: 1px solid {Colors.ACCENT_ACTIVE};
-                    border-radius: 8px;
-                }}
-            """)
+            self._use_count += 1
+            # Emit the primary action
+            self.action_clicked.emit(self._primary_action)
         super().mousePressEvent(event)
-
-    def mouseReleaseEvent(self, event):
-        """Handle mouse release events to trigger the action."""
-        if event.button() == Qt.LeftButton:
-            # Reset style based on hover state
-            if self._hover:
-                self.setStyleSheet(f"""
-                    ActionCard {{
-                        background-color: {Colors.PRIMARY_HOVER};
-                        border: 1px solid {Colors.ACCENT};
-                        border-radius: 8px;
-                    }}
-                """)
-            else:
-                self.setStyleSheet(f"""
-                    ActionCard {{
-                        background-color: {Colors.PRIMARY};
-                        border: 1px solid {Colors.BORDER};
-                        border-radius: 8px;
-                    }}
-                """)
-
-            # Emit our signal
-            self.clicked.emit()
-
-            # Call the callback if provided
-            if self._action_callback:
-                self._action_callback()
-
-        super().mouseReleaseEvent(event)
-
-    def title(self) -> str:
-        """
-        Get the title text.
-
-        Returns:
-            str: The title text
-        """
-        return self._title
-
-    def description(self) -> str:
-        """
-        Get the description text.
-
-        Returns:
-            str: The description text
-        """
-        return self._description
-
-    def icon(self) -> QIcon:
-        """
-        Get the icon.
-
-        Returns:
-            QIcon: The icon (may be null if no icon was specified)
-        """
-        return self._icon
 
     def set_title(self, title: str):
         """
-        Set the title text.
+        Set the title of the action card.
 
         Args:
-            title (str): The new title text
+            title (str): The new title
         """
         self._title = title
         self._title_label.setText(title)
 
+    def title(self) -> str:
+        """
+        Get the current title.
+
+        Returns:
+            str: The current title
+        """
+        return self._title
+
     def set_description(self, description: str):
         """
-        Set the description text.
+        Set the description of the action card.
 
         Args:
-            description (str): The new description text
+            description (str): The new description
         """
         self._description = description
-        self._description_label.setText(description)
 
-    def set_icon(self, icon: QIcon):
+        # Create or update description label
+        if hasattr(self, "_description_label"):
+            self._description_label.setText(description)
+        else:
+            # Create description label if it doesn't exist
+            self._description_label = QLabel(description)
+            self._description_label.setObjectName("actionCardDescription")
+            self._description_label.setStyleSheet("""
+                #actionCardDescription {
+                    color: #585858;
+                    font-size: 13px;
+                }
+            """)
+            self._description_label.setWordWrap(True)
+
+            # Add to layout - need to rebuild layout
+            self._setup_ui()
+
+    def description(self) -> str:
         """
-        Set the icon.
+        Get the current description.
+
+        Returns:
+            str: The current description
+        """
+        return self._description
+
+    def set_icon_name(self, icon_name: str):
+        """
+        Set the icon name of the action card.
 
         Args:
-            icon (QIcon): The new icon
+            icon_name (str): The new icon name
         """
-        self._icon = icon
-        self._refresh_ui()
+        self._icon_name = icon_name
 
-    def _refresh_ui(self):
-        """Refresh the UI with current properties."""
-        # This method would need to recreate the UI elements
-        # For simplicity, we'll just create a new layout
-        old_layout = self.layout()
-
-        # Clear the old layout
-        if old_layout:
-            while old_layout.count():
-                item = old_layout.takeAt(0)
-                if item.widget():
-                    item.widget().deleteLater()
-
-            # Remove the old layout
-            self.setLayout(None)
-
-        # Set up the UI again
+        # Rebuild UI to update icon
         self._setup_ui()
+
+    def icon_name(self) -> str:
+        """
+        Get the current icon name.
+
+        Returns:
+            str: The current icon name
+        """
+        return self._icon_name
+
+    def set_actions(self, actions: list):
+        """
+        Set the actions associated with this card.
+
+        Args:
+            actions (list): List of action names
+        """
+        self._actions = actions
+        self._primary_action = self._actions[0] if self._actions else ""
+
+    def actions(self) -> list:
+        """
+        Get the current actions.
+
+        Returns:
+            list: The current actions
+        """
+        return self._actions
+
+    def primary_action(self) -> str:
+        """
+        Get the primary action (first in the list).
+
+        Returns:
+            str: The primary action
+        """
+        return self._primary_action
+
+    def set_tag(self, tag: str):
+        """
+        Set the tag of the action card.
+
+        Args:
+            tag (str): The new tag
+        """
+        self._tag = tag
+
+        # Rebuild UI to update tag
+        self._setup_ui()
+
+    def tag(self) -> str:
+        """
+        Get the current tag.
+
+        Returns:
+            str: The current tag
+        """
+        return self._tag
+
+    def increment_use_count(self):
+        """Increment the usage count of this action card."""
+        self._use_count += 1
+
+    def use_count(self) -> int:
+        """
+        Get the current use count.
+
+        Returns:
+            int: The current use count
+        """
+        return self._use_count
+
+    def set_use_count(self, count: int):
+        """
+        Set the use count of the action card.
+
+        Args:
+            count (int): The new use count
+        """
+        self._use_count = max(0, count)  # Ensure count is non-negative
+
+    # Define Qt properties
+    title = Property(str, title, set_title)
+    description = Property(str, description, set_description)
+    icon_name = Property(str, icon_name, set_icon_name)
+    tag = Property(str, tag, set_tag)
