@@ -600,73 +600,119 @@ class MainWindow(QMainWindow):
         # Flag to track if we're showing an error
         self._showing_error_dialog = False
 
-        # Close any existing progress dialog to avoid duplicates
+        # Only create a new progress dialog if one doesn't exist or is not visible
+        # This prevents multiple dialogs from appearing
+        create_new_dialog = True
+
         if hasattr(self, "_progress_dialog") and self._progress_dialog:
-            try:
-                # Disconnect any existing signals
+            # Check if the dialog is already visible
+            if self._progress_dialog.isVisible():
+                logger.debug("Progress dialog already exists and is visible, reusing it")
+                create_new_dialog = False
+
                 try:
-                    self._progress_dialog.canceled.disconnect()
+                    # Reset dialog to initial state
+                    self._progress_dialog.reset()
+
+                    # Update dialog for new loading operation
+                    self._progress_dialog.setLabelText("Preparing to load data...")
+                    self._progress_dialog.setValue(0)
+                    self._progress_dialog.setStatusText("")
+
+                    # Ensure button text is set to Cancel
+                    self._progress_dialog.setCancelButtonText("Cancel")
+
+                    # Disconnect any existing signal connections
+                    try:
+                        self._progress_dialog.canceled.disconnect()
+                    except:
+                        pass
+
+                    # Connect cancel button
+                    try:
+                        self._progress_dialog.canceled.connect(self._cancel_loading)
+                        logger.debug("Cancel button reconnected successfully")
+                    except Exception as e:
+                        logger.error(f"Error reconnecting cancel button: {e}")
+
+                    # Make sure button is enabled
+                    if hasattr(self._progress_dialog, "setCancelButtonEnabled"):
+                        self._progress_dialog.setCancelButtonEnabled(True)
+
+                    # Make sure dialog is visible and in front
+                    self._progress_dialog.show()
+                    self._progress_dialog.raise_()
+                    self._progress_dialog.activateWindow()
+
+                    # Process events to ensure UI updates
+                    QApplication.processEvents()
+
+                except Exception as e:
+                    logger.error(f"Error reusing existing progress dialog: {e}")
+                    # If we can't reuse the existing dialog, create a new one
+                    create_new_dialog = True
+
+                    # Close the existing dialog to avoid multiple dialogs
+                    try:
+                        self._progress_dialog.close()
+                        self._progress_dialog = None
+                    except:
+                        pass
+            else:
+                # Dialog exists but is not visible, close it and create a new one
+                logger.debug("Progress dialog exists but is not visible, creating a new one")
+                try:
+                    self._progress_dialog.close()
+                    self._progress_dialog = None
                 except:
                     pass
+                create_new_dialog = True
 
-                # Close the existing dialog
-                self._progress_dialog.close()
+        # Flag to track if dialog was successfully created and shown
+        progress_dialog_ready = not create_new_dialog  # Already true if we're reusing
 
-                # Ensure it's deleted
-                self._progress_dialog.deleteLater()
-                self._progress_dialog = None
+        # Create a new dialog if needed
+        if create_new_dialog:
+            try:
+                # Create a new progress dialog with our custom implementation
+                self._progress_dialog = ProgressDialog(
+                    "Preparing to load data...", "Cancel", 0, 100, self
+                )
+                self._progress_dialog.setWindowTitle("CSV Import - ChestBuddy")
+
+                # Set the dialog to modal to prevent interaction with the main window
+                # but use Qt.ApplicationModal instead of Qt.WindowModal to ensure it stays on top
+                self._progress_dialog.setWindowModality(Qt.ApplicationModal)
+
+                # Connect cancel button - ensure this is always connected
+                try:
+                    self._progress_dialog.canceled.connect(self._cancel_loading)
+                    logger.debug("Cancel button connected successfully")
+                except Exception as e:
+                    logger.error(f"Error connecting cancel button: {e}")
+
+                progress_dialog_ready = True
+
+                # Make sure dialog is visible and activated
+                self._progress_dialog.show()
+                self._progress_dialog.raise_()
+                self._progress_dialog.activateWindow()
 
                 # Process events to ensure UI updates
                 QApplication.processEvents()
 
-                logger.debug("Closed existing progress dialog")
             except Exception as e:
-                logger.error(f"Error closing existing progress dialog: {e}")
-                # Continue anyway
-
-        # Flag to track if dialog was successfully created and shown
-        progress_dialog_ready = False
-
-        try:
-            # Create a new progress dialog with our custom implementation
-            self._progress_dialog = ProgressDialog(
-                "Preparing to load data...", "Cancel", 0, 100, self
-            )
-            self._progress_dialog.setWindowTitle("CSV Import - ChestBuddy")
-
-            # Set the dialog to modal to prevent interaction with the main window
-            # but use Qt.ApplicationModal instead of Qt.WindowModal to ensure it stays on top
-            self._progress_dialog.setWindowModality(Qt.ApplicationModal)
-
-            # Connect cancel button - ensure this is always connected
-            try:
-                self._progress_dialog.canceled.connect(self._cancel_loading)
-                logger.debug("Cancel button connected successfully")
-            except Exception as e:
-                logger.error(f"Error connecting cancel button: {e}")
-
-            progress_dialog_ready = True
-
-            # Make sure dialog is visible and activated
-            self._progress_dialog.show()
-            self._progress_dialog.raise_()
-            self._progress_dialog.activateWindow()
-
-            # Process events to ensure UI updates
-            QApplication.processEvents()
-
-        except Exception as e:
-            logger.error(f"Error creating progress dialog: {e}")
-            self._progress_dialog = None
-            progress_dialog_ready = False
-            # Only show error message if we couldn't create the dialog
-            QMessageBox.critical(
-                self,
-                "Error",
-                f"Failed to create progress dialog: {e}\nFile loading canceled.",
-            )
-            # Cancel the loading operation
-            self._cancel_loading()
+                logger.error(f"Error creating progress dialog: {e}")
+                self._progress_dialog = None
+                progress_dialog_ready = False
+                # Only show error message if we couldn't create the dialog
+                QMessageBox.critical(
+                    self,
+                    "Error",
+                    f"Failed to create progress dialog: {e}\nFile loading canceled.",
+                )
+                # Cancel the loading operation
+                self._cancel_loading()
 
         # Only proceed if dialog is ready
         if not progress_dialog_ready:
@@ -680,29 +726,37 @@ class MainWindow(QMainWindow):
         Args:
             status_message: Message indicating the status of the loading operation
         """
-        logger.debug(f"Load finished: {status_message}")
+        logger.debug(f"Load finished signal received: {status_message}")
 
         # Early return if progress dialog doesn't exist
         if not hasattr(self, "_progress_dialog") or not self._progress_dialog:
-            logger.debug("No progress dialog to update")
+            logger.debug("No progress dialog to update on load finished")
+            return
+
+        # Exit early if table population is in progress or complete
+        # as we'll handle this in _finalize_loading instead
+        if self._table_population_in_progress or self._table_population_complete:
+            logger.debug("Table population in progress/complete, skipping load_finished handler")
             return
 
         try:
             # Check if this is a processing message (which means we're transitioning to table population)
             is_processing_message = (
-                "processing" in status_message.lower() or "populating" in status_message.lower()
-            )
-
-            # Check if table population is already in progress or complete
-            is_table_population = (
-                self._table_population_in_progress or self._table_population_complete
+                "processing" in status_message.lower()
+                or "populating" in status_message.lower()
+                or "preparing" in status_message.lower()
             )
 
             # Check if this is an error message
             is_error = "error" in status_message.lower() or "failed" in status_message.lower()
 
+            # Check if file loading is already marked complete
+            is_file_loading_complete = (
+                hasattr(self, "_file_loading_complete") and self._file_loading_complete
+            )
+
             # If this is an intermediate processing message, we don't finalize the dialog yet
-            if is_processing_message and not is_table_population and not is_error:
+            if is_processing_message and not is_file_loading_complete and not is_error:
                 # Set flag to indicate file loading is complete but table population is next
                 self._file_loading_complete = True
 
@@ -713,70 +767,83 @@ class MainWindow(QMainWindow):
                 # Set progress to 100% to indicate file loading is complete
                 self._progress_dialog.setValue(100)
 
-                # Make sure dialog is still responsive
-                self._progress_dialog.setCancelButtonEnabled(True)
-
                 # Force UI to process events to prevent dialog from appearing frozen
                 QApplication.processEvents()
 
                 # Early return as we don't want to finalize the dialog yet
                 return
 
-            # If we reach here, this is the final completion or an error
+            # If we reach here, this is either a final completion or an error that's not related
+            # to table population (which is handled in _finalize_loading)
+            self._finalize_loading(status_message, is_error)
 
-            # Update the dialog to indicate completion
-            self._progress_dialog.setLabelText("Loading complete")
+        except Exception as e:
+            logger.error(f"Error in _on_load_finished: {e}")
+            # Try to ensure dialog can be closed
+            self._finalize_loading(f"Error: {str(e)}", True)
 
-            # Set progress to max to indicate completion
-            self._progress_dialog.setValue(self._progress_dialog.maximum())
+    def _finalize_loading(self, message: str, is_error: bool) -> None:
+        """
+        Finalize the loading process and update the progress dialog accordingly.
 
-            # Set status text if we have a status message
-            if hasattr(self._progress_dialog, "setStatusText"):
-                self._progress_dialog.setStatusText(status_message)
+        Args:
+            message: The message to display in the dialog
+            is_error: Whether this is an error state
+        """
+        logger.debug(f"Finalizing loading process: {message}, is_error={is_error}")
 
-            # If message contains "error" or "failed", show error styling
+        # Early return if progress dialog doesn't exist
+        if not hasattr(self, "_progress_dialog") or not self._progress_dialog:
+            logger.debug("No progress dialog to update for finalization")
+            return
+
+        try:
+            # Set appropriate dialog state based on success/error
             if is_error:
-                # Error state - show confirmation to close
-                logger.error(f"Load operation failed: {status_message}")
-                self._progress_dialog.setButtonText("Close")
-
-                # Set error state if the method exists
+                # Set error styling
                 if hasattr(self._progress_dialog, "setState") and hasattr(ProgressBar, "State"):
                     self._progress_dialog.setState(ProgressBar.State.ERROR)
+                self._progress_dialog.setLabelText("Loading failed")
             else:
-                # Success state - show confirmation to continue
-                logger.debug(f"Load operation completed successfully: {status_message}")
-                self._progress_dialog.setButtonText("Close")
+                # Set success styling
+                self._progress_dialog.setLabelText("Loading complete")
 
-            # Disconnect previous signal connections to cancel loading
+            # Set status message
+            self._progress_dialog.setStatusText(message)
+
+            # Always set progress to max on finalization
+            self._progress_dialog.setValue(self._progress_dialog.maximum())
+
+            # Change button to Close for final state
+            self._progress_dialog.setCancelButtonText("Close")
+
+            # Disconnect any previous signal connections to prevent issues
             try:
-                self._progress_dialog.canceled.disconnect(self._cancel_loading)
+                # Disconnect all signals from the canceled signal
+                self._progress_dialog.canceled.disconnect()
             except:
-                pass  # Ignore if not connected
+                pass
 
-            # Connect cancel button to close the dialog
+            # Connect cancel button to close dialog
             self._progress_dialog.canceled.connect(self._progress_dialog.close)
 
-            # Enable the button to allow user to continue
+            # Make sure button is enabled
             if hasattr(self._progress_dialog, "setCancelButtonEnabled"):
                 self._progress_dialog.setCancelButtonEnabled(True)
 
-            # Force UI to process events to keep dialog responsive
+            # Process events for UI responsiveness
             QApplication.processEvents()
 
+            logger.debug("Progress dialog updated for finalization")
         except Exception as e:
-            logger.error(f"Error updating progress dialog on load finished: {e}")
-            # Try to ensure the dialog can be closed
+            logger.error(f"Error finalizing progress dialog: {e}")
+            # Try to ensure dialog can be closed
             try:
-                if self._progress_dialog and hasattr(self._progress_dialog, "_cancel_button"):
+                if hasattr(self._progress_dialog, "_cancel_button"):
                     self._progress_dialog._cancel_button.setEnabled(True)
                     self._progress_dialog._cancel_button.setText("Close")
-                    self._progress_dialog._cancel_button.clicked.disconnect()
-                    self._progress_dialog._cancel_button.clicked.connect(
-                        self._progress_dialog.close
-                    )
-            except Exception as inner_e:
-                logger.error(f"Failed to recover progress dialog: {inner_e}")
+            except:
+                pass
 
     def _on_populate_table_requested(self, data: pd.DataFrame) -> None:
         """
@@ -810,9 +877,10 @@ class MainWindow(QMainWindow):
                 # Make cancel button show "Cancel" during table population
                 self._progress_dialog.setCancelButtonText("Cancel")
 
-                # Make sure cancel button is enabled to prevent dialog from appearing frozen
+                # Disable the cancel button during table population to prevent interruptions
+                # that could leave the UI in an inconsistent state
                 if hasattr(self._progress_dialog, "setCancelButtonEnabled"):
-                    self._progress_dialog.setCancelButtonEnabled(True)
+                    self._progress_dialog.setCancelButtonEnabled(False)
 
                 # Make sure dialog is in front
                 self._progress_dialog.raise_()
@@ -847,9 +915,11 @@ class MainWindow(QMainWindow):
                 if hasattr(widget, "_update_view"):
                     # Update the view with progress tracking
                     try:
+                        logger.debug(f"Starting table population in data view")
                         # Call update view to populate table (it has its own chunking)
                         widget._update_view()
                         table_populated = True
+                        logger.debug(f"Table population completed successfully")
                         break
                     except Exception as e:
                         logger.error(f"Error populating table: {e}")
@@ -872,12 +942,14 @@ class MainWindow(QMainWindow):
 
             # Call _on_load_finished with a completion message
             completion_message = f"Successfully loaded and populated table with {len(data):,} rows"
-            self._on_load_finished(completion_message)
+            # Use False for error flag to indicate success
+            self._finalize_loading(completion_message, False)
         else:
             # Handle failed table population
             self._table_population_complete = False
             self._table_population_in_progress = False
-            self._on_load_finished("Error: Failed to populate data table")
+            # Use True for error flag to indicate error
+            self._finalize_loading("Error: Failed to populate data table", True)
 
     def _update_table_population_progress(self):
         """Update the progress dialog during table population."""
