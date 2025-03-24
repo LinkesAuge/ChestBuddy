@@ -151,7 +151,6 @@ class MultiCSVLoadTask(BackgroundTask):
 
         # Initialize progress tracking variables
         self._total_rows_loaded = 0
-        self._total_rows_estimated = 0
         self._current_file_rows = 0
         self._current_file_total_rows = 0
 
@@ -196,15 +195,8 @@ class MultiCSVLoadTask(BackgroundTask):
                     ):
                         current_file_path = str(self.file_paths[self._current_file_index])
 
-                # Calculate progress across all files
-                if self._total_rows_estimated > 0:
-                    # Show progress as loaded rows out of total estimated
-                    total_progress = (
-                        f"{self._total_rows_loaded:,} of {self._total_rows_estimated:,} rows"
-                    )
-                else:
-                    # Fall back to percentage if no row estimate
-                    total_progress = f"{percentage}%"
+                # Show progress as loaded rows
+                total_progress = f"{self._total_rows_loaded:,} rows"
 
                 # Emit progress and status signals within try block to catch Qt errors
                 self.progress.emit(percentage, 100)
@@ -243,11 +235,6 @@ class MultiCSVLoadTask(BackgroundTask):
         # Update current file progress
         self._current_file_rows = current
         self._current_file_total_rows = total
-
-        # Update total progress
-        if self._total_rows_estimated == 0:
-            # If this is the first progress update, initialize total estimate
-            self._total_rows_estimated = total * self._num_files
 
         # Calculate overall progress percentage
         if self._num_files > 0:

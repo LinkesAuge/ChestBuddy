@@ -679,7 +679,6 @@ class MainWindow(QMainWindow):
 
         # Reset state flags
         self._total_rows_loaded = 0
-        self._total_rows_estimated = 0
         self._last_progress_current = 0
         self._file_loading_complete = False
 
@@ -926,7 +925,6 @@ class MainWindow(QMainWindow):
                 # Track rows across all files
                 if not hasattr(self, "_total_rows_loaded"):
                     self._total_rows_loaded = 0
-                    self._total_rows_estimated = 0
                     self._last_progress_current = 0
                     self._file_sizes = {}
 
@@ -938,39 +936,6 @@ class MainWindow(QMainWindow):
                     self._last_progress_current = current
                 else:
                     self._last_progress_current = current
-
-                # Better row estimation based on known file sizes
-                if hasattr(self, "_file_sizes"):
-                    # Calculate known total from processed files
-                    known_sizes = sum(self._file_sizes.values())
-                    known_files = len(self._file_sizes)
-
-                    # Current file's expected size
-                    current_size = total
-
-                    # Calculate average file size from known files
-                    if known_files > 0:
-                        avg_size = known_sizes / known_files
-                    else:
-                        avg_size = current_size  # Fall back to current file size
-
-                    # Count remaining files
-                    remaining_files = (
-                        self._loading_state["total_files"] - known_files - 1
-                    )  # -1 for current file
-                    if remaining_files < 0:
-                        remaining_files = 0
-
-                    # Estimate total rows across all files
-                    self._total_rows_estimated = (
-                        known_sizes + current_size + (avg_size * remaining_files)
-                    )
-                else:
-                    # Fall back to simpler estimation if we don't have file sizes yet
-                    self._total_rows_estimated = max(
-                        self._total_rows_estimated,
-                        total * len(self._loading_state["processed_files"]),
-                    )
 
             # Calculate progress percentage safely
             percentage = min(100, int((current * 100 / total) if total > 0 else 0))
@@ -1004,8 +969,8 @@ class MainWindow(QMainWindow):
                     message = f"{file_info} - {row_info}"
 
                     # Add total rows information as status text
-                    if hasattr(self, "_total_rows_loaded") and self._total_rows_estimated > 0:
-                        total_progress = f"Total: {self._total_rows_loaded:,} of ~{self._total_rows_estimated:,} rows"
+                    if hasattr(self, "_total_rows_loaded"):
+                        total_progress = f"Total: {self._total_rows_loaded:,} rows"
                         self._progress_dialog.setStatusText(total_progress)
                     else:
                         self._progress_dialog.setStatusText("")

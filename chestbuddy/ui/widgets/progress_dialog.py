@@ -357,12 +357,21 @@ class ProgressDialog(QDialog):
         Args:
             state: The state to set
         """
-        if hasattr(self._progress_bar, "setState"):
-            self._progress_bar.setState(state)
+        logger.debug(f"Setting progress dialog state to: {state}")
+
+        # Check if this is a custom progress bar
+        if hasattr(self, "_progress_bar"):
+            # For custom progress bar with setState method
+            if hasattr(self._progress_bar, "setState"):
+                self._progress_bar.setState(state)
 
             # Also update the button style based on the state
             if hasattr(self, "_cancel_button") and self._cancel_button:
+                # Ensure we're using the correct enum by importing if needed
+                from chestbuddy.ui.widgets.progress_bar import ProgressBar
+
                 if state == ProgressBar.State.SUCCESS:
+                    logger.debug("Setting SUCCESS button style")
                     self._cancel_button.setStyleSheet(f"""
                         QPushButton {{
                             background-color: {Colors.SUCCESS};
@@ -378,6 +387,7 @@ class ProgressDialog(QDialog):
                         }}
                     """)
                 elif state == ProgressBar.State.ERROR:
+                    logger.debug("Setting ERROR button style")
                     self._cancel_button.setStyleSheet(f"""
                         QPushButton {{
                             background-color: {Colors.ERROR};

@@ -1868,3 +1868,108 @@
 2025-03-24 21:15:26,716 - __main__ - INFO - Starting application shutdown sequence
 2025-03-24 21:15:26,716 - __main__ - INFO - Saving configuration
 2025-03-24 21:15:26,717 - __main__ - INFO - Application shutdown complete
+2025-03-24 21:31:21,534 - root - INFO - Logging initialized to D:\Projekte\ChestBuddy\chestbuddy\logs\chestbuddy.log
+2025-03-24 21:31:22,014 - __main__ - INFO - Logging initialized at level DEBUG to d:\Projekte\ChestBuddy\chestbuddy\logs\chestbuddy.log
+2025-03-24 21:31:22,058 - chestbuddy.ui.data_view - INFO - Installed event filter on table view
+2025-03-24 21:31:22,059 - chestbuddy.ui.data_view - INFO - Registered Ctrl+C shortcut for copying (table-specific)
+2025-03-24 21:31:22,059 - chestbuddy.ui.data_view - INFO - Registered widget-level Ctrl+V shortcut for pasting (widget hierarchy)
+2025-03-24 21:31:22,068 - chestbuddy.ui.main_window - INFO - Setting active view to: Dashboard
+2025-03-24 21:31:22,069 - chestbuddy.ui.main_window - INFO - View 'Dashboard' activated successfully
+2025-03-24 21:31:22,071 - __main__ - INFO - Autosave enabled with interval of 5 minutes
+2025-03-24 21:31:22,072 - chestbuddy.ui.resources.resource_manager - WARNING - Failed to load Qt resources. Using file-based resources.
+2025-03-24 21:31:22,092 - __main__ - INFO - ChestBuddy application initialized
+2025-03-24 21:31:22,150 - __main__ - INFO - Starting application main event loop
+2025-03-24 21:31:29,592 - chestbuddy.core.services.data_manager - INFO - Loading CSV data: ['D:/Projekte/ChestBuddy/chestbuddy/data/input/Chests_input_2025_03_11.csv', 'D:/Projekte/ChestBuddy/chestbuddy/data/input/Chests_input_2025_03_12.csv']
+2025-03-24 21:31:29,607 - chestbuddy.core.services.data_manager - ERROR - Error setting up CSV loading task: BackgroundWorker.execute_task() takes 2 positional arguments but 3 were given
+2025-03-24 21:31:29,607 - chestbuddy.ui.main_window - ERROR - Load error: Error setting up CSV loading: BackgroundWorker.execute_task() takes 2 positional arguments but 3 were given
+2025-03-24 21:31:29,613 - __main__ - ERROR - Error setting up CSV loading: BackgroundWorker.execute_task() takes 2 positional arguments but 3 were given
+2025-03-24 21:31:38,288 - chestbuddy.ui.main_window - INFO - Cancelling any ongoing operations before closing
+2025-03-24 21:31:38,288 - chestbuddy.core.services.data_manager - INFO - DataManager.cancel_loading called
+2025-03-24 21:31:38,410 - __main__ - INFO - Starting application shutdown sequence
+2025-03-24 21:31:38,410 - __main__ - INFO - Saving configuration
+2025-03-24 21:31:38,410 - __main__ - INFO - Application shutdown complete
+2025-03-24 21:36:10,857 - root - INFO - Logging initialized to D:\Projekte\ChestBuddy\chestbuddy\logs\chestbuddy.log
+2025-03-24 21:36:11,314 - __main__ - INFO - Logging initialized at level DEBUG to d:\Projekte\ChestBuddy\chestbuddy\logs\chestbuddy.log
+2025-03-24 21:36:11,357 - chestbuddy.ui.data_view - INFO - Installed event filter on table view
+2025-03-24 21:36:11,358 - chestbuddy.ui.data_view - INFO - Registered Ctrl+C shortcut for copying (table-specific)
+2025-03-24 21:36:11,358 - chestbuddy.ui.data_view - INFO - Registered widget-level Ctrl+V shortcut for pasting (widget hierarchy)
+2025-03-24 21:36:11,367 - chestbuddy.ui.main_window - INFO - Setting active view to: Dashboard
+2025-03-24 21:36:11,367 - chestbuddy.ui.main_window - INFO - View 'Dashboard' activated successfully
+2025-03-24 21:36:11,370 - __main__ - INFO - Autosave enabled with interval of 5 minutes
+2025-03-24 21:36:11,370 - chestbuddy.ui.resources.resource_manager - WARNING - Failed to load Qt resources. Using file-based resources.
+2025-03-24 21:36:11,392 - __main__ - INFO - ChestBuddy application initialized
+2025-03-24 21:36:11,457 - __main__ - INFO - Starting application main event loop
+2025-03-24 21:36:16,562 - chestbuddy.core.services.data_manager - INFO - Loading CSV data: ['D:/Projekte/ChestBuddy/chestbuddy/data/input/Chests_input_2025_03_11.csv']
+2025-03-24 21:36:16,577 - chestbuddy.core.services.csv_service - INFO - Reading CSV file in chunks: D:/Projekte/ChestBuddy/chestbuddy/data/input/Chests_input_2025_03_11.csv, chunk size: 100
+2025-03-24 21:36:16,585 - chestbuddy.core.services.csv_service - INFO - Detected encoding: utf-8
+2025-03-24 21:36:16,897 - chestbuddy.core.services.csv_service - INFO - Successfully read CSV file with 3497 rows
+2025-03-24 21:36:16,898 - chestbuddy.utils.background_processing - INFO - Successfully loaded 3497 rows from 1 files
+2025-03-24 21:36:16,898 - chestbuddy.core.services.data_manager - INFO - CSV loaded successfully with 3497 rows
+2025-03-24 21:36:16,899 - chestbuddy.core.services.data_manager - INFO - CSV loaded successfully with 3497 rows
+2025-03-24 21:36:17,501 - __main__ - INFO - Data model changed
+2025-03-24 21:36:17,502 - __main__ - INFO - Data loaded successfully with Successfully loaded 3,497 rows of data rows
+2025-03-24 21:36:18,238 - __main__ - INFO - Data loaded successfully with Successfully loaded 3,497 rows of data rows
+2025-03-24 21:36:21,202 - chestbuddy.core.services.data_manager - INFO - DataManager.cancel_loading called
+2025-03-24 21:36:22,473 - chestbuddy.ui.main_window - INFO - Setting active view to: Data
+2025-03-24 21:36:22,476 - chestbuddy.ui.main_window - INFO - View 'Data' activated successfully
+2025-03-24 21:36:24,646 - chestbuddy.ui.main_window - INFO - Setting active view to: Dashboard
+2025-03-24 21:36:24,646 - chestbuddy.ui.main_window - INFO - View 'Dashboard' activated successfully
+2025-03-24 21:36:29,086 - chestbuddy.core.services.data_manager - INFO - Loading CSV data: ['D:/Projekte/ChestBuddy/chestbuddy/data/input/Chests_input_2025_03_11.csv', 'D:/Projekte/ChestBuddy/chestbuddy/data/input/Chests_input_2025_03_12.csv']
+2025-03-24 21:36:29,104 - chestbuddy.core.services.csv_service - INFO - Reading CSV file in chunks: D:/Projekte/ChestBuddy/chestbuddy/data/input/Chests_input_2025_03_11.csv, chunk size: 100
+2025-03-24 21:36:29,104 - chestbuddy.core.services.csv_service - INFO - Detected encoding: utf-8
+2025-03-24 21:36:29,422 - chestbuddy.core.services.csv_service - INFO - Successfully read CSV file with 3497 rows
+2025-03-24 21:36:29,423 - chestbuddy.core.services.csv_service - INFO - Reading CSV file in chunks: D:/Projekte/ChestBuddy/chestbuddy/data/input/Chests_input_2025_03_12.csv, chunk size: 100
+2025-03-24 21:36:29,429 - chestbuddy.core.services.csv_service - INFO - Detected encoding: utf-8
+2025-03-24 21:36:30,147 - chestbuddy.core.services.csv_service - INFO - Successfully read CSV file with 7959 rows
+2025-03-24 21:36:30,158 - chestbuddy.utils.background_processing - INFO - Successfully loaded 11456 rows from 2 files
+2025-03-24 21:36:30,159 - chestbuddy.core.services.data_manager - INFO - CSV loaded successfully with 11456 rows
+2025-03-24 21:36:30,159 - chestbuddy.core.services.data_manager - INFO - CSV loaded successfully with 11456 rows
+2025-03-24 21:36:33,247 - __main__ - INFO - Data model changed
+2025-03-24 21:36:33,248 - __main__ - INFO - Data loaded successfully with Successfully loaded 11,456 rows of data rows
+2025-03-24 21:36:36,455 - __main__ - INFO - Data model changed
+2025-03-24 21:36:36,455 - __main__ - INFO - Data loaded successfully with Successfully loaded 11,456 rows of data rows
+2025-03-24 21:36:39,322 - chestbuddy.core.services.data_manager - INFO - DataManager.cancel_loading called
+2025-03-24 21:36:43,094 - chestbuddy.core.services.data_manager - INFO - Loading CSV data: ['D:/Projekte/ChestBuddy/chestbuddy/data/input/Chests_input_2025_03_11.csv', 'D:/Projekte/ChestBuddy/chestbuddy/data/input/Chests_input_2025_03_12.csv', 'D:/Projekte/ChestBuddy/chestbuddy/data/input/Chests_input_test.csv']
+2025-03-24 21:36:43,110 - chestbuddy.core.services.csv_service - INFO - Reading CSV file in chunks: D:/Projekte/ChestBuddy/chestbuddy/data/input/Chests_input_2025_03_11.csv, chunk size: 100
+2025-03-24 21:36:43,111 - chestbuddy.core.services.csv_service - INFO - Detected encoding: utf-8
+2025-03-24 21:36:43,463 - chestbuddy.core.services.csv_service - INFO - Successfully read CSV file with 3497 rows
+2025-03-24 21:36:43,463 - chestbuddy.core.services.csv_service - INFO - Reading CSV file in chunks: D:/Projekte/ChestBuddy/chestbuddy/data/input/Chests_input_2025_03_12.csv, chunk size: 100
+2025-03-24 21:36:43,464 - chestbuddy.core.services.csv_service - INFO - Detected encoding: utf-8
+2025-03-24 21:36:44,205 - chestbuddy.core.services.csv_service - INFO - Successfully read CSV file with 7959 rows
+2025-03-24 21:36:44,225 - chestbuddy.core.services.csv_service - INFO - Reading CSV file in chunks: D:/Projekte/ChestBuddy/chestbuddy/data/input/Chests_input_test.csv, chunk size: 100
+2025-03-24 21:36:44,226 - chestbuddy.core.services.csv_service - INFO - Detected encoding: utf-8
+2025-03-24 21:36:45,411 - chestbuddy.core.services.csv_service - INFO - Successfully read CSV file with 12387 rows
+2025-03-24 21:36:45,430 - chestbuddy.utils.background_processing - INFO - Successfully loaded 23843 rows from 3 files
+2025-03-24 21:36:45,431 - chestbuddy.core.services.data_manager - INFO - CSV loaded successfully with 23843 rows
+2025-03-24 21:36:45,432 - chestbuddy.core.services.data_manager - INFO - CSV loaded successfully with 23843 rows
+2025-03-24 21:36:46,752 - chestbuddy.core.services.data_manager - INFO - DataManager.cancel_loading called
+2025-03-24 21:36:49,156 - chestbuddy.core.services.data_manager - INFO - Loading CSV data: ['D:/Projekte/ChestBuddy/chestbuddy/data/input/Chests_input_2025_03_11.csv', 'D:/Projekte/ChestBuddy/chestbuddy/data/input/Chests_input_2025_03_12.csv', 'D:/Projekte/ChestBuddy/chestbuddy/data/input/Chests_input_test.csv']
+2025-03-24 21:36:49,177 - chestbuddy.core.services.csv_service - INFO - Reading CSV file in chunks: D:/Projekte/ChestBuddy/chestbuddy/data/input/Chests_input_2025_03_11.csv, chunk size: 100
+2025-03-24 21:36:49,187 - chestbuddy.core.services.csv_service - INFO - Detected encoding: utf-8
+2025-03-24 21:36:49,886 - chestbuddy.core.services.csv_service - INFO - Successfully read CSV file with 3497 rows
+2025-03-24 21:36:49,896 - chestbuddy.core.services.csv_service - INFO - Reading CSV file in chunks: D:/Projekte/ChestBuddy/chestbuddy/data/input/Chests_input_2025_03_12.csv, chunk size: 100
+2025-03-24 21:36:49,912 - chestbuddy.core.services.csv_service - INFO - Detected encoding: utf-8
+2025-03-24 21:36:51,553 - chestbuddy.core.services.csv_service - INFO - Successfully read CSV file with 7959 rows
+2025-03-24 21:36:51,601 - chestbuddy.core.services.csv_service - INFO - Reading CSV file in chunks: D:/Projekte/ChestBuddy/chestbuddy/data/input/Chests_input_test.csv, chunk size: 100
+2025-03-24 21:36:51,626 - chestbuddy.core.services.csv_service - INFO - Detected encoding: utf-8
+2025-03-24 21:36:54,396 - chestbuddy.core.services.csv_service - INFO - Successfully read CSV file with 12387 rows
+2025-03-24 21:36:54,441 - chestbuddy.utils.background_processing - INFO - Successfully loaded 23843 rows from 3 files
+2025-03-24 21:36:54,456 - chestbuddy.core.services.data_manager - INFO - CSV loaded successfully with 23843 rows
+2025-03-24 21:36:54,457 - chestbuddy.core.services.data_manager - INFO - CSV loaded successfully with 23843 rows
+2025-03-24 21:36:55,291 - __main__ - INFO - Data model changed
+2025-03-24 21:36:55,291 - __main__ - INFO - Data loaded successfully with Successfully loaded 23,843 rows of data rows
+2025-03-24 21:36:56,136 - __main__ - INFO - Data loaded successfully with Successfully loaded 23,843 rows of data rows
+2025-03-24 21:36:57,695 - chestbuddy.core.services.data_manager - INFO - DataManager.cancel_loading called
+2025-03-24 21:36:58,872 - __main__ - INFO - Data model changed
+2025-03-24 21:36:58,873 - __main__ - INFO - Data loaded successfully with Successfully loaded 23,843 rows of data rows
+2025-03-24 21:37:03,568 - chestbuddy.ui.main_window - INFO - Setting active view to: Data
+2025-03-24 21:37:03,572 - chestbuddy.ui.main_window - INFO - View 'Data' activated successfully
+2025-03-24 21:37:09,640 - __main__ - INFO - Data model changed
+2025-03-24 21:37:30,960 - __main__ - INFO - Data loaded successfully with Successfully loaded 23,843 rows of data rows
+2025-03-24 21:37:59,319 - chestbuddy.ui.main_window - INFO - Setting active view to: Dashboard
+2025-03-24 21:37:59,320 - chestbuddy.ui.main_window - INFO - View 'Dashboard' activated successfully
+2025-03-24 21:38:09,918 - chestbuddy.ui.main_window - INFO - Cancelling any ongoing operations before closing
+2025-03-24 21:38:09,918 - chestbuddy.core.services.data_manager - INFO - DataManager.cancel_loading called
+2025-03-24 21:38:10,037 - __main__ - INFO - Starting application shutdown sequence
+2025-03-24 21:38:10,037 - __main__ - INFO - Saving configuration
+2025-03-24 21:38:10,038 - __main__ - INFO - Application shutdown complete
