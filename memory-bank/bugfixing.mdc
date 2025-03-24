@@ -89,6 +89,22 @@ alwaysApply: false
   - Fixed notification logic to ensure data changes are properly communicated
   - Added more detailed logging for debugging
 
+## Data Import Issues
+
+### Multiple Table Repopulation During File Import
+
+**Issue:** When importing multiple files, the table gets repopulated multiple times during the import process, causing visual flickering and potentially slowing down the import process.
+
+**Root Cause:** The `DataManager._on_background_task_completed` method was emitting both a `populate_table_requested` signal and updating the `DataModel`, which caused the table to be populated twice:
+1. Once via the `populate_table_requested` signal that triggers `MainWindow._on_populate_table_requested`
+2. Again when the `DataModel` emits `data_changed` which triggers `DataView._on_data_changed` to update the view
+
+**Solution:** Removed the redundant `populate_table_requested.emit(mapped_data)` signal from the `DataManager._on_background_task_completed` method, allowing the table to be populated just once via the normal data change notification path.
+
+**Fixed In:** Commit 843d24f
+
+**Status:** Fixed
+
 # Remaining Issues
 
 ## Minor Issues
