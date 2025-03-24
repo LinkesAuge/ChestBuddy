@@ -468,3 +468,67 @@
 2025-03-25 00:06:01,542 - __main__ - INFO - Starting application shutdown sequence
 2025-03-25 00:06:01,543 - __main__ - INFO - Saving configuration
 2025-03-25 00:06:01,543 - __main__ - INFO - Application shutdown complete
+2025-03-25 00:39:01,527 - root - INFO - Logging initialized to D:\Projekte\ChestBuddy\chestbuddy\logs\chestbuddy.log
+2025-03-25 00:39:02,006 - __main__ - INFO - Logging initialized at level DEBUG to d:\Projekte\ChestBuddy\chestbuddy\logs\chestbuddy.log
+2025-03-25 00:39:02,057 - chestbuddy.ui.data_view - INFO - Installed event filter on table view
+2025-03-25 00:39:02,058 - chestbuddy.ui.data_view - INFO - Registered Ctrl+C shortcut for copying (table-specific)
+2025-03-25 00:39:02,058 - chestbuddy.ui.data_view - INFO - Registered widget-level Ctrl+V shortcut for pasting (widget hierarchy)
+2025-03-25 00:39:02,060 - chestbuddy.ui.data_view - INFO - Starting _update_view method
+2025-03-25 00:39:02,060 - chestbuddy.ui.data_view - INFO - Data model is empty, no data to display
+2025-03-25 00:39:02,066 - chestbuddy.ui.main_window - INFO - Setting active view to: Dashboard
+2025-03-25 00:39:02,068 - __main__ - INFO - Autosave enabled with interval of 5 minutes
+2025-03-25 00:39:02,069 - chestbuddy.ui.resources.resource_manager - WARNING - Failed to load Qt resources. Using file-based resources.
+2025-03-25 00:39:02,091 - __main__ - INFO - ChestBuddy application initialized
+2025-03-25 00:39:02,156 - __main__ - INFO - Starting application main event loop
+2025-03-25 00:39:09,789 - chestbuddy.core.services.data_manager - INFO - Loading CSV data: ['D:/Projekte/ChestBuddy/chestbuddy/data/input/Chests_input_2025_03_11.csv', 'D:/Projekte/ChestBuddy/chestbuddy/data/input/Chests_input_2025_03_12.csv', 'D:/Projekte/ChestBuddy/chestbuddy/data/input/Chests_input_test.csv']
+2025-03-25 00:39:09,805 - chestbuddy.core.services.csv_service - INFO - Reading CSV file in chunks: D:/Projekte/ChestBuddy/chestbuddy/data/input/Chests_input_2025_03_11.csv, chunk size: 100
+2025-03-25 00:39:09,812 - chestbuddy.core.services.csv_service - INFO - Detected encoding: utf-8
+2025-03-25 00:39:10,103 - chestbuddy.core.services.csv_service - INFO - Successfully read CSV file with 3497 rows
+2025-03-25 00:39:10,105 - chestbuddy.core.services.csv_service - INFO - Reading CSV file in chunks: D:/Projekte/ChestBuddy/chestbuddy/data/input/Chests_input_2025_03_12.csv, chunk size: 100
+2025-03-25 00:39:10,112 - chestbuddy.core.services.csv_service - INFO - Detected encoding: utf-8
+2025-03-25 00:39:10,772 - chestbuddy.core.services.csv_service - INFO - Successfully read CSV file with 7959 rows
+2025-03-25 00:39:10,781 - chestbuddy.core.services.csv_service - INFO - Reading CSV file in chunks: D:/Projekte/ChestBuddy/chestbuddy/data/input/Chests_input_test.csv, chunk size: 100
+2025-03-25 00:39:10,782 - chestbuddy.core.services.csv_service - INFO - Detected encoding: utf-8
+2025-03-25 00:39:11,817 - chestbuddy.core.services.csv_service - INFO - Successfully read CSV file with 12387 rows
+2025-03-25 00:39:11,827 - chestbuddy.utils.background_processing - INFO - Successfully loaded 23843 rows from 3 files
+2025-03-25 00:39:11,828 - chestbuddy.core.services.data_manager - INFO - CSV loaded successfully with 23843 rows
+2025-03-25 00:39:11,828 - chestbuddy.core.services.data_manager - INFO - CSV loaded successfully with 23843 rows
+2025-03-25 00:39:11,846 - chestbuddy.ui.data_view - INFO - Starting _update_view method
+2025-03-25 00:39:11,847 - chestbuddy.ui.data_view - INFO - Got data from model: 23843 rows, columns: ['DATE', 'PLAYER', 'SOURCE', 'CHEST', 'SCORE', 'CLAN']
+2025-03-25 00:39:11,848 - chestbuddy.ui.data_view - INFO - Set table model dimensions: 23843 rows, 6 columns
+2025-03-25 00:39:11,851 - chestbuddy.ui.data_view - INFO - Starting to populate table with 23843 rows in chunks of 500
+2025-03-25 00:39:12,628 - chestbuddy.core.services.data_manager - INFO - DataManager.cancel_loading called
+2025-03-25 00:39:14,606 - chestbuddy.ui.main_window - INFO - Setting active view to: Data
+2025-03-25 00:39:15,095 - chestbuddy.ui.main_window - INFO - View 'Data' activated successfully
+2025-03-25 00:39:15,096 - chestbuddy.ui.main_window - INFO - Setting active view to: Data
+2025-03-25 00:39:20,196 - __main__ - INFO - Data model changed
+2025-03-25 00:39:20,198 - chestbuddy.core.services.data_manager - INFO - Emitting data_loaded signal
+2025-03-25 00:39:20,198 - chestbuddy.ui.main_window - INFO - Data loaded signal received, ensuring data table is populated
+2025-03-25 00:39:20,199 - chestbuddy.ui.main_window - INFO - Data view doesn't need refresh, skipping table population
+2025-03-25 00:39:20,199 - __main__ - INFO - Data loaded successfully with Successfully loaded 23,843 rows of data rows
+2025-03-25 00:39:20,199 - chestbuddy.core.services.data_manager - INFO - Emitted load_success signal
+2025-03-25 00:39:20,211 - chestbuddy.core.services.data_manager - INFO - Emitting data_loaded signal
+2025-03-25 00:39:20,211 - chestbuddy.ui.main_window - INFO - Data loaded signal received, ensuring data table is populated
+2025-03-25 00:39:20,212 - chestbuddy.ui.main_window - INFO - Data view doesn't need refresh, skipping table population
+2025-03-25 00:39:20,212 - __main__ - INFO - Data loaded successfully with Successfully loaded 23,843 rows of data rows
+2025-03-25 00:39:20,213 - chestbuddy.core.services.data_manager - INFO - Emitted load_success signal
+2025-03-25 00:39:21,627 - chestbuddy.ui.main_window - INFO - Setting active view to: Dashboard
+2025-03-25 00:39:22,108 - chestbuddy.ui.main_window - INFO - View 'Dashboard' activated successfully
+2025-03-25 00:39:22,108 - chestbuddy.ui.main_window - INFO - Setting active view to: Dashboard
+2025-03-25 00:39:30,837 - chestbuddy.ui.main_window - INFO - Setting active view to: Help
+2025-03-25 00:39:30,837 - chestbuddy.ui.main_window - WARNING - View 'Help' not found in views dictionary
+2025-03-25 00:39:32,219 - chestbuddy.ui.main_window - INFO - Setting active view to: Settings
+2025-03-25 00:39:32,219 - chestbuddy.ui.main_window - WARNING - View 'Settings' not found in views dictionary
+2025-03-25 00:39:32,838 - chestbuddy.ui.main_window - INFO - Setting active view to: Settings
+2025-03-25 00:39:32,838 - chestbuddy.ui.main_window - WARNING - View 'Settings' not found in views dictionary
+2025-03-25 00:39:33,197 - chestbuddy.ui.main_window - INFO - Setting active view to: Settings
+2025-03-25 00:39:33,197 - chestbuddy.ui.main_window - WARNING - View 'Settings' not found in views dictionary
+2025-03-25 00:39:33,444 - chestbuddy.ui.main_window - INFO - Setting active view to: Settings
+2025-03-25 00:39:33,444 - chestbuddy.ui.main_window - WARNING - View 'Settings' not found in views dictionary
+2025-03-25 00:39:33,860 - chestbuddy.ui.main_window - INFO - Setting active view to: Settings
+2025-03-25 00:39:33,860 - chestbuddy.ui.main_window - WARNING - View 'Settings' not found in views dictionary
+2025-03-25 00:39:35,172 - chestbuddy.ui.main_window - INFO - Cancelling any ongoing operations before closing
+2025-03-25 00:39:35,172 - chestbuddy.core.services.data_manager - INFO - DataManager.cancel_loading called
+2025-03-25 00:39:35,183 - __main__ - INFO - Starting application shutdown sequence
+2025-03-25 00:39:35,183 - __main__ - INFO - Saving configuration
+2025-03-25 00:39:35,183 - __main__ - INFO - Application shutdown complete

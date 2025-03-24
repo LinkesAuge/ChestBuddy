@@ -124,6 +124,26 @@ alwaysApply: false
 - **Memory usage during large file imports**: While improved, importing very large files still requires significant memory. 
   - Could be further improved by implementing disk-based intermediate storage for extremely large datasets.
 
+- **UI responsiveness during intensive operations**: Very large datasets (50,000+ rows) can occasionally cause UI freezing despite background processing.
+  - Additional throttling and chunking mechanisms could improve this further.
+
+## Current Technical Challenges
+
+- **Report generation**: Design and implementation of the PDF export functionality
+  - Need to select appropriate PDF generation library
+  - Challenge with embedding charts with proper resolution
+  - Handling pagination for large reports
+
+- **Settings persistence**: More robust storage of application settings
+  - Ensuring backward compatibility when adding new settings
+  - Providing defaults for missing settings
+  - Supporting user profiles in the future
+
+- **Enhanced error recovery**: More sophisticated error recovery mechanisms
+  - Providing better options to users when errors occur
+  - Preserving partial data when possible
+  - Automatic recovery attempts for common issues
+
 ## Lessons Learned
 
 1. Signal connections require careful debugging to ensure they're properly connected and functioning
