@@ -220,9 +220,6 @@ class DataManager(QObject):
         # Emit finished signal with cancellation message
         self.load_finished.emit("Operation cancelled by user")
 
-        # Emit error signal with cancellation message
-        self.load_error.emit("Operation cancelled by user")
-
     def _load_multiple_files(self, file_paths: List[str]) -> Tuple[pd.DataFrame, str]:
         """
         Load multiple CSV files and combine them into a single DataFrame.
