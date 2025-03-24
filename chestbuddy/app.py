@@ -333,15 +333,27 @@ class ChestBuddyApp(QObject):
             logger.error(f"Error handling data changed event: {str(e)}")
 
     def _update_ui(self) -> None:
-        """Update UI components after data model changes."""
+        """
+        Update the UI based on the current application state.
+        Called in response to data model changes.
+        """
         try:
-            # No need to explicitly update UI components as they are connected
-            # to the data_changed signal and will update themselves
-            # Just refresh the main window if needed
+            # Check if the main window exists before attempting to refresh it
             if hasattr(self, "_main_window") and self._main_window is not None:
-                self._main_window.refresh_ui()
+                # Get the current view from the main window
+                if (
+                    hasattr(self._main_window, "_content_stack")
+                    and self._main_window._content_stack is not None
+                ):
+                    current_index = self._main_window._content_stack.currentIndex()
+                    current_widget = self._main_window._content_stack.widget(current_index)
+
+                    # Only refresh if the current view might need it
+                    # Dashboard always needs updates to reflect latest stats
+                    # DataViewAdapter will check internally if it actually needs refresh
+                    self._main_window.refresh_ui()
         except Exception as e:
-            logger.error(f"Error updating UI: {str(e)}")
+            logger.error(f"Error updating UI: {e}")
 
     def _on_background_task_completed(self, task_id, result):
         """Handle background task completion."""

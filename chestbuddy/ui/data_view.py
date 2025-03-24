@@ -80,7 +80,7 @@ class DataView(QWidget):
         self._filtered_rows: List[int] = []
         self._current_filter: Dict[str, str] = {}
         self._is_updating = False  # Guard against recursive updates
-        self._auto_update_enabled = False  # Start with auto-update disabled
+        self._auto_update_enabled = True  # Enable auto-update by default
 
         # Set up UI
         self._init_ui()

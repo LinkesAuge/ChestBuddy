@@ -9,6 +9,7 @@ Usage:
 
 from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtWidgets import QWidget, QVBoxLayout
+import time
 
 from chestbuddy.core.models import ChestDataModel
 from chestbuddy.ui.data_view import DataView
@@ -44,6 +45,13 @@ class DataViewAdapter(BaseView):
         # Store references
         self._data_model = data_model
 
+        # State tracking to prevent unnecessary refreshes
+        self._last_data_state = {
+            "row_count": 0,
+            "column_count": 0,
+            "last_update_time": 0,
+        }
+
         # Create the underlying DataView
         self._data_view = DataView(data_model)
 
@@ -77,6 +85,9 @@ class DataViewAdapter(BaseView):
             if export_button:
                 export_button.clicked.disconnect()  # Disconnect any existing connections
                 export_button.clicked.connect(self.export_requested.emit)
+
+            # Connect data model signals to update our state tracking
+            self._data_model.data_changed.connect(self._on_data_changed)
         except (AttributeError, Exception) as e:
             # Handle the case where the DataView structure might be different
             print(f"Error connecting DataView signals: {e}")
@@ -87,10 +98,64 @@ class DataViewAdapter(BaseView):
         # in its ActionToolbar
         pass
 
+    def _on_data_changed(self):
+        """Handle data model changes to update our state tracking."""
+        # Update our state tracking
+        self._update_data_state()
+
+    def _update_data_state(self):
+        """Update our state tracking with the current data model state."""
+        if not self._data_model.is_empty:
+            self._last_data_state = {
+                "row_count": len(self._data_model.data),
+                "column_count": len(self._data_model.column_names),
+                "last_update_time": int(time.time() * 1000),
+            }
+        else:
+            self._last_data_state = {
+                "row_count": 0,
+                "column_count": 0,
+                "last_update_time": int(time.time() * 1000),
+            }
+
+    def needs_refresh(self) -> bool:
+        """
+        Check if the view needs refreshing based on data state.
+
+        Returns:
+            bool: True if the view needs to be refreshed, False otherwise
+        """
+        # Check if data has changed by comparing with our tracked state
+        current_state = {"row_count": 0, "column_count": 0}
+
+        if not self._data_model.is_empty:
+            current_state = {
+                "row_count": len(self._data_model.data),
+                "column_count": len(self._data_model.column_names),
+            }
+
+        needs_refresh = (
+            current_state["row_count"] != self._last_data_state["row_count"]
+            or current_state["column_count"] != self._last_data_state["column_count"]
+        )
+
+        return needs_refresh
+
     def refresh(self):
-        """Refresh the data view."""
-        if hasattr(self._data_view, "_update_view"):
-            self._data_view._update_view()
+        """
+        Refresh the data view only if the data has changed since the last refresh.
+        This prevents unnecessary table repopulation when switching views.
+        """
+        # Use the needs_refresh method to check if we need to update
+        if self.needs_refresh():
+            print(f"DataViewAdapter.refresh: Data changed, updating view.")
+            if hasattr(self._data_view, "_update_view"):
+                self._data_view._update_view()
+
+            # Update our state tracking
+            self._update_data_state()
+        else:
+            print("DataViewAdapter.refresh: No data changes, skipping view update")
 
     def populate_table(self) -> None:
         """
@@ -102,6 +167,9 @@ class DataViewAdapter(BaseView):
         else:
             # Fallback to update_view if populate_table doesn't exist
             self._data_view._update_view()
+
+        # Update our state tracking
+        self._update_data_state()
 
     def enable_auto_update(self) -> None:
         """Enable automatic table updates on data changes."""

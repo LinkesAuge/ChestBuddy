@@ -539,3 +539,72 @@ class DashboardView(BaseView):
 
         # Switch between empty state and content views
         self._stacked_widget.setCurrentIndex(1 if loaded else 0)
+
+    def refresh(self):
+        """Refresh the dashboard view with the latest data."""
+        # No need to refresh if we're not visible
+        if not self.isVisible():
+            return
+
+        # Update dashboard components
+        self._update_recent_file_list()
+        self._update_dashboard_stats()
+
+    def _update_recent_file_list(self):
+        """Update the recent file list in the dashboard."""
+        try:
+            # Check if the recent files widget exists and update it
+            if hasattr(self, "_recent_files") and self._recent_files is not None:
+                # If we're connected to the main window, get the recent files
+                parent = self.parent()
+                while parent:
+                    if hasattr(parent, "_recent_files"):
+                        # Update with main window's recent files
+                        self._recent_files.set_files(parent._recent_files)
+                        break
+                    parent = parent.parent()
+        except Exception as e:
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error updating recent file list: {e}")
+
+    def _update_dashboard_stats(self):
+        """Update the dashboard statistics."""
+        try:
+            # Only update stats if we have the data model
+            if hasattr(self, "_data_model") and self._data_model is not None:
+                # Get data from the model
+                has_data = not self._data_model.is_empty
+                if has_data:
+                    # Update dashboard stats with current data
+                    row_count = (
+                        len(self._data_model.data) if hasattr(self._data_model, "data") else 0
+                    )
+                    validation_status = (
+                        "Not Validated"
+                        if self._data_model.get_validation_status().empty
+                        else f"{len(self._data_model.get_validation_status())} issues"
+                    )
+                    corrections = (
+                        self._data_model.get_correction_row_count()
+                        if hasattr(self._data_model, "get_correction_row_count")
+                        else 0
+                    )
+
+                    from datetime import datetime
+
+                    last_import = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+                    # Update the stats cards
+                    self.update_stats(
+                        dataset_rows=row_count,
+                        validation_status=validation_status,
+                        corrections=corrections,
+                        last_import=last_import,
+                    )
+        except Exception as e:
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error updating dashboard stats: {e}")

@@ -347,15 +347,9 @@ class MainWindow(QMainWindow):
         self._data_manager.load_error.connect(self._on_load_error)
         self._data_manager.load_success.connect(self.refresh_ui)
 
-        # Don't connect the data_loaded signal to populate_data_table method
-        # We'll call populate_data_table explicitly in _finalize_loading to ensure
-        # it only happens once after all files are loaded
-        # self._data_manager.data_loaded.connect(self.populate_data_table)
-
-        # Disable auto-updates for the DataView component to prevent multiple table populating
-        data_view = self._views.get("Data")
-        if data_view and hasattr(data_view, "disable_auto_update"):
-            data_view.disable_auto_update()
+        # Connect data_loaded signal to populate_data_table method
+        # This ensures the table is populated even for subsequent file loads
+        self._data_manager.data_loaded.connect(self._ensure_data_table_populated)
 
     def _load_settings(self) -> None:
         """Load application settings."""
@@ -537,9 +531,8 @@ class MainWindow(QMainWindow):
         if not is_error:
             self._update_data_loaded_state(True)
 
-            # Explicitly populate the data table after successful loading
-            # This ensures the table is populated only once at the end of the entire loading process
-            self.populate_data_table()
+            # Removed explicit table population - let it happen through data_changed signal
+            # The table will be populated automatically when the data model changes
 
     @Slot(str)
     def _set_active_view(self, view_name: str) -> None:
@@ -1384,8 +1377,23 @@ class MainWindow(QMainWindow):
                 current_index = self._content_stack.currentIndex()
                 current_widget = self._content_stack.widget(current_index)
 
-                # Call refresh or update method if available
-                if hasattr(current_widget, "refresh"):
+                # Special handling for DataViewAdapter to prevent unnecessary refreshes
+                if (
+                    hasattr(current_widget, "__class__")
+                    and current_widget.__class__.__name__ == "DataViewAdapter"
+                ):
+                    if hasattr(current_widget, "needs_refresh") and current_widget.needs_refresh():
+                        current_widget.refresh()
+                    else:
+                        print("DataViewAdapter doesn't need refresh, skipping refresh")
+                # Special handling for DashboardView
+                elif (
+                    hasattr(current_widget, "__class__")
+                    and current_widget.__class__.__name__ == "DashboardView"
+                ):
+                    current_widget.refresh()
+                # For other widgets, call refresh or update method if available
+                elif hasattr(current_widget, "refresh"):
                     current_widget.refresh()
                 elif hasattr(current_widget, "_update_view"):
                     current_widget._update_view()
@@ -1457,5 +1465,29 @@ class MainWindow(QMainWindow):
             logger.info("Calling populate_table on data view")
             data_view.populate_table()
             logger.info("Data table population completed")
+        else:
+            logger.warning("Could not find data view or it lacks populate_table method")
+
+    def _ensure_data_table_populated(self):
+        """
+        Ensure the data table is populated after data is loaded.
+        This is especially important for subsequent file loads.
+        """
+        logger.info("Data loaded signal received, ensuring data table is populated")
+        data_view = self._views.get("Data")
+        if data_view and hasattr(data_view, "populate_table"):
+            # Only populate if the view needs a refresh
+            if hasattr(data_view, "needs_refresh") and data_view.needs_refresh():
+                # If we're currently on the Data view, populate it immediately
+                if self._content_stack.currentWidget() == data_view:
+                    logger.info("Currently on Data view and needs refresh, populating table")
+                    data_view.populate_table()
+                else:
+                    # Otherwise just update the state tracking so it'll populate when shown
+                    if hasattr(data_view, "_update_data_state"):
+                        logger.info("Not on Data view, updating state tracking only")
+                        data_view._update_data_state()
+            else:
+                logger.info("Data view doesn't need refresh, skipping table population")
         else:
             logger.warning("Could not find data view or it lacks populate_table method")

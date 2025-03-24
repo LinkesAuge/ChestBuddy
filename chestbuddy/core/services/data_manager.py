@@ -328,8 +328,8 @@ class DataManager(QObject):
             # Update the data model with the new data - this will trigger data_changed signal
             self._data_model.update_data(mapped_data)
 
-            # Replace populate_table_requested signal with data_loaded signal
-            # This indicates that data is loaded and ready for display
+            # Always emit data_loaded signal regardless of whether it's the first file
+            # This signal indicates that data is loaded and ready for display
             logger.info("Emitting data_loaded signal")
             self.data_loaded.emit()
 
@@ -339,8 +339,10 @@ class DataManager(QObject):
             # Clear the current task
             self._current_task = None
 
-            # Emit final success signal - but don't emit another load_finished to avoid new dialog
+            # Always emit final success signal to ensure UI is updated
+            # This is important for subsequent file loads too
             self.load_success.emit(success_message)
+            logger.info("Emitted load_success signal")
 
         except Exception as e:
             # Ensure signals are unblocked
