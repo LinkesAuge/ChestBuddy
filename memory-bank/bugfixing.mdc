@@ -233,12 +233,16 @@
 
 ## UI Blocking Issue - First Import Only
 - **Issue**: The UI remains blocked after the first file import operation, but works correctly on subsequent imports.
-- **Root Cause**: In MainWindow._on_load_started, we were calling progress_dialog.show() and separately calling ui_state_manager.start_operation() rather than using progress_dialog.show_with_blocking(). This created a disconnect between the dialog and the UI blocking operation, preventing proper cleanup when the dialog closed.
-- **Additional Issue**: MainWindow._close_progress_dialog lacked a final safety check to ensure the operation was actually ended, regardless of whether dialog._end_operation() succeeded.
+- **Root Cause**: During the CSV import process, multiple `load_started` signals are emitted from the `DataManager` to the `MainWindow`. The first call to `_on_load_started` creates a dialog and starts UI blocking, but subsequent calls could cause a mismatch between the dialog and the UI operation. When the dialog is closed, the operation might remain active without being tied to a dialog, leaving the UI in a blocked state.
 - **Solution**:
-  1. Modified MainWindow._on_load_started to use BlockableProgressDialog.show_with_blocking() to ensure the dialog properly owns the blocking operation
-  2. Added a safety check in MainWindow._close_progress_dialog to explicitly end any lingering import operations, even if dialog._end_operation() appeared to succeed
-- **Status**: Fixed on 2024-03-24
-- **Related Files**: 
-  - chestbuddy/ui/main_window.py
-  - chestbuddy/ui/widgets/blockable_progress_dialog.py
+  1. Modified `MainWindow._on_load_started` to use `show_with_blocking` which combines showing the dialog and starting the blocking operation in one atomic step
+  2. Added a safety check in `MainWindow._close_progress_dialog` to ensure the import operation is ended even if `dialog._end_operation()` fails
+  3. Improved error handling throughout both methods
+- **Files Changed**:
+  - `chestbuddy/ui/main_window.py`
+- **PR**: None (direct commit)
+- **Learning Points**:
+  1. Multiple signal emissions during a single logical operation can lead to state management issues
+  2. UI blocking operations need proper cleanup code with robust error handling
+  3. It's important to ensure atomicity between showing UI elements and starting blocking operations
+  4. Always include a final safety check to force cleanup of UI states in error cases

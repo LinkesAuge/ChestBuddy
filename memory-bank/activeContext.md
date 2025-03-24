@@ -485,3 +485,23 @@ Integration testing has been performed and is passing successfully, covering:
 
 This marks the completion of the major implementation work for the UI State Management system. The system is now ready for comprehensive testing in the full application context.
 
+## Current Focus
+- Ensuring robust UI state management during import operations
+- Fixing UI blocking/unblocking issues
+- Improving error handling for edge cases
+
+## Recent Changes
+- Fixed UI blocking issue after first import by ensuring proper coordination between progress dialog and UI state manager
+- Improved error handling in dialog creation and cleanup
+- Added safety checks to ensure UI state is properly reset even in error cases
+
+## Next Steps
+- Continue improving UI responsiveness during file operations
+- Enhance error handling and recovery in the import process
+- Further testing of edge cases in UI state management
+
+## Active Decisions
+- Using `show_with_blocking` for all blockable dialogs to ensure atomicity between dialog display and UI blocking
+- Adding safety checks in cleanup methods to ensure operations are properly ended
+- Improving logging to help diagnose similar issues in the future
+
