@@ -1519,33 +1519,333 @@ Manages application state transitions:
 - ImportState tracks the state of import operations
 
 ### 9. UI State Management Pattern
-A new architectural pattern being implemented to handle UI blocking/unblocking:
+A systematic architectural pattern implemented to handle UI blocking/unblocking during operations:
 
-- **Core Components**:
-  - `UIStateManager`: Singleton that tracks and controls UI element states
-  - `OperationContext`: Context manager for operations that might block the UI
-  - `UIElementGroups`: Logical grouping of related UI elements
-  - `UIOperations`: Standard operations that can block UI elements
-  
-- **Key Concepts**:
-  - **Reference Counting**: Multiple operations can block the same UI element
-  - **Operation Context**: Operations define a context within which UI elements are blocked
-  - **Element Registration**: UI elements register with the manager and specify custom handling
-  - **Group Operations**: Operations can target groups of related elements
-  
-- **Advantages**:
-  - Centralized control of UI state
-  - Declarative rather than imperative approach
-  - No reliance on timing or delayed checks
-  - Thread-safe implementation
-  - Clear visibility into what's blocking UI elements and why
-  
-- **Implementation**:
-  - Uses Qt's signal-slot mechanism for state change notifications
-  - Leverages QMutex for thread safety
-  - Provides context managers for safe operation boundaries
-  - Supports custom handlers for special UI components
+#### Architecture Overview
 
-This pattern replaces ad-hoc UI blocking/unblocking with a systematic approach that properly tracks UI state transitions and ensures UI elements are appropriately enabled/disabled.
+The UI State Management System provides a centralized, thread-safe way to manage UI element states during operations. It addresses the fundamental issues with ad-hoc UI blocking approaches by creating a cohesive system with proper reference counting and automatic cleanup.
+
+![UI State Management Architecture](https://mermaid.ink/img/pako:eNqFkl9PwjAUxb_KTZ-MIWSI8EBC5sM0PvjgixGSmrbdWrtlvRuDGPj2dh3IH_HBS5Oe3t85t-dWTFFJioAZy-yRY59GyZYxZaqQOGRMeXylcDcl3pE9DqbpLX1J3UymvgS50jz_AxiJb3qX0QzH79nqOcvu0nEYrJLFnE7HwXL-OEkvoL0UaZW_Z_Nk9T5P30jt1Yy_SWKMNwolCe9p1W1d-6yNcjKxB_EL9gfxO3-LntH9ILahzaBb_bK0gTDmtKb-IUuSCZSVACy4UbSE5kjVQgX_zXK4J7uDRucq4WZqe5jIr2_XWYbhXCrHYp0ZzPNGKcqtUMCMMFhCZLVujCTUlZbK7sFqj63Wm-V1p5nFwFHDEIGG7aCxnKgGcRXNSC-9VjaBFxXDqjJiDw25MsZzzVkh7W97RtqhbcpvZxcOfA?type=png)
+
+#### Core Components
+
+1. **UIStateManager**
+   - Singleton class for central UI state management
+   - Maps UI elements to their blocking operations
+   - Maintains reference counts for nested operations
+   - Provides thread-safe access with mutex locks
+   - Emits signals when element states change
+
+   ```python
+   # Accessing the UI State Manager
+   from chestbuddy.ui.state.manager import UIStateManager
+   
+   # Get the singleton instance
+   manager = UIStateManager()
+   
+   # Check if an element is blocked
+   is_blocked = manager.is_element_blocked(element_id)
+   
+   # Get operations blocking an element
+   operations = manager.get_blocking_operations(element_id)
+   ```
+
+2. **BlockableElementMixin**
+   - Mixin class that adds blocking capability to UI components
+   - Handles registration with UIStateManager
+   - Provides standard interface for blockable UI elements
+   - Customizable block/unblock behavior via _apply_block and _apply_unblock
+   - Automatically unregisters from manager when closed
+
+   ```python
+   from PySide6.QtWidgets import QWidget
+   from chestbuddy.ui.state.blockable import BlockableElementMixin
+   from chestbuddy.ui.state.enums import UIElementGroups
+   
+   class MyBlockableWidget(QWidget, BlockableElementMixin):
+       def __init__(self, parent=None, element_id="my_widget"):
+           QWidget.__init__(self, parent)
+           BlockableElementMixin.__init__(
+               self, 
+               element_id=element_id,
+               element_group=UIElementGroups.DATA_VIEW
+           )
+           
+       def _apply_block(self):
+           # Custom blocking behavior
+           self.setEnabled(False)
+           self.setStyleSheet("background-color: #f0f0f0;")
+           
+       def _apply_unblock(self):
+           # Custom unblocking behavior
+           self.setEnabled(True)
+           self.setStyleSheet("")
+           
+       def closeEvent(self, event):
+           # Ensure unregistration when widget is closed
+           self.unregister_from_ui_state_manager()
+           super().closeEvent(event)
+   ```
+
+3. **OperationContext**
+   - Context manager for operations that block UI elements
+   - Automatically handles blocking/unblocking, even with exceptions
+   - Supports blocking individual elements or element groups
+   - Uses reference counting for nested operations
+   - Thread-safe implementation
+
+   ```python
+   from chestbuddy.ui.state.context import OperationContext
+   from chestbuddy.ui.state.enums import UIOperations, UIElementGroups
+   
+   # Block specific elements
+   with OperationContext(
+       operation=UIOperations.DATA_IMPORT,
+       element_ids=["data_view", "toolbar"]
+   ):
+       # Perform operation that should block these elements
+       # Elements will be unblocked when exiting the context
+       # Even if an exception occurs
+       load_data_from_csv()
+       
+   # Block entire element groups
+   with OperationContext(
+       operation=UIOperations.DATA_VALIDATION,
+       element_groups=[UIElementGroups.DATA_VIEW, UIElementGroups.NAVIGATION]
+   ):
+       # All elements in these groups will be blocked
+       validate_data()
+   ```
+
+4. **Standardized Enumerations**
+   - UIOperations: Standard operations that can block UI
+   - UIElementGroups: Logical groupings of related elements
+
+   ```python
+   from chestbuddy.ui.state.enums import UIOperations, UIElementGroups
+   
+   # Available operations
+   print(UIOperations.DATA_IMPORT)  # For data import operations
+   print(UIOperations.DATA_EXPORT)  # For data export operations
+   print(UIOperations.DATA_VALIDATION)  # For validation operations
+   print(UIOperations.DATA_CORRECTION)  # For correction operations
+   
+   # Available element groups
+   print(UIElementGroups.NAVIGATION)  # Navigation elements
+   print(UIElementGroups.DATA_VIEW)  # Data view components
+   print(UIElementGroups.TOOLBAR)  # Toolbar actions
+   print(UIElementGroups.DIALOG)  # Dialog components
+   print(UIElementGroups.VALIDATION)  # Validation UI components
+   print(UIElementGroups.CORRECTION)  # Correction UI components
+   ```
+
+#### Reference Counting for Nested Operations
+
+The system handles nested operations through reference counting:
+
+1. When an operation starts and blocks an element, the reference count increases
+2. When a nested operation also blocks the same element, the count increases again
+3. When operations complete, the count decreases
+4. Only when the count reaches zero is the element unblocked
+
+```python
+# Example of nested operations
+with OperationContext(operation=UIOperations.DATA_IMPORT, 
+                     element_groups=[UIElementGroups.DATA_VIEW]):
+    # DATA_VIEW elements are blocked (count=1)
+    
+    # Some processing...
+    
+    with OperationContext(operation=UIOperations.DATA_VALIDATION, 
+                         element_groups=[UIElementGroups.DATA_VIEW]):
+        # DATA_VIEW elements still blocked (count=2)
+        validate_data()
+    
+    # DATA_VIEW elements still blocked (count=1)
+    finish_import()
+
+# DATA_VIEW elements unblocked (count=0)
+```
+
+#### Thread Safety
+
+The UI State Management System is designed to be thread-safe:
+
+1. All state modifications use QMutex for thread safety
+2. UI updates are always performed on the main thread using QMetaObject.invokeMethod
+3. Signals and slots connect with Qt.QueuedConnection to ensure thread safety
+
+```python
+# Thread-safe operation from background thread
+def run_in_background():
+    # This can safely be called from any thread
+    with OperationContext(operation=UIOperations.DATA_PROCESSING,
+                         element_groups=[UIElementGroups.DATA_VIEW]):
+        # Process data in background
+        process_large_dataset()
+        
+# Start background thread
+worker = BackgroundWorker(run_in_background)
+worker.start()
+```
+
+#### Integration with BackgroundWorker
+
+The system integrates with the BackgroundWorker class for background processing:
+
+```python
+from chestbuddy.core.background.worker import BackgroundWorker
+from chestbuddy.core.background.task import BackgroundTask
+from chestbuddy.ui.state.enums import UIOperations, UIElementGroups
+
+class MyDataTask(BackgroundTask):
+    def __init__(self, data):
+        super().__init__()
+        self.data = data
+        
+    def run(self):
+        # Process data
+        # Progress is automatically reported
+        self.progress.emit(50)
+        # Final result
+        return processed_data
+
+# The BackgroundWorker automatically creates an OperationContext
+worker = BackgroundWorker(
+    task=MyDataTask(data),
+    operation=UIOperations.DATA_PROCESSING,
+    element_groups=[UIElementGroups.DATA_VIEW]
+)
+
+# Connect signals
+worker.finished.connect(on_task_completed)
+worker.error.connect(on_task_error)
+
+# Start the worker (UI elements will be blocked)
+worker.start()
+# UI elements will be automatically unblocked when worker finishes
+```
+
+#### Blockable UI Components
+
+The system includes blockable versions of key UI components:
+
+1. **BlockableDataView**: For data viewing and editing
+2. **BlockableValidationTab**: For data validation operations
+3. **BlockableCorrectionTab**: For data correction operations
+4. **BlockableProgressDialog**: For operation progress display
+
+These components register with the UI State Manager and automatically handle their own blocking/unblocking based on active operations.
+
+#### Integration with Adapters
+
+The blockable components are integrated through view adapters:
+
+```python
+# View adapters automatically use blockable components
+class DataViewAdapter(BaseView):
+    def __init__(self, data_model):
+        # Create blockable component with unique ID
+        self._data_view = BlockableDataView(
+            parent=None,
+            element_id=f"data_view_adapter_{id(self)}",
+        )
+        
+        # Initialize base view
+        super().__init__("Data View", parent)
+        
+    def _setup_ui(self):
+        super()._setup_ui()
+        # Add blockable component to layout
+        self.get_content_layout().addWidget(self._data_view)
+```
+
+#### Best Practices
+
+1. **Unique Element IDs**
+   - Always use unique, descriptive IDs for UI elements
+   - Consider using class name + instance ID format
+   - Example: `f"data_view_{id(self)}"`
+
+2. **Proper Element Groups**
+   - Assign elements to appropriate groups for batch operations
+   - Create new groups for specialized component types
+
+3. **Minimal Operation Scope**
+   - Keep operation contexts as narrow as possible
+   - Only block elements that are directly affected by the operation
+
+4. **Always Use Context Managers**
+   - Never manually block/unblock elements
+   - Always use OperationContext to ensure proper cleanup
+
+5. **Custom Block/Unblock Behavior**
+   - Override _apply_block and _apply_unblock for custom blocking behavior
+   - Consider visual indicators beyond just disabling
+
+6. **Thread Safety**
+   - Always be aware of which thread is running your code
+   - Use QMetaObject.invokeMethod for cross-thread UI updates
+
+7. **Testing Blockable Components**
+   - Mock UIStateManager in tests to isolate components
+   - Verify registration happens correctly
+   - Test that block/unblock methods are called appropriately
+
+#### Implementation Examples
+
+**Example 1: Creating a new blockable button**
+
+```python
+from PySide6.QtWidgets import QPushButton
+from chestbuddy.ui.state.blockable import BlockableElementMixin
+from chestbuddy.ui.state.enums import UIElementGroups
+
+class BlockableButton(QPushButton, BlockableElementMixin):
+    def __init__(self, text, parent=None, element_id=None):
+        QPushButton.__init__(self, text, parent)
+        BlockableElementMixin.__init__(
+            self,
+            element_id=element_id or f"button_{id(self)}",
+            element_group=UIElementGroups.TOOLBAR
+        )
+        
+    def _apply_block(self):
+        self.setEnabled(False)
+        self.setToolTip("This action is not available during the current operation")
+        
+    def _apply_unblock(self):
+        self.setEnabled(True)
+        self.setToolTip("")
+```
+
+**Example 2: Using operation context with multiple elements**
+
+```python
+def process_and_export_data():
+    # Define which elements/groups to block
+    elements_to_block = ["export_button", "format_dropdown"]
+    groups_to_block = [UIElementGroups.DATA_VIEW]
+    
+    with OperationContext(
+        operation=UIOperations.DATA_EXPORT,
+        element_ids=elements_to_block,
+        element_groups=groups_to_block
+    ):
+        # Prepare data
+        prepare_data_for_export()
+        
+        # Export to file (nested operation)
+        with OperationContext(
+            operation=UIOperations.FILE_WRITE,
+            element_ids=["cancel_button"]
+        ):
+            write_to_file()
+            
+        # Finalize export
+        finalize_export()
+```
+
+This UI State Management pattern provides a robust, systematic approach to managing UI state during operations, eliminating the issues with ad-hoc UI blocking/unblocking and providing clear visibility into the UI state at all times.
 
 ``` 
