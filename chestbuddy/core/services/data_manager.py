@@ -512,3 +512,166 @@ class DataManager(QObject):
 
         # Always clear the current task
         self._current_task = None
+
+    def save_csv(self, file_path: str) -> bool:
+        """
+        Save data model to a CSV file.
+
+        Args:
+            file_path: Path to save the CSV file
+
+        Returns:
+            True if saving was successful, False otherwise
+        """
+        # Check if a loading operation is in progress
+        if hasattr(self, "_worker") and hasattr(self._worker, "is_running"):
+            if self._worker.is_running and self._current_task:
+                logger.warning("Cannot save while loading is in progress")
+                self.save_error.emit("Cannot save while files are being loaded")
+                return False
+
+        logger.info(f"Saving CSV file: {file_path}")
+
+        # Get the dataframe from the model
+        df = self._data_model.data
+
+        if df is None or df.empty:
+            logger.warning("No data to save")
+            self.save_error.emit("No data to save")
+            return False
+
+        try:
+            # Create the directory if it doesn't exist
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+            # Save the DataFrame to CSV
+            df.to_csv(file_path, index=False)
+            logger.info(f"Successfully saved {len(df)} rows to {file_path}")
+            self.save_success.emit(file_path)
+            return True
+        except Exception as e:
+            error_msg = f"Error saving to {file_path}: {str(e)}"
+            logger.error(error_msg)
+            self.save_error.emit(error_msg)
+            return False
+
+    def _update_recent_files(self, file_path: str) -> None:
+        """
+        Update the list of recent files.
+
+        Args:
+            file_path: Path to add to recent files
+        """
+        # Convert to Path for consistent handling
+        path = Path(file_path)
+        if not path.exists():
+            return
+
+        # Normalize the path to absolute
+        abs_path = str(path.resolve())
+
+        # Get the current list of recent files
+        recent_files = self._config.get("Files", "recent_files", "")
+        # Convert to list if needed
+        if not isinstance(recent_files, list):
+            if recent_files:
+                try:
+                    import json
+
+                    recent_files = json.loads(recent_files)
+                except:
+                    recent_files = []
+            else:
+                recent_files = []
+
+        # Remove the path if it's already in the list
+        if abs_path in recent_files:
+            recent_files.remove(abs_path)
+
+        # Add the path to the beginning of the list
+        recent_files.insert(0, abs_path)
+
+        # Limit the list to 10 items
+        recent_files = recent_files[:10]
+
+        # Update the config
+        self._config.set_list("Files", "recent_files", recent_files)
+
+    def get_recent_files(self) -> List[str]:
+        """
+        Get the list of recent files.
+
+        Returns:
+            List of paths to recent files
+        """
+        recent_files = self._config.get_list("Files", "recent_files", [])
+        if not isinstance(recent_files, list):
+            return []
+
+        # Filter out files that no longer exist
+        valid_files = []
+        for file_path in recent_files:
+            if Path(file_path).exists():
+                valid_files.append(file_path)
+
+        # Update the config if files were removed
+        if len(valid_files) != len(recent_files):
+            self._config.set_list("Files", "recent_files", valid_files)
+
+        return valid_files
+
+    def _map_columns(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Map DataFrame columns to the expected column names.
+
+        This method handles different column naming conventions:
+        - Uppercase (e.g., 'PLAYER')
+        - Title case (e.g., 'Player')
+        - Mixed case (e.g., 'playerName')
+
+        Args:
+            df: DataFrame to map
+
+        Returns:
+            DataFrame with mapped columns
+        """
+        # Make a copy to avoid modifying the original
+        result = df.copy()
+
+        # If the DataFrame is empty, return as is
+        if result.empty:
+            return result
+
+        # Get the expected columns from the data model
+        from chestbuddy.core.models.chest_data_model import ChestDataModel
+
+        expected_columns = ChestDataModel.EXPECTED_COLUMNS
+
+        # Create a mapping of actual column names to expected column names
+        # The approach is to:
+        # 1. Convert all column names to uppercase
+        # 2. Match against expected columns in uppercase
+        # 3. When a match is found, rename the column to the expected case (from EXPECTED_COLUMNS)
+
+        # Dictionary to store the mappings
+        column_map = {}
+
+        # Upper-case versions of expected columns for matching
+        expected_upper = [col.upper() for col in expected_columns]
+
+        # Convert DataFrame column names to uppercase for comparison
+        df_cols_upper = [col.upper() for col in result.columns]
+
+        # Look for matches
+        for i, col in enumerate(df_cols_upper):
+            if col in expected_upper:
+                # Get the index of the match in expected_upper
+                idx = expected_upper.index(col)
+                # Map the actual column name to the expected column name (preserving case)
+                column_map[result.columns[i]] = expected_columns[idx]
+
+        # Apply the mapping if any was found
+        if column_map:
+            result = result.rename(columns=column_map)
+
+        return result

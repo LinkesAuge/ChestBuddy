@@ -187,3 +187,19 @@ During implementation of progress dialog improvements, the DataManager.load_csv 
 
 ### Verification
 Tested by loading multiple CSV files, which now works correctly with proper progress reporting.
+
+## Missing Methods Issue
+
+**Issue:** Application failed to start due to AttributeError: 'DataManager' object has no attribute 'save_csv'
+
+**Root Cause:** When fixing the table repopulation issue, several methods were accidentally removed from the DataManager class, including:
+- save_csv method (needed for saving CSV files)
+- _update_recent_files (for managing recent files list)
+- get_recent_files (for retrieving the list of recent files)
+- _map_columns (for mapping CSV column names to expected names)
+
+**Solution:** Restored all the missing methods while keeping the fix for the table repopulation issue, ensuring the application can start successfully and maintain all previous functionality.
+
+**Fixed In:** Commit [current commit]
+
+**Status:** Fixed
