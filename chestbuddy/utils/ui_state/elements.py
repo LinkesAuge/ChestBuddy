@@ -186,6 +186,21 @@ class BlockableWidgetGroup(QObject):
         # Set of operations currently blocking this group
         self._blocking_operations: Set[Any] = set()
 
+    def register_with_manager(self, manager: "UIStateManager") -> None:
+        """
+        Register this widget group with the UI state manager.
+
+        Args:
+            manager: The UI state manager instance
+        """
+        # Store reference to manager for later use
+        self._manager = manager
+
+        # Register all widgets with the manager
+        for widget in self._widgets:
+            if hasattr(widget, "register_with_manager"):
+                widget.register_with_manager(manager)
+
     def add_widget(self, widget: QWidget) -> None:
         """
         Add a widget to the group.
@@ -254,6 +269,14 @@ class BlockableWidgetGroup(QObject):
                         widget.unblock(operation)
                     else:
                         widget.setEnabled(True)
+        else:
+            # Even if this operation isn't blocking the group, try to unblock individual widgets
+            # This handles cases where widgets were added to multiple groups
+            for widget in self._widgets:
+                if hasattr(widget, "unblock"):
+                    widget.unblock(operation)
+                elif not self._blocking_operations and hasattr(widget, "setEnabled"):
+                    widget.setEnabled(True)
 
     def is_blocked(self) -> bool:
         """

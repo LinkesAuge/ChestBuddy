@@ -12,6 +12,7 @@ import pytest
 from unittest.mock import MagicMock, patch, PropertyMock
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtWidgets import QApplication, QMainWindow, QMessageBox, QWidget
+from typing import Any
 
 from chestbuddy.core.models.chest_data_model import ChestDataModel
 from chestbuddy.core.services.chart_service import ChartService
@@ -114,12 +115,22 @@ class _BlockableElementDelegate(BlockableElementMixin):
         super().__init__()
         self.parent = parent
 
-    def _apply_block(self):
-        """Apply block to the parent widget."""
+    def _apply_block(self, operation: Any = None):
+        """
+        Apply block to the parent widget.
+
+        Args:
+            operation: The operation causing the block
+        """
         self.parent.setEnabled(False)
 
-    def _apply_unblock(self):
-        """Apply unblock to the parent widget."""
+    def _apply_unblock(self, operation: Any = None):
+        """
+        Apply unblock to the parent widget.
+
+        Args:
+            operation: The operation unblocking the widget
+        """
         self.parent.setEnabled(True)
 
 

@@ -87,9 +87,12 @@ class BlockableBaseView(BaseView, BlockableElementMixin):
             self._ui_state_manager.add_element_to_group(self, group)
             logger.debug(f"Added {self} to group {group}")
 
-    def _apply_block(self):
+    def _apply_block(self, operation: Any = None):
         """
         Apply blocking behavior to this view.
+
+        Args:
+            operation: The operation causing the block
 
         This implementation blocks the entire view, all action buttons,
         and the content widget.
@@ -104,11 +107,16 @@ class BlockableBaseView(BaseView, BlockableElementMixin):
             }
         """)
 
-        logger.debug(f"Blocked view: {self.objectName() or self.__class__.__name__}")
+        logger.debug(
+            f"Blocked view: {self.objectName() or self.__class__.__name__} for operation {operation}"
+        )
 
-    def _apply_unblock(self):
+    def _apply_unblock(self, operation: Any = None):
         """
         Apply unblocking behavior to this view.
+
+        Args:
+            operation: The operation that was blocking this view
 
         This implementation restores the view to its original state.
         """
@@ -118,7 +126,9 @@ class BlockableBaseView(BaseView, BlockableElementMixin):
         # Restore normal UI state
         self.setStyleSheet("")
 
-        logger.debug(f"Unblocked view: {self.objectName() or self.__class__.__name__}")
+        logger.debug(
+            f"Unblocked view: {self.objectName() or self.__class__.__name__} from operation {operation}"
+        )
 
     def closeEvent(self, event):
         """
