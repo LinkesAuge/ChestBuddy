@@ -452,7 +452,43 @@ This enhancement allows for more efficient data entry and editing, especially wh
 2. Press Ctrl+V or use the right-click context menu to paste to all selected cells
 3. See immediate feedback as all selected cells are updated simultaneously
 
-### Column Name Standardization 
+### Progress Dialog Improvements
+
+We're enhancing the progress dialog to provide a better user experience during multi-file operations. The following improvements will be implemented:
+
+1. **Single Dialog for Multiple Files**
+   - Keep one progress modal active for all files instead of creating a new one for each file
+   - Maintain continuity in the UI during the entire loading process
+   - Eliminate flickering and dialog recreation between files
+
+2. **Aggregated Progress Tracking**
+   - Display running total of processed rows across all files
+   - Avoid resetting row counter between files
+   - Show total progress as "Total: X of Y rows processed"
+
+3. **Clear File Progress Indicators**
+   - Show "Reading file X of Y" to indicate overall file progress
+   - Display current filename being processed
+   - Track and show overall completion percentage
+
+4. **Enhanced User Control**
+   - Make the progress dialog moveable while active
+   - Allow users to position the dialog where preferred
+   - Keep the dialog on top but not fixed in position
+
+5. **Success Indication**
+   - Change the button to green when files have been loaded successfully
+   - Provide clear visual feedback about operation success
+   - Use ProgressBar's existing SUCCESS state for consistent styling
+
+These improvements will make the file loading process more transparent and provide better feedback to users, especially when dealing with multiple or large files.
+
+Implementation will focus on:
+- Updating MainWindow._on_load_started() to prevent creating new dialogs unnecessarily
+- Ensuring proper state tracking in _loading_state across all files
+- Removing the FramelessWindowHint flag from ProgressDialog to allow movement
+- Applying the SUCCESS state to the progress bar on successful completion
+- Styling the button appropriately in the success state
 
 ## Current Focus: CSV Loading Improvements
 

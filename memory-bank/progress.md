@@ -464,3 +464,28 @@ No critical issues at this time. The minor QThread object deletion warning at sh
 - [x] CSV import test script
 - [ ] Full integration tests
 - [ ] Automated UI tests
+
+## Current Focus: Phase 14
+
+### Progress Dialog Improvements (In Progress)
+- [ ] Maintain a single progress dialog for multiple files
+- [ ] Implement aggregated row counting across all files
+- [ ] Display "Reading file X of Y" progress information
+- [ ] Make progress dialog moveable while active
+- [ ] Change button color to green on successful completion
+
+### Report Generation System (Planned)
+- [ ] Research and select appropriate PDF generation library
+- [ ] Design report templates and structure
+- [ ] Implement ReportService backend
+- [ ] Create ReportView UI component
+- [ ] Add chart embedding in PDF reports
+- [ ] Implement report preview and export functionality
+
+## Backlog
+
+### Future Enhancements
+- [ ] Additional chart types and customization options
+- [ ] Performance optimization for large datasets
+- [ ] Comprehensive user documentation including chart features
+- [ ] Chart integration with reports

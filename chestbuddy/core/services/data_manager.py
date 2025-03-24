@@ -88,88 +88,55 @@ class DataManager(QObject):
 
     def load_csv(self, file_paths: Union[str, List[str]]) -> None:
         """
-        Load one or more CSV files and update the data model.
+        Load CSV data from file(s) into the data store.
 
         Args:
-            file_paths: Path to single CSV file or list of paths
+            file_paths: Path to CSV file(s) to load
         """
-        # Convert single file path to list for consistent handling
+        logger.info(f"Loading CSV data: {file_paths}")
+
+        # Convert single string path to list
         if isinstance(file_paths, str):
             file_paths = [file_paths]
 
-        if not file_paths:
-            logger.warning("No files provided to load")
-            return
+        # Store the files to load for progress tracking
+        self._files_to_load = file_paths
 
-        logger.info(f"Loading {len(file_paths)} CSV file(s)")
+        # Signal that loading has started
+        logger.debug("Emitting load_started signal")
+        self.load_started.emit()
 
-        # Store the most recent file path
-        self._current_file_path = file_paths[0]
-
-        # Add files to the list of recent files
-        for file_path in file_paths:
-            self._update_recent_files(file_path)
-
-        # Temporarily disconnect data_changed signals during import to prevent cascading updates
+        # Block signals from data model to prevent multiple updates
         self._data_model.blockSignals(True)
 
+        # Create the task
         try:
-            # First emit load started signal
-            self.load_started.emit()
-
-            # Get chunk size from config
-            chunk_size = self._config.get_int("Import", "chunk_size", 100)
-
-            # Add safety check for chunk size
-            if chunk_size <= 0:
-                chunk_size = 100  # Use a reasonable default if configuration is invalid
-                logger.warning(f"Invalid chunk size in config, using default: {chunk_size}")
-
-            # Create and configure the task
+            logger.debug(f"Creating MultiCSVLoadTask for {len(file_paths)} files")
             task = MultiCSVLoadTask(
-                file_paths=file_paths,
                 csv_service=self._csv_service,
-                chunk_size=chunk_size,  # Use configured chunk size
+                file_paths=file_paths,
+                chunk_size=100,  # Use smaller chunk size for more granular progress updates
                 normalize_text=True,
                 robust_mode=True,
             )
 
-            # Connect file progress signal with better error handling
-            try:
-                task.file_progress.connect(self._on_file_progress)
-            except Exception as e:
-                logger.error(f"Error connecting file_progress signal: {e}")
-                # Continue even if signal connection fails
+            # Connect progress signals to forward them to the UI
+            task.progress.connect(self._on_load_progress)
+            task.file_progress.connect(self._on_file_progress)
+            task.status_signal.connect(lambda status: logger.debug(f"Task status: {status}"))
 
             # Store the task for potential cancellation
             self._current_task = task
 
-            # Check if worker is already running
-            if self._worker.is_running:
-                logger.warning("Worker is already running, cancelling previous task")
-                try:
-                    self._worker.cancel()
-                    # Wait briefly for cancellation
-                    import time
-
-                    time.sleep(0.5)
-                except Exception as e:
-                    logger.error(f"Error cancelling previous task: {e}")
-
-            # Execute the task with error handling
-            try:
-                self._worker.execute_task(task)
-            except Exception as e:
-                logger.error(f"Error executing CSV load task: {e}")
-                self._data_model.blockSignals(False)
-                self.load_error.emit(f"Error starting file loading: {str(e)}")
-                self.load_finished.emit(f"Error: {str(e)}")
-
+            # Execute the task in the background
+            result_key = "load_csv"
+            logger.debug(f"Executing MultiCSVLoadTask with key: {result_key}")
+            self._worker.execute_task(task, result_key)
         except Exception as e:
-            # Ensure signals are unblocked even if an error occurs
+            logger.error(f"Error setting up CSV loading task: {e}")
+            # Unblock signals if error occurs
             self._data_model.blockSignals(False)
-            logger.error(f"Error during CSV import: {e}")
-            self.load_error.emit(f"Error loading files: {str(e)}")
+            self.load_error.emit(f"Error setting up CSV loading: {str(e)}")
             self.load_finished.emit(f"Error: {str(e)}")
 
     def cancel_loading(self) -> None:

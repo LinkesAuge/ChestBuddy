@@ -479,6 +479,8 @@ class MainWindow(QMainWindow):
                 self._progress_dialog.setLabelText("Loading failed")
             else:
                 # Set success styling
+                if hasattr(self._progress_dialog, "setState") and hasattr(ProgressBar, "State"):
+                    self._progress_dialog.setState(ProgressBar.State.SUCCESS)
                 self._progress_dialog.setLabelText("Loading complete")
 
             # Set status message
@@ -503,14 +505,7 @@ class MainWindow(QMainWindow):
 
             logger.debug("Progress dialog updated for finalization")
         except Exception as e:
-            logger.error(f"Error finalizing progress dialog: {e}")
-            # Try to ensure dialog can be closed
-            try:
-                if hasattr(self._progress_dialog, "_cancel_button"):
-                    self._progress_dialog._cancel_button.setEnabled(True)
-                    self._progress_dialog._cancel_button.setText("Close")
-            except:
-                pass
+            logger.error(f"Error in _finalize_loading: {e}")
 
         # Update data loaded state after successful loading
         if not is_error:
@@ -687,16 +682,18 @@ class MainWindow(QMainWindow):
         self._total_rows_estimated = 0
         self._last_progress_current = 0
         self._file_loading_complete = False
-        # Remove table population state variables
-        # self._table_population_complete = False
-        # self._table_population_in_progress = False
 
         # Flag to track if we're showing an error
         self._showing_error_dialog = False
 
         # Only create a new progress dialog if one doesn't exist or is not visible
         # This prevents multiple dialogs from appearing
-        create_new_dialog = True
+        create_new_dialog = (
+            not hasattr(self, "_progress_dialog")
+            or not self._progress_dialog
+            or not self._progress_dialog.isVisible()
+        )
+        progress_dialog_ready = False
 
         if hasattr(self, "_progress_dialog") and self._progress_dialog:
             # Check if the dialog is already visible
@@ -741,6 +738,9 @@ class MainWindow(QMainWindow):
                     # Process events to ensure UI updates
                     QApplication.processEvents()
 
+                    # Mark the dialog as ready
+                    progress_dialog_ready = True
+
                 except Exception as e:
                     logger.error(f"Error reusing existing progress dialog: {e}")
                     # If we can't reuse the existing dialog, create a new one
@@ -761,9 +761,6 @@ class MainWindow(QMainWindow):
                 except:
                     pass
                 create_new_dialog = True
-
-        # Flag to track if dialog was successfully created and shown
-        progress_dialog_ready = not create_new_dialog  # Already true if we're reusing
 
         # Create a new dialog if needed
         if create_new_dialog:
@@ -1194,9 +1191,14 @@ class MainWindow(QMainWindow):
 
         if file_paths:
             try:
+                # Add selected files to recent files list
                 for file_path in file_paths:
                     self._add_recent_file(file_path)
                     self.file_opened.emit(file_path)
+
+                # Set the total files count in data manager if available
+                if self._data_manager and hasattr(self._data_manager, "_files_to_load"):
+                    self._data_manager._files_to_load = file_paths
 
                 # Emit signal with all selected files
                 self.load_csv_triggered.emit(file_paths)

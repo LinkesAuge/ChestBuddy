@@ -109,8 +109,8 @@ class ProgressDialog(QDialog):
 
     def _setup_ui(self) -> None:
         """Set up the UI components."""
-        # Set window flags to make it modal and frameless
-        self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+        # Set window flags to make it modal but with a frame so it can be moved
+        self.setWindowFlags(Qt.Dialog | Qt.WindowStaysOnTopHint)
         self.setWindowModality(Qt.ApplicationModal)
         self.setFixedSize(420, 250)
 
@@ -359,6 +359,54 @@ class ProgressDialog(QDialog):
         """
         if hasattr(self._progress_bar, "setState"):
             self._progress_bar.setState(state)
+
+            # Also update the button style based on the state
+            if hasattr(self, "_cancel_button") and self._cancel_button:
+                if state == ProgressBar.State.SUCCESS:
+                    self._cancel_button.setStyleSheet(f"""
+                        QPushButton {{
+                            background-color: {Colors.SUCCESS};
+                            color: {Colors.TEXT_LIGHT};
+                            border: none;
+                            padding: 8px 16px;
+                            border-radius: 4px;
+                            font-weight: bold;
+                        }}
+                        QPushButton:hover {{
+                            background-color: {Colors.SUCCESS};
+                            opacity: 0.9;
+                        }}
+                    """)
+                elif state == ProgressBar.State.ERROR:
+                    self._cancel_button.setStyleSheet(f"""
+                        QPushButton {{
+                            background-color: {Colors.ERROR};
+                            color: {Colors.TEXT_LIGHT};
+                            border: none;
+                            padding: 8px 16px;
+                            border-radius: 4px;
+                            font-weight: bold;
+                        }}
+                        QPushButton:hover {{
+                            background-color: {Colors.ERROR};
+                            opacity: 0.9;
+                        }}
+                    """)
+                else:
+                    # Reset to normal style
+                    self._cancel_button.setStyleSheet(f"""
+                        QPushButton {{
+                            background-color: {Colors.PRIMARY};
+                            color: {Colors.TEXT_LIGHT};
+                            border: none;
+                            padding: 8px 16px;
+                            border-radius: 4px;
+                            font-weight: bold;
+                        }}
+                        QPushButton:hover {{
+                            background-color: {Colors.ACCENT};
+                        }}
+                    """)
 
     def reset(self) -> None:
         """
