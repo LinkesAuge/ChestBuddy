@@ -150,21 +150,36 @@ class ChestBuddyApp(QObject):
         self._data_manager.save_success.connect(lambda path: logger.info(f"File saved: {path}"))
         self._data_manager.save_error.connect(self._show_error)
 
-    def _on_data_load_success(self, row_count: str) -> None:
+    def _on_data_load_success(self, message: str) -> None:
         """
         Handle successful data load.
 
         Args:
-            row_count: Number of rows loaded
+            message: Number of rows loaded
         """
-        logger.info(f"Data loaded successfully with {row_count} rows")
+        logger.info(f"Data loaded successfully with {message} rows")
 
-        # Switch to the Data view in the main window using a thread-safe approach
-        # Comment out the automatic tab change as requested by the user
-        # if self._main_window:
-        #     # Use QTimer.singleShot for thread-safety in PySide6
-        #     QTimer.singleShot(0, lambda: self._main_window._set_active_view("Data"))
-        #     logger.info("Requested switch to Data view (thread-safe)")
+        # Set loading completed flag to prevent opening file dialogs
+        self._file_loading_completed = True
+
+        try:
+            # Switch to the Data view in the main window using a thread-safe approach
+            # This code is commented out as requested by the user
+            # if self._main_window:
+            #     # Use QTimer.singleShot for thread-safety in PySide6
+            #     QTimer.singleShot(0, lambda: self._main_window._set_active_view("Data"))
+            #     logger.info("Requested switch to Data view (thread-safe)")
+            pass  # Empty block to satisfy syntax
+        except Exception as e:
+            logger.error(f"Error handling data load success: {e}")
+
+        # Clear the flag after a short delay
+        QTimer.singleShot(1000, self._clear_loading_flags)
+
+    def _clear_loading_flags(self):
+        """Clear loading flags to allow normal operation."""
+        if hasattr(self, "_file_loading_completed"):
+            self._file_loading_completed = False
 
     def _setup_autosave(self) -> None:
         """Set up periodic autosave functionality."""

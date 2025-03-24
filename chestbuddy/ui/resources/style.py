@@ -17,6 +17,7 @@ class Colors:
 
     # Main colors
     PRIMARY = "#1A2C42"  # Dark blue
+    PRIMARY_LIGHT = "#263D5A"  # Lighter version of primary
     SECONDARY = "#D4AF37"  # Gold
     ACCENT = "#4A90E2"  # Light blue
 
@@ -34,6 +35,7 @@ class Colors:
     # Text colors
     TEXT_LIGHT = "#FFFFFF"  # White
     TEXT_MUTED = "#E2E8F0"  # Light gray
+    TEXT_DISABLED = "#889EB8"  # Muted blue-gray
 
     # Border colors
     BORDER = "#4A5568"  # Medium gray

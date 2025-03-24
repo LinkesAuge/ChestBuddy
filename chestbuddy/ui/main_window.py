@@ -166,6 +166,9 @@ class MainWindow(QMainWindow):
             "total_rows": 0,
         }
 
+        # Data state tracking
+        self._has_data_loaded = False
+
         # Update UI
         self._update_ui()
 
@@ -183,6 +186,7 @@ class MainWindow(QMainWindow):
         # Create sidebar navigation
         self._sidebar = SidebarNavigation()
         self._sidebar.navigation_changed.connect(self._on_navigation_changed)
+        self._sidebar.data_dependent_view_clicked.connect(self._on_data_dependent_view_clicked)
         main_layout.addWidget(self._sidebar)
 
         # Create content stack
@@ -212,11 +216,14 @@ class MainWindow(QMainWindow):
         dashboard_view = DashboardView(self._data_model)
         dashboard_view.action_triggered.connect(self._on_dashboard_action)
         dashboard_view.file_selected.connect(self._on_recent_file_selected)
+        dashboard_view.import_requested.connect(self._open_file)
         self._content_stack.addWidget(dashboard_view)
         self._views["Dashboard"] = dashboard_view
 
         # Create Data view
         data_view = DataViewAdapter(self._data_model)
+        data_view.import_requested.connect(self._open_file)
+        data_view.export_requested.connect(self._save_file_as)
         self._content_stack.addWidget(data_view)
         self._views["Data"] = data_view
 
@@ -305,35 +312,24 @@ class MainWindow(QMainWindow):
 
     def _connect_signals(self) -> None:
         """Connect signals and slots."""
-        # Data manager signals
-        self._data_manager.load_started.connect(self._on_load_started)
-        self._data_manager.load_progress.connect(self._on_load_progress)
-        self._data_manager.load_finished.connect(self._on_load_finished)
-        self._data_manager.load_error.connect(self._on_load_error)
-        self._data_manager.load_success.connect(self.refresh_ui)
-        self._data_manager.populate_table_requested.connect(self._on_populate_table_requested)
-
-        # Data model signals
-        self._data_model.data_changed.connect(self._on_data_changed)
-        self._data_model.validation_changed.connect(self._on_validation_changed)
-        self._data_model.correction_applied.connect(self._on_correction_applied)
-
-        # Connect data model signals
-        self._data_model.data_changed.connect(self._on_data_changed)
-        self._data_model.validation_changed.connect(self._on_validation_changed)
-        self._data_model.correction_applied.connect(self._on_correction_applied)
-
-        # Connect data manager signals for progress reporting
+        # Data manager signals - ONLY connect these once
         if self._data_manager:
             logger.debug("Connecting data_manager signals in MainWindow")
             self._data_manager.load_started.connect(self._on_load_started)
             self._data_manager.load_progress.connect(self._on_load_progress)
             self._data_manager.load_finished.connect(self._on_load_finished)
-            self._data_manager.load_success.connect(lambda msg: self._status_bar.set_status(msg))
             self._data_manager.load_error.connect(self._on_load_error)
+            self._data_manager.load_success.connect(self.refresh_ui)
+            self._data_manager.load_success.connect(lambda msg: self._status_bar.set_status(msg))
+            self._data_manager.populate_table_requested.connect(self._on_populate_table_requested)
             logger.debug("All data_manager signals connected successfully")
         else:
             logger.warning("No data_manager available, progress signals will not be connected")
+
+        # Data model signals - Remove duplicate connections
+        self._data_model.data_changed.connect(self._on_data_changed)
+        self._data_model.validation_changed.connect(self._on_validation_changed)
+        self._data_model.correction_applied.connect(self._on_correction_applied)
 
     def _load_settings(self) -> None:
         """Load application settings."""
@@ -407,33 +403,118 @@ class MainWindow(QMainWindow):
             self._recent_files_menu.addAction(no_files_action)
 
     def _update_ui(self) -> None:
-        """Update the UI based on the current state."""
-        has_data = not self._data_model.is_empty
+        """Update UI based on current state."""
+        # Get data model state
+        has_data = self._data_model is not None and not self._data_model.is_empty
 
-        # Update actions
-        self._save_action.setEnabled(has_data)
-        self._save_as_action.setEnabled(has_data)
-        self._validate_action.setEnabled(has_data)
-        self._correct_action.setEnabled(has_data)
+        # Update data loaded state
+        self._update_data_loaded_state(has_data)
+
+        # Update recent files in dashboard
+        if "Dashboard" in self._views:
+            dashboard_view = self._views["Dashboard"]
+            dashboard_view.set_recent_files(self._recent_files)
+
+            if has_data:
+                # Update dashboard stats
+                dashboard_view.update_stats(
+                    dataset_rows=len(self._data_model.data),
+                    validation_status="Not Validated"
+                    if self._data_model.get_validation_status().empty
+                    else f"{len(self._data_model.get_validation_status())} issues",
+                    corrections=self._data_model.get_correction_row_count(),
+                    last_import=datetime.now().strftime("%Y-%m-%d %H:%M") if has_data else "Never",
+                )
 
         # Update status bar
-        if has_data:
-            row_count = len(self._data_model.data)
-            self._status_bar.set_record_count(row_count)
+        self._update_status_bar()
 
-            # Get the current file path
+    def _update_data_loaded_state(self, has_data: bool) -> None:
+        """
+        Update the data loaded state and related UI components.
+
+        Args:
+            has_data (bool): Whether data is currently loaded
+        """
+        # Only update if state has changed
+        if has_data != self._has_data_loaded:
+            self._has_data_loaded = has_data
+
+            # Update dashboard state
+            if "Dashboard" in self._views:
+                dashboard_view = self._views["Dashboard"]
+                dashboard_view.set_data_loaded(has_data)
+
+            # Update sidebar navigation state
+            self._sidebar.set_data_loaded(has_data)
+
+            # Update actions
+            self._save_action.setEnabled(has_data)
+            self._save_as_action.setEnabled(has_data)
+            self._validate_action.setEnabled(has_data)
+            self._correct_action.setEnabled(has_data)
+
+    def _finalize_loading(self, message: str, is_error: bool) -> None:
+        """
+        Finalize the loading process.
+
+        Args:
+            message (str): Message to display
+            is_error (bool): Whether an error occurred
+        """
+        # Existing code
+        logger.debug(f"Finalizing loading process: {message}, is_error={is_error}")
+
+        # Early return if progress dialog doesn't exist
+        if not hasattr(self, "_progress_dialog") or not self._progress_dialog:
+            logger.debug("No progress dialog to update for finalization")
+            return
+
+        try:
+            # Set appropriate dialog state based on success/error
+            if is_error:
+                # Set error styling
+                if hasattr(self._progress_dialog, "setState") and hasattr(ProgressBar, "State"):
+                    self._progress_dialog.setState(ProgressBar.State.ERROR)
+                self._progress_dialog.setLabelText("Loading failed")
+            else:
+                # Set success styling
+                self._progress_dialog.setLabelText("Loading complete")
+
+            # Set status message
+            self._progress_dialog.setStatusText(message)
+
+            # Always set progress to max on finalization
+            self._progress_dialog.setValue(self._progress_dialog.maximum())
+
+            # Change button to Close for final state
+            self._progress_dialog.setCancelButtonText("Close")
+
+            # Don't disconnect or reconnect signals for the cancel button
+            # The ProgressDialog._on_cancel_clicked method will handle both
+            # emitting the signal and closing the dialog
+
+            # Make sure button is enabled
+            if hasattr(self._progress_dialog, "setCancelButtonEnabled"):
+                self._progress_dialog.setCancelButtonEnabled(True)
+
+            # Process events for UI responsiveness
+            QApplication.processEvents()
+
+            logger.debug("Progress dialog updated for finalization")
+        except Exception as e:
+            logger.error(f"Error finalizing progress dialog: {e}")
+            # Try to ensure dialog can be closed
             try:
-                current_file = self._data_model.file_path
-                if current_file:
-                    self._status_bar.set_status(f"Loaded: {os.path.basename(current_file)}")
-                else:
-                    self._status_bar.set_status("Data loaded (unsaved)")
-            except Exception as e:
-                logger.error(f"Error updating UI with file path: {e}")
-                self._status_bar.set_status("Data loaded")
-        else:
-            self._status_bar.clear_all()
-            self._status_bar.set_status("No data loaded")
+                if hasattr(self._progress_dialog, "_cancel_button"):
+                    self._progress_dialog._cancel_button.setEnabled(True)
+                    self._progress_dialog._cancel_button.setText("Close")
+            except:
+                pass
+
+        # Update data loaded state after successful loading
+        if not is_error:
+            self._update_data_loaded_state(True)
 
     @Slot(str)
     def _set_active_view(self, view_name: str) -> None:
@@ -538,7 +619,19 @@ class MainWindow(QMainWindow):
     @Slot()
     def _on_data_changed(self) -> None:
         """Handle data model changes."""
-        self._update_ui()
+        # Prevent recursive actions during data changes
+        if hasattr(self, "_is_data_changing") and self._is_data_changing:
+            return
+
+        self._is_data_changing = True
+        try:
+            self._update_ui()
+
+            # Update data loaded state
+            has_data = self._data_model is not None and not self._data_model.is_empty
+            self._update_data_loaded_state(has_data)
+        finally:
+            self._is_data_changing = False
 
     @Slot(object)
     def _on_validation_changed(self, validation_status: Any) -> None:
@@ -729,9 +822,13 @@ class MainWindow(QMainWindow):
         """
         logger.debug(f"Load finished signal received: {status_message}")
 
+        # Set a flag to prevent any recursive file opening
+        self._is_finishing_load = True
+
         # Early return if progress dialog doesn't exist
         if not hasattr(self, "_progress_dialog") or not self._progress_dialog:
             logger.debug("No progress dialog to update on load finished")
+            self._is_finishing_load = False
             return
 
         try:
@@ -752,6 +849,9 @@ class MainWindow(QMainWindow):
             # Try to ensure dialog can be closed
             self._finalize_loading(f"Error: {str(e)}", True)
 
+        # Clear the flag after processing
+        self._is_finishing_load = False
+
     def _close_progress_dialog(self) -> None:
         """
         Close the progress dialog and set it to None.
@@ -769,63 +869,6 @@ class MainWindow(QMainWindow):
                 self._progress_dialog = None
         except Exception as e:
             logger.error(f"Error closing progress dialog: {e}")
-
-    def _finalize_loading(self, message: str, is_error: bool) -> None:
-        """
-        Finalize the loading process and update the progress dialog accordingly.
-
-        Args:
-            message: The message to display in the dialog
-            is_error: Whether this is an error state
-        """
-        logger.debug(f"Finalizing loading process: {message}, is_error={is_error}")
-
-        # Early return if progress dialog doesn't exist
-        if not hasattr(self, "_progress_dialog") or not self._progress_dialog:
-            logger.debug("No progress dialog to update for finalization")
-            return
-
-        try:
-            # Set appropriate dialog state based on success/error
-            if is_error:
-                # Set error styling
-                if hasattr(self._progress_dialog, "setState") and hasattr(ProgressBar, "State"):
-                    self._progress_dialog.setState(ProgressBar.State.ERROR)
-                self._progress_dialog.setLabelText("Loading failed")
-            else:
-                # Set success styling
-                self._progress_dialog.setLabelText("Loading complete")
-
-            # Set status message
-            self._progress_dialog.setStatusText(message)
-
-            # Always set progress to max on finalization
-            self._progress_dialog.setValue(self._progress_dialog.maximum())
-
-            # Change button to Close for final state
-            self._progress_dialog.setCancelButtonText("Close")
-
-            # Don't disconnect or reconnect signals for the cancel button
-            # The ProgressDialog._on_cancel_clicked method will handle both
-            # emitting the signal and closing the dialog
-
-            # Make sure button is enabled
-            if hasattr(self._progress_dialog, "setCancelButtonEnabled"):
-                self._progress_dialog.setCancelButtonEnabled(True)
-
-            # Process events for UI responsiveness
-            QApplication.processEvents()
-
-            logger.debug("Progress dialog updated for finalization")
-        except Exception as e:
-            logger.error(f"Error finalizing progress dialog: {e}")
-            # Try to ensure dialog can be closed
-            try:
-                if hasattr(self._progress_dialog, "_cancel_button"):
-                    self._progress_dialog._cancel_button.setEnabled(True)
-                    self._progress_dialog._cancel_button.setText("Close")
-            except:
-                pass
 
     def _on_populate_table_requested(self, data: pd.DataFrame) -> None:
         """
@@ -1131,6 +1174,20 @@ class MainWindow(QMainWindow):
 
     def _open_file(self) -> None:
         """Open one or more CSV files."""
+        # Prevent opening a file dialog if we're already finishing a load operation
+        if hasattr(self, "_is_finishing_load") and self._is_finishing_load:
+            logger.debug("Preventing file dialog during load completion")
+            return
+
+        # Also check if we already have a progress dialog showing
+        if (
+            hasattr(self, "_progress_dialog")
+            and self._progress_dialog
+            and self._progress_dialog.isVisible()
+        ):
+            logger.debug("Preventing file dialog while progress dialog is visible")
+            return
+
         file_paths, _ = QFileDialog.getOpenFileNames(
             self, "Open CSV Files", "", "CSV Files (*.csv);;All Files (*)"
         )
@@ -1369,3 +1426,23 @@ class MainWindow(QMainWindow):
         """
         # No UI updates for table population progress
         pass
+
+    @Slot(str, str)
+    def _on_data_dependent_view_clicked(self, section: str, item: str) -> None:
+        """
+        Handle when a data-dependent view is clicked while data is not loaded.
+
+        Args:
+            section (str): The section that was clicked
+            item (str): The item that was clicked (empty for main section)
+        """
+        # Show message to user
+        QMessageBox.information(
+            self,
+            "No Data Loaded",
+            "Please import data first to access this feature.",
+            QMessageBox.Ok,
+        )
+
+        # Optionally, we could automatically navigate to the dashboard or show the import dialog
+        # self._set_active_view("Dashboard")

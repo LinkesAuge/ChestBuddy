@@ -39,6 +39,8 @@ from PySide6.QtGui import (
 )
 
 from chestbuddy.core.models import ChestDataModel
+from chestbuddy.ui.widgets.action_toolbar import ActionToolbar
+from chestbuddy.ui.widgets.action_button import ActionButton
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -91,62 +93,110 @@ class DataView(QWidget):
     def _init_ui(self) -> None:
         """Initialize the user interface."""
         main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)  # Remove margins for a more compact look
 
-        # Create splitter for filter panel and table
-        splitter = QSplitter(Qt.Vertical)
+        # Create a container for the toolbar and filters
+        header_container = QWidget()
+        header_layout = QVBoxLayout(header_container)
+        header_layout.setContentsMargins(10, 10, 10, 10)
+        header_layout.setSpacing(8)
 
-        # Filter panel
-        filter_group = QGroupBox("Filter Data")
-        filter_layout = QVBoxLayout(filter_group)
+        # Create ActionToolbar for grouped actions
+        self._action_toolbar = ActionToolbar(spacing=8)
 
-        # Filter controls
-        filter_form = QFormLayout()
+        # Data operations group
+        self._action_toolbar.start_group("Data")
+        self._action_toolbar.add_button(
+            ActionButton("Import", name="import", tooltip="Import new data")
+        )
+        self._action_toolbar.add_button(
+            ActionButton("Export", name="export", tooltip="Export current data")
+        )
+        self._action_toolbar.end_group()
 
-        # Column selector
+        # Filter operations group
+        self._action_toolbar.start_group("Filter")
+        self._action_toolbar.add_button(
+            ActionButton("Apply", name="apply_filter", tooltip="Apply the current filter")
+        )
+        self._action_toolbar.add_button(
+            ActionButton("Clear", name="clear_filter", tooltip="Clear all filters")
+        )
+        self._action_toolbar.end_group()
+
+        # View operations group
+        self._action_toolbar.start_group("View")
+        self._action_toolbar.add_button(
+            ActionButton("Refresh", name="refresh", tooltip="Refresh the data view")
+        )
+        self._action_toolbar.end_group()
+
+        header_layout.addWidget(self._action_toolbar)
+
+        # Compact filter controls in a horizontal layout
+        filter_container = QWidget()
+        filter_layout = QHBoxLayout(filter_container)
+        filter_layout.setContentsMargins(0, 0, 0, 0)
+        filter_layout.setSpacing(8)
+
+        # Column selector with label
+        column_container = QWidget()
+        column_layout = QHBoxLayout(column_container)
+        column_layout.setContentsMargins(0, 0, 0, 0)
+        column_layout.setSpacing(4)
+        column_layout.addWidget(QLabel("Column:"))
         self._filter_column = QComboBox()
         self._filter_column.setMinimumWidth(150)
-        filter_form.addRow("Column:", self._filter_column)
+        column_layout.addWidget(self._filter_column)
+        filter_layout.addWidget(column_container)
 
-        # Filter text
+        # Filter text with label
+        text_container = QWidget()
+        text_layout = QHBoxLayout(text_container)
+        text_layout.setContentsMargins(0, 0, 0, 0)
+        text_layout.setSpacing(4)
+        text_layout.addWidget(QLabel("Value:"))
         self._filter_text = QLineEdit()
         self._filter_text.setPlaceholderText("Enter filter text...")
-        filter_form.addRow("Value:", self._filter_text)
+        self._filter_text.setMinimumWidth(200)
+        text_layout.addWidget(self._filter_text)
+        filter_layout.addWidget(text_container)
 
-        # Filter mode
+        # Filter mode with label
+        mode_container = QWidget()
+        mode_layout = QHBoxLayout(mode_container)
+        mode_layout.setContentsMargins(0, 0, 0, 0)
+        mode_layout.setSpacing(4)
+        mode_layout.addWidget(QLabel("Mode:"))
         self._filter_mode = QComboBox()
         self._filter_mode.addItems(["Contains", "Equals", "Starts with", "Ends with"])
-        filter_form.addRow("Mode:", self._filter_mode)
+        mode_layout.addWidget(self._filter_mode)
+        filter_layout.addWidget(mode_container)
 
-        # Case sensitive
+        # Case sensitive checkbox
         self._case_sensitive = QCheckBox("Case sensitive")
-        filter_form.addRow("", self._case_sensitive)
+        filter_layout.addWidget(self._case_sensitive)
 
-        filter_layout.addLayout(filter_form)
+        # Add flexible space
+        filter_layout.addStretch()
 
-        # Filter buttons
-        filter_buttons = QHBoxLayout()
-
-        self._apply_filter_btn = QPushButton("Apply Filter")
-        self._clear_filter_btn = QPushButton("Clear Filter")
-
-        filter_buttons.addWidget(self._apply_filter_btn)
-        filter_buttons.addWidget(self._clear_filter_btn)
-
-        filter_layout.addLayout(filter_buttons)
-
-        # Status label
+        # Status label aligned to the right
         self._status_label = QLabel("No data loaded")
         filter_layout.addWidget(self._status_label)
 
-        splitter.addWidget(filter_group)
+        header_layout.addWidget(filter_container)
 
-        # Table view
+        # Add header container to main layout
+        main_layout.addWidget(header_container)
+
+        # Table view with minimal spacing
         self._table_view = QTableView()
         self._table_view.setModel(self._table_model)
         self._table_view.setAlternatingRowColors(True)
         self._table_view.setContextMenuPolicy(Qt.CustomContextMenu)
-        self._table_view.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
         self._table_view.horizontalHeader().setStretchLastSection(True)
+        self._table_view.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
+        self._table_view.verticalHeader().setDefaultSectionSize(24)  # Compact rows
         self._table_view.verticalHeader().setVisible(True)
 
         # Install event filter on table view to capture key events
@@ -159,12 +209,9 @@ class DataView(QWidget):
         # Apply additional styling to ensure visibility
         self._apply_table_styling()
 
-        splitter.addWidget(self._table_view)
-
-        # Set splitter sizes
-        splitter.setSizes([100, 500])
-
-        main_layout.addWidget(splitter)
+        # Add table view directly to main layout for maximum space
+        main_layout.addWidget(self._table_view)
+        main_layout.setStretch(1, 1)  # Give table view all available space
 
     def _setup_shortcuts(self) -> None:
         """Set up keyboard shortcuts for common operations."""
@@ -183,13 +230,6 @@ class DataView(QWidget):
         )  # Active for widget and children
         logger.info("Registered widget-level Ctrl+V shortcut for pasting (widget hierarchy)")
 
-        # Remove global action - it's causing ambiguity
-        # paste_action = QAction("Paste", self)
-        # paste_action.setShortcut(QKeySequence.Paste)
-        # paste_action.triggered.connect(self._paste_to_selected_cells)
-        # self.addAction(paste_action)
-        # logger.info("Added global paste action to widget")
-
     def _connect_signals(self) -> None:
         """Connect signals and slots."""
         # Connect model signals
@@ -197,10 +237,25 @@ class DataView(QWidget):
         self._data_model.validation_changed.connect(self._on_validation_changed)
         self._data_model.correction_applied.connect(self._on_correction_applied)
 
-        # Connect UI signals
-        self._apply_filter_btn.clicked.connect(self._apply_filter)
-        self._clear_filter_btn.clicked.connect(self._clear_filter)
+        # Connect UI signals - update for ActionToolbar
+        self._action_toolbar.get_button_by_name("apply_filter").clicked.connect(self._apply_filter)
+        self._action_toolbar.get_button_by_name("clear_filter").clicked.connect(self._clear_filter)
+        self._action_toolbar.get_button_by_name("refresh").clicked.connect(self._update_view)
+
+        # Additional actions
+        if self._action_toolbar.get_button_by_name("import"):
+            self._action_toolbar.get_button_by_name("import").clicked.connect(
+                self._on_import_clicked
+            )
+        if self._action_toolbar.get_button_by_name("export"):
+            self._action_toolbar.get_button_by_name("export").clicked.connect(
+                self._on_export_clicked
+            )
+
+        # Connect filter text return key
         self._filter_text.returnPressed.connect(self._apply_filter)
+
+        # Connect table signals
         self._table_view.customContextMenuRequested.connect(self._show_context_menu)
 
         # Connect table model signals
@@ -962,3 +1017,38 @@ class DataView(QWidget):
 
         # Pass the event on to the standard event processing
         return super().eventFilter(watched, event)
+
+    def _on_import_clicked(self):
+        """Handle import button click."""
+        # Don't directly open a file dialog, emit a signal that MainWindow has already connected to the proper handler
+        # Check if we're in the middle of a loading process first
+        from PySide6.QtWidgets import QApplication
+
+        # Get MainWindow (the parent of this widget's parent chain)
+        main_window = None
+        parent = self.parent()
+        while parent is not None:
+            if parent.__class__.__name__ == "MainWindow":
+                main_window = parent
+                break
+            parent = parent.parent()
+
+        # If we found MainWindow, check if it's in a loading state
+        if (
+            main_window
+            and hasattr(main_window, "_progress_dialog")
+            and main_window._progress_dialog
+            and main_window._progress_dialog.isVisible()
+        ):
+            # Skip if progress dialog is visible - prevents duplicate file dialog
+            return
+
+        # This empty method should just pass - the adapter will handle the actual connection to MainWindow
+        # The actual file dialog opening is handled by the MainWindow._open_file method
+        pass
+
+    def _on_export_clicked(self):
+        """Handle export button click."""
+        # Implementation would depend on the application architecture
+        # This might emit a signal that the MainWindow would connect to
+        pass

@@ -16,10 +16,13 @@ from PySide6.QtWidgets import (
     QFrame,
     QGridLayout,
     QScrollArea,
+    QStackedWidget,
 )
 
 from chestbuddy.ui.views.base_view import BaseView
 from chestbuddy.ui.resources.style import Colors
+from chestbuddy.ui.resources.icons import Icons
+from chestbuddy.ui.widgets.empty_state_widget import EmptyStateWidget
 
 
 class StatsCard(QFrame):
@@ -361,10 +364,16 @@ class DashboardView(BaseView):
     Dashboard view showing summary information and quick actions.
 
     This is the main landing page of the application.
+
+    Attributes:
+        action_triggered (Signal): Signal emitted when an action is triggered
+        file_selected (Signal): Signal emitted when a file is selected
+        import_requested (Signal): Signal emitted when import is requested
     """
 
     action_triggered = Signal(str)  # action name
     file_selected = Signal(str)  # file path
+    import_requested = Signal()  # request to import data
 
     def __init__(self, data_model=None, parent=None):
         """
@@ -376,15 +385,51 @@ class DashboardView(BaseView):
         """
         super().__init__("Dashboard", parent)
         self._data_model = data_model
+        self._data_loaded = False
 
         # Create dashboard widgets
-        self._create_dashboard_widgets()
+        self._setup_dashboard()
         self._connect_action_signals()
 
-    def _create_dashboard_widgets(self):
-        """Create the dashboard widgets."""
+        # Set initial state
+        self.set_data_loaded(False)
+
+    def _setup_dashboard(self):
+        """Set up the dashboard with content and empty state views."""
         content_layout = self.get_content_layout()
 
+        # Create stacked widget to switch between empty state and content
+        self._stacked_widget = QStackedWidget()
+        content_layout.addWidget(self._stacked_widget)
+
+        # Empty state view
+        self._empty_state_widget = self._create_empty_state_widget()
+        self._stacked_widget.addWidget(self._empty_state_widget)
+
+        # Content view
+        self._content_widget = QWidget()
+        self._content_layout = QVBoxLayout(self._content_widget)
+        self._content_layout.setContentsMargins(0, 0, 0, 0)
+        self._content_layout.setSpacing(20)
+        self._create_dashboard_widgets()
+        self._stacked_widget.addWidget(self._content_widget)
+
+    def _create_empty_state_widget(self):
+        """Create empty state widget for when no data is loaded."""
+        empty_widget = EmptyStateWidget(
+            title="No Data Loaded",
+            message="Import data to see statistics and insights",
+            action_text="Import Data",
+            icon=Icons.get_icon(Icons.OPEN),
+        )
+
+        # Connect action button to import_requested signal
+        empty_widget.action_clicked.connect(self.import_requested.emit)
+
+        return empty_widget
+
+    def _create_dashboard_widgets(self):
+        """Create the dashboard widgets for the data-loaded state."""
         # Stats cards grid
         self._stats_grid = QWidget()
         self._stats_layout = QGridLayout(self._stats_grid)
@@ -403,10 +448,10 @@ class DashboardView(BaseView):
         self._stats_layout.addWidget(self._correction_card, 0, 2)
         self._stats_layout.addWidget(self._import_card, 0, 3)
 
-        content_layout.addWidget(self._stats_grid)
+        self._content_layout.addWidget(self._stats_grid)
 
         # Add spacing
-        content_layout.addSpacing(20)
+        self._content_layout.addSpacing(20)
 
         # Charts grid (two columns)
         self._charts_grid = QWidget()
@@ -435,10 +480,10 @@ class DashboardView(BaseView):
 
         self._charts_layout.addWidget(self._quick_actions, 1, 1)
 
-        content_layout.addWidget(self._charts_grid)
+        self._content_layout.addWidget(self._charts_grid)
 
         # Add stretch to push everything to the top
-        content_layout.addStretch()
+        self._content_layout.addStretch()
 
     def _connect_action_signals(self):
         """Connect action signals."""
@@ -447,6 +492,11 @@ class DashboardView(BaseView):
 
         # Recent files
         self._recent_files.file_selected.connect(self.file_selected)
+
+        # Import action from empty state
+        self._empty_state_widget.action_clicked.connect(
+            lambda: self.action_triggered.emit("import")
+        )
 
     def update_stats(
         self, dataset_rows=0, validation_status="N/A", corrections=0, last_import="Never"
@@ -465,6 +515,10 @@ class DashboardView(BaseView):
         self._correction_card.set_value(f"{corrections:,} corrected")
         self._import_card.set_value(last_import)
 
+        # If we have rows, ensure we're in the data loaded state
+        if dataset_rows > 0:
+            self.set_data_loaded(True)
+
     def set_recent_files(self, files):
         """
         Set the list of recent files.
@@ -473,3 +527,15 @@ class DashboardView(BaseView):
             files (list): List of file paths
         """
         self._recent_files.set_files(files)
+
+    def set_data_loaded(self, loaded: bool):
+        """
+        Set whether data is loaded and update the UI accordingly.
+
+        Args:
+            loaded (bool): Whether data is loaded
+        """
+        self._data_loaded = loaded
+
+        # Switch between empty state and content views
+        self._stacked_widget.setCurrentIndex(1 if loaded else 0)

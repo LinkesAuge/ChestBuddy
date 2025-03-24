@@ -43,15 +43,34 @@ class NavigationButton(QPushButton):
         # Set style properties
         self.setCheckable(True)
         self.setCursor(Qt.PointingHandCursor)
+        self._update_style()
+
+    def _update_style(self):
+        """Update the button style based on enabled state."""
+        enabled_style = f"""
+            text-align: left;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 0px;
+            color: {Colors.TEXT_MUTED};
+            background-color: transparent;
+            font-weight: normal;
+        """
+
+        disabled_style = f"""
+            text-align: left;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 0px;
+            color: {Colors.TEXT_DISABLED};
+            background-color: transparent;
+            font-weight: normal;
+            opacity: 0.6;
+        """
+
         self.setStyleSheet(f"""
             QPushButton {{
-                text-align: left;
-                padding: 10px 15px;
-                border: none;
-                border-radius: 0px;
-                color: {Colors.TEXT_MUTED};
-                background-color: transparent;
-                font-weight: normal;
+                {enabled_style if self.isEnabled() else disabled_style}
             }}
             
             QPushButton:hover {{
@@ -64,7 +83,16 @@ class NavigationButton(QPushButton):
                 border-left: 3px solid {Colors.SECONDARY};
                 font-weight: bold;
             }}
+            
+            QPushButton:disabled {{
+                {disabled_style}
+            }}
         """)
+
+    def setEnabled(self, enabled):
+        """Override setEnabled to update styling when enabled state changes."""
+        super().setEnabled(enabled)
+        self._update_style()
 
 
 class SubNavigationButton(QPushButton):
@@ -84,15 +112,34 @@ class SubNavigationButton(QPushButton):
         # Set style properties
         self.setCheckable(True)
         self.setCursor(Qt.PointingHandCursor)
+        self._update_style()
+
+    def _update_style(self):
+        """Update the button style based on enabled state."""
+        enabled_style = f"""
+            text-align: left;
+            padding: 6px 15px 6px 40px;
+            border: none;
+            border-radius: 0px;
+            color: {Colors.TEXT_MUTED};
+            background-color: transparent;
+            font-size: 13px;
+        """
+
+        disabled_style = f"""
+            text-align: left;
+            padding: 6px 15px 6px 40px;
+            border: none;
+            border-radius: 0px;
+            color: {Colors.TEXT_DISABLED};
+            background-color: transparent;
+            font-size: 13px;
+            opacity: 0.6;
+        """
+
         self.setStyleSheet(f"""
             QPushButton {{
-                text-align: left;
-                padding: 6px 15px 6px 40px;
-                border: none;
-                border-radius: 0px;
-                color: {Colors.TEXT_MUTED};
-                background-color: transparent;
-                font-size: 13px;
+                {enabled_style if self.isEnabled() else disabled_style}
             }}
             
             QPushButton:hover {{
@@ -104,7 +151,16 @@ class SubNavigationButton(QPushButton):
                 background-color: transparent;
                 font-weight: bold;
             }}
+            
+            QPushButton:disabled {{
+                {disabled_style}
+            }}
         """)
+
+    def setEnabled(self, enabled):
+        """Override setEnabled to update styling when enabled state changes."""
+        super().setEnabled(enabled)
+        self._update_style()
 
 
 class NavigationSection(QWidget):
@@ -126,6 +182,7 @@ class NavigationSection(QWidget):
         self._layout = QVBoxLayout(self)
         self._layout.setContentsMargins(0, 0, 0, 0)
         self._layout.setSpacing(0)
+        self._enabled = True
 
         # Create main button
         self._main_button = NavigationButton(title, icon)
@@ -146,7 +203,8 @@ class NavigationSection(QWidget):
 
     def _on_main_button_clicked(self):
         """Handle main button click."""
-        self.button_clicked.emit(self._title, "")
+        if self._enabled:
+            self.button_clicked.emit(self._title, "")
 
     def add_sub_button(self, text):
         """
@@ -163,9 +221,14 @@ class NavigationSection(QWidget):
         self._sub_buttons.append(button)
 
         # Connect button click
-        button.clicked.connect(lambda: self.button_clicked.emit(self._title, text))
+        button.clicked.connect(lambda: self._on_sub_button_clicked(text))
 
         return button
+
+    def _on_sub_button_clicked(self, text):
+        """Handle sub-button click."""
+        if self._enabled:
+            self.button_clicked.emit(self._title, text)
 
     def set_checked(self, is_main=True, sub_text=""):
         """
@@ -187,15 +250,33 @@ class NavigationSection(QWidget):
         for button in self._sub_buttons:
             button.setChecked(False)
 
+    def set_enabled(self, enabled):
+        """
+        Enable or disable this navigation section.
+
+        Args:
+            enabled (bool): Whether the section should be enabled
+        """
+        self._enabled = enabled
+        self._main_button.setEnabled(enabled)
+
+        for button in self._sub_buttons:
+            button.setEnabled(enabled)
+
 
 class SidebarNavigation(QFrame):
     """
     Sidebar navigation widget for the ChestBuddy application.
 
     This widget provides the main navigation menu with sections and sub-items.
+
+    Signals:
+        navigation_changed (str, str): Emitted when navigation selection changes (section, item)
+        data_dependent_view_clicked (str, str): Emitted when a data-dependent view is clicked while disabled
     """
 
     navigation_changed = Signal(str, str)  # section, item
+    data_dependent_view_clicked = Signal(str, str)  # section, item
 
     def __init__(self, parent=None):
         """
@@ -210,6 +291,9 @@ class SidebarNavigation(QFrame):
 
         # Track all sections
         self._sections = {}
+
+        # List of data-dependent sections
+        self._data_dependent_sections = []
 
         # Initialize default sections
         self._create_default_sections()
@@ -287,13 +371,22 @@ class SidebarNavigation(QFrame):
         data_section.add_sub_button("Correct")
         data_section.add_sub_button("Export")
 
+        # Mark the Data section (except Import) as data-dependent
+        self._data_dependent_sections.append("Data")
+
         # Analysis section with sub-items
         analysis_section = self.add_section("Analysis", None)
         analysis_section.add_sub_button("Tables")
         analysis_section.add_sub_button("Charts")
 
+        # Mark the Analysis section as data-dependent
+        self._data_dependent_sections.append("Analysis")
+
         # Reports section
         self.add_section("Reports", None)
+
+        # Mark the Reports section as data-dependent
+        self._data_dependent_sections.append("Reports")
 
         # Settings section with sub-items
         settings_section = self.add_section("Settings", None)
@@ -338,6 +431,19 @@ class SidebarNavigation(QFrame):
             section (str): The section title
             item (str): The item text (empty for main section button)
         """
+        # Check if this is a disabled data-dependent section
+        section_obj = self._sections.get(section)
+
+        if section in self._data_dependent_sections:
+            # Allow "Import" action in the Data section even when disabled
+            if section == "Data" and item == "Import":
+                pass  # Allow this action
+            # For any other data-dependent action:
+            elif not section_obj._enabled:
+                # Emit signal indicating a data-dependent view was clicked while disabled
+                self.data_dependent_view_clicked.emit(section, item)
+                return
+
         # Uncheck all other sections
         for title, section_widget in self._sections.items():
             if title != section:
@@ -362,3 +468,37 @@ class SidebarNavigation(QFrame):
         if section in self._sections:
             is_main = not item
             self._sections[section].set_checked(is_main, item)
+
+    def set_data_loaded(self, has_data):
+        """
+        Update the enabled state of data-dependent sections.
+
+        Args:
+            has_data (bool): Whether data is currently loaded
+        """
+        for section_name in self._data_dependent_sections:
+            section = self._sections.get(section_name)
+            if section:
+                # Special handling for Data section - Import should always be enabled
+                if section_name == "Data":
+                    section.set_enabled(True)  # Keep main Data button enabled
+
+                    # Enable/disable individual sub-buttons except Import
+                    for button in section._sub_buttons:
+                        if button.text() != "Import":
+                            button.setEnabled(has_data)
+                else:
+                    # Other data-dependent sections are fully enabled/disabled
+                    section.set_enabled(has_data)
+
+    def set_view_enabled(self, section_name, enabled):
+        """
+        Enable or disable a specific navigation section.
+
+        Args:
+            section_name (str): The name of the section to enable/disable
+            enabled (bool): Whether the section should be enabled
+        """
+        section = self._sections.get(section_name)
+        if section:
+            section.set_enabled(enabled)

@@ -29,6 +29,10 @@ class DataViewAdapter(BaseView):
         - Provides the same functionality as DataView but with the new UI styling
     """
 
+    # Add signals for data operations
+    import_requested = Signal()
+    export_requested = Signal()
+
     def __init__(self, data_model: ChestDataModel, parent: QWidget = None):
         """
         Initialize the DataViewAdapter.
@@ -60,12 +64,30 @@ class DataViewAdapter(BaseView):
         # First call the parent class's _connect_signals method
         super()._connect_signals()
 
-        # Connect any signals from the DataView if needed
-        pass
+        # Connect DataView's action buttons to our signals
+        try:
+            # Get action toolbar from DataView
+            import_button = self._data_view._action_toolbar.get_button_by_name("import")
+            export_button = self._data_view._action_toolbar.get_button_by_name("export")
+
+            if import_button:
+                import_button.clicked.disconnect()  # Disconnect any existing connections
+                import_button.clicked.connect(self.import_requested.emit)
+
+            if export_button:
+                export_button.clicked.disconnect()  # Disconnect any existing connections
+                export_button.clicked.connect(self.export_requested.emit)
+        except (AttributeError, Exception) as e:
+            # Handle the case where the DataView structure might be different
+            print(f"Error connecting DataView signals: {e}")
 
     def _add_action_buttons(self):
         """Add action buttons to the header."""
-        # Add action buttons for common data operations
-        self.add_header_action("filter", "Filter")
-        self.add_header_action("clear", "Clear Filters")
-        self.add_header_action("refresh", "Refresh")
+        # We'll not add our own action buttons since the DataView already has them
+        # in its ActionToolbar
+        pass
+
+    def refresh(self):
+        """Refresh the data view."""
+        if hasattr(self._data_view, "_update_view"):
+            self._data_view._update_view()
