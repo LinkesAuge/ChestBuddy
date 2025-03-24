@@ -539,7 +539,6 @@ class BackgroundWorker(QObject):
             self._ui_state_manager,
             UIOperations.BACKGROUND_TASK,
             groups=[UIElementGroups.MAIN_WINDOW],
-            auto_enter=False,  # Don't enter context yet
         )
 
         # Connect signals

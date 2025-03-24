@@ -1,7 +1,7 @@
 """
 correction_view_adapter.py
 
-Description: Adapter to integrate the existing CorrectionTab with the new BaseView structure
+Description: Adapter to integrate the BlockableCorrectionTab with the new BaseView structure
 Usage:
     correction_view = CorrectionViewAdapter(data_model, correction_service)
     main_window.add_view(correction_view)
@@ -12,24 +12,25 @@ from PySide6.QtWidgets import QWidget, QVBoxLayout
 
 from chestbuddy.core.models import ChestDataModel
 from chestbuddy.core.services import CorrectionService
-from chestbuddy.ui.correction_tab import CorrectionTab
+from chestbuddy.ui.views.blockable import BlockableCorrectionTab
 from chestbuddy.ui.views.base_view import BaseView
 from chestbuddy.ui.resources.icons import Icons
 
 
 class CorrectionViewAdapter(BaseView):
     """
-    Adapter that wraps the existing CorrectionTab component to integrate with the new UI structure.
+    Adapter that wraps the BlockableCorrectionTab component to integrate with the new UI structure.
 
     Attributes:
         data_model (ChestDataModel): The data model containing chest data
         correction_service (CorrectionService): The service for data correction
-        correction_tab (CorrectionTab): The wrapped CorrectionTab instance
+        correction_tab (BlockableCorrectionTab): The wrapped BlockableCorrectionTab instance
 
     Implementation Notes:
         - Inherits from BaseView to maintain UI consistency
-        - Wraps the existing CorrectionTab component
+        - Wraps the BlockableCorrectionTab component
         - Provides the same functionality as CorrectionTab but with the new UI styling
+        - Uses BlockableCorrectionTab for automatic integration with UI State Management
     """
 
     def __init__(
@@ -50,8 +51,13 @@ class CorrectionViewAdapter(BaseView):
         self._data_model = data_model
         self._correction_service = correction_service
 
-        # Create the underlying CorrectionTab
-        self._correction_tab = CorrectionTab(data_model, correction_service)
+        # Create the underlying BlockableCorrectionTab
+        self._correction_tab = BlockableCorrectionTab(
+            data_model,
+            correction_service,
+            parent=None,  # Will be reparented when added to layout
+            element_id=f"correction_tab_adapter_{id(self)}",
+        )
 
         # Initialize the base view
         super().__init__("Data Correction", parent, data_required=True)
@@ -70,7 +76,7 @@ class CorrectionViewAdapter(BaseView):
         # First call the parent class's _setup_ui method
         super()._setup_ui()
 
-        # Add the CorrectionTab to the content widget
+        # Add the BlockableCorrectionTab to the content widget
         self.get_content_layout().addWidget(self._correction_tab)
 
     def _connect_signals(self):

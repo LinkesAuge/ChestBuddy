@@ -22,6 +22,12 @@ class UIElementGroups(Enum):
     # Data-related views and elements
     DATA_VIEW = auto()
 
+    # Validation-related views and elements
+    VALIDATION = auto()
+
+    # Correction-related views and elements
+    CORRECTION = auto()
+
     # Dashboard components
     DASHBOARD = auto()
 

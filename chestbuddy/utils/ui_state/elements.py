@@ -99,7 +99,10 @@ class BlockableElementMixin:
 
         # Only apply block if this is the first blocking operation
         if len(self._blocking_operations) == 1:
-            self._apply_block()
+            try:
+                self._apply_block(operation)
+            except Exception as e:
+                logger.error(f"Error in {self}.block() for {self}: {e}")
 
         logger.debug(f"Element {self} blocked by operation {operation}")
 
@@ -120,13 +123,19 @@ class BlockableElementMixin:
 
         # Only apply unblock if no more blocking operations
         if not self._blocking_operations:
-            self._apply_unblock()
+            try:
+                self._apply_unblock(operation)
+            except Exception as e:
+                logger.error(f"Error in {self}.unblock() for {self}: {e}")
 
         logger.debug(f"Element {self} unblocked from operation {operation}")
 
-    def _apply_block(self) -> None:
+    def _apply_block(self, operation: Any) -> None:
         """
         Apply the blocking behavior to this element.
+
+        Args:
+            operation: The operation blocking this element.
 
         This method can be overridden by subclasses to provide custom
         blocking behavior. The default implementation disables the widget.
@@ -137,9 +146,12 @@ class BlockableElementMixin:
         else:
             logger.warning(f"Element {self} is not a QWidget, cannot apply block")
 
-    def _apply_unblock(self) -> None:
+    def _apply_unblock(self, operation: Any) -> None:
         """
         Apply the unblocking behavior to this element.
+
+        Args:
+            operation: The operation unblocking this element.
 
         This method can be overridden by subclasses to provide custom
         unblocking behavior. The default implementation restores the

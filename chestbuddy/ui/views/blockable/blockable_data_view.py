@@ -132,10 +132,11 @@ class BlockableDataView(DataView, BlockableElementMixin):
         Args:
             force_rescan: Whether to force a rescan
         """
-        # Check if the view is blocked
-        if self._ui_state_manager.is_element_blocked(self):
-            logger.debug(f"Skipping update for blocked {self.__class__.__name__}")
-            return
+        # Check if the view is blocked, but only if _ui_state_manager is properly initialized
+        if hasattr(self, "_ui_state_manager") and self._ui_state_manager is not None:
+            if self._ui_state_manager.is_element_blocked(self):
+                logger.debug(f"Skipping update for blocked {self.__class__.__name__}")
+                return
 
         # If not blocked, proceed with normal update
         super().update(force_rescan)
