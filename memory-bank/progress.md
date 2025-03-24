@@ -480,6 +480,7 @@ No critical issues at this time. The minor QThread object deletion warning at sh
 - [x] Enhanced task result handling in DataManager
 - [x] Improved task ID tracking and signaling for background tasks
 - [x] Tested and verified CSV loading with multiple files
+- [x] Fixed table repopulation issue during import of multiple files
 
 ### Report Generation System (Planned)
 - [ ] Research and select appropriate PDF generation library
