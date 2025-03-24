@@ -479,6 +479,23 @@ class ProgressDialog(QDialog):
         # Call parent exec
         return super().exec()
 
+    def closeEvent(self, event):
+        """
+        Handle the close event.
+
+        Overridden to ensure the canceled signal is emitted when the dialog is closed,
+        which ensures background processes are properly cancelled.
+        """
+        # Only emit the signal if it hasn't been canceled already
+        # This prevents emitting twice when Cancel button is used
+        if not self._was_canceled:
+            logger.debug("Dialog closed via window close button, emitting canceled signal")
+            self._was_canceled = True
+            self.canceled.emit()
+
+        # Call the parent class's closeEvent
+        super().closeEvent(event)
+
     def close(self) -> None:
         """
         Close the dialog.
