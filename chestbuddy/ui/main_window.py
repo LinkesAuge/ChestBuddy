@@ -746,7 +746,7 @@ class MainWindow(QMainWindow, BlockableElementMixin):
         # Check if import operation is active
         import_active = False
         try:
-            import_active = self._ui_state_manager.is_operation_active(UIOperations.IMPORT)
+            import_active = self._ui_state_manager.has_active_operations(UIOperations.IMPORT)
         except Exception as e:
             logger.error(f"Error checking if import operation is active: {e}")
 
@@ -760,6 +760,22 @@ class MainWindow(QMainWindow, BlockableElementMixin):
 
         # Close any existing progress dialog before creating a new one
         self._close_progress_dialog()
+
+        # Ensure the DataView elements are properly registered with the UI state manager
+        try:
+            # Ensure the DataView is registered in the DATA_VIEW group
+            data_view = self._views.get("Data")
+            if data_view and hasattr(data_view, "_data_view"):
+                # Register the data view with the UI state manager if not already
+                if not self._ui_state_manager.is_element_in_group(
+                    data_view._data_view, UIElementGroups.DATA_VIEW
+                ):
+                    logger.debug("Registering DataView with UI state manager")
+                    self._ui_state_manager.register_element(
+                        data_view._data_view, groups=[UIElementGroups.DATA_VIEW]
+                    )
+        except Exception as e:
+            logger.error(f"Error registering DataView with UI state manager: {e}")
 
         # Make sure any lingering import operation is ended
         if import_active:
@@ -779,13 +795,23 @@ class MainWindow(QMainWindow, BlockableElementMixin):
             # Connect cancel action
             self._progress_dialog.canceled.connect(self._cancel_loading)
 
+            # Define the UI groups that should be blocked during import
+            blocked_groups = [UIElementGroups.DATA_VIEW, UIElementGroups.MAIN_WINDOW]
+
             # Show the dialog with blocking operation
             try:
                 # Use show_with_blocking instead of separate show() and start_operation()
-                self._progress_dialog.show_with_blocking(
-                    UIOperations.IMPORT, [UIElementGroups.DATA_VIEW]
-                )
-                logger.debug("Progress dialog shown with blocking operation")
+                logger.debug(f"Showing progress dialog with blocking groups: {blocked_groups}")
+                self._progress_dialog.show_with_blocking(UIOperations.IMPORT, blocked_groups)
+
+                # Verify the operation was started correctly
+                if not self._ui_state_manager.is_operation_active(UIOperations.IMPORT):
+                    logger.error(
+                        "Failed to start IMPORT operation - operation not active after dialog shown"
+                    )
+                else:
+                    logger.debug("Progress dialog shown with blocking operation")
+
             except Exception as e:
                 logger.error(f"Error showing progress dialog with blocking: {e}")
                 # Fallback to regular show if blocking fails
@@ -815,9 +841,18 @@ class MainWindow(QMainWindow, BlockableElementMixin):
                 self._update_ui()
 
                 # End any active import operation if it exists
-                if self._ui_state_manager.is_operation_active(UIOperations.IMPORT):
-                    logger.warning("Import operation active but no dialog - ending operation")
-                    self._ui_state_manager.end_operation(UIOperations.IMPORT)
+                try:
+                    if self._ui_state_manager.has_active_operations(UIOperations.IMPORT):
+                        logger.warning("Import operation active but no dialog - ending operation")
+                        self._ui_state_manager.end_operation(UIOperations.IMPORT)
+
+                        # Verify operation was actually ended
+                        if self._ui_state_manager.has_active_operations(UIOperations.IMPORT):
+                            logger.error(
+                                "Failed to end import operation - still active after end call"
+                            )
+                except Exception as e:
+                    logger.error(f"Error ending operation when no dialog exists: {e}")
 
                 # Signal completion if needed
                 if success and self._data_loaded:
@@ -828,7 +863,7 @@ class MainWindow(QMainWindow, BlockableElementMixin):
                 logger.error(f"Error handling missing dialog case: {e}")
                 # Still try to end the operation even if other steps fail
                 try:
-                    if self._ui_state_manager.is_operation_active(UIOperations.IMPORT):
+                    if self._ui_state_manager.has_active_operations(UIOperations.IMPORT):
                         self._ui_state_manager.end_operation(UIOperations.IMPORT)
                 except Exception as e2:
                     logger.error(f"Error ending operation after initial error: {e2}")
@@ -852,6 +887,14 @@ class MainWindow(QMainWindow, BlockableElementMixin):
 
             # Ensure the progress dialog is properly closed after we've updated UI state
             self._close_progress_dialog()
+
+            # Verify no import operation is still active
+            try:
+                if self._ui_state_manager.has_active_operations(UIOperations.IMPORT):
+                    logger.error("Import operation still active after _close_progress_dialog")
+                    self._ui_state_manager.end_operation(UIOperations.IMPORT)
+            except Exception as e:
+                logger.error(f"Error verifying operation state after dialog close: {e}")
 
             # Signal completion if successful
             if success and self._data_loaded:
@@ -879,9 +922,20 @@ class MainWindow(QMainWindow, BlockableElementMixin):
 
             # Final safety check - ensure import operation is ended
             try:
-                if self._ui_state_manager.is_operation_active(UIOperations.IMPORT):
+                if self._ui_state_manager.has_active_operations(UIOperations.IMPORT):
                     logger.warning("Import operation still active after errors - forcing end")
                     self._ui_state_manager.end_operation(UIOperations.IMPORT)
+
+                    # One last check to make absolutely sure it's ended
+                    if self._ui_state_manager.has_active_operations(UIOperations.IMPORT):
+                        logger.critical(
+                            "Critical failure - couldn't end import operation, direct cleanup needed"
+                        )
+                        # Direct cleanup as last resort
+                        if hasattr(self._ui_state_manager, "_active_operations"):
+                            if UIOperations.IMPORT in self._ui_state_manager._active_operations:
+                                del self._ui_state_manager._active_operations[UIOperations.IMPORT]
+
             except Exception as op_e:
                 logger.error(f"Final error ending import operation: {op_e}")
 
@@ -906,54 +960,76 @@ class MainWindow(QMainWindow, BlockableElementMixin):
         """
         logger.debug("Closing progress dialog")
 
-        # Check if import operation is still active
-        import_active = False
-        try:
-            import_active = self._ui_state_manager.is_operation_active(UIOperations.IMPORT)
-            if import_active:
-                logger.debug("Import operation is still active during dialog close")
-        except Exception as e:
-            logger.error(f"Error checking if import operation is active: {e}")
-            # Assume it might be active if we can't check
-            import_active = True
-
         # Capture dialog reference before setting to None to avoid issues with callbacks
         dialog = self._progress_dialog
         self._progress_dialog = None
         self._progress_dialog_finalized = False  # Reset finalized flag
 
-        # First try to close the dialog if it exists
-        if dialog is not None:
+        try:
+            # Check if import operation is still active
+            import_active = False
             try:
-                # End any active operation associated with the dialog
-                dialog._end_operation()
-                dialog.close()
-                logger.debug("Progress dialog closed successfully")
+                import_active = self._ui_state_manager.has_active_operations(UIOperations.IMPORT)
+                if import_active:
+                    logger.debug("Import operation is still active during dialog close")
             except Exception as e:
-                logger.error(f"Error closing progress dialog: {e}")
-                # Even if the dialog close fails, we need to ensure the operation is ended
+                logger.error(f"Error checking if import operation is active: {e}")
+                # Assume it might be active if we can't check
                 import_active = True
-        elif import_active:
-            # Dialog is None but operation is active - unusual case, try to clean up
-            logger.warning("No progress dialog but import operation is active - ending operation")
 
-        # Add a final safety check to ensure the operation is ended
-        # This is crucial to prevent the UI from remaining blocked
-        if import_active:
-            logger.warning("Ensuring import operation is properly ended")
-            try:
-                self._ui_state_manager.end_operation(UIOperations.IMPORT)
-                logger.debug("Successfully ended import operation")
-            except Exception as e:
-                logger.error(f"Error ending import operation: {e}")
-                # Last resort - try to end ALL operations to unblock UI
+            # First try to close the dialog if it exists
+            if dialog is not None:
                 try:
-                    logger.warning("Attempting to end all operations to unblock UI")
-                    active_ops = self._ui_state_manager.get_active_operations()
-                    for op in active_ops:
-                        self._ui_state_manager.end_operation(op)
-                except Exception as e2:
-                    logger.error(f"Critical error ending all operations: {e2}")
+                    # End any active operation associated with the dialog
+                    logger.debug("Calling dialog._end_operation()")
+                    dialog._end_operation()
+                    dialog.close()
+                    logger.debug("Progress dialog closed successfully")
+                except Exception as e:
+                    logger.error(f"Error closing progress dialog: {e}")
+                    # Even if the dialog close fails, we need to ensure the operation is ended
+                    import_active = True
+
+            # Verify the operation is actually ended
+            try:
+                import_active = self._ui_state_manager.has_active_operations(UIOperations.IMPORT)
+            except Exception as e:
+                logger.error(f"Error checking if import operation ended: {e}")
+                import_active = True  # Assume it might still be active
+
+            # Add a final safety check to ensure the operation is ended
+            # This is crucial to prevent the UI from remaining blocked
+            if import_active:
+                logger.warning("Import operation still active after dialog close - forcing end")
+                try:
+                    self._ui_state_manager.end_operation(UIOperations.IMPORT)
+                    logger.debug("Successfully ended import operation")
+
+                    # Double-check the operation was ended
+                    if self._ui_state_manager.has_active_operations(UIOperations.IMPORT):
+                        logger.error("Failed to end import operation!")
+                    else:
+                        logger.debug("Verified import operation is now inactive")
+                except Exception as e:
+                    logger.error(f"Error ending import operation: {e}")
+                    # Last resort - try to end ALL operations to unblock UI
+                    try:
+                        logger.warning("Attempting to end all operations to unblock UI")
+                        active_ops = list(self._ui_state_manager.get_active_operations())
+                        for op in active_ops:
+                            self._ui_state_manager.end_operation(op)
+                    except Exception as e2:
+                        logger.error(f"Critical error ending all operations: {e2}")
+        except Exception as e:
+            logger.error(f"Unexpected error in _close_progress_dialog: {e}")
+            # Last desperate attempt to ensure UI isn't permanently blocked
+            try:
+                if hasattr(self._ui_state_manager, "_active_operations"):
+                    if UIOperations.IMPORT in self._ui_state_manager._active_operations:
+                        logger.critical("Emergency cleanup of IMPORT operation")
+                        del self._ui_state_manager._active_operations[UIOperations.IMPORT]
+            except Exception as e3:
+                logger.error(f"Failed emergency cleanup: {e3}")
 
     def _perform_final_ui_check(self, delay_ms: int = 500) -> None:
         """

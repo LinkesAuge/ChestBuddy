@@ -58,6 +58,28 @@ class DataViewAdapter(BaseView):
             action_text="Import Data",
         )
 
+        # Make sure the data view is also registered explicitly with the UI State Manager
+        try:
+            from chestbuddy.utils.ui_state import UIStateManager, UIElementGroups
+
+            ui_manager = UIStateManager()
+
+            # Check if properly registered
+            if not ui_manager.is_element_in_group(self._data_view, UIElementGroups.DATA_VIEW):
+                # Register it explicitly
+                ui_manager.register_element(self._data_view, groups=[UIElementGroups.DATA_VIEW])
+                import logging
+
+                logging.getLogger(__name__).debug(
+                    f"Explicitly registered DataView with UIElementGroups.DATA_VIEW"
+                )
+        except Exception as e:
+            import logging
+
+            logging.getLogger(__name__).error(
+                f"Error registering DataView with UI state manager: {e}"
+            )
+
     def _setup_ui(self):
         """Set up the UI components."""
         # First call the parent class's _setup_ui method

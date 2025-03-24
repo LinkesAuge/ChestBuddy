@@ -694,10 +694,18 @@ class UIStateManager(QObject, metaclass=QObjectSingletonMeta):
             active_operations_details[str(operation)] = len(blocked_elements)
         self._debug_info["active_operations_details"] = active_operations_details
 
-    def has_active_operations(self) -> bool:
-        """Check if there are any active operations.
+    def has_active_operations(self, specific_operation=None) -> bool:
+        """
+        Check if any operations are currently active.
+
+        Args:
+            specific_operation: If provided, only check for this specific operation
 
         Returns:
-            bool: True if there are active operations, False otherwise
+            bool: True if any operations are active, False otherwise.
         """
-        return len(self._active_operations) > 0
+        with mutex_lock(self._mutex):
+            if specific_operation is not None:
+                return specific_operation in self._active_operations
+
+            return len(self._active_operations) > 0

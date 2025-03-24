@@ -95,58 +95,77 @@ class BlockableProgressDialog(ProgressDialog):
         if blocked_groups is None:
             blocked_groups = []
 
+        logger.debug(f"Showing progress dialog with blocking for operation {operation}")
+
         # Store the operation for _end_operation to use later
         self._operation = operation
 
         # Check if operation is already active
         already_active = False
         try:
-            already_active = self._ui_state_manager.is_operation_active(operation)
+            already_active = self._ui_state_manager.has_active_operations(operation)
+            if already_active:
+                logger.warning(f"Operation {operation} already active when showing dialog")
         except Exception as e:
             logger.error(f"Error checking if operation {operation} is active: {e}")
             # If we can't check, assume it's not active for safety
             already_active = False
 
         if already_active:
-            logger.warning(f"Operation {operation} already active, reusing existing context")
+            logger.debug(
+                f"Operation {operation} already active, attempting to reuse existing context"
+            )
 
             # Try to get active context from UIStateManager
             try:
                 active_operations = self._ui_state_manager.get_active_operations()
                 if operation in active_operations:
+                    # Reuse the existing context
                     self._operation_context = active_operations[operation]
                     logger.debug(f"Reusing existing context for operation {operation}")
+
+                    # Just show the dialog without creating a new blocking context
+                    self.show()
+                    self.raise_()
+                    self.activateWindow()
+
+                    # Log some debug info about the operation
+                    logger.debug(
+                        f"Active operation {operation} has {len(blocked_groups)} blocked groups"
+                    )
+                    return
                 else:
                     logger.warning(f"Operation {operation} marked active but no context found")
-                    # End and restart the operation to ensure state consistency
-                    try:
-                        self._ui_state_manager.end_operation(operation)
-                        logger.debug(f"Ended inconsistent operation {operation}")
-                        already_active = False
-                    except Exception as e:
-                        logger.error(f"Error ending inconsistent operation {operation}: {e}")
-                    self._operation_context = None
+                    # We need to restart the operation since something is inconsistent
             except Exception as e:
                 logger.error(f"Error getting active operations: {e}")
-                self._operation_context = None
-                already_active = False
+                # Continue to start a new operation due to the error
 
-            # Just show the dialog without creating a new blocking context if operation is active
-            if already_active:
-                self.show()
-                self.raise_()
-                self.activateWindow()
-            return
+        # At this point we need to start a new operation
+        logger.debug(f"Starting new operation {operation} with blocked groups: {blocked_groups}")
 
-        # If we get here, we need to start a new operation (either it wasn't active or we reset it)
-        logger.debug(f"Starting new operation {operation}")
+        # End any existing operation with this name first
         try:
+            if already_active:
+                logger.warning(f"Ending existing operation {operation} before starting a new one")
+                self._ui_state_manager.end_operation(operation)
+        except Exception as e:
+            logger.error(f"Error ending existing operation {operation}: {e}")
+
+        # Now start a fresh operation
+        try:
+            # Create a new operation context - this should automatically register with the manager
             self._operation_context = self._ui_state_manager.start_operation(
-                operation, blocked_groups
+                operation, groups=blocked_groups
             )
-            # Only show the dialog if starting the operation was successful
+
+            # Show the dialog
             self.show()
-            logger.debug(f"Operation {operation} started successfully")
+            logger.debug(f"Started new operation {operation} successfully")
+
+            # Verify the operation was started correctly
+            if not self._ui_state_manager.is_operation_active(operation):
+                logger.error(f"Failed to start operation {operation} - not active after starting")
         except Exception as e:
             logger.error(f"Failed to start operation {operation}: {e}")
             # Show the dialog anyway but log the error
@@ -155,13 +174,6 @@ class BlockableProgressDialog(ProgressDialog):
 
         # Process events to ensure UI updates properly
         QApplication.processEvents()
-
-        # Validate that operation started correctly
-        try:
-            if not self._ui_state_manager.is_operation_active(operation):
-                logger.error(f"Failed to verify operation {operation} is active")
-        except Exception as e:
-            logger.error(f"Error validating operation {operation} state: {e}")
 
     def exec_with_blocking(
         self,
@@ -238,59 +250,66 @@ class BlockableProgressDialog(ProgressDialog):
             logger.debug("No operation to end")
             return
 
+        operation_name = str(self._operation)
+        logger.debug(f"Ending operation {operation_name}")
+
         try:
             # First check if operation is still active
             is_active = False
             try:
-                is_active = self._ui_state_manager.is_operation_active(self._operation)
+                is_active = self._ui_state_manager.has_active_operations(self._operation)
+                if not is_active:
+                    logger.debug(f"Operation {operation_name} is already inactive")
             except Exception as e:
-                logger.error(f"Error checking if operation {self._operation} is active: {e}")
+                logger.error(f"Error checking if operation {operation_name} is active: {e}")
                 # If we can't check, assume it's active for safety
                 is_active = True
 
-            # Case 1: We have a valid operation context
+            # Case 1: We have a valid operation context and operation is active
             if self._operation_context and is_active:
-                logger.debug(f"Ending operation {self._operation} with context")
+                logger.debug(f"Ending operation {operation_name} with context")
                 try:
                     self._operation_context.end()
-                    logger.debug(f"Successfully ended operation {self._operation} with context")
+                    logger.debug(f"Successfully ended operation {operation_name} with context")
                 except Exception as e:
-                    logger.error(f"Error ending operation {self._operation} with context: {e}")
+                    logger.error(f"Error ending operation {operation_name} with context: {e}")
                     # Fall back to ending via UIStateManager
                     try:
+                        logger.warning(f"Falling back to UIStateManager to end {operation_name}")
                         self._ui_state_manager.end_operation(self._operation)
-                        logger.debug(f"Fallback: ended operation {self._operation} via manager")
+                        logger.debug(f"Successfully ended {operation_name} via direct manager call")
                     except Exception as e2:
                         logger.error(
-                            f"Critical: failed both context and direct end for {self._operation}: {e2}"
+                            f"Critical error ending {operation_name}: both methods failed: {e2}"
                         )
+                        self._force_end_operation(self._operation)
 
-            # Case 2: We know the operation type but have no context or context end failed
+            # Case 2: We know the operation type but have no context or the context failed
             elif is_active:
-                logger.warning(f"Ending operation {self._operation} without context")
+                logger.warning(f"Ending operation {operation_name} without context")
                 try:
+                    # Direct call to end the operation
                     self._ui_state_manager.end_operation(self._operation)
-                    logger.debug(f"Successfully ended operation {self._operation} via manager")
+                    logger.debug(f"Successfully ended operation {operation_name} directly")
+
+                    # Verify it was actually ended
+                    is_still_active = self._ui_state_manager.has_active_operations(self._operation)
+                    if is_still_active:
+                        logger.error(
+                            f"Failed to end operation {operation_name} - still active after end call"
+                        )
+                        self._force_end_operation(self._operation)
                 except Exception as e:
-                    logger.error(f"Error ending operation {self._operation} via manager: {e}")
-                    # Try to end ALL operations as a last resort
-                    try:
-                        active_ops = self._ui_state_manager.get_active_operations()
-                        if active_ops:
-                            logger.warning(f"Attempting to end all operations: {active_ops.keys()}")
-                            for op in active_ops:
-                                if op != self._operation:  # Skip the one we already tried
-                                    try:
-                                        self._ui_state_manager.end_operation(op)
-                                    except:
-                                        pass  # Already logged enough errors
-                    except:
-                        pass  # Already in deep error handling, just continue
-            # Case 3: Operation already ended
+                    logger.error(f"Error ending operation {operation_name} directly: {e}")
+                    self._force_end_operation(self._operation)
+
+            # Case 3: Operation is already ended
             else:
-                logger.debug(f"Operation {self._operation} already ended")
+                logger.debug(f"Operation {operation_name} was already ended")
         except Exception as e:
-            logger.error(f"Unexpected error in _end_operation for {self._operation}: {e}")
+            logger.error(f"Unexpected error in _end_operation for {operation_name}: {e}")
+            # Last resort recovery attempt
+            self._force_end_operation(self._operation)
         finally:
             # Clear operation references regardless of outcome
             self._operation = None
@@ -301,3 +320,39 @@ class BlockableProgressDialog(ProgressDialog):
                 QApplication.processEvents()
             except Exception as e:
                 logger.error(f"Error processing events after ending operation: {e}")
+
+    def _force_end_operation(self, operation):
+        """
+        Emergency last-resort method to force an operation to end by directly
+        manipulating the state manager's internal data structures.
+
+        This should only be used when all other methods fail, as it bypasses
+        the normal cleanup procedures.
+
+        Args:
+            operation: The operation to forcibly end
+        """
+        logger.critical(f"EMERGENCY: Force ending operation {operation}")
+
+        try:
+            # Direct access to internal state as a last resort
+            if hasattr(self._ui_state_manager, "_active_operations"):
+                if operation in self._ui_state_manager._active_operations:
+                    active_elements = self._ui_state_manager._active_operations[operation]
+                    logger.critical(
+                        f"Forcibly removing operation that had {len(active_elements)} active elements"
+                    )
+                    del self._ui_state_manager._active_operations[operation]
+                    logger.debug("Successfully forced operation end")
+
+                    # Try to unblock elements that might be blocked
+                    for element, operations in self._ui_state_manager._element_registry.items():
+                        if operation in operations:
+                            try:
+                                operations.remove(operation)
+                                if hasattr(element, "setEnabled"):
+                                    element.setEnabled(True)
+                            except:
+                                pass  # Ignore errors in cleanup
+        except Exception as e:
+            logger.critical(f"Failed emergency operation end: {e}")
