@@ -293,6 +293,13 @@ class DataManager(QObject):
 
             data, message = result_tuple
 
+            # Check for cancellation messages to avoid showing error for cancellations
+            if message and isinstance(message, str) and "cancel" in message.lower():
+                logger.info(f"CSV load was cancelled: {message}")
+                self._data_model.blockSignals(False)
+                self.load_finished.emit("Operation cancelled")
+                return
+
             # Validate the DataFrame
             if data is None or not isinstance(data, pd.DataFrame):
                 logger.error(f"CSV load did not return valid DataFrame: {type(data)}")
@@ -585,12 +592,15 @@ class DataManager(QObject):
                 logger.error(f"Error connecting worker.started signal: {e}")
 
             try:
-                self._worker.progress.connect(self._on_load_progress)
+                # Progress signal is already connected in __init__, don't connect again
+                # self._worker.progress.connect(self._on_load_progress)
+                pass
             except Exception as e:
                 logger.error(f"Error connecting worker.progress signal: {e}")
 
             try:
-                # Don't directly connect - use an adapter function
+                # Connect the worker.finished signal - this is different from task_completed
+                # which is connected in __init__
                 self._worker.finished.connect(self._adapt_task_result)
             except Exception as e:
                 logger.error(f"Error connecting worker.finished signal: {e}")
@@ -608,9 +618,10 @@ class DataManager(QObject):
             except Exception as e:
                 logger.error(f"Error connecting worker.error to load_finished signal: {e}")
 
-            # Cancellation handling
+            # Cancellation handling - already connected in __init__, don't connect again
             try:
-                self._worker.cancelled.connect(self._on_load_cancelled)
+                # self._worker.cancelled.connect(self._on_load_cancelled)
+                pass
             except Exception as e:
                 logger.error(f"Error connecting worker.cancelled signal: {e}")
 
@@ -638,6 +649,15 @@ class DataManager(QObject):
 
             # Unpack the tuple
             success, data_or_error = result
+
+            # Special handling for cancellation
+            if not success and isinstance(data_or_error, str) and "cancel" in data_or_error.lower():
+                logger.info(f"Task was cancelled: {data_or_error}")
+                # Don't emit load_error for cancellation, just finish the operation
+                self.load_finished.emit("Operation cancelled")
+                # Unblock signals
+                self._data_model.blockSignals(False)
+                return
 
             if success and isinstance(data_or_error, pd.DataFrame):
                 # Success case - pass DataFrame and empty message
