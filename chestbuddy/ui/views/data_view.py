@@ -1,6 +1,6 @@
 import logging
-from PyQt6.QtCore import QItemSelectionModel, QModelIndex, Qt, QTimer
-from PyQt6.QtWidgets import (
+from PySide6.QtCore import QItemSelectionModel, QModelIndex, Qt, QTimer
+from PySide6.QtWidgets import (
     QHeaderView,
     QLineEdit,
     QSizePolicy,
