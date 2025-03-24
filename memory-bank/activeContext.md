@@ -201,6 +201,15 @@ The most significant recent changes include:
 7. Fixed test imports and color reference issues
 8. Fixed BlockableProgressDialog patching in tests to properly verify dialog creation with correct parameters
 
+### UI Blocking Fix - 2024-03-24
+Fixed a critical UI blocking issue where the application UI would remain blocked after the first file import operation. This was caused by a disconnect between the progress dialog and the UI state management system. The solution involved:
+
+1. Properly creating the progress dialog with integrated blocking operations
+2. Adding safety checks to ensure UI operations are properly ended
+3. Improving error handling for edge cases
+
+These changes ensure that the UI now properly unblocks after all import operations, improving the overall user experience and preventing situations where users would need to restart the application after their first import.
+
 ## Upcoming Challenges
 
 1. **Integration Complexity**: The integration will touch several core components, requiring careful testing to ensure we don't introduce new issues.

@@ -14,6 +14,12 @@
 - **Cause:** Layout issue in the progress dialog component
 - **Fix:** Corrected layout and ensured proper initialization of the cancel button
 
+#### UI blocking after CSV import operations (2025-03-24)
+- **Issue:** Dashboard remains blocked after CSV import operations complete
+- **Cause:** Multiple progress dialogs being created for the same operation, with subsequent dialogs showing without proper operation contexts, leading to orphaned UI blocking operations
+- **Fix:** Modified MainWindow._on_load_started to reuse existing progress dialogs, enhanced BlockableProgressDialog.show_with_blocking to properly handle already active operations, improved cleanup in _close_progress_dialog, and added better logging and checks in UIStateManager.has_active_operations
+- **Date:** 2025-03-24
+
 #### UI State tests metaclass conflict (2025-03-26)
 - **Issue**: Tests for the UI State Management System were failing due to metaclass conflicts when importing MainWindow
 - **Cause**: The MainWindow class now uses the BlockableElementMixin which has a metaclass, causing conflicts when multiple inheritance is used in tests
@@ -224,3 +230,15 @@
 - Enhanced error reporting
 - Memory management improvements
 - Expanded user documentation
+
+## UI Blocking Issue - First Import Only
+- **Issue**: The UI remains blocked after the first file import operation, but works correctly on subsequent imports.
+- **Root Cause**: In MainWindow._on_load_started, we were calling progress_dialog.show() and separately calling ui_state_manager.start_operation() rather than using progress_dialog.show_with_blocking(). This created a disconnect between the dialog and the UI blocking operation, preventing proper cleanup when the dialog closed.
+- **Additional Issue**: MainWindow._close_progress_dialog lacked a final safety check to ensure the operation was actually ended, regardless of whether dialog._end_operation() succeeded.
+- **Solution**:
+  1. Modified MainWindow._on_load_started to use BlockableProgressDialog.show_with_blocking() to ensure the dialog properly owns the blocking operation
+  2. Added a safety check in MainWindow._close_progress_dialog to explicitly end any lingering import operations, even if dialog._end_operation() appeared to succeed
+- **Status**: Fixed on 2024-03-24
+- **Related Files**: 
+  - chestbuddy/ui/main_window.py
+  - chestbuddy/ui/widgets/blockable_progress_dialog.py
