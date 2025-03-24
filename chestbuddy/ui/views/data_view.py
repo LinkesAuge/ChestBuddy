@@ -1,5 +1,5 @@
 import logging
-from PySide6.QtCore import QItemSelectionModel, QModelIndex, Qt, QTimer
+from PySide6.QtCore import QItemSelectionModel, QModelIndex, Qt, QTimer, QSortFilterProxyModel
 from PySide6.QtWidgets import (
     QHeaderView,
     QLineEdit,
@@ -9,10 +9,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from chestbuddy.models.filtering import FilterProxyModel
 from chestbuddy.ui.views.base_view import BaseView
 
 logger = logging.getLogger(__name__)
+
+# Create an alias for QSortFilterProxyModel to maintain compatibility
+FilterProxyModel = QSortFilterProxyModel
 
 
 class DataView(BaseView):

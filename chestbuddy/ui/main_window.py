@@ -53,7 +53,7 @@ from chestbuddy.ui.views.chart_view_adapter import ChartViewAdapter
 from chestbuddy.ui.views.dashboard_view_adapter import DashboardViewAdapter
 from chestbuddy.ui.widgets import ProgressDialog, ProgressBar
 from chestbuddy.ui.widgets.blockable_progress_dialog import BlockableProgressDialog
-from chestbuddy.ui.data_view import DataView
+from chestbuddy.ui.views.blockable import BlockableDataView
 from chestbuddy.utils.config import ConfigManager
 from chestbuddy.utils.ui_state import (
     UIStateManager,

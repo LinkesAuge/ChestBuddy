@@ -23,12 +23,9 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QWidget
 
 from chestbuddy.ui.views.data_view import DataView
-from chestbuddy.utils.ui_state import (
-    BlockableElementMixin,
-    UIStateManager,
-    UIElementGroups,
-    UIOperations,
-)
+from chestbuddy.utils.ui_state.elements import BlockableElementMixin
+from chestbuddy.utils.ui_state.manager import UIStateManager
+from chestbuddy.utils.ui_state.constants import UIElementGroups, UIOperations
 
 logger = logging.getLogger(__name__)
 
@@ -57,16 +54,21 @@ class BlockableDataView(DataView, BlockableElementMixin):
         DataView.__init__(self, parent=parent)
 
         # Initialize BlockableElementMixin
-        BlockableElementMixin.__init__(
-            self, element_id=element_id or f"blockable_data_view_{id(self)}"
-        )
+        BlockableElementMixin.__init__(self)
+
+        # Set element ID
+        self._element_id = element_id or f"blockable_data_view_{id(self)}"
 
         # Add to DATA_VIEW group by default
         self._ui_element_groups = {UIElementGroups.DATA_VIEW}
 
         # Get UI state manager and register
         self._ui_state_manager = UIStateManager()
-        self.register_with_manager(self._ui_state_manager, groups=list(self._ui_element_groups))
+        self.register_with_manager(self._ui_state_manager)
+
+        # Register this element with the specified groups
+        for group in self._ui_element_groups:
+            self._ui_state_manager.add_element_to_group(self, group)
 
         # Register child widgets
         self._register_child_widgets()
@@ -76,24 +78,14 @@ class BlockableDataView(DataView, BlockableElementMixin):
     def _register_child_widgets(self):
         """Register child widgets that should be individually blockable."""
         # Register table view if available
-        if hasattr(self, "table_view") and self.table_view is not None:
+        if hasattr(self, "_data_view") and self._data_view is not None:
             try:
                 self._ui_state_manager.register_element(
-                    self.table_view, groups=[UIElementGroups.DATA_VIEW]
+                    self._data_view, groups=[UIElementGroups.DATA_VIEW]
                 )
-                logger.debug(f"Registered table_view with UI state manager")
+                logger.debug(f"Registered _data_view with UI state manager")
             except Exception as e:
-                logger.warning(f"Failed to register table_view: {e}")
-
-        # Register filter bar if available
-        if hasattr(self, "filter_bar") and self.filter_bar is not None:
-            try:
-                self._ui_state_manager.register_element(
-                    self.filter_bar, groups=[UIElementGroups.DATA_VIEW]
-                )
-                logger.debug(f"Registered filter_bar with UI state manager")
-            except Exception as e:
-                logger.warning(f"Failed to register filter_bar: {e}")
+                logger.warning(f"Failed to register _data_view: {e}")
 
     def _apply_block(self, operation: UIOperations) -> None:
         """
@@ -111,11 +103,8 @@ class BlockableDataView(DataView, BlockableElementMixin):
         self.setStyleSheet("background-color: rgba(0, 0, 0, 0.05);")
 
         # Also disable child widgets directly
-        if hasattr(self, "table_view") and self.table_view is not None:
-            self.table_view.setEnabled(False)
-
-        if hasattr(self, "filter_bar") and self.filter_bar is not None:
-            self.filter_bar.setEnabled(False)
+        if hasattr(self, "_data_view") and self._data_view is not None:
+            self._data_view.setEnabled(False)
 
     def _apply_unblock(self, operation: UIOperations) -> None:
         """
@@ -133,17 +122,15 @@ class BlockableDataView(DataView, BlockableElementMixin):
         self.setStyleSheet("")
 
         # Also enable child widgets directly
-        if hasattr(self, "table_view") and self.table_view is not None:
-            self.table_view.setEnabled(True)
+        if hasattr(self, "_data_view") and self._data_view is not None:
+            self._data_view.setEnabled(True)
 
-        if hasattr(self, "filter_bar") and self.filter_bar is not None:
-            self.filter_bar.setEnabled(True)
-
-    def _update_view(self):
+    def update(self, force_rescan: bool = False) -> None:
         """
-        Override the _update_view method to check if the view is blocked before updating.
+        Override the update method to check if the view is blocked before updating.
 
-        If the view is blocked by an operation, updating the view will be skipped.
+        Args:
+            force_rescan: Whether to force a rescan
         """
         # Check if the view is blocked
         if self._ui_state_manager.is_element_blocked(self):
@@ -151,7 +138,7 @@ class BlockableDataView(DataView, BlockableElementMixin):
             return
 
         # If not blocked, proceed with normal update
-        super()._update_view()
+        super().update(force_rescan)
 
     def closeEvent(self, event):
         """

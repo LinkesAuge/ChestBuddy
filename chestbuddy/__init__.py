@@ -41,5 +41,8 @@ setup_logging()
 from chestbuddy.core.models import BaseModel, ChestDataModel
 from chestbuddy.core.services import CSVService, ValidationService, CorrectionService
 
+# Import UI components
+from chestbuddy import ui
+
 # Set version
 __version__ = "0.1.0"

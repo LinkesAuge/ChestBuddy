@@ -11,7 +11,7 @@ from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtWidgets import QWidget, QVBoxLayout
 
 from chestbuddy.core.models import ChestDataModel
-from chestbuddy.ui.data_view import DataView
+from chestbuddy.ui.views.blockable import BlockableDataView
 from chestbuddy.ui.views.base_view import BaseView
 
 
@@ -21,12 +21,13 @@ class DataViewAdapter(BaseView):
 
     Attributes:
         data_model (ChestDataModel): The data model containing chest data
-        data_view (DataView): The wrapped DataView instance
+        data_view (BlockableDataView): The wrapped BlockableDataView instance
 
     Implementation Notes:
         - Inherits from BaseView to maintain UI consistency
-        - Wraps the existing DataView component
+        - Wraps the BlockableDataView component
         - Provides the same functionality as DataView but with the new UI styling
+        - Uses BlockableDataView for automatic integration with UI State Management
     """
 
     def __init__(self, data_model: ChestDataModel, parent: QWidget = None):
@@ -40,8 +41,11 @@ class DataViewAdapter(BaseView):
         # Store references
         self._data_model = data_model
 
-        # Create the underlying DataView
-        self._data_view = DataView(data_model)
+        # Create the underlying DataView (now using BlockableDataView)
+        self._data_view = BlockableDataView(
+            parent=None,  # Will be reparented when added to layout
+            element_id=f"data_view_adapter_{id(self)}",
+        )
 
         # Initialize the base view
         super().__init__("Data View", parent, data_required=True)
