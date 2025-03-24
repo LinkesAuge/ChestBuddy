@@ -60,6 +60,29 @@ alwaysApply: false
   - Ensured cancel button is renamed to "Close" once loading completes
   - Dialog no longer automatically closes, allowing users to review final status
 
+- ✅ Table repopulating multiple times when importing multiple files
+  - Fixed by removing explicit data_changed.emit() call in DataManager._on_csv_load_success 
+  - The update_data method already emits this signal internally when signals are unblocked
+  - This was causing the data view to update and repopulate the table multiple times unnecessarily
+
+- ✅ Table not populating after importing files
+  - Fixed by modifying ChestDataModel._calculate_data_hash to better handle empty vs non-empty DataFrames
+  - Added _calculate_hash_for_empty method to provide consistent hash for empty state
+  - Added special handling in update_data to force hash refresh during empty → populated transitions
+  - This ensured that data_changed signal was properly emitted when loading data for the first time
+
+- ✅ Multiple table population during file imports
+  - Fixed by disconnecting the DataManager.data_loaded signal from MainWindow.populate_data_table method
+  - Modified the MainWindow._finalize_loading method to explicitly call populate_data_table only once
+  - This ensures the table is populated only once after all files are loaded, improving performance
+  - Prevents UI slowdowns during multi-file imports
+
+- ✅ Missing menu actions causing app startup errors
+  - Fixed missing _export_validation_action and _about_action in MainWindow class
+  - Added proper initialization of the export validation action in the Data menu
+  - Changed instantiation of about_action to store it in self._about_action for proper signal connections
+  - Improved signal connections in _connect_signals method to verify action existence before connecting
+
 ## Background Processing Issues
 - ✅ Signal connections not working properly
   - Fixed connections between DataManager and MainWindow
@@ -88,22 +111,6 @@ alwaysApply: false
 - ✅ ChestDataModel.update_data not notifying correctly
   - Fixed notification logic to ensure data changes are properly communicated
   - Added more detailed logging for debugging
-
-## Data Import Issues
-
-### Multiple Table Repopulation During File Import
-
-**Issue:** When importing multiple files, the table gets repopulated multiple times during the import process, causing visual flickering and potentially slowing down the import process.
-
-**Root Cause:** The `DataManager._on_background_task_completed` method was emitting both a `populate_table_requested` signal and updating the `DataModel`, which caused the table to be populated twice:
-1. Once via the `populate_table_requested` signal that triggers `MainWindow._on_populate_table_requested`
-2. Again when the `DataModel` emits `data_changed` which triggers `DataView._on_data_changed` to update the view
-
-**Solution:** Removed the redundant `populate_table_requested.emit(mapped_data)` signal from the `DataManager._on_background_task_completed` method, allowing the table to be populated just once via the normal data change notification path.
-
-**Fixed In:** Commit 843d24f
-
-**Status:** Fixed
 
 # Remaining Issues
 
@@ -187,19 +194,3 @@ During implementation of progress dialog improvements, the DataManager.load_csv 
 
 ### Verification
 Tested by loading multiple CSV files, which now works correctly with proper progress reporting.
-
-## Missing Methods Issue
-
-**Issue:** Application failed to start due to AttributeError: 'DataManager' object has no attribute 'save_csv'
-
-**Root Cause:** When fixing the table repopulation issue, several methods were accidentally removed from the DataManager class, including:
-- save_csv method (needed for saving CSV files)
-- _update_recent_files (for managing recent files list)
-- get_recent_files (for retrieving the list of recent files)
-- _map_columns (for mapping CSV column names to expected names)
-
-**Solution:** Restored all the missing methods while keeping the fix for the table repopulation issue, ensuring the application can start successfully and maintain all previous functionality.
-
-**Fixed In:** Commit [current commit]
-
-**Status:** Fixed

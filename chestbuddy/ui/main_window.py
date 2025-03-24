@@ -185,7 +185,7 @@ class MainWindow(QMainWindow):
 
         # Create sidebar navigation
         self._sidebar = SidebarNavigation()
-        self._sidebar.navigation_changed.connect(self._on_navigation_changed)
+        self._sidebar.navigation_changed.connect(self._set_active_view)
         self._sidebar.data_dependent_view_clicked.connect(self._on_data_dependent_view_clicked)
         main_layout.addWidget(self._sidebar)
 
@@ -301,35 +301,61 @@ class MainWindow(QMainWindow):
         self._correct_action.triggered.connect(self._correct_data)
         data_menu.addAction(self._correct_action)
 
+        # Export Validation Issues action
+        self._export_validation_action = QAction("Export &Validation Issues...", self)
+        self._export_validation_action.setStatusTip("Export validation issues to a file")
+        self._export_validation_action.triggered.connect(self._export_validation_issues)
+        data_menu.addAction(self._export_validation_action)
+
         # Help menu
         help_menu = self.menuBar().addMenu("&Help")
 
         # About action
-        about_action = QAction("&About", self)
-        about_action.setStatusTip("Show the application's About box")
-        about_action.triggered.connect(self._show_about)
-        help_menu.addAction(about_action)
+        self._about_action = QAction("&About", self)
+        self._about_action.setStatusTip("Show the application's About box")
+        self._about_action.triggered.connect(self._show_about)
+        help_menu.addAction(self._about_action)
 
     def _connect_signals(self) -> None:
         """Connect signals and slots."""
-        # Data manager signals - ONLY connect these once
-        if self._data_manager:
-            logger.debug("Connecting data_manager signals in MainWindow")
-            self._data_manager.load_started.connect(self._on_load_started)
-            self._data_manager.load_progress.connect(self._on_load_progress)
-            self._data_manager.load_finished.connect(self._on_load_finished)
-            self._data_manager.load_error.connect(self._on_load_error)
-            self._data_manager.load_success.connect(self.refresh_ui)
-            self._data_manager.load_success.connect(lambda msg: self._status_bar.set_status(msg))
-            self._data_manager.populate_table_requested.connect(self._on_populate_table_requested)
-            logger.debug("All data_manager signals connected successfully")
-        else:
-            logger.warning("No data_manager available, progress signals will not be connected")
+        # Connect signals from sidebar navigation
+        self._sidebar.navigation_changed.connect(self._on_navigation_changed)
+        self._sidebar.data_dependent_view_clicked.connect(self._on_data_dependent_view_clicked)
 
-        # Data model signals - Remove duplicate connections
-        self._data_model.data_changed.connect(self._on_data_changed)
+        # Connect signals from data model
+        self._data_model.data_changed.connect(self._on_data_model_changed)
         self._data_model.validation_changed.connect(self._on_validation_changed)
         self._data_model.correction_applied.connect(self._on_correction_applied)
+
+        # Connect file menu signals
+        self._open_action.triggered.connect(self._open_file)
+        self._save_action.triggered.connect(self._save_file)
+        self._save_as_action.triggered.connect(self._save_file_as)
+
+        # Connect tools menu signals
+        self._validate_action.triggered.connect(self._validate_data)
+        self._correct_action.triggered.connect(self._correct_data)
+        self._export_validation_action.triggered.connect(self._export_validation_issues)
+
+        # Connect help menu signals
+        self._about_action.triggered.connect(self._show_about)
+
+        # Connect DataManager signals
+        self._data_manager.load_started.connect(self._on_load_started)
+        self._data_manager.load_finished.connect(self._on_load_finished)
+        self._data_manager.load_progress.connect(self._on_load_progress)
+        self._data_manager.load_error.connect(self._on_load_error)
+        self._data_manager.load_success.connect(self.refresh_ui)
+
+        # Don't connect the data_loaded signal to populate_data_table method
+        # We'll call populate_data_table explicitly in _finalize_loading to ensure
+        # it only happens once after all files are loaded
+        # self._data_manager.data_loaded.connect(self.populate_data_table)
+
+        # Disable auto-updates for the DataView component to prevent multiple table populating
+        data_view = self._views.get("Data")
+        if data_view and hasattr(data_view, "disable_auto_update"):
+            data_view.disable_auto_update()
 
     def _load_settings(self) -> None:
         """Load application settings."""
@@ -511,6 +537,10 @@ class MainWindow(QMainWindow):
         if not is_error:
             self._update_data_loaded_state(True)
 
+            # Explicitly populate the data table after successful loading
+            # This ensures the table is populated only once at the end of the entire loading process
+            self.populate_data_table()
+
     @Slot(str)
     def _set_active_view(self, view_name: str) -> None:
         """
@@ -612,7 +642,7 @@ class MainWindow(QMainWindow):
         self._open_recent_file(file_path)
 
     @Slot()
-    def _on_data_changed(self) -> None:
+    def _on_data_model_changed(self) -> None:
         """Handle data model changes."""
         # Prevent recursive actions during data changes
         if hasattr(self, "_is_data_changing") and self._is_data_changing:
@@ -1413,3 +1443,19 @@ class MainWindow(QMainWindow):
 
         # Optionally, we could automatically navigate to the dashboard or show the import dialog
         # self._set_active_view("Dashboard")
+
+    def populate_data_table(self) -> None:
+        """
+        Explicitly populate the data table.
+        This should be called only once after data loading completes.
+        """
+        logger.info("MainWindow.populate_data_table called")
+
+        # Find the data view and call its populate method
+        data_view = self._views.get("Data")
+        if data_view and hasattr(data_view, "populate_table"):
+            logger.info("Calling populate_table on data view")
+            data_view.populate_table()
+            logger.info("Data table population completed")
+        else:
+            logger.warning("Could not find data view or it lacks populate_table method")

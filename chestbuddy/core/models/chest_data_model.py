@@ -93,10 +93,19 @@ class ChestDataModel(QObject):
             str: A hash string representing the current data state
         """
         try:
-            # For performance, we'll use a sample of the data rather than the entire DataFrame
+            # Handle empty dataframe case
             if self._data.empty:
-                return "empty_dataframe"
+                # Instead of just returning a constant string, also include column information
+                # This ensures empty DataFrame with columns != empty DataFrame without columns
+                empty_hash_data = {
+                    "is_empty": True,
+                    "has_columns": len(self._data.columns) > 0,
+                    "columns": list(self._data.columns) if len(self._data.columns) > 0 else [],
+                }
+                json_data = json.dumps(empty_hash_data, sort_keys=True)
+                return hashlib.md5(json_data.encode()).hexdigest()
 
+            # For non-empty dataframes, continue with the existing logic
             # Take a sample of rows (first, middle, last) to represent the data
             row_count = len(self._data)
             sample_indices = [0]
@@ -109,6 +118,7 @@ class ChestDataModel(QObject):
 
             # Create a dictionary with key metadata
             hash_data = {
+                "is_empty": False,
                 "row_count": row_count,
                 "column_count": len(self._data.columns),
                 "columns": list(self._data.columns),
@@ -389,8 +399,24 @@ class ChestDataModel(QObject):
                 print("Unblocking signals before notifying")
                 self.blockSignals(False)
 
-            # Update the current hash before notifying
-            self._update_data_hash()
+            # Important change: Clear the current hash before notifying
+            # This ensures that _notify_change will detect a change and emit the signal
+            was_empty = self._current_data_hash == self._calculate_hash_for_empty()
+            is_now_populated = not self._data.empty
+
+            # Force hash refresh for significant changes (empty → populated or populated → empty)
+            if (was_empty and is_now_populated) or (not was_empty and self._data.empty):
+                print(
+                    "Clearing current hash to force signal emission for empty/populated transition"
+                )
+                logger.debug(
+                    "Clearing current hash to force signal emission for empty/populated transition"
+                )
+                self._current_data_hash = None
+            else:
+                # Update the current hash before notifying
+                self._update_data_hash()
+
             print("Calling _notify_change to emit signals")
         except Exception as e:
             # Ensure signals are unblocked on exception
@@ -410,6 +436,16 @@ class ChestDataModel(QObject):
             # Mark update as complete and notify if needed
             self._updating = False
             print("Data update complete, set _updating to False")
+
+    def _calculate_hash_for_empty(self) -> str:
+        """Calculate a hash for an empty DataFrame with the expected columns."""
+        empty_hash_data = {
+            "is_empty": True,
+            "has_columns": True,
+            "columns": self.EXPECTED_COLUMNS,
+        }
+        json_data = json.dumps(empty_hash_data, sort_keys=True)
+        return hashlib.md5(json_data.encode()).hexdigest()
 
     def get_row(self, index: int) -> pd.Series:
         """

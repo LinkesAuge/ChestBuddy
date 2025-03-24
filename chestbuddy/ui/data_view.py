@@ -80,6 +80,7 @@ class DataView(QWidget):
         self._filtered_rows: List[int] = []
         self._current_filter: Dict[str, str] = {}
         self._is_updating = False  # Guard against recursive updates
+        self._auto_update_enabled = False  # Start with auto-update disabled
 
         # Set up UI
         self._init_ui()
@@ -271,16 +272,20 @@ class DataView(QWidget):
         try:
             self._is_updating = True
             print("Starting _update_view method")
+            logger.info("Starting _update_view method")
 
             # Clear the table model
             self._table_model.clear()
+            print("Cleared table model")
 
             # Check if data is empty
             if self._data_model.is_empty:
                 print("Data model is empty, no data to display")
+                logger.info("Data model is empty, no data to display")
                 self._status_label.setText("No data loaded")
                 self._filtered_rows = []  # Initialize to empty list when no data
                 self._is_updating = False
+                print("_update_view aborted: No data in model")
                 return
 
             # Temporarily disable sorting and selection during population
@@ -291,6 +296,7 @@ class DataView(QWidget):
                 # Get data from model - get a shallow copy to avoid modifying original
                 data = self._data_model.data
                 print(f"Got data from model: {len(data)} rows, columns: {list(data.columns)}")
+                logger.info(f"Got data from model: {len(data)} rows, columns: {list(data.columns)}")
 
                 # Get column names
                 column_names = list(data.columns)
@@ -298,9 +304,14 @@ class DataView(QWidget):
                 # Set table dimensions
                 self._table_model.setColumnCount(len(column_names))
                 self._table_model.setRowCount(len(data))
+                print(f"Set table model dimensions: {len(data)} rows, {len(column_names)} columns")
+                logger.info(
+                    f"Set table model dimensions: {len(data)} rows, {len(column_names)} columns"
+                )
 
                 # Set headers
                 self._table_model.setHorizontalHeaderLabels(column_names)
+                print(f"Set horizontal headers: {column_names}")
 
                 # Update status to show we're populating the table
                 self._status_label.setText(f"Populating table with {len(data)} records...")
@@ -313,6 +324,13 @@ class DataView(QWidget):
                 # Populate table with data in chunks
                 total_rows = len(data)
                 processed_rows = 0
+
+                print(
+                    f"Starting to populate table with {total_rows} rows in chunks of {CHUNK_SIZE}"
+                )
+                logger.info(
+                    f"Starting to populate table with {total_rows} rows in chunks of {CHUNK_SIZE}"
+                )
 
                 # Process data in chunks to maintain UI responsiveness
                 try:
@@ -778,6 +796,24 @@ class DataView(QWidget):
         logger.debug("DataView._on_data_changed called")
         print("DataView._on_data_changed called!")
 
+        # Skip if auto-update is disabled
+        if not self._auto_update_enabled:
+            logger.debug("Auto-update disabled, skipping table update")
+            print("Auto-update disabled, skipping table update")
+            return
+
+        # Add debug logging to verify data model state
+        has_data = not self._data_model.is_empty
+        data_shape = (
+            "empty"
+            if self._data_model.is_empty
+            else f"{len(self._data_model.data)} rows x {len(self._data_model.column_names)} columns"
+        )
+        print(f"Data model state in _on_data_changed: has_data={has_data}, shape={data_shape}")
+        logger.debug(
+            f"Data model state in _on_data_changed: has_data={has_data}, shape={data_shape}"
+        )
+
         # Rate-limit updates to prevent UI freezing
         current_time = time.time() * 1000
         time_since_last_update = current_time - self._last_update_time
@@ -795,6 +831,8 @@ class DataView(QWidget):
         # Force update the view
         self._update_view()
         self._last_update_time = current_time
+        print("_update_view completed from _on_data_changed")
+        logger.debug("_update_view completed from _on_data_changed")
 
     @Slot(object)
     def _on_validation_changed(self, validation_status) -> None:
@@ -1052,3 +1090,24 @@ class DataView(QWidget):
         # Implementation would depend on the application architecture
         # This might emit a signal that the MainWindow would connect to
         pass
+
+    def populate_table(self) -> None:
+        """
+        Explicitly populate the table with current data.
+        This should be called once after data loading is complete.
+        """
+        logger.info("DataView.populate_table explicitly called")
+        print("DataView.populate_table explicitly called")
+        self._update_view()
+        logger.info("DataView.populate_table completed")
+        print("DataView.populate_table completed")
+
+    def enable_auto_update(self) -> None:
+        """Enable automatic table updates on data changes."""
+        logger.info("DataView auto-update enabled")
+        self._auto_update_enabled = True
+
+    def disable_auto_update(self) -> None:
+        """Disable automatic table updates on data changes."""
+        logger.info("DataView auto-update disabled")
+        self._auto_update_enabled = False

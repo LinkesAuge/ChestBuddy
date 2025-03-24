@@ -91,3 +91,24 @@ class DataViewAdapter(BaseView):
         """Refresh the data view."""
         if hasattr(self._data_view, "_update_view"):
             self._data_view._update_view()
+
+    def populate_table(self) -> None:
+        """
+        Explicitly populate the table with current data.
+        This should be called once after data loading is complete.
+        """
+        if hasattr(self._data_view, "populate_table"):
+            self._data_view.populate_table()
+        else:
+            # Fallback to update_view if populate_table doesn't exist
+            self._data_view._update_view()
+
+    def enable_auto_update(self) -> None:
+        """Enable automatic table updates on data changes."""
+        if hasattr(self._data_view, "enable_auto_update"):
+            self._data_view.enable_auto_update()
+
+    def disable_auto_update(self) -> None:
+        """Disable automatic table updates on data changes."""
+        if hasattr(self._data_view, "disable_auto_update"):
+            self._data_view.disable_auto_update()
