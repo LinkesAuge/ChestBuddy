@@ -102,6 +102,17 @@ class BlockableProgressDialog(ProgressDialog):
         if groups is None:
             groups = []
 
+        # Check if operation is already active to avoid creating duplicate contexts
+        if self._ui_state_manager.is_operation_active(operation):
+            logger.warning(
+                f"Operation {operation} is already active, not creating duplicate context"
+            )
+            # Store operation for later use in _end_operation
+            self._operation = operation
+            # Show the dialog without creating a new blocking context
+            self.show()
+            return
+
         # Create operation context
         self._operation = operation
         self._operation_context = ManualOperationContext(
@@ -186,6 +197,21 @@ class BlockableProgressDialog(ProgressDialog):
 
     def _end_operation(self) -> None:
         """End the current UI blocking operation."""
+        # First, check if we have an operation but no context
+        if self._operation and not self._operation_context:
+            logger.debug(f"No operation context for {self._operation}, checking if active directly")
+            if self._ui_state_manager.is_operation_active(self._operation):
+                logger.warning(
+                    f"Operation {self._operation} is active without a context, ending directly"
+                )
+                try:
+                    self._ui_state_manager.end_operation(self._operation)
+                    self._operation = None
+                    return
+                except Exception as e:
+                    logger.error(f"Error ending operation {self._operation} directly: {e}")
+
+        # Handle normal case with operation context
         if self._operation_context and self._operation_context.is_active():
             logger.debug(f"Ending blocking operation {self._operation}")
 
@@ -197,6 +223,20 @@ class BlockableProgressDialog(ProgressDialog):
                 logger.debug(f"Traceback: {traceback}")
 
             # End the operation context
-            self._operation_context.end()
+            try:
+                self._operation_context.end()
+            except Exception as e:
+                logger.error(f"Error ending operation context: {e}")
+                # Try direct operation end as fallback
+                if self._operation and self._ui_state_manager.is_operation_active(self._operation):
+                    logger.warning(
+                        f"Attempting direct operation end for {self._operation} after context error"
+                    )
+                    try:
+                        self._ui_state_manager.end_operation(self._operation)
+                    except Exception as direct_e:
+                        logger.error(f"Error ending operation directly: {direct_e}")
+
+            # Clear references
             self._operation_context = None
             self._operation = None

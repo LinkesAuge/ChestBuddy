@@ -122,6 +122,24 @@
   5. Used context managers throughout the application for operations
 - **Status**: Fixed ✅ - All tests pass, UI properly unblocks after operations, even on first import
 
+#### Multiple UI Blocking Operations Issue (2025-03-24)
+- **Status**: ✅ Fixed
+- **Issue**: Parts of the UI would first unblock after import, but then the entire UI would get blocked
+- **Cause**: Multiple dialogs creating operations with the same name (UIOperations.IMPORT), causing tracking issues:
+  1. Initial dialog creates IMPORT operation correctly
+  2. Subsequent dialogs detect IMPORT is already active
+  3. Dialog is shown anyway without tracking context, leaving parent operation active
+  4. First dialog closes but second one doesn't properly clean up the IMPORT operation
+  5. UI remains blocked after all dialogs close
+- **Fix**: 
+  1. Added `has_active_operations()` method to UIStateManager
+  2. Modified _on_load_started to avoid creating dialog if operation is already active
+  3. Improved _on_load_finished to handle errors properly with explicit success flag
+  4. Enhanced _close_progress_dialog with better error handling and forced cleanup
+  5. Fixed _finalize_loading to explicitly set success flag
+  6. Improved BlockableProgressDialog._end_operation to handle cases with operation but no context
+- **Status**: Fixed ✅ - UI properly unblocks after all operations complete
+
 ## Current Issues in Progress
 
 ### Performance with Large Datasets
@@ -135,6 +153,23 @@
 - **Implementation Status**:
   - Initial chunked processing implemented
   - Further optimizations in planning phase
+
+### UI State Integration Test Improvements (2025-03-26)
+- **Status**: 🔄 In Progress (Integration tests fixed, other test files in progress)
+- **Description**: Fixed various issues in the UI State Management System tests
+- **Issues Fixed**:
+  - ✅ Fixed UIElementGroups.SETTINGS reference in MockMainWindow (replaced with UIElementGroups.DIALOG)
+  - ✅ Fixed attribute references from _operations to _active_operations in test files
+  - ✅ Enhanced BlockableWidgetGroup unblock method to better handle edge cases with widgets in multiple groups
+- **Issues In Progress**:
+  - 🔄 Addressing BlockableWidget method signature mismatches in test classes
+  - 🔄 Fixing missing view references in complex tests
+  - 🔄 Resolving widget blocking/unblocking issues in thread safety and nested operation tests
+- **Impact**: Integration tests now pass correctly, demonstrating proper UI State Management functionality for basic scenarios
+- **Next Steps**: 
+  - Update other test files to use correct attribute names
+  - Fix BlockableWidget implementation in tests to match interface requirements
+  - Ensure proper cleanup of resources in thread-related tests
 
 ## Lessons Learned
 
@@ -180,30 +215,9 @@
 
 # Bugfixing Log
 
-*Last Updated: 2025-03-26*
+*Last Updated: 2025-03-24*
 
 ## Recent Fixes
-
-### UI State Management System Implementation
-- **Status**: ✅ Completed
-- **Description**: Designed and implemented a comprehensive UI State Management system to address persistent UI blocking issues
-- **Components**:
-  - UIStateManager: Centralized singleton for managing UI state
-  - BlockableElementMixin: Standard interface for UI elements that can be blocked
-  - OperationContext: Context manager for UI blocking operations
-  - UIOperations & UIElementGroups: Enums for standardizing operations and groups
-  - BlockableDataView: Blockable version of DataView
-  - BlockableValidationTab: Blockable version of ValidationTab
-  - BlockableCorrectionTab: Blockable version of CorrectionTab
-- **Implementation Status**:
-  - ✅ Core components implemented
-  - ✅ Tests written and passed
-  - ✅ Example implementations created
-  - ✅ Integration with MainWindow completed
-  - ✅ Fixed test issues (metaclass conflicts, color constants, empty state widget visibility)
-  - ✅ Integration with view adapters completed
-  - ✅ Comprehensive tests for all components added and passing
-  - ✅ Verified solution resolves the UI blocking issues after first import
 
 ### Next Areas of Focus
 - Performance optimization for large datasets

@@ -200,9 +200,9 @@ class MainWindow(QMainWindow, BlockableElementMixin):
 
         logger.debug("MainWindow initialized")
 
-    def _apply_block(self) -> None:
+    def _apply_block(self, operation: Any = None) -> None:
         """Apply block to the main window and all its children."""
-        logger.debug("MainWindow: Applying block")
+        logger.debug(f"MainWindow: Applying block for operation {operation}")
         # Original enabled state is saved by the mixin
 
         # We'll disable the main UI components but not the whole window
@@ -216,9 +216,9 @@ class MainWindow(QMainWindow, BlockableElementMixin):
         if hasattr(self, "menuBar") and self.menuBar():
             self.menuBar().setEnabled(False)
 
-    def _apply_unblock(self) -> None:
+    def _apply_unblock(self, operation: Any = None) -> None:
         """Restore original enabled state when unblocking."""
-        logger.debug("MainWindow: Applying unblock")
+        logger.debug(f"MainWindow: Applying unblock for operation {operation}")
 
         # Re-enable main components
         if hasattr(self, "_sidebar") and self._sidebar:
@@ -721,6 +721,11 @@ class MainWindow(QMainWindow, BlockableElementMixin):
         """Handle when a loading operation starts."""
         logger.debug("MainWindow._on_load_started called")
 
+        # Check if import operation is already active
+        if self._ui_state_manager.is_operation_active(UIOperations.IMPORT):
+            logger.warning("Import operation already active, not creating duplicate context")
+            return
+
         # Reset progress dialog finalized flag
         self._progress_dialog_finalized = False
 
@@ -815,9 +820,22 @@ class MainWindow(QMainWindow, BlockableElementMixin):
 
         # Make sure we have a progress dialog to finalize
         if not self._progress_dialog:
-            # Create one if needed to ensure UI is unblocked
-            logger.warning("Missing progress dialog in _on_load_finished, creating one to finalize")
-            self._progress_dialog = ProgressDialog(self, "Loading Data")
+            # If dialog doesn't exist, just update UI state without trying to show a dialog
+            logger.warning("Missing progress dialog in _on_load_finished")
+            try:
+                # Update data state based on success
+                self._data_loaded = success and self._check_data_available()
+                self._update_navigation_based_on_data_state()
+                self._update_ui()
+
+                # End any active import operation if it exists
+                if self._ui_state_manager.is_operation_active(UIOperations.IMPORT):
+                    logger.warning("Import operation active but no dialog - ending operation")
+                    self._ui_state_manager.end_operation(UIOperations.IMPORT)
+                return
+            except Exception as e:
+                logger.error(f"Error handling missing dialog case: {e}")
+                return
 
         try:
             # Disable further updates - this should be final state
@@ -827,50 +845,129 @@ class MainWindow(QMainWindow, BlockableElementMixin):
                 self._finalize_loading(message, None)
             else:
                 self._finalize_loading(None, message)
+
+            # Check if there are any active operations not properly ended by the dialog
+            if self._ui_state_manager.is_operation_active(UIOperations.IMPORT):
+                logger.warning("Import operation still active after load finished, forcing cleanup")
+                self._ui_state_manager.end_operation(UIOperations.IMPORT)
+
+            # Ensure UI state is updated based on new data state
+            self._update_navigation_based_on_data_state()
+            self._update_ui()
+
+            # Ensure the progress dialog is properly closed after we've updated UI state
+            self._close_progress_dialog()
+
         except Exception as e:
             logger.error(f"Error in _on_load_finished: {e}")
-            self._finalize_loading(None, f"Error: {str(e)}")
+
+            # Define success explicitly to avoid UnboundLocalError
+            if not "success" in locals():
+                success = False
+
+            # Try to finalize with error
+            try:
+                self._finalize_loading(None, f"Error: {str(e)}")
+            except Exception as inner_e:
+                logger.error(f"Second error in finalize_loading: {inner_e}")
+
+                # Last resort - try to update state directly
+                self._data_loaded = False
+                self._update_navigation_based_on_data_state()
+                self._update_ui()
+
+            # Ensure dialog is closed even if there was an error
+            if self._progress_dialog:
+                try:
+                    self._close_progress_dialog()
+                except Exception as close_e:
+                    logger.error(f"Error closing dialog after exception: {close_e}")
+
+    def _check_data_available(self) -> bool:
+        """Check if data is available in the data model.
+
+        Returns:
+            bool: True if data is available, False otherwise
+        """
+        try:
+            if hasattr(self.data_model, "data") and self.data_model.data is not None:
+                return len(self.data_model.data) > 0
+            return False
+        except Exception as e:
+            logger.error(f"Error checking data availability: {e}")
+            return False
 
     def _close_progress_dialog(self) -> None:
         """Close progress dialog and clean up."""
         logger.debug("Closing progress dialog")
+        if self._progress_dialog is None:
+            logger.debug("No progress dialog to close")
+            # Still check for active operations even if dialog is gone
+            if self._ui_state_manager.is_operation_active(UIOperations.IMPORT):
+                logger.warning("Import operation active but no dialog - ending operation")
+                try:
+                    self._ui_state_manager.end_operation(UIOperations.IMPORT)
+                except Exception as e:
+                    logger.error(f"Error ending import operation with no dialog: {e}")
+            return
+
         try:
-            # Check if there's a dialog to close
-            if self._progress_dialog is not None:
-                # Capture the dialog reference before setting it to None
-                dialog = self._progress_dialog
+            # Capture the dialog reference before setting it to None
+            dialog = self._progress_dialog
 
-                # Clear the reference first to avoid callbacks updating a dialog we're closing
-                self._progress_dialog = None
+            # Clear the reference first to avoid callbacks updating a dialog we're closing
+            self._progress_dialog = None
 
-                # If the dialog is a BlockableProgressDialog, ensure the operation is ended
-                if hasattr(dialog, "_end_operation"):
+            # If the dialog is a BlockableProgressDialog, ensure the operation is ended
+            if hasattr(dialog, "_end_operation"):
+                logger.debug("Calling dialog._end_operation() to end UI blocking operation")
+                try:
                     dialog._end_operation()
+                except Exception as e:
+                    logger.error(f"Error ending operation in dialog: {e}")
 
-                # Hide and accept the dialog
+            # Check if import operation is still active after dialog end_operation
+            if self._ui_state_manager.is_operation_active(UIOperations.IMPORT):
+                logger.warning(
+                    "Import operation still active after dialog._end_operation(), forcing cleanup"
+                )
+                try:
+                    self._ui_state_manager.end_operation(UIOperations.IMPORT)
+                except Exception as e:
+                    logger.error(f"Error forcing end of import operation: {e}")
+
+            # Hide and accept the dialog
+            try:
                 dialog.hide()
                 dialog.accept()
-
                 logger.debug("Progress dialog closed successfully")
-            else:
-                logger.debug("No progress dialog to close")
+            except Exception as e:
+                logger.error(f"Error accepting dialog: {e}")
+
         except Exception as e:
             logger.error(f"Error closing progress dialog: {e}")
             # Make sure the progress_dialog reference is cleared even in case of error
             self._progress_dialog = None
 
-            # In case of error during import, make sure UI state is restored
-            ui_state_manager = UIStateManager()
-            if ui_state_manager.is_operation_active(UIOperations.IMPORT):
+        # Final check - if operations are still active, try one more forced cleanup
+        active_operations = []
+        try:
+            if self._ui_state_manager.has_active_operations():
                 logger.warning(
-                    "Import operation still active after dialog close error, attempting cleanup"
+                    "Operations still active after dialog closure, forcing final cleanup"
                 )
-                try:
-                    # Force unblock UI elements
-                    self._apply_unblock()
-                except Exception as unblock_error:
-                    logger.error(f"Failed to unblock UI after dialog close error: {unblock_error}")
+                active_operations = list(self._ui_state_manager._active_operations.keys())
+                for operation in active_operations:
+                    try:
+                        self._ui_state_manager.end_operation(operation)
+                        logger.debug(f"Forced end of operation {operation} in final cleanup")
+                    except Exception as e:
+                        logger.error(f"Failed to force end operation {operation}: {e}")
+        except Exception as e:
+            logger.error(f"Error during final operations cleanup: {e}")
 
+        # Force UI update to ensure everything is properly refreshed
+        QApplication.processEvents()
         logger.debug("Dialog closure complete")
 
     def _perform_final_ui_check(self, delay_ms: int = 500) -> None:
@@ -914,6 +1011,9 @@ class MainWindow(QMainWindow, BlockableElementMixin):
         """
         logger.debug("[LOAD_FINALIZE] Starting load finalization process")
 
+        # Determine success based on presence of error message
+        success = error_message is None
+
         # Always set the progress dialog to 100%
         if self._progress_dialog:
             self._progress_dialog.setValue(100)
@@ -925,7 +1025,7 @@ class MainWindow(QMainWindow, BlockableElementMixin):
                 self._progress_dialog.setStatusText(error_message)
                 self._progress_dialog.setCancelButtonText("Close")
                 logger.error(f"[LOAD_FAILED] Loading failed: {error_message}")
-                success = False  # Define success as False for error case
+                success = False
             else:
                 # Otherwise set success state
                 logger.debug("[LOAD_SUCCESS] Setting progress dialog to success state")
@@ -934,18 +1034,14 @@ class MainWindow(QMainWindow, BlockableElementMixin):
                 self._progress_dialog.setCancelButtonText("Confirm")
                 self._progress_dialog.set_confirm_button_style()
                 logger.info(f"[LOAD_COMPLETED] Loading successful: {success_message}")
-                success = True  # Define success as True for success case
+                success = True
 
         # Safely check if there are rows in the data model
-        has_data_rows = False
-        try:
-            if hasattr(self.data_model, "data") and self.data_model.data is not None:
-                has_data_rows = len(self.data_model.data) > 0
-                logger.debug(f"[DATA_STATE] Data model has {len(self.data_model.data)} rows")
-            else:
-                logger.warning("[DATA_STATE] Data model doesn't have 'data' attribute or it's None")
-        except Exception as e:
-            logger.error(f"[DATA_CHECK_ERROR] Error checking data rows: {e}")
+        has_data_rows = self._check_data_available()
+        if has_data_rows:
+            logger.debug(f"[DATA_STATE] Data model has rows")
+        else:
+            logger.warning("[DATA_STATE] Data model has no rows or data is not accessible")
 
         # Update data loaded flag based on success and data availability
         previous_data_loaded = self._data_loaded  # Store previous state for comparison
@@ -954,9 +1050,16 @@ class MainWindow(QMainWindow, BlockableElementMixin):
             f"[DATA_LOADED_STATE] Previous: {previous_data_loaded}, New: {self._data_loaded}"
         )
 
+        # Ensure UI elements are updated based on new data state
+        logger.debug("[UI_UPDATE] Triggering UI update based on new data state")
+        self._update_ui()  # Update all UI elements based on data availability
+
         # Enable navigation based on data state
         logger.debug("[NAV_UPDATE] Updating navigation based on data state")
         self._update_navigation_based_on_data_state()
+
+        # Force process events to ensure UI updates are applied
+        QApplication.processEvents()
 
     def _on_populate_table_requested(self, data: pd.DataFrame) -> None:
         """

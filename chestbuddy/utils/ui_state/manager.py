@@ -693,3 +693,11 @@ class UIStateManager(QObject, metaclass=QObjectSingletonMeta):
         for operation, blocked_elements in self._active_operations.items():
             active_operations_details[str(operation)] = len(blocked_elements)
         self._debug_info["active_operations_details"] = active_operations_details
+
+    def has_active_operations(self) -> bool:
+        """Check if there are any active operations.
+
+        Returns:
+            bool: True if there are active operations, False otherwise
+        """
+        return len(self._active_operations) > 0
