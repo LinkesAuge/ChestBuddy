@@ -1009,8 +1009,8 @@ class MainWindow(QMainWindow):
                 # Format rows with commas for readability
                 if total > 0:
                     current_formatted = f"{current:,}"
-                    total_formatted = f"{total:,}"
-                    row_info = f"{current_formatted} of {total_formatted} rows"
+                    # Show only current rows read, not the estimated total
+                    row_info = f"{current_formatted} rows read"
 
                     # Create combined message with standardized format
                     message = f"{file_info} - {row_info}"
@@ -1029,7 +1029,7 @@ class MainWindow(QMainWindow):
                 # Fallback if we don't have file count yet
                 message = f"Loading {filename}..."
                 if total > 0:
-                    message += f" ({current:,}/{total:,} rows)"
+                    message += f" ({current:,} rows read)"
 
             # Update the dialog
             self._progress_dialog.setLabelText(message)
