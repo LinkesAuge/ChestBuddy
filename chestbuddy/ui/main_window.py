@@ -509,8 +509,11 @@ class MainWindow(QMainWindow):
             # Always set progress to max on finalization
             self._progress_dialog.setValue(self._progress_dialog.maximum())
 
-            # Change button to Close for final state
-            self._progress_dialog.setCancelButtonText("Close")
+            # Set button text based on success/error state
+            if is_error:
+                self._progress_dialog.setCancelButtonText("Close")
+            else:
+                self._progress_dialog.setCancelButtonText("Confirm")
 
             # Don't disconnect or reconnect signals for the cancel button
             # The ProgressDialog._on_cancel_clicked method will handle both
