@@ -194,3 +194,77 @@ During implementation of progress dialog improvements, the DataManager.load_csv 
 
 ### Verification
 Tested by loading multiple CSV files, which now works correctly with proper progress reporting.
+
+# Bug Tracking and Fixing Log
+
+This document tracks bugs, issues, and their solutions in ChestBuddy.
+
+## Active Issues
+
+1. ~~**Table repopulation on view switch** - When switching views, the table is unnecessarily repopulated even if the data hasn't changed.~~
+   - Status: Fixed
+   - Solution: Modified `DataViewAdapter.needs_refresh()` to check data dimensions before refreshing and added proper refresh handling in `MainWindow.refresh_ui()`.
+
+2. ~~**Data table not refreshing on new file imports** - When importing new files after an initial import, the data view doesn't properly refresh.~~
+   - Status: Fixed
+   - Solution: Modified `ChestDataModel` to expose the data hash via a new property (`data_hash`) and updated `DataViewAdapter.needs_refresh()` to check for data content changes using this hash in addition to dimension changes.
+
+## Fixed Issues
+
+### Bug: Table repopulation on view switch
+
+**Description:**
+When switching between views (e.g., from Data view to Dashboard and back), the table is unnecessarily repopulated even if the data hasn't changed, causing performance issues.
+
+**Root Cause:**
+The `refresh_ui()` method in `MainWindow` was refreshing the data view every time, regardless of whether the data had changed. The adapter class lacked proper state tracking to prevent unnecessary refreshes.
+
+**Solution:**
+1. Added a `needs_refresh()` method to `DataViewAdapter` to check if the data dimensions have changed
+2. Updated `refresh_ui()` in `MainWindow` to only call `refresh()` on the adapter if needed
+3. Added state tracking in `DataViewAdapter` to compare current and previous data state
+
+**Resolved:** March 24, 2025
+
+### Bug: Data table not refreshing on new file imports
+
+**Description:**
+When importing new files after an initial import, the data view doesn't update to show the new data if the dimensions (row/column count) remain the same.
+
+**Root Cause:**
+The `needs_refresh()` method in `DataViewAdapter` only checked for changes in dimensions (row count and column count). When loading a new file with the same number of rows and columns, it couldn't detect that the data content itself had changed.
+
+**Solution:**
+1. Added a new `data_hash` property to `ChestDataModel` to expose the internal hash-based data change detection
+2. Updated `DataViewAdapter._update_data_state()` to store the current data hash
+3. Modified `DataViewAdapter.needs_refresh()` to check both dimensions and data hash changes
+4. This ensures the data view detects all data changes, even when dimensions remain the same
+
+**Resolved:** March 24, 2025
+
+### Bug: Data view not refreshing when selecting another file
+
+**Description:**
+When a user loads data and then selects another file, the table in the Data view didn't update to show the new data, even though the data model was updated correctly.
+
+**Root Cause:**
+In `MainWindow._ensure_data_table_populated`, when the user was not on the Data view, the code was calling `data_view._update_data_state()` which prematurely updated the state tracking. This caused the data view to incorrectly think it was already up to date when switching to it later, resulting in the table not refreshing.
+
+**Solution:**
+1. Added a `_needs_population` flag to `DataViewAdapter` to track when the table needs population even if state tracking suggests otherwise
+2. Modified `MainWindow._ensure_data_table_populated` to set the `needs_population` flag instead of updating state tracking when not on the Data view
+3. Updated `MainWindow._set_active_view` to check this flag when activating the Data view and populate the table if needed
+4. This ensures that when data changes while the user is not on the Data view, the table will be refreshed when switching to it later
+
+**Resolved:** March 24, 2025
+
+## Known Limitations
+
+1. **Memory usage with large datasets** - Loading very large datasets (>100k rows) can be memory-intensive
+   - Status: To be optimized
+   - Potential solution: Implement data paging/virtualization
+
+2. **UI responsiveness during data loading** - UI can become less responsive during loading of large files
+   - Status: Partially mitigated
+   - Current solution: Background processing with progress reporting
+   - Further improvements planned: Chunked processing with yield points for UI updates

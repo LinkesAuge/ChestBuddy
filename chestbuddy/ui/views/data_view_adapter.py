@@ -49,8 +49,12 @@ class DataViewAdapter(BaseView):
         self._last_data_state = {
             "row_count": 0,
             "column_count": 0,
+            "data_hash": self._data_model.data_hash,
             "last_update_time": 0,
         }
+
+        # Flag to track if the table needs population when shown
+        self._needs_population = False
 
         # Create the underlying DataView
         self._data_view = DataView(data_model)
@@ -58,6 +62,16 @@ class DataViewAdapter(BaseView):
         # Initialize the base view
         super().__init__("Data View", parent)
         self.setObjectName("DataViewAdapter")
+
+    @property
+    def needs_population(self) -> bool:
+        """Get whether the view needs table population when shown."""
+        return self._needs_population
+
+    @needs_population.setter
+    def needs_population(self, value: bool) -> None:
+        """Set whether the view needs table population when shown."""
+        self._needs_population = value
 
     def _setup_ui(self):
         """Set up the UI components."""
@@ -109,12 +123,14 @@ class DataViewAdapter(BaseView):
             self._last_data_state = {
                 "row_count": len(self._data_model.data),
                 "column_count": len(self._data_model.column_names),
+                "data_hash": self._data_model.data_hash,
                 "last_update_time": int(time.time() * 1000),
             }
         else:
             self._last_data_state = {
                 "row_count": 0,
                 "column_count": 0,
+                "data_hash": self._data_model.data_hash,
                 "last_update_time": int(time.time() * 1000),
             }
 
@@ -126,18 +142,31 @@ class DataViewAdapter(BaseView):
             bool: True if the view needs to be refreshed, False otherwise
         """
         # Check if data has changed by comparing with our tracked state
-        current_state = {"row_count": 0, "column_count": 0}
+        current_state = {"row_count": 0, "column_count": 0, "data_hash": ""}
 
         if not self._data_model.is_empty:
             current_state = {
                 "row_count": len(self._data_model.data),
                 "column_count": len(self._data_model.column_names),
+                "data_hash": self._data_model.data_hash,
             }
 
-        needs_refresh = (
+        # Check for dimension changes or data content changes via hash
+        dimensions_changed = (
             current_state["row_count"] != self._last_data_state["row_count"]
             or current_state["column_count"] != self._last_data_state["column_count"]
         )
+
+        content_changed = current_state["data_hash"] != self._last_data_state.get("data_hash", "")
+
+        needs_refresh = dimensions_changed or content_changed
+
+        if needs_refresh:
+            print(
+                f"DataViewAdapter.needs_refresh: TRUE - Data changed. Old: {self._last_data_state}, New: {current_state}"
+            )
+        else:
+            print(f"DataViewAdapter.needs_refresh: FALSE - No data changes detected")
 
         return needs_refresh
 

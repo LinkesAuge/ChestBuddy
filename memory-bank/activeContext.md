@@ -139,6 +139,13 @@ We are currently implementing a comprehensive UI enhancement for the ChestBuddy 
    - Enhanced progress dialog with improved status reporting and feedback
    - Implemented report generation with configurable templates and filters
 
+3. **Data Refresh Mechanism Improvements**
+   - Fixed issue with the table not updating when selecting another file while not on the Data view
+   - Added a needs_population flag to DataViewAdapter to track when the table needs refreshing
+   - Modified MainWindow to properly handle view switching with pending data updates
+   - Enhanced data state tracking to ensure consistent UI updates
+   - Ensured proper data hash checking to detect content changes even when dimensions remain the same
+
 ## Active Decisions
 
 1. **PDF Library Selection**: We need to identify the best PDF generation library that works well with PySide6. Currently considering reportlab, WeasyPrint, and PyFPDF.
@@ -688,3 +695,13 @@ These mockups illustrate the key UI enhancements, including:
 3. Compact header design in the Data view to maximize table space
 4. Streamlined filtering and status display
 5. Logical grouping of action buttons 
+
+## Current Tasks & Progress
+
+### Recently Completed
+
+- Fixed issue with unnecessary table repopulation when switching views
+- Fixed issue with data view not refreshing when importing new files with the same dimensions
+- Improved data hash tracking to detect actual data content changes, not just dimension changes
+- Enhanced the dashboard view to properly update statistics on refresh
+- Updated UI refresh mechanism to be more selective about when components need refreshing

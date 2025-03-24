@@ -1065,3 +1065,16 @@ class ChestDataModel(QObject):
         except Exception as e:
             logger.error(f"Error getting invalid rows: {e}")
             return []
+
+    @property
+    def data_hash(self) -> str:
+        """
+        Get the current data hash.
+
+        Returns:
+            str: A hash string representing the current data state
+        """
+        # Make sure the hash is up to date
+        if self._current_data_hash is None:
+            self._update_data_hash()
+        return self._current_data_hash

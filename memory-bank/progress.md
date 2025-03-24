@@ -248,8 +248,12 @@ We have successfully completed all improvements to the CSV loading functionality
   - Fixed progress bar jumping from 0% to 100% with smooth updates
   - Enhanced progress dialog to show total rows loaded across files
   - Added formatted numbers with commas for better readability
-  - Improved progress calculation based on all files being processed
-  - Added separate tracking of per-file and overall progress
+- [x] Fixed data refresh issues in the UI:
+  - Resolved issue with table not updating when loading another file while not on the Data view
+  - Added needs_population flag to DataViewAdapter to track required refreshes
+  - Enhanced MainWindow._set_active_view to check this flag when activating the Data view
+  - Modified _ensure_data_table_populated to prevent premature state tracking updates
+  - Improved data state tracking to ensure all data changes are properly detected and displayed
 
 ### Background Processing
 - Implemented robust CSV import with memory-efficient processing

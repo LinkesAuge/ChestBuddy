@@ -537,22 +537,46 @@ class MainWindow(QMainWindow):
     @Slot(str)
     def _set_active_view(self, view_name: str) -> None:
         """
-        Set the active view.
+        Set the active view in the content stack.
 
         Args:
-            view_name: The name of the view to activate.
+            view_name (str): The name of the view to activate
         """
         try:
+            # Log the view switch for debugging
             logger.info(f"Setting active view to: {view_name}")
+
+            # Update sidebar selection
+            self._sidebar.set_active_item(view_name)
+
+            # Get the view from the views dictionary
             view = self._views.get(view_name)
-            if view:
-                self._content_stack.setCurrentWidget(view)
-                self._sidebar.set_active_item(view_name)
-                logger.info(f"View '{view_name}' activated successfully")
-            else:
-                logger.warning(f"View '{view_name}' not found in available views")
+            if view is None:
+                logger.warning(f"View '{view_name}' not found in views dictionary")
+                return
+
+            # Check if the view is already active
+            if self._content_stack.currentWidget() == view:
+                logger.debug(f"View '{view_name}' is already active")
+                return
+
+            # Special handling for DataView to check if it needs population
+            if view_name == "Data" and hasattr(view, "needs_population") and view.needs_population:
+                logger.info("Data view needs population, populating table")
+                view.populate_table()
+                view.needs_population = False
+
+            # Set the view as the current widget in the stack
+            self._content_stack.setCurrentWidget(view)
+
+            # Update UI components based on the new view
+            self._update_ui()
+
+            # Log success
+            logger.info(f"View '{view_name}' activated successfully")
         except Exception as e:
-            logger.error(f"Error setting active view to {view_name}: {e}")
+            logger.error(f"Error setting active view to '{view_name}': {e}")
+            QMessageBox.critical(self, "Error", f"Error switching to {view_name} view: {str(e)}")
 
     # ===== Slots =====
 
@@ -1483,10 +1507,11 @@ class MainWindow(QMainWindow):
                     logger.info("Currently on Data view and needs refresh, populating table")
                     data_view.populate_table()
                 else:
-                    # Otherwise just update the state tracking so it'll populate when shown
-                    if hasattr(data_view, "_update_data_state"):
-                        logger.info("Not on Data view, updating state tracking only")
-                        data_view._update_data_state()
+                    # Otherwise set the needs_population flag and don't update state tracking
+                    # This ensures the table will be populated when the view is shown
+                    if hasattr(data_view, "needs_population"):
+                        logger.info("Not on Data view, setting needs_population flag")
+                        data_view.needs_population = True
             else:
                 logger.info("Data view doesn't need refresh, skipping table population")
         else:
