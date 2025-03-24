@@ -1383,3 +1383,38 @@
 2025-03-23 17:42:55,626 - chestbuddy.ui.resources.resource_manager - WARNING - Failed to load Qt resources. Using file-based resources.
 2025-03-23 17:42:55,645 - __main__ - INFO - ChestBuddy application initialized
 2025-03-23 17:42:55,695 - __main__ - INFO - Starting application main event loop
+2025-03-24 20:01:12,629 - root - INFO - Logging initialized to D:\Projekte\ChestBuddy\chestbuddy\logs\chestbuddy.log
+2025-03-24 20:01:13,151 - __main__ - INFO - Logging initialized at level DEBUG to d:\Projekte\ChestBuddy\chestbuddy\logs\chestbuddy.log
+2025-03-24 20:01:13,192 - chestbuddy.ui.data_view - INFO - Installed event filter on table view
+2025-03-24 20:01:13,192 - chestbuddy.ui.data_view - INFO - Registered Ctrl+C shortcut for copying (table-specific)
+2025-03-24 20:01:13,192 - chestbuddy.ui.data_view - INFO - Registered widget-level Ctrl+V shortcut for pasting (widget hierarchy)
+2025-03-24 20:01:13,202 - chestbuddy.ui.main_window - INFO - Setting active view to: Dashboard
+2025-03-24 20:01:13,202 - chestbuddy.ui.main_window - INFO - View 'Dashboard' activated successfully
+2025-03-24 20:01:13,204 - __main__ - INFO - Autosave enabled with interval of 5 minutes
+2025-03-24 20:01:13,205 - chestbuddy.ui.resources.resource_manager - WARNING - Failed to load Qt resources. Using file-based resources.
+2025-03-24 20:01:13,225 - __main__ - INFO - ChestBuddy application initialized
+2025-03-24 20:01:13,280 - __main__ - INFO - Starting application main event loop
+2025-03-24 20:01:20,832 - chestbuddy.core.services.data_manager - INFO - Loading 3 CSV file(s)
+2025-03-24 20:01:20,867 - chestbuddy.core.services.csv_service - INFO - Reading CSV file in chunks: D:/Projekte/ChestBuddy/chestbuddy/data/input/Chests_input_2025_03_11.csv, chunk size: 100
+2025-03-24 20:01:20,879 - chestbuddy.core.services.csv_service - INFO - Detected encoding: utf-8
+2025-03-24 20:01:21,201 - chestbuddy.core.services.csv_service - INFO - Successfully read CSV file with 3497 rows
+2025-03-24 20:01:21,202 - chestbuddy.core.services.csv_service - INFO - Reading CSV file in chunks: D:/Projekte/ChestBuddy/chestbuddy/data/input/Chests_input_2025_03_12.csv, chunk size: 100
+2025-03-24 20:01:21,215 - chestbuddy.core.services.csv_service - INFO - Detected encoding: utf-8
+2025-03-24 20:01:21,911 - chestbuddy.core.services.csv_service - INFO - Successfully read CSV file with 7959 rows
+2025-03-24 20:01:21,924 - chestbuddy.core.services.csv_service - INFO - Reading CSV file in chunks: D:/Projekte/ChestBuddy/chestbuddy/data/input/Chests_input_test.csv, chunk size: 100
+2025-03-24 20:01:21,931 - chestbuddy.core.services.csv_service - INFO - Detected encoding: utf-8
+2025-03-24 20:01:23,000 - chestbuddy.core.services.csv_service - INFO - Successfully read CSV file with 12387 rows
+2025-03-24 20:01:23,013 - chestbuddy.utils.background_processing - INFO - Successfully loaded 23843 rows from 3 files
+2025-03-24 20:01:23,014 - chestbuddy.core.services.data_manager - INFO - CSV loaded successfully with 23843 rows
+2025-03-24 20:01:27,332 - chestbuddy.core.services.data_manager - INFO - DataManager.cancel_loading called
+2025-03-24 20:01:29,247 - __main__ - INFO - Data model changed
+2025-03-24 20:01:29,248 - __main__ - INFO - Data loaded successfully with Successfully loaded 23,843 rows of data rows
+2025-03-24 20:01:29,804 - chestbuddy.ui.main_window - INFO - Setting active view to: Data
+2025-03-24 20:01:29,807 - chestbuddy.ui.main_window - INFO - View 'Data' activated successfully
+2025-03-24 20:01:30,530 - chestbuddy.ui.main_window - INFO - Setting active view to: Dashboard
+2025-03-24 20:01:30,531 - chestbuddy.ui.main_window - INFO - View 'Dashboard' activated successfully
+2025-03-24 20:01:31,657 - chestbuddy.ui.main_window - INFO - Cancelling any ongoing operations before closing
+2025-03-24 20:01:31,657 - chestbuddy.core.services.data_manager - INFO - DataManager.cancel_loading called
+2025-03-24 20:01:31,667 - __main__ - INFO - Starting application shutdown sequence
+2025-03-24 20:01:31,667 - __main__ - INFO - Saving configuration
+2025-03-24 20:01:31,667 - __main__ - INFO - Application shutdown complete
