@@ -4,6 +4,11 @@ globs:
 alwaysApply: false
 ---
 ---
+description: 
+globs: 
+alwaysApply: false
+---
+---
 description: Tracking of bugs, fixes, and ongoing issues
 globs: 
 alwaysApply: false
@@ -120,7 +125,7 @@ alwaysApply: false
   - **Date**: 2025-03-24
   - **Notes**: This solution increases the chances of catching the end of the table population process, particularly for large datasets on the first import. The multiple checks at different intervals ensure we have multiple opportunities to re-enable the UI.
 
-- ⚠️ UI still blocked after first import (major architectural redesign)
+- 🔄 UI still blocked after first import (UI State Management System Implementation)
   - **Issue**: Despite multiple incremental fix attempts, the UI blocking issue after the first import persists.
   - **Cause**: Root analysis shows our approach of reactive patching has fundamental flaws. The real problems are:
     1. Lack of centralized UI state management
@@ -128,23 +133,49 @@ alwaysApply: false
     3. Reliance on timing and delayed checks (inherently fragile)
     4. No proper reference counting for blocking operations
     5. Mixed responsibilities in code (UI state mixed with business logic)
-  - **Planned Solution**: Complete architectural redesign with a `UIStateManager` system that provides:
+  - **Solution Approach**: Complete architectural redesign with a `UIStateManager` system that provides:
     1. Centralized tracking of which UI elements are blocked and why
     2. Reference counting for multiple operations blocking the same element
     3. Context manager for operations that might block the UI
     4. Proper element state tracking and restoration
     5. Thread-safe implementation for cross-thread operations
     6. Clear separation of UI state from business logic
-  - **Implementation Plan**: Phased approach:
-    1. Core components (UIStateManager, signals, contexts)
-    2. MainWindow integration
-    3. ProgressDialog integration
-    4. DataView integration
-    5. BackgroundWorker integration
-    6. Comprehensive testing
-    7. Documentation and finalization
-  - **Date**: 2025-03-24
-  - **Notes**: This represents a shift from reactive fixes to a proper architectural solution that addresses the underlying design issues rather than symptoms.
+  - **Implementation Status**:
+    - Core components implemented
+    - Tests written and passed
+    - Example implementations created
+    - Integration in progress
+    - Phased implementation plan defined
+
+- ✅ RecentFilesList test failures
+  - **Issue**: Tests for the RecentFilesList component were failing due to visibility issues with the EmptyStateWidget
+  - **Cause**: The EmptyStateWidget was not being properly shown when there were no files in the list
+  - **Fix**: Updated the set_files and _on_clear_all methods to explicitly call show() on the empty state widget, and updated tests to check properties rather than just visibility
+  - **Date**: 2025-03-26
+
+- ✅ WelcomeStateWidget checkbox signal issue
+  - **Issue**: The dont_show_again_changed signal in WelcomeStateWidget was not emitting correct values
+  - **Cause**: The signal handler was checking for Qt.Checked (which may have different values in different environments) rather than checking for the actual state value
+  - **Fix**: Modified the _on_dont_show_changed method to explicitly check for state == 2 (the value when checked) rather than comparing to Qt.Checked
+  - **Date**: 2025-03-26
+
+- ✅ Missing color constants in style.py
+  - **Issue**: Some tests were failing due to missing DISABLED color constant in the Colors class
+  - **Cause**: The DISABLED color was being referenced in tests and components but wasn't defined in the Colors class
+  - **Fix**: Added the DISABLED color constant to the Colors class in style.py
+  - **Date**: 2025-03-26
+
+- ✅ UI State tests metaclass conflict
+  - **Issue**: Tests for the UI State Management System were failing due to metaclass conflicts when importing MainWindow
+  - **Cause**: The MainWindow class now uses the BlockableElementMixin which has a metaclass, causing conflicts when multiple inheritance is used in tests
+  - **Fix**: Created a proper MainWindowMock class that avoids the metaclass conflict, and updated the tests to use this mock instead of importing the real MainWindow
+  - **Date**: 2025-03-26
+
+- ✅ MainWindow UI State tests not properly mocking BlockableProgressDialog
+  - **Issue**: Tests for the MainWindow UI state management weren't properly testing BlockableProgressDialog creation
+  - **Cause**: The mock for BlockableProgressDialog wasn't receiving the correct parameters during the test
+  - **Fix**: Updated the mock implementation in the tests to properly verify the creation of BlockableProgressDialog with correct parameters
+  - **Date**: 2025-03-26
 
 ## Background Processing Issues
 - ✅ Signal connections not working properly
@@ -213,14 +244,41 @@ alwaysApply: false
   - Always disconnect signals when done to prevent memory leaks
   - Use try/except blocks around Qt object interactions that might be deleted
 
+- **UI State Management Best Practices**:
+  - Use a centralized system for tracking UI state
+  - Implement reference counting for nested blocking operations
+  - Use context managers for automatic cleanup, even in case of exceptions
+  - Separate UI state management from business logic
+  - Make blocking/unblocking declarative rather than imperative
+  - Avoid timing-dependent solutions
+  - Implement thread-safe mechanisms for cross-thread operations
+
 # Bugfixing Log
 
-*Last Updated: 2025-03-25*
+*Last Updated: 2025-03-26*
+
+## Recent Fixes
+
+### UI State Management System
+- **Status**: 🔄 In Progress
+- **Description**: Designed and implemented a comprehensive UI State Management system to address persistent UI blocking issues
+- **Components**:
+  - UIStateManager: Centralized singleton for managing UI state
+  - BlockableElementMixin: Standard interface for UI elements that can be blocked
+  - OperationContext: Context manager for UI blocking operations
+  - UIOperations & UIElementGroups: Enums for standardizing operations and groups
+- **Implementation Status**:
+  - Core components implemented
+  - Tests written and passed
+  - Example implementations created
+  - Integration with MainWindow completed
+  - Fixed test issues (metaclass conflicts, color constants, empty state widget visibility)
+  - Integration with other components in progress
 
 ## Persistent Issues
 
 ### UI Blocking After First Import
-- **Status**: 🟡 In Progress - Comprehensive redesign in progress
+- **Status**: 🔄 In Progress - UI State Management System implementation
 - **Description**: The UI, especially the data table, remains blocked after the first import operation completes.
 - **Root Cause Analysis**: 
   - Multiple attempts to fix with timing-based solutions have been unsuccessful
@@ -228,63 +286,21 @@ alwaysApply: false
   - Current approach uses ad-hoc timing-sensitive code with multiple calls to QApplication.processEvents()
   - There's no centralized tracking of which elements are blocked and by which operations
   - Potential threading issues between background worker and UI thread
-- **Solution Attempts**:
-  1. ❌ First attempt: Added processEvents() calls after dialog closure
-  2. ❌ Second attempt: Added manual enabling of table view
-  3. ❌ Third attempt: Added multiple phases of UI unblocking
-  4. ❌ Fourth attempt: Added explicit checks for data view table
-  5. ❌ Fifth attempt: Added delayed UI checks
-  6. ❌ Sixth attempt: Removed automatic view transition
-  7. ❌ Seventh attempt: Added two-phase UI unblocking (immediate + delayed)
-  8. ❌ Eighth attempt: Implemented multiple delayed UI checks at increasing intervals
-  9. 🟡 **Current approach**: Implementing a comprehensive UI State Management System that:
-     - Centralizes UI blocking/unblocking logic
-     - Uses reference counting for nested operations
-     - Provides context managers for automatic cleanup
-     - Adds proper tracking of blocked elements
-     - Ensures thread safety
-     - Eliminates timing-dependent solutions
+- **Solution Approach**:
+  - Implementing a comprehensive UI State Management System that:
+    - Centralizes UI blocking/unblocking logic
+    - Uses reference counting for nested operations
+    - Provides context managers for automatic cleanup
+    - Adds proper tracking of blocked elements
+    - Ensures thread safety
+    - Eliminates timing-dependent solutions
+- **Implementation Status**:
+  - Core components implemented
+  - Tests written and passed
+  - Example implementations created
+  - Integration in progress
+  - Phased implementation plan defined
 
 ### Progress Dialog Visibility
 - **Status**: ✅ Fixed
 - **Description**: Progress dialog sometimes doesn't appear during long operations.
-- **Root Cause**: Dialog was created but not properly shown or brought to front.
-- **Solution**: Enhanced dialog show logic to ensure visibility and focus.
-
-## New System: UI State Management
-
-### Architecture
-- **UIStateManager**: Singleton class that manages all UI state.
-- **BlockableElementMixin**: Mixin for UI elements that can be blocked.
-- **OperationContext**: Context manager for UI blocking operations.
-- **UIElementGroups & UIOperations**: Standard enums for element groups and operations.
-
-### Key Features
-1. **Centralized Control**: Single source of truth for UI state.
-2. **Reference Counting**: Properly handles nested operations.
-3. **Thread Safety**: Protected by QMutex for concurrent access.
-4. **Declarative API**: Simple interface for blocking/unblocking.
-5. **Automatic Cleanup**: Context managers ensure proper unblocking.
-
-### Implementation Plan
-1. Create core UI state management components
-2. Integrate with MainWindow
-3. Integrate with ProgressDialog
-4. Integrate with DataView
-5. Integrate with BackgroundWorker
-6. Comprehensive testing
-7. Documentation
-
-## Recent Fixes
-
-### Data Table Selection Issues
-- **Status**: ✅ Fixed
-- **Description**: Selecting cells in the data table sometimes failed after filtering.
-- **Root Cause**: Index mapping between filtered and unfiltered data was incorrect.
-- **Solution**: Fixed index translation in the data model.
-
-### Memory Leaks During Import
-- **Status**: ✅ Fixed
-- **Description**: Memory usage increased significantly during large imports.
-- **Root Cause**: Temporary dataframes weren't being properly garbage collected.
-- **Solution**: Added explicit deletion and forced garbage collection after processing.

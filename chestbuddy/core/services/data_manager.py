@@ -53,7 +53,7 @@ class DataManager(QObject):
     # New signals for progress reporting
     load_progress = Signal(str, int, int)  # file_path, current progress, total
     load_started = Signal()
-    load_finished = Signal(str)  # Include a message parameter
+    load_finished = Signal(bool, str)  # Include a message parameter
 
     # Signal for synchronous table population
     populate_table_requested = Signal(pd.DataFrame)  # DataFrame to populate in the table
@@ -163,14 +163,14 @@ class DataManager(QObject):
                 logger.error(f"Error executing CSV load task: {e}")
                 self._data_model.blockSignals(False)
                 self.load_error.emit(f"Error starting file loading: {str(e)}")
-                self.load_finished.emit(f"Error: {str(e)}")
+                self.load_finished.emit(False, f"Error: {str(e)}")
 
         except Exception as e:
             # Ensure signals are unblocked even if an error occurs
             self._data_model.blockSignals(False)
             logger.error(f"Error during CSV import: {e}")
             self.load_error.emit(f"Error loading files: {str(e)}")
-            self.load_finished.emit(f"Error: {str(e)}")
+            self.load_finished.emit(False, f"Error: {str(e)}")
 
     def cancel_loading(self) -> None:
         """Cancel any ongoing loading operation."""
@@ -187,7 +187,7 @@ class DataManager(QObject):
                 self._current_task.cancel()
 
                 # Signal progress completion to clean up any UI
-                self.load_finished.emit("Loading cancelled")
+                self.load_finished.emit(False, "Loading cancelled")
             except Exception as e:
                 logger.error(f"Error cancelling task: {e}")
 
@@ -249,7 +249,7 @@ class DataManager(QObject):
         self._current_task = None
 
         # Emit finished signal with cancellation message
-        self.load_finished.emit("Operation cancelled by user")
+        self.load_finished.emit(False, "Operation cancelled by user")
 
         # Emit error signal with cancellation message
         self.load_error.emit("Operation cancelled by user")
@@ -309,20 +309,21 @@ class DataManager(QObject):
             logger.error(f"Error combining DataFrames: {e}")
             return None, f"Error combining files: {str(e)}"
 
-    def _on_csv_load_success(self, result_tuple: Tuple[pd.DataFrame, str]):
+    def _on_csv_load_success(self, result_tuple: Tuple) -> None:
         """
-        Handle successful CSV load from background thread.
+        Handle successful CSV load.
 
         Args:
-            result_tuple: Tuple containing (DataFrame, message)
+            result_tuple: Tuple containing the loaded data and a message
         """
+        # Early returns for invalid results
         try:
             # Type check the result tuple
             if not isinstance(result_tuple, tuple) or len(result_tuple) != 2:
                 logger.error(f"Invalid result format from CSV load: {type(result_tuple)}")
                 self.load_error.emit("Invalid result format from CSV service")
                 self._data_model.blockSignals(False)
-                self.load_finished.emit("Invalid result format from CSV service")
+                self.load_finished.emit(False, "Invalid result format from CSV service")
                 return
 
             data, message = result_tuple
@@ -332,14 +333,14 @@ class DataManager(QObject):
                 logger.error(f"CSV load did not return valid DataFrame: {type(data)}")
                 self.load_error.emit(message or "Failed to load CSV data")
                 self._data_model.blockSignals(False)
-                self.load_finished.emit(message or "Failed to load CSV data")
+                self.load_finished.emit(False, message or "Failed to load CSV data")
                 return
 
             if data.empty:
                 logger.warning("CSV load returned empty DataFrame")
                 self.load_error.emit("CSV file is empty")
                 self._data_model.blockSignals(False)
-                self.load_finished.emit("CSV file is empty")
+                self.load_finished.emit(False, "CSV file is empty")
                 return
 
             # Log successful load
@@ -348,6 +349,17 @@ class DataManager(QObject):
             # Store the file path that was successfully loaded
             if self._current_file_path:
                 self._update_recent_files(self._current_file_path)
+
+            # Emit success message for file reading completion
+            # This allows the UI to update and the button to be available
+            success_message = f"Successfully read {len(data):,} rows of data from file(s)"
+            self.load_success.emit(success_message)
+
+            # Signal completion of file reading phase (allows close button to be available)
+            self.load_finished.emit(True, success_message)
+
+            # Give the UI a moment to process events before heavy data processing
+            QApplication.processEvents()
 
             # Map columns
             mapped_data = self._map_columns(data)
@@ -361,9 +373,6 @@ class DataManager(QObject):
             # the mapped_data again through another channel
             self.populate_table_requested.emit(mapped_data)
 
-            # Complete the file loading phase with a success message
-            success_message = f"Successfully loaded {len(data):,} rows of data"
-
             # Unblock signals after all updates are complete
             self._data_model.blockSignals(False)
 
@@ -375,15 +384,6 @@ class DataManager(QObject):
             # Clear the current task
             self._current_task = None
 
-            # Give the UI a moment to process events before emitting final success signal
-            QApplication.processEvents()
-
-            # Emit final success signal without triggering additional data processing
-            self.load_success.emit(success_message)
-
-            # Signal completion of loading operation
-            self.load_finished.emit(success_message)
-
         except Exception as e:
             # Ensure signals are unblocked
             self._data_model.blockSignals(False)
@@ -391,7 +391,7 @@ class DataManager(QObject):
             # Log and emit error
             logger.error(f"Error in CSV load success handler: {e}")
             self.load_error.emit(f"Error processing CSV data: {str(e)}")
-            self.load_finished.emit(f"Error: {str(e)}")
+            self.load_finished.emit(False, f"Error: {str(e)}")
 
     def _update_recent_files(self, file_path: str) -> None:
         """
@@ -594,7 +594,7 @@ class DataManager(QObject):
             self.load_error.emit(f"Error loading file: {error}")
 
             # Emit finished signal
-            self.load_finished.emit("Error: {str(error)}")
+            self.load_finished.emit(False, f"Error: {str(error)}")
 
             # Clear current task
             self._current_task = None
@@ -632,7 +632,9 @@ class DataManager(QObject):
                 logger.error(f"Error connecting worker.error signal: {e}")
 
             try:
-                self._worker.error.connect(lambda e: self.load_finished.emit(f"Error: {str(e)}"))
+                self._worker.error.connect(
+                    lambda e: self.load_finished.emit(False, f"Error: {str(e)}")
+                )
             except Exception as e:
                 logger.error(f"Error connecting worker.error to load_finished signal: {e}")
 

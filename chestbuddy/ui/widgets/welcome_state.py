@@ -352,7 +352,9 @@ class WelcomeStateWidget(QWidget):
         Args:
             state: Checkbox state (Qt.Checked or Qt.Unchecked)
         """
-        self.dont_show_again_changed.emit(state == Qt.Checked)
+        # The state value is 2 when checked, not Qt.Checked (which may have a different value in some environments)
+        is_checked = bool(state == 2)  # Qt.Checked value is 2
+        self.dont_show_again_changed.emit(is_checked)
 
     def get_dont_show_again(self) -> bool:
         """

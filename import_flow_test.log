@@ -1,0 +1,6 @@
+2025-03-23 23:57:47,518 [WARNING] No sample data directory found. Using current directory.
+2025-03-23 23:57:47,518 [INFO] Starting import flow test with 5 iterations
+2025-03-23 23:57:47,567 [INFO] Found 48 data files for testing
+2025-03-23 23:57:47,584 [INFO] Logging initialized to D:\Projekte\ChestBuddy\chestbuddy\logs\chestbuddy.log
+2025-03-23 23:57:48,038 [ERROR] Failed to import MainWindow. Ensure the script is run from the project root.
+2025-03-23 23:57:48,038 [WARNING] No test results to report

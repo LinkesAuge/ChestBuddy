@@ -9,8 +9,9 @@ and coordinates between UI elements.
 import logging
 import traceback
 import time
-from typing import Any, Dict, List, Optional, Set, Union, Tuple
+from typing import Any, Dict, List, Optional, Set, Union, Tuple, Callable, ContextManager
 from weakref import WeakSet, WeakKeyDictionary, WeakValueDictionary
+from contextlib import contextmanager
 
 from PySide6.QtCore import QMutex, QObject, Qt, QThread
 
@@ -21,6 +22,29 @@ from chestbuddy.utils.ui_state.constants import UIElementGroups, UIOperations
 logger = logging.getLogger(__name__)
 
 
+@contextmanager
+def mutex_lock(mutex: QMutex = None) -> None:
+    """
+    Context manager for safely locking and unlocking a QMutex.
+
+    If no mutex is provided, a new one will be created.
+
+    Args:
+        mutex: Optional QMutex instance to lock. If None, a new QMutex is created.
+
+    Yields:
+        None
+    """
+    if mutex is None:
+        mutex = QMutex()
+
+    mutex.lock()
+    try:
+        yield
+    finally:
+        mutex.unlock()
+
+
 class SingletonMeta(type):
     """Metaclass for implementing the Singleton pattern."""
 
@@ -28,14 +52,33 @@ class SingletonMeta(type):
     _mutex = QMutex()
 
     def __call__(cls, *args, **kwargs):
-        with QMutex().locked():
+        mutex = QMutex()
+        mutex.lock()
+        try:
             if cls not in cls._instances:
                 instance = super().__call__(*args, **kwargs)
                 cls._instances[cls] = instance
             return cls._instances[cls]
+        finally:
+            mutex.unlock()
 
 
-class UIStateManager(QObject, metaclass=SingletonMeta):
+# Get the metaclass of QObject
+QObjectMetaClass = type(QObject)
+
+
+class QObjectSingletonMeta(QObjectMetaClass, SingletonMeta):
+    """
+    Metaclass that combines QObject's metaclass with SingletonMeta.
+
+    This resolves the metaclass conflict when a class inherits from both
+    QObject and uses SingletonMeta as its metaclass.
+    """
+
+    pass
+
+
+class UIStateManager(QObject, metaclass=QObjectSingletonMeta):
     """
     Central manager for UI state in the application.
 
@@ -105,7 +148,7 @@ class UIStateManager(QObject, metaclass=SingletonMeta):
             block_handler: Optional custom function to call when blocking.
             unblock_handler: Optional custom function to call when unblocking.
         """
-        with QMutex().locked():
+        with mutex_lock():
             # Initialize element in registry if not present
             if element not in self._element_registry:
                 self._element_registry[element] = set()
@@ -132,7 +175,7 @@ class UIStateManager(QObject, metaclass=SingletonMeta):
         Args:
             element: The UI element to unregister.
         """
-        with QMutex().locked():
+        with mutex_lock():
             # Remove from registry
             if element in self._element_registry:
                 del self._element_registry[element]
@@ -166,7 +209,7 @@ class UIStateManager(QObject, metaclass=SingletonMeta):
             block_handler: Optional custom function to call when blocking the group.
             unblock_handler: Optional custom function to call when unblocking the group.
         """
-        with QMutex().locked():
+        with mutex_lock():
             # Initialize group in registry if not present
             if group_id not in self._group_registry:
                 self._group_registry[group_id] = set()
@@ -189,7 +232,7 @@ class UIStateManager(QObject, metaclass=SingletonMeta):
         Args:
             group_id: The identifier for the group.
         """
-        with QMutex().locked():
+        with mutex_lock():
             # Remove from registry
             if group_id in self._group_registry:
                 del self._group_registry[group_id]
@@ -207,7 +250,7 @@ class UIStateManager(QObject, metaclass=SingletonMeta):
             element: The UI element to add.
             group_id: The identifier for the group.
         """
-        with QMutex().locked():
+        with mutex_lock():
             # Register the group if not present
             if group_id not in self._group_registry:
                 self._group_registry[group_id] = set()
@@ -230,7 +273,7 @@ class UIStateManager(QObject, metaclass=SingletonMeta):
             element: The UI element to remove.
             group_id: The identifier for the group.
         """
-        with QMutex().locked():
+        with mutex_lock():
             # Remove element from group
             if group_id in self._group_registry and element in self._group_registry[group_id]:
                 self._group_registry[group_id].remove(element)
@@ -244,7 +287,7 @@ class UIStateManager(QObject, metaclass=SingletonMeta):
             element: The UI element to block.
             operation: The operation blocking the element.
         """
-        with QMutex().locked():
+        with mutex_lock():
             self._block_element(element, operation)
 
     def unblock_element(self, element: Any, operation: Any) -> None:
@@ -255,7 +298,7 @@ class UIStateManager(QObject, metaclass=SingletonMeta):
             element: The UI element to unblock.
             operation: The operation to unblock.
         """
-        with QMutex().locked():
+        with mutex_lock():
             self._unblock_element(element, operation)
 
     def block_group(self, group_id: Any, operation: Any) -> None:
@@ -266,7 +309,7 @@ class UIStateManager(QObject, metaclass=SingletonMeta):
             group_id: The identifier for the group.
             operation: The operation blocking the group.
         """
-        with QMutex().locked():
+        with mutex_lock():
             if group_id not in self._group_registry:
                 logger.warning(f"Group {group_id} not found")
                 return
@@ -300,7 +343,7 @@ class UIStateManager(QObject, metaclass=SingletonMeta):
             group_id: The identifier for the group.
             operation: The operation to unblock.
         """
-        with QMutex().locked():
+        with mutex_lock():
             if group_id not in self._group_registry:
                 logger.warning(f"Group {group_id} not found")
                 return
@@ -346,7 +389,7 @@ class UIStateManager(QObject, metaclass=SingletonMeta):
             groups: Optional list of groups to block.
             operation_name: Optional name for the operation (for logging).
         """
-        with QMutex().locked():
+        with mutex_lock():
             if operation not in self._active_operations:
                 self._active_operations[operation] = set()
 
@@ -385,7 +428,7 @@ class UIStateManager(QObject, metaclass=SingletonMeta):
         Args:
             operation: The operation to end.
         """
-        with QMutex().locked():
+        with mutex_lock():
             if operation not in self._active_operations:
                 logger.warning(f"Operation {operation} not active")
                 return
@@ -442,7 +485,7 @@ class UIStateManager(QObject, metaclass=SingletonMeta):
         Returns:
             bool: True if the element is blocked, False otherwise.
         """
-        with QMutex().locked():
+        with mutex_lock():
             if element not in self._element_registry:
                 return False
 
@@ -458,7 +501,7 @@ class UIStateManager(QObject, metaclass=SingletonMeta):
         Returns:
             Set[Any]: Set of operations blocking the element.
         """
-        with QMutex().locked():
+        with mutex_lock():
             if element not in self._element_registry:
                 return set()
 
@@ -474,7 +517,7 @@ class UIStateManager(QObject, metaclass=SingletonMeta):
         Returns:
             bool: True if the group is blocked, False otherwise.
         """
-        with QMutex().locked():
+        with mutex_lock():
             if group_id not in self._group_registry:
                 return False
 
@@ -493,7 +536,7 @@ class UIStateManager(QObject, metaclass=SingletonMeta):
 
     def is_operation_active(self, operation: Any) -> bool:
         """
-        Check if an operation is currently active.
+        Check if an operation is active.
 
         Args:
             operation: The operation to check.
@@ -501,17 +544,31 @@ class UIStateManager(QObject, metaclass=SingletonMeta):
         Returns:
             bool: True if the operation is active, False otherwise.
         """
-        with QMutex().locked():
+        with mutex_lock():
             return operation in self._active_operations
+
+    def is_element_in_group(self, element: Any, group_id: Any) -> bool:
+        """
+        Check if an element is in a specific group.
+
+        Args:
+            element: The UI element to check.
+            group_id: The identifier for the group.
+
+        Returns:
+            bool: True if the element is in the group, False otherwise.
+        """
+        with mutex_lock():
+            return group_id in self._group_registry and element in self._group_registry[group_id]
 
     def get_active_operations(self) -> Set[Any]:
         """
-        Get all currently active operations.
+        Get the set of active operations.
 
         Returns:
             Set[Any]: Set of active operations.
         """
-        with QMutex().locked():
+        with mutex_lock():
             return set(self._active_operations.keys())
 
     def get_debug_info(self) -> Dict[str, Any]:
@@ -521,7 +578,7 @@ class UIStateManager(QObject, metaclass=SingletonMeta):
         Returns:
             Dict[str, Any]: Dictionary of debug information.
         """
-        with QMutex().locked():
+        with mutex_lock():
             # Update debug info before returning
             self._update_debug_info()
             return self._debug_info.copy()

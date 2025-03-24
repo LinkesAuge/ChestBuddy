@@ -54,9 +54,13 @@ class Colors:
     # Text colors
     TEXT_LIGHT = "#FFFFFF"  # White
     TEXT_MUTED = "#E2E8F0"  # Light gray
+    TEXT_DISABLED = "#A0AEC0"  # Disabled text color
 
     # Border colors
     BORDER = "#4A5568"  # Medium gray
+
+    # Disabled elements
+    DISABLED = "#4A5568"  # Medium gray for disabled elements
 
 
 def apply_application_style(app):

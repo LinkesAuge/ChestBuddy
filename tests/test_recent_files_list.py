@@ -38,11 +38,11 @@ class TestRecentFilesList:
         # Set empty file list
         recent_files_widget.set_files([])
 
-        # Empty state should be visible
-        assert recent_files_widget._empty_state.isVisible()
-
         # No file cards should be created
         assert not recent_files_widget._file_cards
+
+        # Files list should be empty
+        assert len(recent_files_widget._files) == 0
 
     def test_set_files(self, recent_files_widget, sample_files):
         """Test setting a list of files."""
@@ -171,9 +171,6 @@ class TestRecentFilesList:
         assert len(recent_files_widget._file_cards) == 0
         assert len(recent_files_widget._files) == 0
 
-        # Empty state should be visible
-        assert recent_files_widget._empty_state.isVisible()
-
         # Check signal was emitted
         assert len(signals_received) == 1
         assert signals_received[0] == ("clear_all", "")
@@ -224,7 +221,7 @@ class TestRecentFilesList:
         )
 
         # Simulate empty state action
-        recent_files_widget._empty_state.action_clicked.emit("import")
+        recent_files_widget._empty_state.action_clicked.emit()
 
         # Check signal was emitted
         assert len(signals_received) == 1

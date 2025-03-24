@@ -389,6 +389,337 @@ def example_manual_operation_context():
         operation_context.end()
 
 
+#
+# Examples of using blockable UI components
+#
+
+
+def example_blockable_base_view():
+    """
+    Example of using BlockableBaseView.
+
+    The BlockableBaseView is a base view that implements BlockableElementMixin,
+    so it can be automatically blocked and unblocked by the UI State Manager.
+    """
+    from PySide6.QtWidgets import QApplication, QMainWindow
+    from chestbuddy.ui.views.blockable.blockable_base_view import BlockableBaseView
+    from chestbuddy.utils.ui_state import (
+        UIElementGroups,
+        UIOperations,
+        OperationContext,
+        UIStateManager,
+    )
+
+    app = QApplication([])
+    main_window = QMainWindow()
+
+    # Create a blockable base view
+    view = BlockableBaseView(parent=main_window)
+
+    # Register the view with specific UI element groups
+    view.register_with_groups([UIElementGroups.MAIN_CONTENT, UIElementGroups.DATA_VIEW])
+
+    # Manually block the view
+    ui_state_manager = UIStateManager()
+    ui_state_manager.block_elements([view], UIOperations.IMPORT)
+
+    # The view will now be disabled and appear blocked
+
+    # Unblock the view
+    ui_state_manager.unblock_elements([view], UIOperations.IMPORT)
+
+    # The view will now be enabled
+
+    # Using with OperationContext (preferred method)
+    with OperationContext(ui_state_manager, UIOperations.EXPORT, elements=[view]):
+        # Code to perform the export operation
+        # The view will be automatically blocked during this operation
+        pass
+
+    # The view will be automatically unblocked after the operation
+
+
+def example_blockable_data_view():
+    """
+    Example of using BlockableDataView.
+
+    The BlockableDataView extends DataView and implements BlockableElementMixin,
+    so it can be automatically blocked and unblocked by the UI State Manager.
+    """
+    from PySide6.QtWidgets import QApplication, QMainWindow
+    from chestbuddy.ui.views.blockable.blockable_data_view import BlockableDataView
+    from chestbuddy.utils.ui_state import (
+        UIElementGroups,
+        UIOperations,
+        OperationContext,
+        UIStateManager,
+    )
+    import pandas as pd
+
+    app = QApplication([])
+    main_window = QMainWindow()
+
+    # Create a blockable data view
+    view = BlockableDataView(parent=main_window)
+
+    # Set some data
+    data = pd.DataFrame(
+        {
+            "Name": ["Alice", "Bob", "Charlie"],
+            "Age": [25, 30, 35],
+            "City": ["New York", "London", "Paris"],
+        }
+    )
+    view.set_data(data)
+
+    # The view is already registered with UIElementGroups.DATA_VIEW
+
+    # Block all DATA_VIEW elements during an import operation
+    ui_state_manager = UIStateManager()
+
+    with OperationContext(
+        ui_state_manager, UIOperations.IMPORT, groups=[UIElementGroups.DATA_VIEW]
+    ):
+        # Simulate a long-running import operation
+        import time
+
+        time.sleep(2)  # In a real app, this would be actual import logic
+
+        # During this time, the data view will be blocked,
+        # including its child widgets (table_view, filter_bar)
+
+    # After the operation completes, the data view will be automatically unblocked
+
+
+def example_blockable_progress_dialog():
+    """
+    Example of using BlockableProgressDialog.
+
+    The BlockableProgressDialog extends ProgressDialog and automatically
+    manages UI blocking when shown or executed.
+    """
+    from PySide6.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayout, QWidget
+    from chestbuddy.ui.widgets.blockable_progress_dialog import BlockableProgressDialog
+    from chestbuddy.utils.ui_state import UIElementGroups, UIOperations, UIStateManager
+
+    app = QApplication([])
+    main_window = QMainWindow()
+    central_widget = QWidget()
+    layout = QVBoxLayout(central_widget)
+
+    # Create a button to start the operation
+    button = QPushButton("Start Import")
+    layout.addWidget(button)
+
+    main_window.setCentralWidget(central_widget)
+    main_window.resize(400, 300)
+    main_window.show()
+
+    # Function to handle the button click
+    def on_button_clicked():
+        # Create a blockable progress dialog
+        dialog = BlockableProgressDialog(
+            "Importing data...", "Cancel", 0, 100, parent=main_window, title="Import Progress"
+        )
+
+        # Show the dialog and block UI elements
+        # Here we block the main content and toolbar groups
+        dialog.show_with_blocking(
+            UIOperations.IMPORT, groups=[UIElementGroups.MAIN_CONTENT, UIElementGroups.TOOLBAR]
+        )
+
+        # Simulate progress
+        for i in range(101):
+            # Update progress
+            dialog.setValue(i)
+
+            # Process events to keep the UI responsive
+            app.processEvents()
+
+            # Simulate work
+            import time
+
+            time.sleep(0.05)
+
+            # Check if the user cancelled
+            if dialog.wasCanceled():
+                break
+
+        # Close the dialog when done
+        dialog.accept()
+
+    # Connect the button click to our function
+    button.clicked.connect(on_button_clicked)
+
+    # For a modal dialog that blocks until complete:
+    def example_modal_dialog():
+        dialog = BlockableProgressDialog(
+            "Exporting data...", "Cancel", 0, 100, parent=main_window, title="Export Progress"
+        )
+
+        # Execute the dialog modally and block UI elements
+        result = dialog.exec_with_blocking(
+            UIOperations.EXPORT, groups=[UIElementGroups.MAIN_CONTENT]
+        )
+
+        # Check the result
+        if result == 1:  # Dialog accepted
+            print("Export completed successfully")
+        else:
+            print("Export was cancelled")
+
+
+def example_integration_all_components():
+    """
+    Example showing integration of all blockable components.
+
+    This example demonstrates how to use BlockableBaseView, BlockableDataView,
+    and BlockableProgressDialog together in a single application.
+    """
+    from PySide6.QtWidgets import (
+        QApplication,
+        QMainWindow,
+        QTabWidget,
+        QPushButton,
+        QVBoxLayout,
+        QHBoxLayout,
+        QWidget,
+        QLabel,
+    )
+    from chestbuddy.ui.views.blockable.blockable_base_view import BlockableBaseView
+    from chestbuddy.ui.views.blockable.blockable_data_view import BlockableDataView
+    from chestbuddy.ui.widgets.blockable_progress_dialog import BlockableProgressDialog
+    from chestbuddy.utils.ui_state import UIElementGroups, UIOperations, UIStateManager
+    import pandas as pd
+
+    app = QApplication([])
+    main_window = QMainWindow()
+    central_widget = QWidget()
+    main_layout = QVBoxLayout(central_widget)
+
+    # Create a tab widget
+    tab_widget = QTabWidget()
+    main_layout.addWidget(tab_widget)
+
+    # Create a button layout
+    button_layout = QHBoxLayout()
+    main_layout.addLayout(button_layout)
+
+    # Create blockable views
+    base_view = BlockableBaseView(parent=main_window)
+    base_content = QWidget()
+    base_layout = QVBoxLayout(base_content)
+    base_layout.addWidget(QLabel("This is a BlockableBaseView"))
+    base_view.setWidget(base_content)
+
+    # Create a data view with some sample data
+    data_view = BlockableDataView(parent=main_window)
+    data = pd.DataFrame(
+        {
+            "Name": ["Alice", "Bob", "Charlie", "David", "Eve"],
+            "Age": [25, 30, 35, 28, 42],
+            "City": ["New York", "London", "Paris", "Tokyo", "Berlin"],
+        }
+    )
+    data_view.set_data(data)
+
+    # Add views to the tab widget
+    tab_widget.addTab(base_view, "Base View")
+    tab_widget.addTab(data_view, "Data View")
+
+    # Create buttons for different operations
+    import_button = QPushButton("Import (Block All)")
+    export_button = QPushButton("Export (Block Data View)")
+    process_button = QPushButton("Process (Block Current Tab)")
+
+    button_layout.addWidget(import_button)
+    button_layout.addWidget(export_button)
+    button_layout.addWidget(process_button)
+
+    # Set up the main window
+    main_window.setCentralWidget(central_widget)
+    main_window.resize(800, 600)
+    main_window.setWindowTitle("UI State Management Example")
+
+    # Define button click handlers
+    def on_import_clicked():
+        # Create a blockable progress dialog for import
+        dialog = BlockableProgressDialog(
+            "Importing data...", "Cancel", 0, 100, parent=main_window, title="Import Progress"
+        )
+
+        # Block all UI elements during import
+        dialog.show_with_blocking(
+            UIOperations.IMPORT, groups=[UIElementGroups.DATA_VIEW, UIElementGroups.MAIN_CONTENT]
+        )
+
+        # Simulate progress
+        for i in range(101):
+            dialog.setValue(i)
+            app.processEvents()
+            import time
+
+            time.sleep(0.03)
+            if dialog.wasCanceled():
+                break
+
+        dialog.accept()
+
+    def on_export_clicked():
+        # Create a blockable progress dialog for export
+        dialog = BlockableProgressDialog(
+            "Exporting data...", "Cancel", 0, 100, parent=main_window, title="Export Progress"
+        )
+
+        # Only block the data view during export
+        dialog.show_with_blocking(UIOperations.EXPORT, groups=[UIElementGroups.DATA_VIEW])
+
+        # Simulate progress
+        for i in range(101):
+            dialog.setValue(i)
+            app.processEvents()
+            import time
+
+            time.sleep(0.02)
+            if dialog.wasCanceled():
+                break
+
+        dialog.accept()
+
+    def on_process_clicked():
+        # Get the currently active view
+        current_tab_index = tab_widget.currentIndex()
+        current_view = tab_widget.widget(current_tab_index)
+
+        # Create a blockable progress dialog for processing
+        dialog = BlockableProgressDialog(
+            "Processing data...", "Cancel", 0, 100, parent=main_window, title="Processing"
+        )
+
+        # Block only the current view
+        dialog.show_with_blocking(UIOperations.PROCESS, elements=[current_view])
+
+        # Simulate progress
+        for i in range(101):
+            dialog.setValue(i)
+            app.processEvents()
+            import time
+
+            time.sleep(0.01)
+            if dialog.wasCanceled():
+                break
+
+        dialog.accept()
+
+    # Connect button signals
+    import_button.clicked.connect(on_import_clicked)
+    export_button.clicked.connect(on_export_clicked)
+    process_button.clicked.connect(on_process_clicked)
+
+    main_window.show()
+    app.exec()
+
+
 if __name__ == "__main__":
     import sys
 

@@ -429,14 +429,15 @@ class RecentFilesList(QWidget):
         self._container_layout.setSpacing(12)
 
         # Empty state
+        icon = IconProvider.get_icon("history")
         self._empty_state = EmptyStateWidget(
             title="No Recent Files",
             message="Recently opened files will appear here",
-            icon="history",
+            icon=icon,
             action_text="Import Files",
-            action_name="import",
+            action_callback=lambda: self.file_action.emit("import", ""),
         )
-        self._empty_state.action_clicked.connect(lambda action: self.file_action.emit("import", ""))
+        self._empty_state.action_clicked.connect(lambda: self.file_action.emit("import", ""))
         self._container_layout.addWidget(self._empty_state)
         self._empty_state.setVisible(False)  # Hide initially
 
@@ -459,10 +460,12 @@ class RecentFilesList(QWidget):
         # Show empty state if no files
         if not self._files:
             self._empty_state.setVisible(True)
+            self._empty_state.show()
             return
 
         # Hide empty state
         self._empty_state.setVisible(False)
+        self._empty_state.hide()
 
         # Create file cards for each file
         for file_data in self._files:
@@ -545,6 +548,7 @@ class RecentFilesList(QWidget):
 
         # Show empty state
         self._empty_state.setVisible(True)
+        self._empty_state.show()
 
         # Emit signal
         self.file_action.emit("clear_all", "")

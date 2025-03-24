@@ -22,6 +22,7 @@ class Icons:
 
     # Application icons
     APP_ICON = ":/icons/app_icon.png"
+    APP_LOGO = ":/icons/app_logo.png"  # Added app_logo for welcome screen
 
     # Action icons
     OPEN = ":/icons/open.png"
@@ -80,3 +81,32 @@ class Icons:
             QPixmap: The pixmap
         """
         return QPixmap(icon_path)
+
+
+# Import and re-export the IconProvider class
+try:
+    from chestbuddy.ui.resources.icon_provider import IconProvider
+except ImportError:
+    # Define a minimal IconProvider if the module doesn't exist
+    class IconProvider:
+        """Fallback IconProvider class."""
+
+        @staticmethod
+        def get_icon(name):
+            """Get an icon by name."""
+            if hasattr(Icons, name.upper()):
+                icon_path = getattr(Icons, name.upper())
+                return QIcon(icon_path)
+            return QIcon(name)
+
+        @staticmethod
+        def get_pixmap(name):
+            """Get a pixmap by name."""
+            if hasattr(Icons, name.upper()):
+                icon_path = getattr(Icons, name.upper())
+                return QPixmap(icon_path)
+            return QPixmap(name)
+
+
+# Re-export for backward compatibility
+__all__ = ["Icons", "IconProvider"]
