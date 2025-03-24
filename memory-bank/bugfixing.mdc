@@ -126,3 +126,48 @@ alwaysApply: false
   - Implement throttling for high-frequency progress updates
   - Always disconnect signals when done to prevent memory leaks
   - Use try/except blocks around Qt object interactions that might be deleted
+
+## [2025-03-24] CSV Loading Error
+
+### Issue
+CSV loading functionality was failing with an error:
+```
+Error setting up CSV loading task: BackgroundWorker.execute_task() takes 2 positional arguments but 3 were given
+```
+
+### Root Cause
+During implementation of progress dialog improvements, the DataManager.load_csv method was modified to call `self._worker.execute_task(task, result_key)` with three arguments, but the BackgroundWorker.execute_task method only accepts two parameters (self and task).
+
+### Solution
+1. Fixed the DataManager.load_csv method to call execute_task correctly:
+   ```python
+   # Changed from
+   result_key = "load_csv"
+   self._worker.execute_task(task, result_key)
+   
+   # To
+   self._worker.execute_task(task)
+   ```
+
+2. Updated the BackgroundWorker._on_thread_started method to properly emit the task_completed signal with the task ID after completion:
+   ```python
+   task_id = getattr(self._task, "task_id", "unknown")
+   self.finished.emit(result)
+   self.task_completed.emit(task_id, result)
+   ```
+
+3. Enhanced the DataManager._on_background_task_completed method to better handle task results:
+   ```python
+   if isinstance(result, tuple) and len(result) == 2:
+       success, data_or_error = result
+       if success and isinstance(data_or_error, pd.DataFrame):
+           # Handle successful CSV load
+           self._on_csv_load_success((data_or_error, None))
+       else:
+           # Handle CSV load error
+           error_msg = data_or_error if isinstance(data_or_error, str) else str(data_or_error)
+           self._on_csv_load_success((None, error_msg))
+   ```
+
+### Verification
+Tested by loading multiple CSV files, which now works correctly with proper progress reporting.

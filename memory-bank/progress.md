@@ -467,12 +467,18 @@ No critical issues at this time. The minor QThread object deletion warning at sh
 
 ## Current Focus: Phase 14
 
-### Progress Dialog Improvements (In Progress)
-- [ ] Maintain a single progress dialog for multiple files
-- [ ] Implement aggregated row counting across all files
-- [ ] Display "Reading file X of Y" progress information
-- [ ] Make progress dialog moveable while active
-- [ ] Change button color to green on successful completion
+### Progress Dialog Improvements ✅
+- [x] Maintain a single progress dialog for multiple files
+- [x] Implement aggregated row counting across all files
+- [x] Display "Reading file X of Y" progress information
+- [x] Make progress dialog moveable while active
+- [x] Change button color to green on successful completion
+
+### CSV Loading Error Fix ✅
+- [x] Fixed error with BackgroundWorker.execute_task parameters
+- [x] Enhanced task result handling in DataManager
+- [x] Improved task ID tracking and signaling for background tasks
+- [x] Tested and verified CSV loading with multiple files
 
 ### Report Generation System (Planned)
 - [ ] Research and select appropriate PDF generation library
