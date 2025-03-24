@@ -565,18 +565,24 @@ class BackgroundWorker(QObject):
             # Execute the task
             result = self._task.run()
 
-            # If the task wasn't cancelled, emit finished
-            if not self._task.is_cancelled:
+            # Check if thread is still running (might have been stopped during run)
+            if self._is_running:
+                # Emit signals for task completion
+                task_id = getattr(self._task, "task_id", "unknown")
+                logger.debug(f"Task completed: {task_id}")
                 self.finished.emit(result)
+                self.task_completed.emit(task_id, result)
         except Exception as e:
-            # Log the error
             logger.error(f"Error in background task: {e}")
-            logger.debug(traceback.format_exc())
-
-            # Emit error signal
+            traceback.print_exc()
             self.error.emit(e)
+            # Also emit task_failed with the task ID if available
+            if hasattr(self._task, "task_id"):
+                self.task_failed.emit(self._task.task_id, e)
+            else:
+                self.task_failed.emit("unknown", e)
         finally:
-            # Quit the thread
+            # Clean up thread
             self._thread.quit()
 
     @Slot()

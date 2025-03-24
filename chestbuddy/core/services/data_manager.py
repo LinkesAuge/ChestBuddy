@@ -129,9 +129,8 @@ class DataManager(QObject):
             self._current_task = task
 
             # Execute the task in the background
-            result_key = "load_csv"
-            logger.debug(f"Executing MultiCSVLoadTask with key: {result_key}")
-            self._worker.execute_task(task, result_key)
+            logger.debug(f"Executing MultiCSVLoadTask")
+            self._worker.execute_task(task)
         except Exception as e:
             logger.error(f"Error setting up CSV loading task: {e}")
             # Unblock signals if error occurs
@@ -516,23 +515,38 @@ class DataManager(QObject):
 
     def _on_background_task_completed(self, task_id: str, result: Any) -> None:
         """
-        Handle background task completion.
+        Handle completion of a background task.
 
         Args:
-            task_id: Identifier of the completed task
-            result: Result of the task
+            task_id (str): ID of the completed task
+            result (Any): Result of the task
         """
-        logger.info(f"Background task completed: {task_id}")
+        logger.debug(f"Background task {task_id} completed with result: {type(result)}")
 
-        if task_id == "save_csv":
-            success, file_path = result
-            if success:
-                self.save_success.emit(file_path)
+        # Clear current task reference
+        self._current_task = None
+
+        # Process the result based on task type
+        # If it's a MultiCSVLoadTask, the result will be from the CSV load operation
+        if isinstance(result, tuple) and len(result) == 2:
+            success, data_or_error = result
+            if success and isinstance(data_or_error, pd.DataFrame):
+                # Handle successful CSV load
+                self._on_csv_load_success((data_or_error, None))
             else:
-                self.save_error.emit(f"Error saving file: {file_path}")
-        elif task_id == "load_csv":
-            # Handle load_csv task completion
-            self._on_csv_load_success(result)
+                # Handle CSV load error
+                error_msg = data_or_error if isinstance(data_or_error, str) else str(data_or_error)
+                self._on_csv_load_success((None, error_msg))
+        else:
+            # For other task types or unexpected results
+            logger.warning(f"Unhandled task result: {type(result)} for task {task_id}")
+            # Try to adapt the result format if possible
+            try:
+                self._adapt_task_result(result)
+            except Exception as e:
+                logger.error(f"Error adapting task result: {e}")
+                self.load_error.emit(f"Error processing task result: {str(e)}")
+                self.load_finished.emit(f"Error: {str(e)}")
 
     def _on_background_task_failed(self, task_id: str, error: str) -> None:
         """
