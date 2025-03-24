@@ -1,6 +1,6 @@
 ---
 title: Active Context - ChestBuddy Application Development
-date: 2025-03-23
+date: 2025-03-26
 ---
 
 # Active Context
@@ -253,34 +253,10 @@ The most significant recent changes include:
 
 ## Known Issues
 
-### UI Interaction
-- Menu items sometimes remain disabled after operation completion
-- Occasional freezing during large data imports
-- Table view remains blocked after first import in some cases
-- Dialog closure doesn't always unblock UI elements
-- **Current ad-hoc approach to UI blocking/unblocking is fragile and timing-dependent**
-
-### Performance
-- Slowdown when handling large datasets
-- Validation process creates UI lag
-- Memory usage increases significantly with large files
-- Ongoing investigation into UI responsiveness during heavy data operations
-
-## Next Steps
-
-### Short-term
-- Complete dashboard components
-- Optimize data loading process
-- Add more validation rules
-- Implement user preferences system
-- **Integrate new UI State Management System with MainWindow, ProgressDialog, and DataView**
-
-### Mid-term
-- Improve reporting capabilities
-- Add export format options
-- Implement advanced filtering
-- Create saved searches functionality
-- **Extend UI State Management to cover all UI elements and operations**
+### UI Blocking Issues
+- Progress dialog sometimes doesn't close properly
+- UI elements occasionally remain disabled after operations complete
+- **Working on comprehensive UI State Management system to address these issues**
 
 ### Long-term
 - Add collaborative features

@@ -9,7 +9,7 @@ date: 2025-03-26
 
 This document tracks the implementation progress of ChestBuddy, including what's working, what's in progress, and what's still to be built.
 
-## What's Working
+## What Works
 
 ### Core Functionality
 - ✅ Basic application structure and initialization

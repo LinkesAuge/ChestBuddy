@@ -1,13 +1,14 @@
-"""
+'''
 Tests for the MainWindow class of the ChestBuddy application.
 
 This module contains tests for the MainWindow class, which is the main window of the
 ChestBuddy application. It includes tests for initialization, menu actions, toolbar actions,
 tab switching, signal emission, and state persistence.
-"""
+'''
 
 import os
 import sys
+import logging
 import logging
 import tempfile
 from pathlib import Path
@@ -15,6 +16,7 @@ from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
+from PySide6.QtCore import QSize, Qt, QByteArray, Signal, QTimer
 from PySide6.QtCore import QSize, Qt, QByteArray, Signal, QTimer
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QApplication, QFileDialog, QMainWindow, QTabWidget, QMessageBox
@@ -27,6 +29,22 @@ from chestbuddy.ui.main_window import MainWindow
 from chestbuddy.ui.data_view import DataView
 from chestbuddy.ui.validation_tab import ValidationTab
 from chestbuddy.ui.correction_tab import CorrectionTab
+from chestbuddy.core.services.data_manager import DataManager
+from chestbuddy.core.services.csv_service import CSVService
+from chestbuddy.utils.ui_state import UIStateManager
+from chestbuddy.utils.ui_state.elements import BlockableElementMixin
+from chestbuddy.ui.widgets.blockable_progress_dialog import BlockableProgressDialog
+from chestbuddy.core.services.chart_service import ChartService
+
+
+# Setup Qt Application for tests
+@pytest.fixture(scope="module")
+def qapp():
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication(sys.argv)
+    yield app
+    # app is cleaned up after tests by pytest-qt
 from chestbuddy.core.services.data_manager import DataManager
 from chestbuddy.core.services.csv_service import CSVService
 from chestbuddy.utils.ui_state import UIStateManager
@@ -105,9 +123,73 @@ def main_window(qapp, monkeypatch):
 
     # Cleanup
     window.close()
+def main_window(qapp, monkeypatch):
+    # Reset the singleton instance before each test
+    UIStateManager._instance = None
+
+    # Create mocks for services
+    data_model_mock = MagicMock(spec=ChestDataModel)
+    csv_service_mock = MagicMock(spec=CSVService)
+    validation_service_mock = MagicMock(spec=ValidationService)
+    correction_service_mock = MagicMock(spec=CorrectionService)
+    chart_service_mock = MagicMock(spec=ChartService)
+    data_manager_mock = MagicMock()
+
+    # Set up signals for data_manager_mock
+    data_manager_mock.load_started = MagicMock()
+    data_manager_mock.load_started.connect = MagicMock()
+    data_manager_mock.load_progress = MagicMock()
+    data_manager_mock.load_progress.connect = MagicMock()
+    data_manager_mock.load_finished = MagicMock()
+    data_manager_mock.load_finished.connect = MagicMock()
+    data_manager_mock.load_error = MagicMock()
+    data_manager_mock.load_error.connect = MagicMock()
+    data_manager_mock.load_success = MagicMock()
+    data_manager_mock.load_success.connect = MagicMock()
+    data_manager_mock.populate_table_requested = MagicMock()
+    data_manager_mock.populate_table_requested.connect = MagicMock()
+
+    # Create the main window with mocked services
+    window = MainWindow(
+        data_model_mock,
+        csv_service_mock,
+        validation_service_mock,
+        correction_service_mock,
+        chart_service_mock,
+        data_manager_mock,
+    )
+
+    # Add BlockableElementMixin mock
+    window.is_blocked = MagicMock(return_value=False)
+    window.block = MagicMock()
+    window.unblock = MagicMock()
+
+    # Create import and data service mocks
+    window._import_service = MagicMock()
+    window._import_service.import_progress = MagicMock()
+    window._import_service.import_progress.connect = MagicMock()
+    window._import_service.import_completed = MagicMock()
+    window._import_service.import_completed.connect = MagicMock()
+    window._import_service.import_started = MagicMock()
+    window._import_service.import_started.connect = MagicMock()
+    window._import_service.import_error = MagicMock()
+    window._import_service.import_error.connect = MagicMock()
+
+    window._data_service = MagicMock()
+    window._data_service.set_data = MagicMock()
+
+    yield window
+
+    # Cleanup
+    window.close()
 
 
 @pytest.fixture
+def mock_file_dialog(monkeypatch):
+    mock = MagicMock()
+    mock.return_value = ("test_file.csv", "CSV Files (*.csv)")
+    monkeypatch.setattr("PySide6.QtWidgets.QFileDialog.getOpenFileName", mock)
+    return mock
 def mock_file_dialog(monkeypatch):
     mock = MagicMock()
     mock.return_value = ("test_file.csv", "CSV Files (*.csv)")
@@ -129,9 +211,26 @@ def mock_progress_dialog(monkeypatch):
         "chestbuddy.ui.widgets.blockable_progress_dialog.BlockableProgressDialog", mock
     )
     return mock
+def mock_progress_dialog(monkeypatch):
+    dialog_instance = MagicMock()
+    dialog_instance.setMaximum = MagicMock()
+    dialog_instance.setValue = MagicMock()
+    dialog_instance.setLabelText = MagicMock()
+    dialog_instance.wasCanceled = MagicMock(return_value=False)
+    dialog_instance.close = MagicMock()
+
+    mock = MagicMock(return_value=dialog_instance)
+    monkeypatch.setattr(
+        "chestbuddy.ui.widgets.blockable_progress_dialog.BlockableProgressDialog", mock
+    )
+    return mock
 
 
 @pytest.fixture
+def mock_message_box(monkeypatch):
+    mock = MagicMock()
+    monkeypatch.setattr("PySide6.QtWidgets.QMessageBox.critical", mock)
+    return mock
 def mock_message_box(monkeypatch):
     mock = MagicMock()
     monkeypatch.setattr("PySide6.QtWidgets.QMessageBox.critical", mock)
