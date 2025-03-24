@@ -124,16 +124,20 @@ We are currently implementing a comprehensive UI enhancement for the ChestBuddy 
 +---------------------------------------+
 ```
 
-## Recent Decisions
-- Focus on the empty state experience first to ensure users have clear guidance
-- Improve the Data view with better UI organization to enhance usability
-- Use ActionToolbar to group related actions across all views
-- Maintain consistent approach to disabled states when no data is loaded
+## Recent Decisions and Improvements
 
-## Recent Improvements
-1. Enhanced CSV loading process with progress dialog and better error handling
-2. Enhanced progress dialog with improved status reporting and feedback
-3. Implemented report generation with configurable templates and filters
+1. **Progress Dialog Improvements**
+   - Maintained a single active progress dialog for all files being processed
+   - Aggregated row counts across all files for better tracking
+   - Added clear file progress indicators showing "File X of Y"
+   - Enhanced user control by making the dialog movable
+   - Improved visual feedback with success state button color changes
+   - Simplified progress reporting by showing actual rows read instead of estimates
+
+2. **CSV Loading Workflow**
+   - Improved CSV loading process with progress dialog and better error handling
+   - Enhanced progress dialog with improved status reporting and feedback
+   - Implemented report generation with configurable templates and filters
 
 ## Active Decisions
 

@@ -473,6 +473,7 @@ No critical issues at this time. The minor QThread object deletion warning at sh
 - [x] Display "Reading file X of Y" progress information
 - [x] Make progress dialog moveable while active
 - [x] Change button color to green on successful completion
+- [x] Remove row estimation and only display actual rows loaded
 
 ### CSV Loading Error Fix ✅
 - [x] Fixed error with BackgroundWorker.execute_task parameters
