@@ -34,6 +34,12 @@ from PySide6.QtGui import QAction, QIcon, QKeySequence
 
 from chestbuddy.core.models import ChestDataModel
 from chestbuddy.core.services import CSVService, ValidationService, CorrectionService, ChartService
+from chestbuddy.core.controllers import (
+    FileOperationsController,
+    ProgressController,
+    ViewStateController,
+    DataViewController,
+)
 from chestbuddy.ui.resources.style import Colors
 from chestbuddy.ui.resources.icons import Icons
 from chestbuddy.ui.resources.resource_manager import ResourceManager
@@ -101,7 +107,11 @@ class MainWindow(QMainWindow):
         validation_service: ValidationService,
         correction_service: CorrectionService,
         chart_service: ChartService,
-        data_manager=None,
+        data_manager,
+        file_operations_controller: FileOperationsController,
+        progress_controller: ProgressController,
+        view_state_controller: ViewStateController,
+        data_view_controller: DataViewController,
         parent: Optional[QWidget] = None,
     ) -> None:
         """
@@ -114,6 +124,10 @@ class MainWindow(QMainWindow):
             correction_service: Service for data correction.
             chart_service: Service for chart generation.
             data_manager: The data manager service (optional).
+            file_operations_controller: Controller for file operations.
+            progress_controller: Controller for progress reporting.
+            view_state_controller: Controller for view state management.
+            data_view_controller: Controller for data view operations.
             parent: The parent widget.
         """
         super().__init__(parent)
@@ -125,6 +139,10 @@ class MainWindow(QMainWindow):
         self._correction_service = correction_service
         self._chart_service = chart_service
         self._data_manager = data_manager
+        self._file_controller = file_operations_controller
+        self._progress_controller = progress_controller
+        self._view_state_controller = view_state_controller
+        self._data_view_controller = data_view_controller
 
         if self._data_manager:
             logger.debug("MainWindow initialized with data_manager")
@@ -154,9 +172,6 @@ class MainWindow(QMainWindow):
         self._recent_files: List[str] = []
         self._load_recent_files()
 
-        # Don't set up progress dialog yet - it will be created when needed
-        self._progress_dialog = None
-
         # State tracking for file loading progress
         self._loading_state = {
             "current_file": "",
@@ -172,6 +187,134 @@ class MainWindow(QMainWindow):
         # Update UI
         self._update_ui()
 
+        # Transition to using controllers
+        self._register_with_controllers()
+
+    def _register_with_controllers(self):
+        """Register with controllers and connect signals."""
+        # Connect file controller signals to local handlers
+        self._file_controller.file_opened.connect(self._on_file_opened)
+        self._file_controller.file_saved.connect(self._on_file_saved)
+        self._file_controller.recent_files_changed.connect(self._on_recent_files_changed)
+
+        # Connect data view controller signals
+        self._data_view_controller.filter_applied.connect(self._on_filter_applied)
+        self._data_view_controller.sort_applied.connect(self._on_sort_applied)
+        self._data_view_controller.table_populated.connect(self._on_table_populated)
+
+    @Slot(dict)
+    def _on_filter_applied(self, filter_params: Dict) -> None:
+        """
+        Handle when a filter is applied via the controller.
+
+        Args:
+            filter_params (Dict): Filter parameters
+        """
+        if filter_params:
+            logger.info(f"Filter applied: {filter_params}")
+            # Update status bar with filter information
+            column = filter_params.get("column", "")
+            text = filter_params.get("text", "")
+            if column and text:
+                self._status_bar.set_status(f"Filter applied: {column}={text}")
+        else:
+            # Filter was cleared
+            logger.info("Filter cleared")
+            self._status_bar.set_status("Filter cleared")
+
+    @Slot(str, bool)
+    def _on_sort_applied(self, column: str, ascending: bool) -> None:
+        """
+        Handle when sorting is applied via the controller.
+
+        Args:
+            column (str): Column name
+            ascending (bool): Sort direction
+        """
+        direction = "ascending" if ascending else "descending"
+        logger.info(f"Sort applied: {column} ({direction})")
+        self._status_bar.set_status(f"Sorted by {column} ({direction})")
+
+    @Slot(int)
+    def _on_table_populated(self, row_count: int) -> None:
+        """
+        Handle when the table is populated via the controller.
+
+        Args:
+            row_count (int): Number of rows populated
+        """
+        logger.info(f"Table populated with {row_count} rows")
+        self._status_bar.set_status(f"Loaded {row_count} rows")
+
+    @Slot(str)
+    def _on_file_opened(self, file_path: str) -> None:
+        """
+        Handle when a file is opened via the controller.
+
+        Args:
+            file_path (str): Path to the opened file
+        """
+        logger.info(f"File opened: {file_path}")
+
+        # Update status bar
+        self._status_bar.set_status(f"Loaded: {os.path.basename(file_path)}")
+
+        # Update last modified timestamp
+        try:
+            modified_time = os.path.getmtime(file_path)
+            self._status_bar.set_last_modified(modified_time)
+        except Exception as e:
+            logger.error(f"Error getting file modified time: {e}")
+
+        # Update data model file path if available
+        if hasattr(self._data_model, "file_path"):
+            self._data_model.file_path = file_path
+
+    @Slot(str)
+    def _on_file_saved(self, file_path: str) -> None:
+        """
+        Handle when a file is saved via the controller.
+
+        Args:
+            file_path (str): Path to the saved file
+        """
+        logger.info(f"File saved: {file_path}")
+
+        # Update status bar
+        self._status_bar.set_status(f"Saved: {os.path.basename(file_path)}")
+
+        # Update last modified timestamp
+        try:
+            modified_time = os.path.getmtime(file_path)
+            self._status_bar.set_last_modified(modified_time)
+        except Exception as e:
+            logger.error(f"Error getting file modified time: {e}")
+
+        # Update data model file path if available
+        if hasattr(self._data_model, "file_path"):
+            self._data_model.file_path = file_path
+
+    @Slot(list)
+    def _on_recent_files_changed(self, recent_files: List[str]) -> None:
+        """
+        Handle when the recent files list changes via the controller.
+
+        Args:
+            recent_files (List[str]): Updated list of recent files
+        """
+        logger.debug(f"Recent files updated: {len(recent_files)} files")
+
+        # Update local recent files list
+        self._recent_files = recent_files
+
+        # Update the recent files menu
+        self._update_recent_files_menu()
+
+        # Update dashboard
+        dashboard_view = self._views.get("Dashboard")
+        if dashboard_view and isinstance(dashboard_view, DashboardView):
+            dashboard_view.set_recent_files(recent_files)
+
     def _init_ui(self) -> None:
         """Initialize the user interface."""
         # Create central widget
@@ -185,7 +328,7 @@ class MainWindow(QMainWindow):
 
         # Create sidebar navigation
         self._sidebar = SidebarNavigation()
-        self._sidebar.navigation_changed.connect(self._set_active_view)
+        self._sidebar.navigation_changed.connect(self._on_navigation_changed)
         self._sidebar.data_dependent_view_clicked.connect(self._on_data_dependent_view_clicked)
         main_layout.addWidget(self._sidebar)
 
@@ -204,8 +347,17 @@ class MainWindow(QMainWindow):
         # Create views
         self._create_views()
 
+        # Initialize view state controller with UI components
+        self._view_state_controller.set_ui_components(
+            self._views, self._sidebar, self._content_stack
+        )
+
+        # Connect view state controller signals
+        self._view_state_controller.view_changed.connect(self._on_view_changed)
+        self._view_state_controller.data_state_changed.connect(self._on_data_state_changed)
+
         # Set initial view to Dashboard
-        self._set_active_view("Dashboard")
+        self._view_state_controller.set_active_view("Dashboard")
 
     def _create_views(self) -> None:
         """Create the views for the application."""
@@ -224,6 +376,10 @@ class MainWindow(QMainWindow):
         data_view = DataViewAdapter(self._data_model)
         data_view.import_requested.connect(self._open_file)
         data_view.export_requested.connect(self._save_file_as)
+
+        # Set up the data view controller with the view
+        self._data_view_controller.set_view(data_view)
+
         self._content_stack.addWidget(data_view)
         self._views["Data"] = data_view
 
@@ -358,11 +514,17 @@ class MainWindow(QMainWindow):
         if geometry:
             self.restoreGeometry(geometry)
 
+        # Recent files are now handled by the file controller
+        # No need to load them here
+
     def _save_settings(self) -> None:
         """Save application settings."""
         settings = QSettings("ChestBuddy", "ChestBuddy")
         settings.setValue("geometry", self.saveGeometry())
         settings.sync()
+
+        # Recent files are now handled by the file controller
+        # No need to save them here
 
     def _load_recent_files(self) -> None:
         """Load the list of recent files."""
@@ -451,91 +613,19 @@ class MainWindow(QMainWindow):
 
     def _update_data_loaded_state(self, has_data: bool) -> None:
         """
-        Update the data loaded state and related UI components.
+        Update UI components based on whether data is loaded.
 
         Args:
-            has_data (bool): Whether data is currently loaded
+            has_data: Whether data is loaded.
         """
-        # Only update if state has changed
-        if has_data != self._has_data_loaded:
-            self._has_data_loaded = has_data
+        # Delegate to the view state controller
+        self._view_state_controller.update_data_loaded_state(has_data)
 
-            # Update dashboard state
-            if "Dashboard" in self._views:
-                dashboard_view = self._views["Dashboard"]
-                dashboard_view.set_data_loaded(has_data)
-
-            # Update sidebar navigation state
-            self._sidebar.set_data_loaded(has_data)
-
-            # Update actions
-            self._save_action.setEnabled(has_data)
-            self._save_as_action.setEnabled(has_data)
-            self._validate_action.setEnabled(has_data)
-            self._correct_action.setEnabled(has_data)
-
-    def _finalize_loading(self, message: str, is_error: bool) -> None:
-        """
-        Finalize the loading process.
-
-        Args:
-            message (str): Message to display
-            is_error (bool): Whether an error occurred
-        """
-        # Existing code
-        logger.debug(f"Finalizing loading process: {message}, is_error={is_error}")
-
-        # Early return if progress dialog doesn't exist
-        if not hasattr(self, "_progress_dialog") or not self._progress_dialog:
-            logger.debug("No progress dialog to update for finalization")
-            return
-
-        try:
-            # Set appropriate dialog state based on success/error
-            if is_error:
-                # Set error styling
-                if hasattr(self._progress_dialog, "setState") and hasattr(ProgressBar, "State"):
-                    self._progress_dialog.setState(ProgressBar.State.ERROR)
-                self._progress_dialog.setLabelText("Loading failed")
-            else:
-                # Set success styling
-                if hasattr(self._progress_dialog, "setState") and hasattr(ProgressBar, "State"):
-                    self._progress_dialog.setState(ProgressBar.State.SUCCESS)
-                self._progress_dialog.setLabelText("Loading complete")
-
-            # Set status message
-            self._progress_dialog.setStatusText(message)
-
-            # Always set progress to max on finalization
-            self._progress_dialog.setValue(self._progress_dialog.maximum())
-
-            # Set button text based on success/error state
-            if is_error:
-                self._progress_dialog.setCancelButtonText("Close")
-            else:
-                self._progress_dialog.setCancelButtonText("Confirm")
-
-            # Don't disconnect or reconnect signals for the cancel button
-            # The ProgressDialog._on_cancel_clicked method will handle both
-            # emitting the signal and closing the dialog
-
-            # Make sure button is enabled
-            if hasattr(self._progress_dialog, "setCancelButtonEnabled"):
-                self._progress_dialog.setCancelButtonEnabled(True)
-
-            # Process events for UI responsiveness
-            QApplication.processEvents()
-
-            logger.debug("Progress dialog updated for finalization")
-        except Exception as e:
-            logger.error(f"Error in _finalize_loading: {e}")
-
-        # Update data loaded state after successful loading
-        if not is_error:
-            self._update_data_loaded_state(True)
-
-            # Removed explicit table population - let it happen through data_changed signal
-            # The table will be populated automatically when the data model changes
+        # Update actions - keeping this here since it's UI-specific
+        self._save_action.setEnabled(has_data)
+        self._save_as_action.setEnabled(has_data)
+        self._validate_action.setEnabled(has_data)
+        self._correct_action.setEnabled(has_data)
 
     @Slot(str)
     def _set_active_view(self, view_name: str) -> None:
@@ -545,43 +635,39 @@ class MainWindow(QMainWindow):
         Args:
             view_name (str): The name of the view to activate
         """
+        # Delegate to the view state controller
         try:
-            # Log the view switch for debugging
-            logger.info(f"Setting active view to: {view_name}")
-
-            # Update sidebar selection
-            self._sidebar.set_active_item(view_name)
-
-            # Get the view from the views dictionary
-            view = self._views.get(view_name)
-            if view is None:
-                logger.warning(f"View '{view_name}' not found in views dictionary")
-                return
-
-            # Check if the view is already active
-            if self._content_stack.currentWidget() == view:
-                logger.debug(f"View '{view_name}' is already active")
-                return
-
-            # Special handling for DataView to check if it needs population
-            if view_name == "Data" and hasattr(view, "needs_population") and view.needs_population:
-                logger.info("Data view needs population, populating table")
-                view.populate_table()
-                view.needs_population = False
-
-            # Set the view as the current widget in the stack
-            self._content_stack.setCurrentWidget(view)
-
-            # Update UI components based on the new view
-            self._update_ui()
-
-            # Log success
-            logger.info(f"View '{view_name}' activated successfully")
+            self._view_state_controller.set_active_view(view_name)
         except Exception as e:
             logger.error(f"Error setting active view to '{view_name}': {e}")
             QMessageBox.critical(self, "Error", f"Error switching to {view_name} view: {str(e)}")
 
     # ===== Slots =====
+
+    @Slot(str)
+    def _on_view_changed(self, view_name: str) -> None:
+        """
+        Handle view changed signal from the ViewStateController.
+
+        Args:
+            view_name (str): The name of the active view
+        """
+        # Update UI components based on the new view
+        self._update_ui()
+
+    @Slot(bool)
+    def _on_data_state_changed(self, has_data: bool) -> None:
+        """
+        Handle data state changed signal from the ViewStateController.
+
+        Args:
+            has_data (bool): Whether data is loaded
+        """
+        # Update actions
+        self._save_action.setEnabled(has_data)
+        self._save_as_action.setEnabled(has_data)
+        self._validate_action.setEnabled(has_data)
+        self._correct_action.setEnabled(has_data)
 
     @Slot(str, str)
     def _on_navigation_changed(self, section: str, subsection: Optional[str] = None) -> None:
@@ -600,14 +686,14 @@ class MainWindow(QMainWindow):
                 if subsection == "Import":
                     self._open_file()
                 elif subsection == "Validate":
-                    self._set_active_view("Validation")
+                    self._view_state_controller.set_active_view("Validation")
                 elif subsection == "Correct":
-                    self._set_active_view("Correction")
+                    self._view_state_controller.set_active_view("Correction")
                 elif subsection == "Export":
                     self._save_file_as()
             elif section == "Analysis":
                 if subsection == "Charts":
-                    self._set_active_view("Charts")
+                    self._view_state_controller.set_active_view("Charts")
                 elif subsection == "Tables":
                     # TODO: Handle tables view
                     pass
@@ -617,11 +703,11 @@ class MainWindow(QMainWindow):
         else:
             # Handle main sections
             if section == "Dashboard":
-                self._set_active_view("Dashboard")
+                self._view_state_controller.set_active_view("Dashboard")
             elif section == "Data":
-                self._set_active_view("Data")
+                self._view_state_controller.set_active_view("Data")
             elif section == "Analysis":
-                self._set_active_view("Charts")
+                self._view_state_controller.set_active_view("Charts")
             elif section == "Reports":
                 # TODO: Handle reports view
                 pass
@@ -644,9 +730,9 @@ class MainWindow(QMainWindow):
             self._open_file()
         elif action == "validate":
             self._validate_data()
-            self._set_active_view("Validation")
+            self._view_state_controller.set_active_view("Validation")
         elif action == "analyze":
-            self._set_active_view("Charts")
+            self._view_state_controller.set_active_view("Charts")
         elif action == "report":
             # TODO: Handle report generation
             pass
@@ -711,153 +797,8 @@ class MainWindow(QMainWindow):
         """Handle when a loading operation starts."""
         logger.debug("MainWindow._on_load_started called")
 
-        # Initialize loading state
-        self._loading_state = {
-            "current_file": "",
-            "current_file_index": 0,
-            "processed_files": [],
-            "total_files": 0,  # Will be set by the caller via total_files property
-            "total_rows": 0,
-        }
-
-        # Get total files from data manager if available
-        if self._data_manager and hasattr(self._data_manager, "total_files"):
-            self._loading_state["total_files"] = self._data_manager.total_files
-            logger.debug(
-                f"Setting total files to {self._loading_state['total_files']} from data manager"
-            )
-
-        # Reset state flags
-        self._total_rows_loaded = 0
-        self._last_progress_current = 0
-        self._file_loading_complete = False
-
-        # Flag to track if we're showing an error
-        self._showing_error_dialog = False
-
-        # Only create a new progress dialog if one doesn't exist or is not visible
-        # This prevents multiple dialogs from appearing
-        create_new_dialog = (
-            not hasattr(self, "_progress_dialog")
-            or not self._progress_dialog
-            or not self._progress_dialog.isVisible()
-        )
-        progress_dialog_ready = False
-
-        if hasattr(self, "_progress_dialog") and self._progress_dialog:
-            # Check if the dialog is already visible
-            if self._progress_dialog.isVisible():
-                logger.debug("Progress dialog already exists and is visible, reusing it")
-                create_new_dialog = False
-
-                try:
-                    # Reset dialog to initial state
-                    self._progress_dialog.reset()
-
-                    # Update dialog for new loading operation
-                    self._progress_dialog.setLabelText("Preparing to load data...")
-                    self._progress_dialog.setValue(0)
-                    self._progress_dialog.setStatusText("")
-
-                    # Ensure button text is set to Cancel
-                    self._progress_dialog.setCancelButtonText("Cancel")
-
-                    # Disconnect any existing signal connections
-                    try:
-                        self._progress_dialog.canceled.disconnect()
-                    except:
-                        pass
-
-                    # Connect cancel button
-                    try:
-                        self._progress_dialog.canceled.connect(self._cancel_loading)
-                        logger.debug("Cancel button reconnected successfully")
-                    except Exception as e:
-                        logger.error(f"Error reconnecting cancel button: {e}")
-
-                    # Make sure button is enabled
-                    if hasattr(self._progress_dialog, "setCancelButtonEnabled"):
-                        self._progress_dialog.setCancelButtonEnabled(True)
-
-                    # Make sure dialog is visible and in front
-                    self._progress_dialog.show()
-                    self._progress_dialog.raise_()
-                    self._progress_dialog.activateWindow()
-
-                    # Process events to ensure UI updates
-                    QApplication.processEvents()
-
-                    # Mark the dialog as ready
-                    progress_dialog_ready = True
-
-                except Exception as e:
-                    logger.error(f"Error reusing existing progress dialog: {e}")
-                    # If we can't reuse the existing dialog, create a new one
-                    create_new_dialog = True
-
-                    # Close the existing dialog to avoid multiple dialogs
-                    try:
-                        self._progress_dialog.close()
-                        self._progress_dialog = None
-                    except:
-                        pass
-            else:
-                # Dialog exists but is not visible, close it and create a new one
-                logger.debug("Progress dialog exists but is not visible, creating a new one")
-                try:
-                    self._progress_dialog.close()
-                    self._progress_dialog = None
-                except:
-                    pass
-                create_new_dialog = True
-
-        # Create a new dialog if needed
-        if create_new_dialog:
-            try:
-                # Create a new progress dialog with our custom implementation
-                self._progress_dialog = ProgressDialog(
-                    "Preparing to load data...", "Cancel", 0, 100, self
-                )
-                self._progress_dialog.setWindowTitle("CSV Import - ChestBuddy")
-
-                # Set the dialog to modal to prevent interaction with the main window
-                # but use Qt.ApplicationModal instead of Qt.WindowModal to ensure it stays on top
-                self._progress_dialog.setWindowModality(Qt.ApplicationModal)
-
-                # Connect cancel button - ensure this is always connected
-                try:
-                    self._progress_dialog.canceled.connect(self._cancel_loading)
-                    logger.debug("Cancel button connected successfully")
-                except Exception as e:
-                    logger.error(f"Error connecting cancel button: {e}")
-
-                progress_dialog_ready = True
-
-                # Make sure dialog is visible and activated
-                self._progress_dialog.show()
-                self._progress_dialog.raise_()
-                self._progress_dialog.activateWindow()
-
-                # Process events to ensure UI updates
-                QApplication.processEvents()
-
-            except Exception as e:
-                logger.error(f"Error creating progress dialog: {e}")
-                self._progress_dialog = None
-                progress_dialog_ready = False
-                # Only show error message if we couldn't create the dialog
-                QMessageBox.critical(
-                    self,
-                    "Error",
-                    f"Failed to create progress dialog: {e}\nFile loading canceled.",
-                )
-                # Cancel the loading operation
-                self._cancel_loading()
-
-        # Only proceed if dialog is ready
-        if not progress_dialog_ready:
-            logger.warning("Progress dialog not ready, canceling loading operation")
-            self._cancel_loading()
+        # The progress controller now handles all loading state tracking
+        # No need to duplicate that logic here
 
     def _on_load_finished(self, status_message: str) -> None:
         """
@@ -871,50 +812,19 @@ class MainWindow(QMainWindow):
         # Set a flag to prevent any recursive file opening
         self._is_finishing_load = True
 
-        # Early return if progress dialog doesn't exist
-        if not hasattr(self, "_progress_dialog") or not self._progress_dialog:
-            logger.debug("No progress dialog to update on load finished")
-            self._is_finishing_load = False
-            return
-
         try:
             # Check if this is an error message
             is_error = "error" in status_message.lower() or "failed" in status_message.lower()
 
-            # Update the dialog with the final status
-            self._finalize_loading(status_message, is_error)
-
-            # Process events to ensure the dialog updates are visible
-            QApplication.processEvents()
-
-            # Keep dialog open for user confirmation
-            # Dialog will close when user clicks the "Close" button
+            # Update data loaded state after successful loading
+            if not is_error:
+                self._update_data_loaded_state(True)
 
         except Exception as e:
             logger.error(f"Error in _on_load_finished: {e}")
-            # Try to ensure dialog can be closed
-            self._finalize_loading(f"Error: {str(e)}", True)
-
-        # Clear the flag after processing
-        self._is_finishing_load = False
-
-    def _close_progress_dialog(self) -> None:
-        """
-        Close the progress dialog and set it to None.
-        This ensures no further updates will be sent to the dialog.
-        """
-        try:
-            # Only proceed if dialog exists
-            if hasattr(self, "_progress_dialog") and self._progress_dialog:
-                logger.debug("Closing progress dialog after load completion")
-
-                # Close the dialog
-                self._progress_dialog.close()
-
-                # Set to None to prevent further updates
-                self._progress_dialog = None
-        except Exception as e:
-            logger.error(f"Error closing progress dialog: {e}")
+        finally:
+            # Clear the flag after processing
+            self._is_finishing_load = False
 
     def _on_populate_table_requested(self, data: pd.DataFrame) -> None:
         """
@@ -926,8 +836,9 @@ class MainWindow(QMainWindow):
         """
         logger.debug(f"Received request to populate table with {len(data):,} rows")
 
-        # Set file loading complete flag
-        self._file_loading_complete = True
+        # Mark file loading as complete in progress controller
+        if hasattr(self._progress_controller, "mark_file_loading_complete"):
+            self._progress_controller.mark_file_loading_complete()
 
         # The actual table population occurs in the data model and views
         # No need to show progress dialog for this step anymore
@@ -942,118 +853,9 @@ class MainWindow(QMainWindow):
             current: Current progress value
             total: Total progress value
         """
-        # Ensure progress dialog exists
-        if not hasattr(self, "_progress_dialog") or not self._progress_dialog:
-            return
-
-        try:
-            # Update loading state based on signal type
-            if file_path:
-                # This is a file-specific progress update
-                # If this is a new file, update the file index
-                if file_path != self._loading_state["current_file"]:
-                    # If we're moving to a new file, record the size of the completed file
-                    if self._loading_state["current_file"]:
-                        # Initialize file sizes tracking dictionary if it doesn't exist
-                        if not hasattr(self, "_file_sizes"):
-                            self._file_sizes = {}
-                        # Store the actual size of the completed file
-                        self._file_sizes[self._loading_state["current_file"]] = self._loading_state[
-                            "total_rows"
-                        ]
-
-                    # Add new file to processed files if needed
-                    if file_path not in self._loading_state["processed_files"]:
-                        self._loading_state["current_file_index"] += 1
-                        if file_path not in self._loading_state["processed_files"]:
-                            self._loading_state["processed_files"].append(file_path)
-                    self._loading_state["current_file"] = file_path
-
-                # Update total rows for this file
-                self._loading_state["total_rows"] = max(total, self._loading_state["total_rows"])
-
-                # Track rows across all files
-                if not hasattr(self, "_total_rows_loaded"):
-                    self._total_rows_loaded = 0
-                    self._last_progress_current = 0
-                    self._file_sizes = {}
-
-                # Increment total rows loaded by the increase since last update
-                if hasattr(self, "_last_progress_current"):
-                    # Only increment if current is greater than last value (to avoid counting backwards)
-                    if current > self._last_progress_current:
-                        self._total_rows_loaded += current - self._last_progress_current
-                    self._last_progress_current = current
-                else:
-                    self._last_progress_current = current
-
-            # Calculate progress percentage safely
-            percentage = min(100, int((current * 100 / total) if total > 0 else 0))
-
-            # Create a consistent progress message
-            filename = (
-                os.path.basename(self._loading_state["current_file"])
-                if self._loading_state["current_file"]
-                else "files"
-            )
-
-            # Standardized progress message format: "File X of Y - Z rows processed"
-            if self._loading_state["total_files"] > 0:
-                # Format file information
-                # Always use total_files directly, not current_file_index
-                total_files = self._loading_state["total_files"]
-                current_file_index = self._loading_state["current_file_index"]
-
-                file_info = f"File {current_file_index} of {total_files}"
-
-                # Add filename
-                file_info += f": {filename}"
-
-                # Format rows with commas for readability
-                if total > 0:
-                    current_formatted = f"{current:,}"
-                    # Show only current rows read, not the estimated total
-                    row_info = f"{current_formatted} rows read"
-
-                    # Create combined message with standardized format
-                    message = f"{file_info} - {row_info}"
-
-                    # Add total rows information as status text
-                    if hasattr(self, "_total_rows_loaded"):
-                        total_progress = f"Total: {self._total_rows_loaded:,} rows"
-                        self._progress_dialog.setStatusText(total_progress)
-                    else:
-                        self._progress_dialog.setStatusText("")
-                else:
-                    # If we don't have row information yet
-                    message = file_info
-                    self._progress_dialog.setStatusText("")
-            else:
-                # Fallback if we don't have file count yet
-                message = f"Loading {filename}..."
-                if total > 0:
-                    message += f" ({current:,} rows read)"
-
-            # Update the dialog
-            self._progress_dialog.setLabelText(message)
-            self._progress_dialog.setValue(percentage)
-
-            # Only make visibility adjustments if the dialog is not already visible
-            # This prevents unnecessary UI updates that can make it appear like a new window
-            if not self._progress_dialog.isVisible():
-                self._progress_dialog.show()
-                self._progress_dialog.raise_()
-                self._progress_dialog.activateWindow()
-
-            # Process events to ensure UI updates, but limit this to avoid excessive refreshing
-            # Only process events if the percentage changes significantly
-            if percentage % 5 == 0 or percentage >= 100:
-                QApplication.processEvents()
-
-        except Exception as e:
-            # Add error handling to prevent crashes
-            logger.error(f"Error updating progress dialog: {e}")
-            # Don't crash the application if there's an error updating the progress
+        # Progress controller now handles all progress tracking and updates
+        # This method is kept for backward compatibility but delegates to the controller
+        self._progress_controller.update_file_progress(file_path, current, total)
 
     def _on_load_error(self, message: str) -> None:
         """
@@ -1064,123 +866,21 @@ class MainWindow(QMainWindow):
         """
         logger.error(f"Load error: {message}")
 
-        # Update the status bar
-        self._status_bar.set_status(f"Error: {message}")
+        # Progress controller handles updating the progress dialog
+        # We just need to handle UI-specific error handling here
 
-        # Check if loading is already complete or in progress with data
-        data_loaded = False
-        try:
-            if self._data_model and not self._data_model.is_empty:
-                data_loaded = True
-                logger.warning(f"Error occurred but data model has data: {message}")
-        except:
-            pass
+        # Update the UI to reflect the error state
+        self._status_bar.set_status(f"Error: {message}", is_error=True)
 
-        # Check if there's a progress signal that has been received
-        has_progress = False
-        try:
-            if hasattr(self, "_loading_state") and self._loading_state.get("total_rows", 0) > 0:
-                has_progress = True
-                logger.warning(f"Error occurred after progress was received: {message}")
-        except:
-            pass
-
-        # If showing error dialog flag is set, don't show another error
-        if hasattr(self, "_showing_error_dialog") and self._showing_error_dialog:
-            logger.debug("Already showing an error dialog, skipping additional error dialog")
-            return
-
-        # If we have data loaded or progress, skip closing everything, just log the error
-        if data_loaded or has_progress:
-            logger.warning(f"Non-critical error during loading, continuing: {message}")
-            return
-
-        # Set flag to prevent multiple error dialogs
-        self._showing_error_dialog = True
-
-        # If the progress dialog exists, update it to show the error
-        if hasattr(self, "_progress_dialog") and self._progress_dialog:
-            try:
-                # Set error state
-                if hasattr(self._progress_dialog, "setState") and hasattr(ProgressBar, "State"):
-                    self._progress_dialog.setState(ProgressBar.State.ERROR)
-
-                # Update labels
-                self._progress_dialog.setLabelText("Loading failed")
-                self._progress_dialog.setStatusText(f"Error: {message}")
-
-                # Change button to Close
-                self._progress_dialog.setCancelButtonText("Close")
-
-                # Disconnect previous signal connections
-                try:
-                    self._progress_dialog.canceled.disconnect()
-                except:
-                    pass
-
-                # Connect cancel button to close the dialog
-                self._progress_dialog.canceled.connect(self._progress_dialog.close)
-
-                # Ensure button is enabled
-                if hasattr(self._progress_dialog, "setCancelButtonEnabled"):
-                    self._progress_dialog.setCancelButtonEnabled(True)
-
-                # Make sure dialog is visible
-                if not self._progress_dialog.isVisible():
-                    self._progress_dialog.show()
-                    self._progress_dialog.raise_()
-                    self._progress_dialog.activateWindow()
-
-                # Process events to update the UI
-                QApplication.processEvents()
-
-                logger.debug("Progress dialog updated to show error")
-            except Exception as e:
-                logger.error(f"Error updating progress dialog for error state: {e}")
-                # Try to show a message box as fallback
-                QMessageBox.critical(self, "Error", f"Loading failed: {message}")
-        else:
-            # If no progress dialog exists, show a message box
-            QMessageBox.critical(self, "Error", f"Loading failed: {message}")
-
-        # Reset loading state
-        self._loading_state = {
-            "total_files": 0,
-            "current_file_index": 0,
-            "current_file": "",
-            "processed_files": [],
-            "total_rows": 0,
-        }
-
-        # Clear error dialog flag after showing
-        self._showing_error_dialog = False
+        # Reset any file loading state in the UI
 
     def _cancel_loading(self) -> None:
         """Cancel the current loading operation."""
-        logger.debug("Canceling loading operation from MainWindow")
+        logger.info("Canceling loading operation")
 
-        # Cancel the data loading in the data manager
+        # Tell data manager to cancel the current operation
         if self._data_manager:
-            try:
-                logger.debug("Calling data_manager.cancel_loading()")
-                self._data_manager.cancel_loading()
-                logger.debug("data_manager.cancel_loading() called successfully")
-            except Exception as e:
-                logger.error(f"Error canceling loading in data manager: {e}")
-        else:
-            logger.warning("No data_manager available, can't cancel loading")
-
-        # Close the progress dialog if it exists
-        if hasattr(self, "_progress_dialog") and self._progress_dialog:
-            try:
-                logger.debug("Closing progress dialog on cancel")
-                self._progress_dialog.close()
-                self._progress_dialog = None
-            except Exception as e:
-                logger.error(f"Error closing progress dialog on cancel: {e}")
-
-        # Clear state
-        self._file_loading_complete = False
+            self._data_manager.cancel_loading()
 
     # ===== Actions =====
 
@@ -1193,34 +893,14 @@ class MainWindow(QMainWindow):
 
         # Also check if we already have a progress dialog showing
         if (
-            hasattr(self, "_progress_dialog")
-            and self._progress_dialog
-            and self._progress_dialog.isVisible()
+            hasattr(self, "_progress_controller")
+            and self._progress_controller.is_progress_showing()
         ):
             logger.debug("Preventing file dialog while progress dialog is visible")
             return
 
-        file_paths, _ = QFileDialog.getOpenFileNames(
-            self, "Open CSV Files", "", "CSV Files (*.csv);;All Files (*)"
-        )
-
-        if file_paths:
-            try:
-                # Add selected files to recent files list
-                for file_path in file_paths:
-                    self._add_recent_file(file_path)
-                    self.file_opened.emit(file_path)
-
-                # Set the total files count in data manager if available
-                if self._data_manager and hasattr(self._data_manager, "_files_to_load"):
-                    self._data_manager._files_to_load = file_paths
-
-                # Emit signal with all selected files
-                self.load_csv_triggered.emit(file_paths)
-                self._status_bar.set_status(f"Loaded: {len(file_paths)} files")
-            except Exception as e:
-                logger.error(f"Error opening files: {e}")
-                QMessageBox.critical(self, "Error", f"Error opening files: {str(e)}")
+        # Delegate to the controller
+        self._file_controller.open_file(self)
 
     def _open_recent_file(self, file_path: str) -> None:
         """
@@ -1229,78 +909,24 @@ class MainWindow(QMainWindow):
         Args:
             file_path: The path of the file to open.
         """
-        if not os.path.exists(file_path):
-            QMessageBox.warning(self, "File Not Found", f"The file {file_path} does not exist.")
-            # Remove from recent files
-            if file_path in self._recent_files:
-                self._recent_files.remove(file_path)
-                self._update_recent_files_menu()
-                self._save_recent_files()
-            return
-
-        try:
-            # Add to recent files (will move to top of list)
-            self._add_recent_file(file_path)
-
-            # Emit signals
-            self.file_opened.emit(file_path)
-            self.load_csv_triggered.emit([file_path])
-
-            # Update status
-            self._status_bar.set_status(f"Loaded: {os.path.basename(file_path)}")
-
-            # Update last modified timestamp
-            modified_time = os.path.getmtime(file_path)
-            self._status_bar.set_last_modified(modified_time)
-        except Exception as e:
-            logger.error(f"Error opening file: {e}")
-            QMessageBox.critical(self, "Error", f"Error opening file: {str(e)}")
+        # Delegate to the controller
+        self._file_controller.open_recent_file(file_path)
 
     def _save_file(self) -> None:
         """Save the current file."""
         if self._data_model.is_empty:
             return
 
-        file_path = self._data_model.file_path
-        if not file_path:
-            self._save_file_as()
-            return
-
-        try:
-            self._csv_service.write_csv(file_path, self._data_model.data)
-            self.file_saved.emit(file_path)
-            self.save_csv_triggered.emit(file_path)
-            self._status_bar.set_status(f"Saved: {os.path.basename(file_path)}")
-
-            # Update last modified timestamp
-            modified_time = os.path.getmtime(file_path)
-            self._status_bar.set_last_modified(modified_time)
-        except Exception as e:
-            logger.error(f"Error saving file: {e}")
-            QMessageBox.critical(self, "Error", f"Error saving file: {str(e)}")
+        # Delegate to the controller
+        self._file_controller.save_file(self)
 
     def _save_file_as(self) -> None:
         """Save the file with a new name."""
         if self._data_model.is_empty:
             return
 
-        file_path, _ = QFileDialog.getSaveFileName(
-            self, "Save CSV File", "", "CSV Files (*.csv);;All Files (*)"
-        )
-
-        if file_path:
-            try:
-                self._csv_service.write_csv(file_path, self._data_model.data)
-                self._add_recent_file(file_path)
-                self.file_saved.emit(file_path)
-                self._status_bar.set_status(f"Saved: {os.path.basename(file_path)}")
-
-                # Update last modified timestamp
-                modified_time = os.path.getmtime(file_path)
-                self._status_bar.set_last_modified(modified_time)
-            except Exception as e:
-                logger.error(f"Error saving file: {e}")
-                QMessageBox.critical(self, "Error", f"Error saving file: {str(e)}")
+        # Delegate to the controller
+        self._file_controller.save_file_as(self)
 
     def _validate_data(self) -> None:
         """Validate the data."""
@@ -1309,7 +935,7 @@ class MainWindow(QMainWindow):
 
         self.validation_requested.emit()
         self.validate_data_triggered.emit()
-        self._set_active_view("Validation")
+        self._view_state_controller.set_active_view("Validation")
 
     def _correct_data(self) -> None:
         """Apply corrections to the data."""
@@ -1318,7 +944,7 @@ class MainWindow(QMainWindow):
 
         self.correction_requested.emit()
         self.apply_corrections_triggered.emit()
-        self._set_active_view("Correction")
+        self._view_state_controller.set_active_view("Correction")
 
     def _show_about(self) -> None:
         """Show the About dialog."""
@@ -1383,9 +1009,9 @@ class MainWindow(QMainWindow):
                 logger.error(f"Error cancelling operations during shutdown: {e}")
 
         # Close progress dialog if it exists
-        if hasattr(self, "_progress_dialog") and self._progress_dialog:
+        if hasattr(self, "_progress_controller") and self._progress_controller:
             try:
-                self._progress_dialog.close()
+                self._progress_controller.close_progress()
             except Exception as e:
                 logger.error(f"Error closing progress dialog during shutdown: {e}")
 
@@ -1399,33 +1025,14 @@ class MainWindow(QMainWindow):
     def refresh_ui(self) -> None:
         """Refresh all UI components."""
         try:
-            # Refresh the current tab if it exists
-            if hasattr(self, "_content_stack") and self._content_stack is not None:
-                current_index = self._content_stack.currentIndex()
-                current_widget = self._content_stack.widget(current_index)
+            # Delegate to the view state controller for active view refreshing
+            self._view_state_controller.refresh_active_view()
 
-                # Special handling for DataViewAdapter to prevent unnecessary refreshes
-                if (
-                    hasattr(current_widget, "__class__")
-                    and current_widget.__class__.__name__ == "DataViewAdapter"
-                ):
-                    if hasattr(current_widget, "needs_refresh") and current_widget.needs_refresh():
-                        current_widget.refresh()
-                    else:
-                        print("DataViewAdapter doesn't need refresh, skipping refresh")
-                # Special handling for DashboardView
-                elif (
-                    hasattr(current_widget, "__class__")
-                    and current_widget.__class__.__name__ == "DashboardView"
-                ):
-                    current_widget.refresh()
-                # For other widgets, call refresh or update method if available
-                elif hasattr(current_widget, "refresh"):
-                    current_widget.refresh()
-                elif hasattr(current_widget, "_update_view"):
-                    current_widget._update_view()
+            # Use data view controller to refresh data if needed
+            if self._content_stack.currentWidget() == self._views.get("Data"):
+                self._data_view_controller.refresh_data()
 
-            # Update other UI elements as needed (status bar, etc.)
+            # Update status bar (keeping this here as it's UI-specific)
             if hasattr(self, "_status_bar") and self._status_bar is not None:
                 self._update_status_bar()
         except Exception as e:
@@ -1480,20 +1087,9 @@ class MainWindow(QMainWindow):
         # self._set_active_view("Dashboard")
 
     def populate_data_table(self) -> None:
-        """
-        Explicitly populate the data table.
-        This should be called only once after data loading completes.
-        """
-        logger.info("MainWindow.populate_data_table called")
-
-        # Find the data view and call its populate method
-        data_view = self._views.get("Data")
-        if data_view and hasattr(data_view, "populate_table"):
-            logger.info("Calling populate_table on data view")
-            data_view.populate_table()
-            logger.info("Data table population completed")
-        else:
-            logger.warning("Could not find data view or it lacks populate_table method")
+        """Populate the data table with current data."""
+        # Delegate to the data view controller
+        self._data_view_controller.populate_table()
 
     def _ensure_data_table_populated(self):
         """
@@ -1501,21 +1097,10 @@ class MainWindow(QMainWindow):
         This is especially important for subsequent file loads.
         """
         logger.info("Data loaded signal received, ensuring data table is populated")
-        data_view = self._views.get("Data")
-        if data_view and hasattr(data_view, "populate_table"):
-            # Only populate if the view needs a refresh
-            if hasattr(data_view, "needs_refresh") and data_view.needs_refresh():
-                # If we're currently on the Data view, populate it immediately
-                if self._content_stack.currentWidget() == data_view:
-                    logger.info("Currently on Data view and needs refresh, populating table")
-                    data_view.populate_table()
-                else:
-                    # Otherwise set the needs_population flag and don't update state tracking
-                    # This ensures the table will be populated when the view is shown
-                    if hasattr(data_view, "needs_population"):
-                        logger.info("Not on Data view, setting needs_population flag")
-                        data_view.needs_population = True
-            else:
-                logger.info("Data view doesn't need refresh, skipping table population")
+
+        # Delegate to the data view controller
+        if self._data_view_controller.needs_refresh():
+            logger.info("Data view needs refresh, populating table")
+            self._data_view_controller.populate_table()
         else:
-            logger.warning("Could not find data view or it lacks populate_table method")
+            logger.info("Data view doesn't need refresh, skipping table population")
