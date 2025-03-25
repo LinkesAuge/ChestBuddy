@@ -83,6 +83,13 @@ alwaysApply: false
   - Changed instantiation of about_action to store it in self._about_action for proper signal connections
   - Improved signal connections in _connect_signals method to verify action existence before connecting
 
+- ✅ Type annotation issues in ViewStateController
+  - Fixed type annotations to use built-in Python types instead of typing module equivalents
+  - Changed `Dict` to `dict`, `List` to `list`, `Set` to `set` throughout the controller
+  - Updated signal parameter type annotations to ensure PySide6 compatibility
+  - Added comprehensive type annotation tests to validate correct types are used
+  - This prevents issues with PySide6 signals that can't handle typing module types
+
 ## Background Processing Issues
 - ✅ Signal connections not working properly
   - Fixed connections between DataManager and MainWindow
@@ -157,6 +164,7 @@ alwaysApply: false
 9. Check Python files for syntax errors such as extraneous code block markers (```) or incorrect indentation
 10. Verify color constants and other resources exist before using them in UI components
 11. Keep import paths consistent with actual project structure
+12. Use built-in Python types (dict, list) instead of typing module equivalents (Dict, List) for PySide6 signals
 
 - **Memory Management Patterns**: Accumulating chunks of data in memory can lead to crashes with large files. Instead:
   - Process data incrementally where possible
@@ -214,6 +222,52 @@ During implementation of progress dialog improvements, the DataManager.load_csv 
 
 ### Verification
 Tested by loading multiple CSV files, which now works correctly with proper progress reporting.
+
+## [2025-03-25] ViewStateController Type Annotation Issues
+
+### Issue
+The ViewStateController was using typing module type annotations (Dict, List, Set) which are incompatible with PySide6 signals that expect built-in Python types.
+
+### Root Cause
+PySide6 signals cannot properly handle typing module types like Dict, List, and Set. When a signal emits a value with these types, it can cause type errors or serialization issues.
+
+### Solution
+1. Updated all type annotations in ViewStateController to use built-in Python types:
+   ```python
+   # Changed from
+   self._view_dependencies: Dict[str, Set[str]] = {}
+   self._view_prerequisites: Dict[str, List[Callable]] = {}
+   self._view_availability: Dict[str, bool] = {}
+
+   # To
+   self._view_dependencies: dict[str, set[str]] = {}
+   self._view_prerequisites: dict[str, list[Callable]] = {}
+   self._view_availability: dict[str, bool] = {}
+   ```
+
+2. Updated class docstring to reflect the correct types:
+   ```python
+   """
+   Attributes:
+       _view_dependencies (dict[str, set[str]]): View dependencies (key depends on values)
+       _view_prerequisites (dict[str, list[Callable]]): View prerequisites functions
+       _view_availability (dict[str, bool]): Current availability of views
+   """
+   ```
+
+3. Created comprehensive type annotation tests that verify:
+   - Signal documentation uses correct types
+   - Attributes use built-in Python types
+   - Method parameters use built-in Python types
+   - Emitted signal values are properly typed
+
+### Verification
+Created and implemented `tests/core/controllers/test_view_state_controller_type_annotations.py` which verifies all type annotations are compatible with PySide6 signals. All tests pass successfully.
+
+### Lessons Learned
+1. Always use built-in Python types (dict, list, set) instead of typing module equivalents (Dict, List, Set) when working with PySide6 signals
+2. Create dedicated tests for type annotations when working with cross-language bindings like PySide6
+3. Document signal parameter types clearly in docstrings using consistent syntax
 
 # Bug Tracking and Fixing Log
 
@@ -288,3 +342,20 @@ In `MainWindow._ensure_data_table_populated`, when the user was not on the Data 
    - Status: Partially mitigated
    - Current solution: Background processing with progress reporting
    - Further improvements planned: Chunked processing with yield points for UI updates
+
+## Recent Fixes
+
+### Type Annotation Fix for PySide6 Signals (2024-03-29)
+
+**Issue**: PySide6 signal handling in ViewStateController and related classes was causing issues due to incorrect type annotations - using `typing.Dict` instead of Python built-in `dict` type.
+
+**Fix**: 
+- Updated imports to remove `Dict` from typing imports in affected files
+- Changed signal annotations from `@Slot(Dict)` to `@Slot(dict)` 
+- This ensures proper type compatibility with PySide6's signal/slot mechanism
+- Files updated:
+  - chestbuddy/ui/widgets/sidebar_navigation.py
+  - chestbuddy/core/controllers/view_state_controller.py (already using correct annotation)
+  - chestbuddy/ui/main_window.py (already using correct annotation)
+
+**Impact**: This improves type-checking consistency and prevents potential signal connection issues. We should ensure that all PySide6 signals use Python's built-in types rather than typing equivalents.

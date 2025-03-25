@@ -14,6 +14,9 @@ from typing import Dict, Optional, Any, Tuple, List
 from PySide6.QtCore import QObject, Signal, Slot
 import pandas as pd
 
+from chestbuddy.core.services.validation_service import ValidationService
+from chestbuddy.core.services.correction_service import CorrectionService
+
 # Set up logger
 logger = logging.getLogger(__name__)
 
@@ -30,6 +33,12 @@ class DataViewController(QObject):
         sort_applied (Signal): Emitted when sort is applied
         table_populated (Signal): Emitted when the table is populated
         operation_error (Signal): Emitted when an error occurs
+        validation_started (Signal): Emitted when validation starts
+        validation_completed (Signal): Emitted when validation completes
+        validation_error (Signal): Emitted when validation fails
+        correction_started (Signal): Emitted when correction starts
+        correction_completed (Signal): Emitted when correction completes
+        correction_error (Signal): Emitted when correction fails
     """
 
     # Define signals
@@ -38,15 +47,29 @@ class DataViewController(QObject):
     table_populated = Signal(int)  # Number of rows
     operation_error = Signal(str)  # Error message
 
-    def __init__(self, data_model):
+    # Validation signals
+    validation_started = Signal()
+    validation_completed = Signal(dict)  # Validation results
+    validation_error = Signal(str)  # Error message
+
+    # Correction signals
+    correction_started = Signal(str)  # Strategy name
+    correction_completed = Signal(str, int)  # Strategy name, affected rows
+    correction_error = Signal(str)  # Error message
+
+    def __init__(self, data_model, validation_service=None, correction_service=None):
         """
         Initialize the DataViewController.
 
         Args:
             data_model: The data model
+            validation_service: Optional ValidationService instance
+            correction_service: Optional CorrectionService instance
         """
         super().__init__()
         self._data_model = data_model
+        self._validation_service = validation_service
+        self._correction_service = correction_service
         self._view = None
         self._filtered_data = None
         self._current_filter = {}
@@ -64,9 +87,17 @@ class DataViewController(QObject):
         self._connect_signals()
 
     def _connect_signals(self):
-        """Connect to relevant signals from the data model."""
+        """Connect to relevant signals from the data model and services."""
         if hasattr(self._data_model, "data_changed"):
             self._data_model.data_changed.connect(self._on_data_changed)
+
+        # Connect to validation service signals if available
+        if self._validation_service and hasattr(self._validation_service, "validation_completed"):
+            self._validation_service.validation_completed.connect(self._on_validation_completed)
+
+        # Connect to correction service signals if available
+        if self._correction_service and hasattr(self._correction_service, "correction_completed"):
+            self._correction_service.correction_completed.connect(self._on_correction_completed)
 
     def set_view(self, view):
         """
@@ -88,6 +119,25 @@ class DataViewController(QObject):
 
                 if clear_button and hasattr(clear_button, "clicked"):
                     clear_button.clicked.connect(self._handle_clear_filter_button_clicked)
+
+    def set_services(self, validation_service=None, correction_service=None):
+        """
+        Set or update the validation and correction services.
+
+        Args:
+            validation_service: The validation service to use
+            correction_service: The correction service to use
+        """
+        if validation_service:
+            self._validation_service = validation_service
+
+        if correction_service:
+            self._correction_service = correction_service
+
+        # Reconnect signals with new services
+        self._connect_signals()
+
+        logger.info("Validation and correction services updated")
 
     @Slot()
     def _handle_filter_button_clicked(self):
@@ -340,49 +390,49 @@ class DataViewController(QObject):
 
     def needs_refresh(self) -> bool:
         """
-        Check if the view needs refreshing based on data state.
+        Determine if the view needs to be refreshed.
+
+        This checks if the data has changed since the last refresh.
 
         Returns:
-            bool: True if the view needs to be refreshed, False otherwise
+            bool: True if refresh is needed, False otherwise
         """
+        if self._data_model.is_empty:
+            return False
+
         try:
-            # Check if data has changed
-            current_state = {"row_count": 0, "column_count": 0, "data_hash": ""}
-
-            if not self._data_model.is_empty:
-                current_state = {
-                    "row_count": len(self._data_model.data),
-                    "column_count": len(self._data_model.column_names),
-                    "data_hash": self._data_model.data_hash
-                    if hasattr(self._data_model, "data_hash")
-                    else "",
-                }
-
-            # Check for dimension changes or data content changes via hash
-            dimensions_changed = (
-                current_state["row_count"] != self._last_data_state["row_count"]
-                or current_state["column_count"] != self._last_data_state["column_count"]
+            # Check if data hash has changed
+            current_hash = (
+                self._data_model.data_hash if hasattr(self._data_model, "data_hash") else ""
             )
+            last_hash = self._last_data_state.get("data_hash", "")
 
-            content_changed = current_state["data_hash"] != self._last_data_state.get(
-                "data_hash", ""
-            )
+            if current_hash != last_hash:
+                logger.debug(f"Needs refresh: data hash changed ({last_hash} -> {current_hash})")
+                return True
 
-            needs_refresh = dimensions_changed or content_changed
+            # Check if row count has changed
+            current_rows = len(self._data_model.data)
+            last_rows = self._last_data_state.get("row_count", 0)
 
-            if needs_refresh:
-                logger.debug(
-                    f"View needs refresh: Data changed. Old: {self._last_data_state}, New: {current_state}"
-                )
-            else:
-                logger.debug("View doesn't need refresh: No data changes detected")
+            if current_rows != last_rows:
+                logger.debug(f"Needs refresh: row count changed ({last_rows} -> {current_rows})")
+                return True
 
-            return needs_refresh
+            # Check if column count has changed
+            current_cols = len(self._data_model.column_names)
+            last_cols = self._last_data_state.get("column_count", 0)
+
+            if current_cols != last_cols:
+                logger.debug(f"Needs refresh: column count changed ({last_cols} -> {current_cols})")
+                return True
+
+            # No need to refresh
+            return False
 
         except Exception as e:
-            logger.error(f"Error checking if view needs refresh: {e}")
-            # Default to refresh if there's an error
-            return True
+            logger.error(f"Error checking if refresh is needed: {e}")
+            return True  # Refresh anyway to be safe
 
     def refresh_data(self) -> bool:
         """
@@ -448,3 +498,364 @@ class DataViewController(QObject):
             Dict: Current sort parameters
         """
         return self._current_sort.copy()
+
+    def validate_data(self, specific_rules: Optional[List[str]] = None) -> bool:
+        """
+        Validate the data using the validation service.
+
+        Args:
+            specific_rules: Optional list of specific rule names to run
+
+        Returns:
+            bool: Success status
+        """
+        try:
+            if not self._validation_service:
+                logger.warning("Cannot validate: Validation service not available")
+                self.operation_error.emit("Validation service not available")
+                return False
+
+            if self._data_model.is_empty:
+                logger.warning("Cannot validate: Data model is empty")
+                self.operation_error.emit("Cannot validate empty data")
+                return False
+
+            # Emit validation started signal
+            self.validation_started.emit()
+
+            # Run validation
+            results = self._validation_service.validate_data(specific_rules)
+
+            # Emit validation completed signal
+            self.validation_completed.emit(results)
+
+            # Update view if attached
+            if self._view and hasattr(self._view, "refresh"):
+                self._view.refresh()
+
+            logger.info(f"Validation completed with {len(results)} rule results")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error validating data: {e}")
+            self.validation_error.emit(f"Error validating data: {str(e)}")
+            self.operation_error.emit(f"Error validating data: {str(e)}")
+            return False
+
+    def get_validation_summary(self) -> Dict[str, int]:
+        """
+        Get a summary of validation issues.
+
+        Returns:
+            Dict[str, int]: A dictionary mapping rule names to the count of issues found
+        """
+        try:
+            if not self._validation_service:
+                logger.warning("Cannot get validation summary: Validation service not available")
+                return {}
+
+            return self._validation_service.get_validation_summary()
+
+        except Exception as e:
+            logger.error(f"Error getting validation summary: {e}")
+            self.operation_error.emit(f"Error getting validation summary: {str(e)}")
+            return {}
+
+    @Slot(dict)
+    def _on_validation_completed(self, results):
+        """
+        Handle validation completed signal from the validation service.
+
+        Args:
+            results: The validation results
+        """
+        try:
+            # Update the view if attached
+            if self._view and hasattr(self._view, "refresh"):
+                self._view.refresh()
+
+            logger.info(f"Handled validation completion with {len(results)} rule results")
+
+        except Exception as e:
+            logger.error(f"Error handling validation completion: {e}")
+            self.operation_error.emit(f"Error handling validation completion: {str(e)}")
+
+    def apply_correction(
+        self,
+        strategy_name: str,
+        column: Optional[str] = None,
+        rows: Optional[List[int]] = None,
+        **strategy_args,
+    ) -> bool:
+        """
+        Apply a correction strategy to the data.
+
+        Args:
+            strategy_name: The name of the correction strategy to apply
+            column: Optional column name to apply the correction to
+            rows: Optional list of row indices to apply the correction to
+            **strategy_args: Additional arguments to pass to the strategy function
+
+        Returns:
+            bool: Success status
+        """
+        try:
+            if not self._correction_service:
+                logger.warning("Cannot apply correction: Correction service not available")
+                self.operation_error.emit("Correction service not available")
+                return False
+
+            if self._data_model.is_empty:
+                logger.warning("Cannot apply correction: Data model is empty")
+                self.operation_error.emit("Cannot apply correction to empty data")
+                return False
+
+            # Emit correction started signal
+            self.correction_started.emit(strategy_name)
+
+            # Apply correction
+            result, error = self._correction_service.apply_correction(
+                strategy_name, column, rows, **strategy_args
+            )
+
+            if result:
+                # Emit correction completed signal
+                affected_rows = len(rows) if rows else self._data_model.row_count
+                self.correction_completed.emit(strategy_name, affected_rows)
+
+                # Update view if attached
+                if self._view and hasattr(self._view, "refresh"):
+                    self._view.refresh()
+
+                logger.info(f"Correction {strategy_name} applied successfully")
+                return True
+            else:
+                self.correction_error.emit(error if error else f"Failed to apply {strategy_name}")
+                self.operation_error.emit(error if error else f"Failed to apply {strategy_name}")
+                return False
+
+        except Exception as e:
+            logger.error(f"Error applying correction: {e}")
+            self.correction_error.emit(f"Error applying correction: {str(e)}")
+            self.operation_error.emit(f"Error applying correction: {str(e)}")
+            return False
+
+    def get_correction_history(self) -> List[Dict[str, Any]]:
+        """
+        Get the correction history.
+
+        Returns:
+            List[Dict[str, Any]]: A list of correction records
+        """
+        try:
+            if not self._correction_service:
+                logger.warning("Cannot get correction history: Correction service not available")
+                return []
+
+            return self._correction_service.get_correction_history()
+
+        except Exception as e:
+            logger.error(f"Error getting correction history: {e}")
+            self.operation_error.emit(f"Error getting correction history: {str(e)}")
+            return []
+
+    @Slot(str, int)
+    def _on_correction_completed(self, strategy_name, affected_rows):
+        """
+        Handle correction completed signal from the correction service.
+
+        Args:
+            strategy_name: The name of the applied correction strategy
+            affected_rows: The number of affected rows
+        """
+        try:
+            # Update the view if attached
+            if self._view and hasattr(self._view, "refresh"):
+                self._view.refresh()
+
+            logger.info(
+                f"Handled correction completion: {strategy_name} affected {affected_rows} rows"
+            )
+
+        except Exception as e:
+            logger.error(f"Error handling correction completion: {e}")
+            self.operation_error.emit(f"Error handling correction completion: {str(e)}")
+
+    def get_invalid_rows(self) -> List[int]:
+        """
+        Get the list of row indices that have validation issues.
+
+        Returns:
+            List[int]: Row indices with validation issues
+        """
+        try:
+            if self._data_model.is_empty:
+                return []
+
+            return self._data_model.get_invalid_rows()
+
+        except Exception as e:
+            logger.error(f"Error getting invalid rows: {e}")
+            self.operation_error.emit(f"Error getting invalid rows: {str(e)}")
+            return []
+
+    def get_corrected_rows(self) -> List[int]:
+        """
+        Get the list of row indices that have been corrected.
+
+        Returns:
+            List[int]: Row indices that have been corrected
+        """
+        try:
+            if self._data_model.is_empty:
+                return []
+
+            corrected_rows = []
+            correction_status = self._data_model.get_correction_status()
+
+            for row_idx, status in correction_status.items():
+                if status:  # If any corrections have been applied to this row
+                    corrected_rows.append(row_idx)
+
+            return corrected_rows
+
+        except Exception as e:
+            logger.error(f"Error getting corrected rows: {e}")
+            self.operation_error.emit(f"Error getting corrected rows: {str(e)}")
+            return []
+
+    def highlight_invalid_rows(self) -> bool:
+        """
+        Highlight rows with validation issues in the view.
+
+        Returns:
+            bool: Success status
+        """
+        try:
+            if self._data_model.is_empty:
+                return False
+
+            if not self._view:
+                return False
+
+            # Get rows with validation issues
+            invalid_rows = self.get_invalid_rows()
+
+            # If the view has a highlight_rows method, call it
+            if hasattr(self._view, "highlight_rows"):
+                self._view.highlight_rows(invalid_rows, "invalid")
+                return True
+            elif hasattr(self._view, "_highlight_invalid_rows"):
+                self._view._highlight_invalid_rows(invalid_rows)
+                return True
+
+            return False
+
+        except Exception as e:
+            logger.error(f"Error highlighting invalid rows: {e}")
+            self.operation_error.emit(f"Error highlighting invalid rows: {str(e)}")
+            return False
+
+    def highlight_corrected_rows(self) -> bool:
+        """
+        Highlight rows that have been corrected in the view.
+
+        Returns:
+            bool: Success status
+        """
+        try:
+            if self._data_model.is_empty:
+                return False
+
+            if not self._view:
+                return False
+
+            # Get rows that have been corrected
+            corrected_rows = self.get_corrected_rows()
+
+            # If the view has a highlight_rows method, call it
+            if hasattr(self._view, "highlight_rows"):
+                self._view.highlight_rows(corrected_rows, "corrected")
+                return True
+            elif hasattr(self._view, "_highlight_corrected_rows"):
+                self._view._highlight_corrected_rows(corrected_rows)
+                return True
+
+            return False
+
+        except Exception as e:
+            logger.error(f"Error highlighting corrected rows: {e}")
+            self.operation_error.emit(f"Error highlighting corrected rows: {str(e)}")
+            return False
+
+    def export_validation_report(self, file_path) -> Tuple[bool, Optional[str]]:
+        """
+        Export a validation report to a file.
+
+        Args:
+            file_path: The path to save the report to
+
+        Returns:
+            Tuple[bool, Optional[str]]: Success status and error message if any
+        """
+        try:
+            if not self._validation_service:
+                error_msg = "Validation service not available"
+                logger.warning(error_msg)
+                self.operation_error.emit(error_msg)
+                return False, error_msg
+
+            if self._data_model.is_empty:
+                error_msg = "Cannot export validation report: Data model is empty"
+                logger.warning(error_msg)
+                self.operation_error.emit(error_msg)
+                return False, error_msg
+
+            result, error = self._validation_service.export_validation_report(file_path)
+
+            if not result:
+                self.operation_error.emit(error if error else "Failed to export validation report")
+
+            return result, error
+
+        except Exception as e:
+            error_msg = f"Error exporting validation report: {e}"
+            logger.error(error_msg)
+            self.operation_error.emit(error_msg)
+            return False, error_msg
+
+    def export_correction_report(self, file_path) -> Tuple[bool, Optional[str]]:
+        """
+        Export a correction report to a file.
+
+        Args:
+            file_path: The path to save the report to
+
+        Returns:
+            Tuple[bool, Optional[str]]: Success status and error message if any
+        """
+        try:
+            if not self._correction_service:
+                error_msg = "Correction service not available"
+                logger.warning(error_msg)
+                self.operation_error.emit(error_msg)
+                return False, error_msg
+
+            if self._data_model.is_empty:
+                error_msg = "Cannot export correction report: Data model is empty"
+                logger.warning(error_msg)
+                self.operation_error.emit(error_msg)
+                return False, error_msg
+
+            result, error = self._correction_service.export_correction_report(file_path)
+
+            if not result:
+                self.operation_error.emit(error if error else "Failed to export correction report")
+
+            return result, error
+
+        except Exception as e:
+            error_msg = f"Error exporting correction report: {e}"
+            logger.error(error_msg)
+            self.operation_error.emit(error_msg)
+            return False, error_msg

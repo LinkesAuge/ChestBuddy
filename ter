@@ -1,5 +1,0 @@
-[33mcommit 538cfd8d47ee36b96a46b03543fa4b50987ecc6e[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmaster[m[33m)[m
-Author: ChestBuddy Developer <dev@chestbuddy.example.com>
-Date:   Sun Mar 23 06:24:14 2025 +0100
-
-    Fix progress dialog issues: 1) Replace non-existent TEXT_SECONDARY with TEXT_MUTED 2) Add error handling to ensure processing doesn't start without dialog

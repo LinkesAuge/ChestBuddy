@@ -76,7 +76,7 @@ class ChestBuddyApp(QObject):
             self._setup_logging()
 
             # Create configuration manager
-            self._config_manager = ConfigManager("chestbuddy", "config.ini")
+            self._config_manager = ConfigManager("chestbuddy")
 
             # Initialize data model
             self._data_model = ChestDataModel()
@@ -101,6 +101,9 @@ class ChestBuddyApp(QObject):
 
             # Set up controller relationships
             self._error_controller.set_progress_controller(self._progress_controller)
+
+            # Connect ViewStateController and DataViewController
+            self._view_state_controller.set_data_view_controller(self._data_view_controller)
 
             # Create resource manager
             self._resource_manager = ResourceManager()

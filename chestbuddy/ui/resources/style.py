@@ -17,6 +17,7 @@ class Colors:
 
     # Main colors
     PRIMARY = "#1A2C42"  # Dark blue
+    PRIMARY_DARK = "#0F1A2A"  # Darker version of primary
     PRIMARY_LIGHT = "#263D5A"  # Lighter version of primary
     SECONDARY = "#D4AF37"  # Gold
     ACCENT = "#4A90E2"  # Light blue
@@ -39,6 +40,41 @@ class Colors:
 
     # Border colors
     BORDER = "#4A5568"  # Medium gray
+    BORDER_DARK = "#2D3748"  # Dark gray border
+
+
+def get_sidebar_style():
+    """
+    Get the stylesheet for the sidebar navigation.
+
+    Returns:
+        str: The stylesheet for the sidebar.
+    """
+    return f"""
+        QListWidget {{
+            background-color: {Colors.PRIMARY_DARK};
+            color: {Colors.TEXT_LIGHT};
+            border: none;
+            border-radius: 0px;
+            outline: none;
+        }}
+        
+        QListWidget::item {{
+            padding: 10px;
+            padding-left: 15px;
+            border-bottom: 1px solid {Colors.BORDER_DARK};
+        }}
+        
+        QListWidget::item:selected {{
+            background-color: {Colors.PRIMARY};
+            color: {Colors.ACCENT};
+            border-left: 3px solid {Colors.ACCENT};
+        }}
+        
+        QListWidget::item:hover:!selected {{
+            background-color: {Colors.PRIMARY_LIGHT};
+        }}
+    """
 
 
 def apply_application_style(app):

@@ -1,0 +1,17 @@
+2025-03-25 05:30:17,573 - __main__ - INFO - Logging initialized
+2025-03-25 05:30:17,573 - __main__ - CRITICAL - Failed to initialize application: ConfigManager.__new__() takes from 1 to 2 positional arguments but 3 were given
+2025-03-25 05:39:14,965 - __main__ - INFO - Logging initialized
+2025-03-25 05:39:14,968 - chestbuddy.core.models.chest_data_model - DEBUG - Updated data hash to: 1d4f9f63b040166415e97d034fc84c19
+2025-03-25 05:39:14,968 - __main__ - CRITICAL - Failed to initialize application: ChartService.__init__() missing 1 required positional argument: 'data_model'
+2025-03-25 05:39:26,330 - __main__ - INFO - Logging initialized
+2025-03-25 05:39:26,336 - chestbuddy.core.models.chest_data_model - DEBUG - Updated data hash to: 1d4f9f63b040166415e97d034fc84c19
+2025-03-25 05:39:26,337 - __main__ - CRITICAL - Failed to initialize application: ChartService.__init__() missing 1 required positional argument: 'data_model'
+2025-03-25 05:40:10,644 - __main__ - INFO - Logging initialized
+2025-03-25 05:40:10,645 - chestbuddy.core.models.chest_data_model - DEBUG - Updated data hash to: 1d4f9f63b040166415e97d034fc84c19
+2025-03-25 05:40:10,647 - __main__ - CRITICAL - Failed to initialize application: ChartService.__init__() missing 1 required positional argument: 'data_model'
+2025-03-25 05:53:08,869 - __main__ - INFO - Logging initialized
+2025-03-25 05:53:08,872 - chestbuddy.core.models.chest_data_model - DEBUG - Updated data hash to: 1d4f9f63b040166415e97d034fc84c19
+2025-03-25 05:53:08,872 - __main__ - CRITICAL - Failed to initialize application: ChartService.__init__() missing 1 required positional argument: 'data_model'
+2025-03-25 05:54:58,588 - __main__ - INFO - Logging initialized
+2025-03-25 05:54:58,590 - chestbuddy.core.models.chest_data_model - DEBUG - Updated data hash to: 1d4f9f63b040166415e97d034fc84c19
+2025-03-25 05:54:58,590 - __main__ - CRITICAL - Failed to initialize application: ChartService.__init__() missing 1 required positional argument: 'data_model'
