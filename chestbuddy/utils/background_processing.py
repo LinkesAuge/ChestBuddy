@@ -315,6 +315,16 @@ class MultiCSVLoadTask(BackgroundTask):
                 # Try to read the file - returns tuple of (dataframe, error_message)
                 result_tuple = self.csv_service.read_csv_chunked(file_path_str, **csv_params)
 
+                # Make sure we got a tuple with exactly 2 elements
+                if not isinstance(result_tuple, tuple) or len(result_tuple) != 2:
+                    logger.error(f"Unexpected result from read_csv_chunked: {type(result_tuple)}")
+                    error_msg = f"Error reading CSV file {file_path_str}: Unexpected result format"
+                    # Clean up and return error
+                    if combined_df is not None:
+                        del combined_df
+                    gc.collect()
+                    return False, error_msg
+
                 # Unpack the tuple
                 file_df, error_msg = result_tuple
 

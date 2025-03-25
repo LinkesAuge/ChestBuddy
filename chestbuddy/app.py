@@ -206,7 +206,10 @@ class ChestBuddyApp(QObject):
     def _connect_signals(self) -> None:
         """Connect signals between components."""
         try:
-            # Connect DataManager signals to MainWindow
+            logger.info("Connecting application signals...")
+
+            # Connect DataManager signals to app-level handlers
+            logger.debug("Connecting DataManager signals...")
             self._data_manager.load_started.connect(self._on_load_started)
             self._data_manager.load_progress.connect(self._on_load_progress)
             self._data_manager.load_finished.connect(self._on_load_finished)
@@ -214,20 +217,54 @@ class ChestBuddyApp(QObject):
             self._data_manager.save_success.connect(self._on_save_success)
             self._data_manager.save_error.connect(self._on_save_error)
 
+            # Add connections for data loading state changes
+            logger.debug("Connecting data state signals...")
+            self._data_manager.data_loaded.connect(
+                lambda: logger.info("App: Data loaded signal received")
+            )
+
+            # Connect directly to data model to track changes
+            if hasattr(self._data_model, "data_changed"):
+                logger.debug("Connecting data model signals...")
+                self._data_model.data_changed.connect(
+                    lambda: logger.info("App: Data model changed signal received")
+                )
+                self._data_model.data_cleared.connect(
+                    lambda: logger.info("App: Data model cleared signal received")
+                )
+
             # Connect FileOperationsController signals
+            logger.debug("Connecting FileOperationsController signals...")
             self._file_controller.load_csv_triggered.connect(self._data_manager.load_csv)
             self._file_controller.save_csv_triggered.connect(self._data_manager.save_csv)
             self._file_controller.recent_files_changed.connect(self._on_recent_files_changed)
 
+            # Connect MainWindow signals for file operations
+            if hasattr(self._main_window, "file_opened"):
+                logger.debug("Connecting MainWindow file operation signals...")
+                self._main_window.file_opened.connect(
+                    lambda path: logger.info(f"App: File opened signal received: {path}")
+                )
+
             # Connect ProgressController signals
+            logger.debug("Connecting ProgressController signals...")
             self._progress_controller.progress_canceled.connect(self._data_manager.cancel_loading)
 
-            # Connect DataViewController signals
-            self._data_view_controller.operation_error.connect(self._on_data_view_error)
+            # Connect cancellation signals bidirectionally
+            self._progress_controller.progress_canceled.connect(
+                lambda: logger.info("App: Progress canceled signal received")
+            )
 
-            logger.info("Signals connected")
+            # Connect DataViewController signals
+            logger.debug("Connecting DataViewController signals...")
+            self._data_view_controller.operation_error.connect(self._on_data_view_error)
+            self._data_view_controller.table_populated.connect(
+                lambda rows: logger.info(f"App: Table populated with {rows} rows")
+            )
+
+            logger.info("All signals connected successfully")
         except Exception as e:
-            logger.critical(f"Failed to connect signals: {e}")
+            logger.critical(f"Failed to connect signals: {e}", exc_info=True)
             self._error_controller.handle_exception(e, "Failed to connect signals")
             sys.exit(1)
 
@@ -281,7 +318,16 @@ class ChestBuddyApp(QObject):
         """
         logger.info(f"Load finished: {message}")
         is_error = "error" in message.lower() or "failed" in message.lower()
+
+        # First finish the progress with the final message
         self._progress_controller.finish_progress(message, is_error)
+
+        # Wait a brief moment for UI to update before closing
+        QTimer.singleShot(1500, self._progress_controller.close_progress)
+
+        # If it was successful, schedule the data table to be populated
+        if not is_error and self._main_window:
+            QTimer.singleShot(2000, self._main_window.populate_data_table)
 
     @Slot(str)
     def _on_load_error(self, error_message: str) -> None:

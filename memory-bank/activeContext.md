@@ -298,18 +298,45 @@ Tests have been updated to reflect these changes, ensuring that all references t
 ```
 
 ## Current Focus
-- Fixed a bug in the `FileOperationsController` where calls to `ConfigManager.set()` and `ConfigManager.get()` were missing the required section parameter, causing a TypeError when trying to import files.
-- The fix involved updating all ConfigManager method calls to use the correct three-parameter format (section, option, value) and using specialized `get_list`/`set_list` methods for list data.
+
+The current focus is on stabilizing the application's core file import and data loading functionality. Recent work has addressed several critical issues:
+
+1. **Duplicate File Dialog Issue**: Fixed a problem where multiple file dialogs would appear when importing files.
+   - Implemented state tracking flags to prevent duplicate dialogs
+   - Added robust try/finally blocks to ensure proper cleanup
+   - Fixed signal connection issues causing multiple dialog triggers
+
+2. **Data Loading Issues**: Solved problems with data not properly loading or being displayed after import.
+   - Enhanced error handling in the DataManager's load operations
+   - Fixed signal blockage issues that prevented UI updates
+   - Improved cancellation handling to properly clean up state
+   - Added comprehensive logging for better debugging
+
+3. **Signal Connection Improvements**: Enhanced the application's signal/slot connections for better reliability.
+   - Added robust error handling for signal connections
+   - Improved logging of signal activities
+   - Added state tracking for data loaded status
 
 ## Recent Changes
-- Fixed ConfigManager parameter issue in FileOperationsController
-- Updated both `get` and `set` methods to use the correct three-parameter format
-- Added documentation of the bug and solution in bugfixing.mdc
 
-## Known Issues
-None currently identified after the ConfigManager parameter fix.
+- Implemented state tracking flags in MainWindow (`_is_opening_file`, `_is_saving_file`) to prevent duplicate dialogs
+- Enhanced error handling in DataManager's `_on_csv_load_success`, `cancel_loading`, and `load_csv` methods
+- Improved signal connections in App's `_connect_signals` method with better error handling and logging
+- Added comprehensive diagnostics for debugging signal connections and data state changes
+- Updated documentation in `bugfixing.mdc` and other memory files to track issues and solutions
 
 ## Next Steps
-- Continue testing other file operations to ensure the fix didn't introduce any regressions
-- Review other controllers for similar issues with ConfigManager usage
-- Update any documentation about ConfigManager usage to clarify the correct parameter format
+
+1. **Data Persistence**: Ensure data state is properly maintained throughout the application lifecycle.
+2. **Error Recovery**: Improve robustness when handling unexpected states or errors during file operations.
+3. **Performance Optimization**: Review and improve performance with large CSV files.
+4. **UI Feedback**: Enhance user feedback during long-running operations.
+5. **Testing**: Add more comprehensive tests for file operations and data loading to catch regressions.
+
+## Active Decisions
+
+- State tracking should be used throughout the application to prevent UI issues and race conditions.
+- Signal connections should include robust error handling and logging.
+- All methods handling user data should have try/except blocks with proper error reporting.
+- The application should provide clear feedback during long-running operations.
+- File and data operations should be cancellable with clean state reset.

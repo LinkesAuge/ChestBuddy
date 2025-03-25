@@ -163,6 +163,40 @@ Overall project completion: ~92%
 - **Progress Indication**: Detailed progress updates during long operations
 - **View Transitions**: Smooth transitions between views with proper state persistence
 
+## Recent Improvements
+
+### March 25, 2025: Fixed File Import Issues
+
+1. **Fixed File Import Dialog Duplication**
+   - Added state tracking flags to prevent opening multiple file dialogs
+   - Implemented try/finally blocks to ensure flags are reset
+   - Added better logging to track dialog state
+
+2. **Improved Data Loading**
+   - Enhanced error handling in CSV load operations
+   - Fixed signal blockage to ensure data model signals are properly managed
+   - Improved cancellation handling to clean up state properly
+   - Added more detailed logging for debugging
+
+3. **Fixed Signal Connections**
+   - Added better connections between components for data loading signals
+   - Improved error handling for signal connections
+   - Added state tracking for data loaded status
+
+## Known Issues
+
+* Performance can be slow with very large CSV files (>100,000 rows)
+* Some edge cases in validation may not be handled correctly
+* Chart customization options are limited
+
+## Next Steps
+
+* Add export options for reports
+* Implement user preferences for UI customization
+* Add support for additional data formats beyond CSV
+* Improve performance for large datasets
+* Add more chart types for data visualization
+
 ## Next Steps (Priority Order)
 
 1. **Improve Chart Functionality**

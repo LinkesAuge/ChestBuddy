@@ -76,6 +76,8 @@ class ProgressDialog(QDialog):
         self._cancel_button_text = cancel_button_text
         self._was_canceled = False
         self._is_fully_initialized = False  # Track when dialog is fully shown
+        self._is_cancelable = show_cancel_button  # Track if dialog is cancelable
+        self._can_be_dismissed = True  # Track if dialog can be dismissed with window close
 
         # Ensure we have references to UI elements
         self._label = None
@@ -111,9 +113,14 @@ class ProgressDialog(QDialog):
     def _setup_ui(self) -> None:
         """Set up the UI components."""
         # Set window flags to make it modal but with a frame so it can be moved
-        self.setWindowFlags(Qt.Dialog | Qt.WindowStaysOnTopHint)
+        self.setWindowFlags(
+            Qt.Dialog | Qt.WindowStaysOnTopHint | Qt.CustomizeWindowHint | Qt.WindowTitleHint
+        )
         self.setWindowModality(Qt.ApplicationModal)
         self.setFixedSize(420, 250)
+
+        # Prevent the dialog from being closed by escape key or clicking outside
+        self.setAttribute(Qt.WA_DeleteOnClose, False)
 
         # Set the style for the dialog
         self.setStyleSheet(f"""
@@ -224,7 +231,14 @@ class ProgressDialog(QDialog):
         # Always close the dialog when the button is clicked
         # This ensures the button works even if signal connections are broken
         logger.debug("Directly closing dialog after cancel button clicked")
-        self.close()
+
+        # Force dialog close regardless of dismissable setting when cancel button is clicked
+        self._can_be_dismissed = True  # Temporarily allow dismissal
+
+        # Force the dialog to close immediately
+        # Standard close() can be delayed by the Qt event loop, so we use hide() and deleteLater()
+        self.hide()
+        self.deleteLater()
 
     def setValue(self, value: int) -> None:
         """
@@ -500,6 +514,13 @@ class ProgressDialog(QDialog):
         Overridden to ensure the canceled signal is emitted when the dialog is closed,
         which ensures background processes are properly cancelled.
         """
+        # Check if the dialog can be dismissed via window close
+        # Only apply this check for window close events, not when close() is called directly
+        if not self._can_be_dismissed and self._is_fully_initialized and not self._was_canceled:
+            logger.debug("Dialog close prevented - can only be closed with Cancel/OK button")
+            event.ignore()
+            return
+
         # Only emit the signal if it hasn't been canceled already AND the dialog was properly shown
         if not self._was_canceled and self._is_fully_initialized:
             logger.debug("Dialog closed via window close button, emitting canceled signal")
@@ -508,7 +529,7 @@ class ProgressDialog(QDialog):
         elif not self._is_fully_initialized:
             logger.debug("Ignoring closeEvent during initialization")
 
-        # Call the parent class's closeEvent
+        # Call the parent class's closeEvent if not ignored
         super().closeEvent(event)
 
     def close(self) -> None:
@@ -518,9 +539,10 @@ class ProgressDialog(QDialog):
         """
         logger.debug("Progress dialog close called")
 
-        # Don't disconnect the cancel button's clicked signal
-        # This is the most critical connection that ensures the dialog can close
-        # Only disconnect other signals if they exist
+        # Make sure the dialog is dismissable before closing
+        # This handles the case where close() is called programmatically
+        old_dismissable = self._can_be_dismissed
+        self._can_be_dismissed = True
 
         # Call parent close to actually close the dialog
         try:
@@ -530,7 +552,36 @@ class ProgressDialog(QDialog):
             logger.error(f"Error closing progress dialog: {e}")
             # Try again with force if normal close fails
             try:
-                self.hide()  # In case close() failed, at least hide the dialog
+                self.hide()  # In case close() fails, at least hide the dialog
+                self.deleteLater()  # Schedule for deletion when event loop is free
                 logger.debug("Forced hide of progress dialog after close failure")
             except:
                 pass
+
+        # Restore original dismissable state if close() failed
+        self._can_be_dismissed = old_dismissable
+
+    def reject(self) -> None:
+        """
+        Handle dialog rejection (Escape key or clicking outside).
+        Overridden to prevent accidental closing of the dialog.
+        """
+        # If dialog has a cancel button and is in a cancelable state, trigger cancel button click
+        # Otherwise, do nothing - prevents dialog from closing via Escape or clicking outside
+        if self._is_cancelable and hasattr(self, "_cancel_button") and self._cancel_button:
+            # Only trigger cancel button if it's enabled
+            if self._cancel_button.isEnabled():
+                self._on_cancel_clicked()
+                return  # Return here as _on_cancel_clicked will handle closing
+        else:
+            # Ignore the reject action - keep dialog open
+            logger.debug("Dialog rejection ignored - dialog kept open")
+
+    def set_dismissable(self, can_dismiss: bool) -> None:
+        """
+        Set whether the dialog can be dismissed via window close.
+
+        Args:
+            can_dismiss: Whether the dialog can be dismissed via window close
+        """
+        self._can_be_dismissed = can_dismiss

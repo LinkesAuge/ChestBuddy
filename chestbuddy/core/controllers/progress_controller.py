@@ -93,10 +93,28 @@ class ProgressController(QObject):
             bool: True if progress dialog was successfully created
         """
         try:
-            # Close any existing dialog
+            # If a dialog is already showing, update it instead of creating a new one
             if self._progress_dialog:
-                self._progress_dialog.close()
-                self._progress_dialog = None
+                logger.debug(
+                    f"Progress dialog already exists, updating instead of creating new one"
+                )
+                self._progress_dialog.setLabelText(message)
+
+                # Update cancel button if needed
+                if cancelable != self._is_cancelable:
+                    self._is_cancelable = cancelable
+                    self._progress_dialog.setCancelButtonText("Cancel" if cancelable else "Close")
+
+                # Update cancel callback
+                self._cancel_callback = cancel_callback
+
+                # Make sure dialog is visible and at the front
+                self._progress_dialog.show()
+                self._progress_dialog.raise_()
+                self._progress_dialog.activateWindow()
+                QApplication.processEvents()
+
+                return True
 
             # Create a new progress dialog
             self._progress_dialog = ProgressDialog(
@@ -112,6 +130,10 @@ class ProgressController(QObject):
             # Set cancel callback
             self._cancel_callback = cancel_callback
             self._is_cancelable = cancelable
+
+            # Prevent dialog dismissal for important operations
+            if "CSV" in title or "Loading" in title or "Export" in title:
+                self._progress_dialog.set_dismissable(False)
 
             # Connect signals
             self._progress_dialog.canceled.connect(self._on_cancel_clicked)
@@ -349,8 +371,10 @@ class ProgressController(QObject):
             else:
                 self._progress_dialog.setCancelButtonText("Confirm")
 
-            # Enable button
+            # Enable button and make dialog dismissable
             self._progress_dialog.setCancelButtonEnabled(True)
+            if hasattr(self._progress_dialog, "set_dismissable"):
+                self._progress_dialog.set_dismissable(True)
 
             # Update UI
             QApplication.processEvents()
@@ -423,3 +447,7 @@ class ProgressController(QObject):
 
         # Emit canceled signal
         self.progress_canceled.emit()
+
+        # Make sure to clean up the dialog reference to prevent further updates
+        # This prevents further operations on a dialog that's being closed
+        self._progress_dialog = None

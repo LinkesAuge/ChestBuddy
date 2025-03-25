@@ -91,26 +91,48 @@ class DataManager(QObject):
 
     def load_csv(self, file_paths: Union[str, List[str]]) -> None:
         """
-        Load CSV data from file(s) into the data store.
+        Load CSV data from one or more files.
 
         Args:
-            file_paths: Path to CSV file(s) to load
+            file_paths: Path or list of paths to CSV files
         """
-        logger.info(f"Loading CSV data: {file_paths}")
+        logger.info(
+            f"DataManager.load_csv called with {file_paths if isinstance(file_paths, str) else len(file_paths)} file(s)"
+        )
 
         # Convert single string path to list
         if isinstance(file_paths, str):
             file_paths = [file_paths]
+            logger.debug(f"Converted single file path to list: {file_paths}")
+
+        # Validate file paths
+        if not file_paths or len(file_paths) == 0:
+            logger.warning("No file paths provided to load_csv")
+            self.load_error.emit("No files selected for loading")
+            return
 
         # Store the files to load for progress tracking
-        self._files_to_load = file_paths
+        self._files_to_load = file_paths.copy()
+        logger.debug(f"Set files_to_load with {len(self._files_to_load)} files")
+
+        # Store the first file path as the current file path
+        if file_paths and len(file_paths) > 0:
+            self._current_file_path = file_paths[0]
+            logger.debug(f"Set current_file_path to: {self._current_file_path}")
 
         # Signal that loading has started
         logger.debug("Emitting load_started signal")
         self.load_started.emit()
 
+        # Ensure any previous tasks are cancelled
+        self.cancel_loading()
+
         # Block signals from data model to prevent multiple updates
-        self._data_model.blockSignals(True)
+        if not self._data_model.signalsBlocked():
+            logger.debug("Blocking data model signals during load")
+            self._data_model.blockSignals(True)
+        else:
+            logger.debug("Data model signals already blocked")
 
         # Create the task
         try:
@@ -130,14 +152,20 @@ class DataManager(QObject):
 
             # Store the task for potential cancellation
             self._current_task = task
+            logger.debug(f"Stored task reference: {self._current_task}")
+
+            # Reset cancellation flag
+            self._cancel_requested = False
+            logger.debug("Reset cancellation flag to False")
 
             # Execute the task in the background
             logger.debug(f"Executing MultiCSVLoadTask")
             self._worker.execute_task(task)
         except Exception as e:
-            logger.error(f"Error setting up CSV loading task: {e}")
+            logger.error(f"Error setting up CSV loading task: {e}", exc_info=True)
             # Unblock signals if error occurs
-            self._data_model.blockSignals(False)
+            if self._data_model.signalsBlocked():
+                self._data_model.blockSignals(False)
             self.load_error.emit(f"Error setting up CSV loading: {str(e)}")
             self.load_finished.emit(f"Error: {str(e)}")
 
@@ -147,6 +175,7 @@ class DataManager(QObject):
 
         # Set the cancellation flag
         self._cancel_requested = True
+        logger.debug("Set cancellation flag to True")
 
         # If there's an active task, try to cancel it
         if self._current_task:
@@ -154,18 +183,32 @@ class DataManager(QObject):
                 logger.debug(f"Cancelling current task: {self._current_task}")
                 # Signal task to cancel
                 self._current_task.cancel()
+                logger.debug("Cancel signal sent to task")
 
                 # Signal progress completion to clean up any UI
+                logger.debug("Emitting load_finished signal for cancellation")
                 self.load_finished.emit("Loading cancelled")
+
+                # Unblock signals on the data model
+                if hasattr(self, "_data_model") and self._data_model:
+                    if self._data_model.signalsBlocked():
+                        logger.debug("Unblocking data model signals")
+                        self._data_model.blockSignals(False)
+                    else:
+                        logger.debug("Data model signals already unblocked")
             except Exception as e:
-                logger.error(f"Error cancelling task: {e}")
+                logger.error(f"Error cancelling task: {e}", exc_info=True)
+        else:
+            logger.debug("No active task to cancel")
 
         # Reset state variables
-        self._current_file_path = None
-        self._cancel_requested = False
-
-        # Clean up the task reference
         self._current_task = None
+        self._cancel_requested = False
+        self._files_to_load = []
+
+        # Clear current file path to avoid confusion
+        if hasattr(self, "_current_file_path"):
+            self._current_file_path = None
 
         logger.debug("Loading operation cancelled successfully")
 
@@ -282,6 +325,7 @@ class DataManager(QObject):
         Args:
             result_tuple: Tuple containing (DataFrame, message)
         """
+        logger.info("DataManager._on_csv_load_success called")
         try:
             # Type check the result tuple
             if not isinstance(result_tuple, tuple) or len(result_tuple) != 2:
@@ -292,6 +336,7 @@ class DataManager(QObject):
                 return
 
             data, message = result_tuple
+            logger.debug(f"CSV load result message: {message}")
 
             # Check for cancellation messages to avoid showing error for cancellations
             if message and isinstance(message, str) and "cancel" in message.lower():
@@ -319,26 +364,48 @@ class DataManager(QObject):
             logger.info(f"CSV loaded successfully with {len(data)} rows")
 
             # Store the file path that was successfully loaded
-            if self._current_file_path:
+            if hasattr(self, "_current_file_path") and self._current_file_path:
+                logger.debug(f"Updating recent files with path: {self._current_file_path}")
                 self._update_recent_files(self._current_file_path)
 
             # Complete the file loading phase with a success message
             success_message = f"Successfully loaded {len(data):,} rows of data"
             self.load_finished.emit(success_message)
 
-            # Map columns
-            mapped_data = self._map_columns(data)
+            try:
+                # Map columns
+                logger.debug("Mapping columns...")
+                mapped_data = self._map_columns(data)
+                logger.debug(f"Mapped columns successfully, DataFrame shape: {mapped_data.shape}")
 
-            # Update the data model with the new data - this will trigger data_changed signal
-            self._data_model.update_data(mapped_data)
+                # Ensure signals are unblocked before updating data model
+                if self._data_model.signalsBlocked():
+                    logger.debug("Unblocking data model signals before update")
+                    self._data_model.blockSignals(False)
+
+                # Update the data model with the new data - this will trigger data_changed signal
+                logger.debug("Updating data model with new data")
+                self._data_model.update_data(mapped_data)
+
+                # Force a data_changed signal if not emitted during update_data
+                if not self._data_model.data.empty and self._data_model.signalsBlocked():
+                    logger.debug(
+                        "Data model signals still blocked, unblocking and emitting data_changed"
+                    )
+                    self._data_model.blockSignals(False)
+                    self._data_model.data_changed.emit()
+            except Exception as e:
+                logger.error(f"Error updating data model: {e}", exc_info=True)
+                self.load_error.emit(f"Error updating data model: {str(e)}")
+                # Ensure signals are unblocked
+                if self._data_model.signalsBlocked():
+                    self._data_model.blockSignals(False)
+                return
 
             # Always emit data_loaded signal regardless of whether it's the first file
             # This signal indicates that data is loaded and ready for display
             logger.info("Emitting data_loaded signal")
             self.data_loaded.emit()
-
-            # Unblock signals after data loading
-            self._data_model.blockSignals(False)
 
             # Clear the current task
             self._current_task = None
@@ -350,10 +417,15 @@ class DataManager(QObject):
 
         except Exception as e:
             # Ensure signals are unblocked
-            self._data_model.blockSignals(False)
+            if (
+                hasattr(self, "_data_model")
+                and self._data_model
+                and self._data_model.signalsBlocked()
+            ):
+                self._data_model.blockSignals(False)
 
             # Log and emit error
-            logger.error(f"Error in CSV load success handler: {e}")
+            logger.error(f"Error in CSV load success handler: {e}", exc_info=True)
             self.load_error.emit(f"Error processing CSV data: {str(e)}")
             self.load_finished.emit(f"Error: {str(e)}")
 

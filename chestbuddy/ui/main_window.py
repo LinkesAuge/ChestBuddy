@@ -189,6 +189,10 @@ class MainWindow(QMainWindow):
         # Data state tracking
         self._has_data_loaded = False
 
+        # UI state flags to prevent duplicate dialogs
+        self._is_opening_file = False
+        self._is_saving_file = False
+
         # Update UI
         self._update_ui()
 
@@ -276,10 +280,6 @@ class MainWindow(QMainWindow):
         except Exception as e:
             logger.error(f"Error getting file modified time: {e}")
 
-        # Update data model file path if available
-        if hasattr(self._data_model, "file_path"):
-            self._data_model.file_path = file_path
-
     @Slot(str)
     def _on_file_saved(self, file_path: str) -> None:
         """
@@ -299,10 +299,6 @@ class MainWindow(QMainWindow):
             self._status_bar.set_last_modified(modified_time)
         except Exception as e:
             logger.error(f"Error getting file modified time: {e}")
-
-        # Update data model file path if available
-        if hasattr(self._data_model, "file_path"):
-            self._data_model.file_path = file_path
 
     @Slot(list)
     def _on_recent_files_changed(self, recent_files: List[str]) -> None:
@@ -941,6 +937,11 @@ class MainWindow(QMainWindow):
 
     def _open_file(self) -> None:
         """Open one or more CSV files."""
+        # Track if we're currently opening a file to prevent duplicate dialogs
+        if hasattr(self, "_is_opening_file") and self._is_opening_file:
+            logger.debug("Preventing duplicate file dialog")
+            return
+
         # Prevent opening a file dialog if we're already finishing a load operation
         if hasattr(self, "_is_finishing_load") and self._is_finishing_load:
             logger.debug("Preventing file dialog during load completion")
@@ -954,8 +955,15 @@ class MainWindow(QMainWindow):
             logger.debug("Preventing file dialog while progress dialog is visible")
             return
 
-        # Delegate to the controller
-        self._file_controller.open_file(self)
+        try:
+            # Set flag to prevent duplicate dialogs
+            self._is_opening_file = True
+
+            # Delegate to the controller
+            self._file_controller.open_file(self)
+        finally:
+            # Always reset the flag when done
+            self._is_opening_file = False
 
     def _open_recent_file(self, file_path: str) -> None:
         """
@@ -980,8 +988,20 @@ class MainWindow(QMainWindow):
         if self._data_model.is_empty:
             return
 
-        # Delegate to the controller
-        self._file_controller.save_file_as(self)
+        # Prevent duplicate file dialogs
+        if hasattr(self, "_is_saving_file") and self._is_saving_file:
+            logger.debug("Preventing duplicate file save dialog")
+            return
+
+        try:
+            # Set flag to prevent duplicate dialogs
+            self._is_saving_file = True
+
+            # Delegate to the controller
+            self._file_controller.save_file_as(self)
+        finally:
+            # Always reset the flag when done
+            self._is_saving_file = False
 
     def _validate_data(self) -> None:
         """Validate the data."""
@@ -1110,14 +1130,6 @@ class MainWindow(QMainWindow):
         else:
             # Delegate to UI state controller
             self._ui_state_controller.update_status_message("No data model available")
-
-    def _update_table_population_progress(self):
-        """
-        Placeholder for table population progress updates.
-        This method exists for backward compatibility but no longer updates the UI.
-        """
-        # No UI updates for table population progress
-        pass
 
     @Slot(str, str)
     def _on_data_dependent_view_clicked(self, section: str, item: str) -> None:

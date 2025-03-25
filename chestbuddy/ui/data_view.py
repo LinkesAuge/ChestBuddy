@@ -867,7 +867,6 @@ class DataView(QWidget):
         try:
             # Ignore item changes if we're currently updating
             if self._is_updating:
-                logger.debug("Ignoring item change during view update")
                 return
 
             # Get the row and column of the changed item

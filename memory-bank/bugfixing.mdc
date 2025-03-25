@@ -484,3 +484,153 @@ Updated all occurrences of `ConfigManager` method calls in `FileOperationsContro
 ### Verification
 
 The changes were applied and the application was tested. The file import functionality now works correctly without the TypeError.
+
+## Duplicate File Dialog and Data Loading Issues
+
+**Date:** 2025-03-25
+
+### Problems
+
+After fixing the ConfigManager issue, two new problems were identified:
+
+1. **Duplicate File Dialogs**: When clicking Import, two file browser windows would appear in succession.
+2. **Data Not Loading**: Even after selecting a file, the data wasn't actually loading into the application.
+
+### Root Cause Analysis
+
+1. **Duplicate File Dialogs**: The `_open_file` method in `MainWindow` was being triggered multiple times due to signal connections and the lack of state tracking to prevent multiple simultaneous file dialogs.
+
+2. **Data Not Loading**: Several issues were identified:
+   - The `_on_file_opened` method in `MainWindow` was trying to set a read-only property `file_path` on the data model
+   - Signal connections in `DataManager` weren't properly handling task completion and cancellation
+   - The data model's signals were being blocked but not consistently unblocked in some error cases
+
+### Solutions
+
+1. **For Duplicate File Dialogs**:
+   - Added state tracking in `MainWindow._open_file` with `self._is_opening_file` flag
+   - Applied similar state tracking to `_save_file_as` method
+   - Added proper exception handling with try/finally to ensure flags are reset
+
+   ```python
+   # Before
+   def _open_file(self) -> None:
+       """Open one or more CSV files."""
+       # Prevent opening a file dialog if we're already finishing a load operation
+       if hasattr(self, "_is_finishing_load") and self._is_finishing_load:
+           logger.debug("Preventing file dialog during load completion")
+           return
+
+       # Also check if we already have a progress dialog showing
+       if (
+           hasattr(self, "_progress_controller")
+           and self._progress_controller.is_progress_showing()
+       ):
+           logger.debug("Preventing file dialog while progress dialog is visible")
+           return
+
+       # Delegate to the controller
+       self._file_controller.open_file(self)
+
+   # After
+   def _open_file(self) -> None:
+       """Open one or more CSV files."""
+       # Track if we're currently opening a file to prevent duplicate dialogs
+       if hasattr(self, "_is_opening_file") and self._is_opening_file:
+           logger.debug("Preventing duplicate file dialog")
+           return
+
+       # Prevent opening a file dialog if we're already finishing a load operation
+       if hasattr(self, "_is_finishing_load") and self._is_finishing_load:
+           logger.debug("Preventing file dialog during load completion")
+           return
+
+       # Also check if we already have a progress dialog showing
+       if (
+           hasattr(self, "_progress_controller")
+           and self._progress_controller.is_progress_showing()
+       ):
+           logger.debug("Preventing file dialog while progress dialog is visible")
+           return
+
+       try:
+           # Set flag to prevent duplicate dialogs
+           self._is_opening_file = True
+           
+           # Delegate to the controller
+           self._file_controller.open_file(self)
+       finally:
+           # Always reset the flag when done
+           self._is_opening_file = False
+   ```
+
+2. **For Data Loading Issues**:
+   - Removed invalid property setter calls in `MainWindow._on_file_opened`
+   - Updated `DataManager._on_csv_load_success` for better error handling and to ensure signals are properly unblocked
+   - Improved cancellation handling in `DataManager.cancel_loading`
+   - Updated signal connections in `chestbuddy/app.py` for better debugging of data changes
+   - Added proper initialization of `_current_file_path` in `DataManager.load_csv`
+
+### Verification
+
+The changes were tested and:
+1. Only one file dialog appears when importing files
+2. The application now properly handles file loading with better error reporting
+3. Signal blockage is better managed to prevent UI freezes
+4. Task cancellation works consistently
+
+## Issue: Multiple progress dialogs appearing during CSV import
+
+**Date**: 2025-03-25
+**Fixed**: Yes
+
+### Description
+During CSV file import, after the initial progress dialog reaches 100% and shows a "Confirm" button, a second progress dialog at 0% appears when the user clicks the first one. This creates a confusing user experience where multiple dialogs need to be closed.
+
+### Root Cause
+The issue is in the application's handling of the load_finished signal:
+
+1. When CSV loading completes, the load_finished signal is emitted
+2. Both MainWindow._on_load_finished and ChestBuddyApp._on_load_finished are connected to this signal
+3. ChestBuddyApp._on_load_finished calls self._progress_controller.finish_progress() which sets the progress to 100% and changes the button text to "Confirm"
+4. However, the dialog is not automatically closed, and when the user clicks it, table population might be triggering another progress dialog
+
+### Fix
+Modified ChestBuddyApp._on_load_finished method to:
+
+1. Call finish_progress() to update the dialog state (100% progress and "Confirm" button)
+2. Schedule an automatic close of the dialog after a short delay (1.5 seconds) using QTimer.singleShot()
+3. Schedule table population after a slightly longer delay (2 seconds) to ensure the dialog is fully closed before the next operation starts
+
+```python
+@Slot(str)
+def _on_load_finished(self, message: str) -> None:
+    """
+    Handle load finished signal.
+
+    Args:
+        message: Completion message
+    """
+    logger.info(f"Load finished: {message}")
+    is_error = "error" in message.lower() or "failed" in message.lower()
+    
+    # First finish the progress with the final message
+    self._progress_controller.finish_progress(message, is_error)
+    
+    # Wait a brief moment for UI to update before closing
+    QTimer.singleShot(1500, self._progress_controller.close_progress)
+    
+    # If it was successful, schedule the data table to be populated
+    if not is_error and self._main_window:
+        QTimer.singleShot(2000, self._main_window.populate_data_table)
+```
+
+### Verification
+Tested the fix by importing a CSV file. Now, the progress dialog shows 100% completion, updates the button text to "Confirm", and then automatically closes after 1.5 seconds without requiring user interaction. The data table is then populated without showing another progress dialog.
+
+### Additional Notes
+This fix improves the user experience by:
+1. Eliminating the need to manually close progress dialogs
+2. Ensuring the UI reflects the loading state clearly
+3. Preventing multiple dialogs from appearing
+4. Maintaining a smooth transition from loading to data display
