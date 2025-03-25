@@ -29,6 +29,7 @@ from chestbuddy.core.controllers import (
     ViewStateController,
     DataViewController,
     ErrorHandlingController,
+    UIStateController,
 )
 from chestbuddy.ui.main_window import MainWindow
 from chestbuddy.utils.config import ConfigManager
@@ -81,23 +82,37 @@ class ChestBuddyApp(QObject):
             # Initialize data model
             self._data_model = ChestDataModel()
 
-            # Create services
-            self._csv_service = CSVService()
-            self._validation_service = ValidationService(self._data_model)
-            self._correction_service = CorrectionService(self._data_model)
-            self._chart_service = ChartService()
-            self._data_manager = DataManager(
-                self._data_model, self._csv_service, self._config_manager
-            )
-
-            # Create controllers
-            self._file_controller = FileOperationsController(
-                self._data_manager, self._config_manager
-            )
-            self._progress_controller = ProgressController()
-            self._view_state_controller = ViewStateController(self._data_model)
-            self._data_view_controller = DataViewController(self._data_model)
+            # Create controllers - create error controller early
             self._error_controller = ErrorHandlingController()
+
+            # Create services
+            try:
+                self._csv_service = CSVService()
+                self._validation_service = ValidationService(self._data_model)
+                self._correction_service = CorrectionService(self._data_model)
+                self._chart_service = ChartService(self._data_model)
+                self._data_manager = DataManager(self._data_model, self._csv_service)
+
+                # Initialize DataManager with config_manager
+                self._data_manager._config = self._config_manager
+            except Exception as e:
+                logger.error(f"Error initializing services: {e}")
+                self._error_controller.handle_exception(e, "Error initializing services")
+                raise
+
+            # Create remaining controllers
+            try:
+                self._file_controller = FileOperationsController(
+                    self._data_manager, self._config_manager
+                )
+                self._progress_controller = ProgressController()
+                self._view_state_controller = ViewStateController(self._data_model)
+                self._data_view_controller = DataViewController(self._data_model)
+                self._ui_state_controller = UIStateController()
+            except Exception as e:
+                logger.error(f"Error initializing controllers: {e}")
+                self._error_controller.handle_exception(e, "Error initializing controllers")
+                raise
 
             # Set up controller relationships
             self._error_controller.set_progress_controller(self._progress_controller)
@@ -115,7 +130,8 @@ class ChestBuddyApp(QObject):
             self._connect_signals()
 
             # Apply application-wide styling
-            apply_application_style()
+            app = QApplication.instance()
+            apply_application_style(app)
 
             logger.info("Application initialized successfully")
         except Exception as e:
@@ -175,7 +191,7 @@ class ChestBuddyApp(QObject):
                 self._progress_controller,
                 self._view_state_controller,
                 self._data_view_controller,
-                self._error_controller,
+                self._ui_state_controller,
             )
 
             # Show the main window

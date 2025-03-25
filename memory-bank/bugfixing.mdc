@@ -17,6 +17,12 @@ alwaysApply: false
   - Set minimum duration to 0 to show immediately
   - Added explicit visibility commands
 
+- ✅ Missing header_action_clicked signal causing app startup error
+  - Fixed by adding header_action_clicked = Signal(str) to the BaseView class
+  - Updated add_header_action method to connect button.clicked to emit this signal
+  - Fixed ValidationViewAdapter and CorrectionViewAdapter to use header_action_clicked instead of action_clicked
+  - This ensures consistent signal handling across all view adapters
+
 - ✅ Data not displaying in table view after loading
   - Fixed the DataView._update_view method to correctly display data from the model
   - Added clearer logs to trace data flow
@@ -269,6 +275,34 @@ Created and implemented `tests/core/controllers/test_view_state_controller_type_
 2. Create dedicated tests for type annotations when working with cross-language bindings like PySide6
 3. Document signal parameter types clearly in docstrings using consistent syntax
 
+## Startup Errors (2025-03-25)
+
+### Issues Fixed
+1. **ChartService initialization error**: The ChartService constructor expected a data_model parameter but none was provided.
+   - Fixed by adding the data_model parameter: `self._chart_service = ChartService(self._data_model)`
+
+2. **DataManager initialization error**: The DataManager was being initialized with a config_manager parameter which wasn't expected by its constructor.
+   - Fixed by removing the extra parameter: `self._data_manager = DataManager(self._data_model, self._csv_service)`
+   - Added a separate line to set the config attribute: `self._data_manager._config = self._config_manager`
+
+3. **Missing data_cleared signal**: The ViewStateController was trying to connect to a data_cleared signal that didn't exist in ChestDataModel.
+   - Fixed by adding the signal to ChestDataModel: `data_cleared = Signal()`
+   - Updated the clear() method to emit this signal: `self.data_cleared.emit()`
+
+4. **QTimer.currentTime() error**: The ViewStateController was using QTimer.currentTime() which doesn't exist.
+   - Fixed by using time.time() instead: `current_time = time.time() * 1000`
+
+5. **apply_application_style missing parameter**: The apply_application_style function was called without its required app parameter.
+   - Fixed by adding the parameter: `app = QApplication.instance(); apply_application_style(app)`
+
+6. **MainWindow initialization error**: The MainWindow was being initialized with an error_controller parameter which wasn't expected in its constructor.
+   - Fixed by removing the parameter from the MainWindow initialization call.
+
+### Known Issues
+- There's a TypeError when trying to use the file dialog: `ConfigManager.set() missing 1 required positional argument: 'value'`
+  - This happens in FileOperationsController.open_file() method when trying to save the last directory.
+  - This is a separate issue not directly related to the startup problems.
+
 # Bug Tracking and Fixing Log
 
 This document tracks bugs, issues, and their solutions in ChestBuddy.
@@ -282,6 +316,10 @@ This document tracks bugs, issues, and their solutions in ChestBuddy.
 2. ~~**Data table not refreshing on new file imports** - When importing new files after an initial import, the data view doesn't properly refresh.~~
    - Status: Fixed
    - Solution: Modified `ChestDataModel` to expose the data hash via a new property (`data_hash`) and updated `DataViewAdapter.needs_refresh()` to check for data content changes using this hash in addition to dimension changes.
+
+3. ~~**Data view not refreshing when selecting another file** - When a user loads data and then selects another file, the table in the Data view didn't update to show the new data, even though the data model was updated correctly.~~
+   - Status: Fixed
+   - Solution: Added a `_needs_population` flag to `DataViewAdapter` to track when the table needs population even if state tracking suggests otherwise and modified `MainWindow._ensure_data_table_populated` to set the `needs_population` flag instead of updating state tracking when not on the Data view.
 
 ## Fixed Issues
 
@@ -359,3 +397,23 @@ In `MainWindow._ensure_data_table_populated`, when the user was not on the Data 
   - chestbuddy/ui/main_window.py (already using correct annotation)
 
 **Impact**: This improves type-checking consistency and prevents potential signal connection issues. We should ensure that all PySide6 signals use Python's built-in types rather than typing equivalents.
+
+## 2024-03-25: CorrectionViewAdapter Refactoring
+
+### Changes Made
+- Updated `CorrectionViewAdapter` to use the `DataViewController` for correction operations
+- Added `set_controller` method to connect signals from the controller to the adapter
+- Connected controller signals (`correction_started`, `correction_completed`, `correction_error`, `operation_error`) to adapter slots
+- Updated action button handlers to delegate to the controller when available
+- Added fallback behavior for when the controller isn't set
+- Updated `MainWindow._create_views` to set the controller for the `CorrectionViewAdapter`
+- Created comprehensive integration tests in `tests/integration/test_correction_view_controller_integration.py`
+
+### Potential Watch Points
+- The `_on_apply_clicked` method still needs to call the underlying tab's `_apply_correction` method to get the necessary parameters for the correction operation, as the controller doesn't have direct access to the UI state. This is less than ideal, but necessary due to the current structure.
+- If the button functionality in `CorrectionTab` changes, we'll need to update the corresponding methods in `CorrectionViewAdapter`.
+- The integration of the controller with the adapter introduces additional signal connections that may need to be disconnected properly when the components are destroyed.
+
+### Next Integration Steps
+- Complete the refactoring of `ChartViewAdapter` to use the `ChartController` in a similar way.
+- Consider further refactoring the correction UI to eliminate the need to call the tab's methods directly.

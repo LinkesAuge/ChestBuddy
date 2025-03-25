@@ -34,6 +34,7 @@ class ChestDataModel(QObject):
         data_changed (Signal): Signal emitted when the data is changed.
         validation_changed (Signal): Signal emitted when validation status changes.
         correction_applied (Signal): Signal emitted when corrections are applied.
+        data_cleared (Signal): Signal emitted when data is cleared.
 
     Implementation Notes:
         - Uses pandas DataFrame as the primary data structure
@@ -45,6 +46,7 @@ class ChestDataModel(QObject):
     data_changed = Signal()
     validation_changed = Signal()
     correction_applied = Signal()
+    data_cleared = Signal()
 
     # Define expected columns
     EXPECTED_COLUMNS = ["DATE", "PLAYER", "SOURCE", "CHEST", "SCORE", "CLAN"]
@@ -153,6 +155,8 @@ class ChestDataModel(QObject):
         self._data = pd.DataFrame(columns=self.EXPECTED_COLUMNS)
         self._validation_status = pd.DataFrame()
         self._correction_status = pd.DataFrame()
+        # Emit data_cleared signal
+        self.data_cleared.emit()
         self._notify_change()
 
     def _notify_change(self) -> None:

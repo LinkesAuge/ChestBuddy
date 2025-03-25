@@ -217,6 +217,9 @@ class FileOperationsController(QObject):
     def _load_recent_files(self):
         """Load recent files from config."""
         recent_files = self._config_manager.get("recent_files", [])
+        # Handle case where config returns None
+        if recent_files is None:
+            recent_files = []
         # Filter out files that don't exist
         self._recent_files = [f for f in recent_files if Path(f).exists()]
         logger.debug(f"Loaded {len(self._recent_files)} recent files from config")

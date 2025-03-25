@@ -117,6 +117,9 @@ class BaseView(QWidget):
     This provides common structure and functionality for all views.
     """
 
+    # Define signals
+    header_action_clicked = Signal(str)  # Action ID
+
     def __init__(self, title, parent=None):
         """
         Initialize the base view.
@@ -184,7 +187,12 @@ class BaseView(QWidget):
         Returns:
             QPushButton: The created button
         """
-        return self._header.add_action_button(name, text, button_type)
+        button = self._header.add_action_button(name, text, button_type)
+
+        # Connect the button to emit the header_action_clicked signal with the action ID
+        button.clicked.connect(lambda: self.header_action_clicked.emit(name))
+
+        return button
 
     def get_content_widget(self):
         """

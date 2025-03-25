@@ -4,6 +4,7 @@ data_view_adapter.py
 Description: Adapter to integrate the existing DataView with the new BaseView structure
 Usage:
     data_view = DataViewAdapter(data_model)
+    data_view.set_controller(data_view_controller)
     main_window.add_view(data_view)
 """
 
@@ -12,6 +13,7 @@ from PySide6.QtWidgets import QWidget, QVBoxLayout
 import time
 
 from chestbuddy.core.models import ChestDataModel
+from chestbuddy.core.controllers.data_view_controller import DataViewController
 from chestbuddy.ui.data_view import DataView
 from chestbuddy.ui.views.base_view import BaseView
 
@@ -23,10 +25,12 @@ class DataViewAdapter(BaseView):
     Attributes:
         data_model (ChestDataModel): The data model containing chest data
         data_view (DataView): The wrapped DataView instance
+        _controller (DataViewController): The controller for data view operations
 
     Implementation Notes:
         - Inherits from BaseView to maintain UI consistency
         - Wraps the existing DataView component
+        - Uses DataViewController for business logic operations
         - Provides the same functionality as DataView but with the new UI styling
     """
 
@@ -44,12 +48,15 @@ class DataViewAdapter(BaseView):
         """
         # Store references
         self._data_model = data_model
+        self._controller = None
 
         # State tracking to prevent unnecessary refreshes
         self._last_data_state = {
             "row_count": 0,
             "column_count": 0,
-            "data_hash": self._data_model.data_hash,
+            "data_hash": self._data_model.data_hash
+            if hasattr(self._data_model, "data_hash")
+            else "",
             "last_update_time": 0,
         }
 
@@ -62,6 +69,32 @@ class DataViewAdapter(BaseView):
         # Initialize the base view
         super().__init__("Data View", parent)
         self.setObjectName("DataViewAdapter")
+
+    def set_controller(self, controller: DataViewController) -> None:
+        """
+        Set the data view controller for this adapter.
+
+        Args:
+            controller: The DataViewController instance to use
+        """
+        self._controller = controller
+
+        # Register this view with the controller
+        if self._controller:
+            self._controller.set_view(self)
+
+            # Connect controller signals
+            self._controller.validation_started.connect(self._on_validation_started)
+            self._controller.validation_completed.connect(self._on_validation_completed)
+            self._controller.correction_started.connect(self._on_correction_started)
+            self._controller.correction_completed.connect(self._on_correction_completed)
+            self._controller.operation_error.connect(self._on_operation_error)
+            self._controller.table_populated.connect(self._on_table_populated)
+
+            # Connect data model signals through the controller
+            self._controller.data_changed.connect(self._on_data_changed)
+
+            print("DataViewAdapter: Controller set and signals connected")
 
     @property
     def needs_population(self) -> bool:
@@ -86,25 +119,106 @@ class DataViewAdapter(BaseView):
         # First call the parent class's _connect_signals method
         super()._connect_signals()
 
-        # Connect DataView's action buttons to our signals
+        # Connect DataView's action buttons to our controller
         try:
             # Get action toolbar from DataView
             import_button = self._data_view._action_toolbar.get_button_by_name("import")
             export_button = self._data_view._action_toolbar.get_button_by_name("export")
+            filter_button = self._data_view._action_toolbar.get_button_by_name("apply_filter")
+            clear_filter_button = self._data_view._action_toolbar.get_button_by_name("clear_filter")
 
             if import_button:
                 import_button.clicked.disconnect()  # Disconnect any existing connections
-                import_button.clicked.connect(self.import_requested.emit)
+                import_button.clicked.connect(self._on_import_requested)
 
             if export_button:
                 export_button.clicked.disconnect()  # Disconnect any existing connections
-                export_button.clicked.connect(self.export_requested.emit)
+                export_button.clicked.connect(self._on_export_requested)
 
-            # Connect data model signals to update our state tracking
-            self._data_model.data_changed.connect(self._on_data_changed)
+            if filter_button and self._controller:
+                filter_button.clicked.disconnect()  # Disconnect any existing connections
+                filter_button.clicked.connect(self._on_apply_filter_clicked)
+
+            if clear_filter_button and self._controller:
+                clear_filter_button.clicked.disconnect()  # Disconnect any existing connections
+                clear_filter_button.clicked.connect(self._on_clear_filter_clicked)
+
+            # Connect data model signals to update our state tracking through controller
+            if hasattr(self._data_model, "data_changed"):
+                self._data_model.data_changed.connect(self._on_data_changed)
         except (AttributeError, Exception) as e:
             # Handle the case where the DataView structure might be different
             print(f"Error connecting DataView signals: {e}")
+
+    def _on_import_requested(self):
+        """Handle import button click."""
+        self.import_requested.emit()
+
+    def _on_export_requested(self):
+        """Handle export button click."""
+        self.export_requested.emit()
+
+    def _on_apply_filter_clicked(self):
+        """Handle filter button click using controller."""
+        if self._controller:
+            # Get filter parameters from the data view
+            filter_text = ""
+            column = ""
+
+            if hasattr(self._data_view, "_filter_bar"):
+                filter_text = self._data_view._filter_bar.get_filter_text()
+                column = self._data_view._filter_bar.get_selected_column()
+
+            # Apply filter using controller
+            self._controller.apply_filter(column, filter_text)
+
+    def _on_clear_filter_clicked(self):
+        """Handle clear filter button click using controller."""
+        if self._controller:
+            self._controller.clear_filter()
+
+    @Slot()
+    def _on_validation_started(self):
+        """Handle validation started event."""
+        # Update UI to show validation in progress
+        if hasattr(self, "_set_header_status"):
+            self._set_header_status("Validating data...")
+
+    @Slot(object)
+    def _on_validation_completed(self, results):
+        """Handle validation completed event."""
+        # Update UI to show validation results
+        if hasattr(self, "_set_header_status"):
+            issue_count = len(results) if results else 0
+            self._set_header_status(f"Validation complete: {issue_count} issues found")
+
+    @Slot()
+    def _on_correction_started(self):
+        """Handle correction started event."""
+        # Update UI to show correction in progress
+        if hasattr(self, "_set_header_status"):
+            self._set_header_status("Applying corrections...")
+
+    @Slot(str, int)
+    def _on_correction_completed(self, strategy, affected_rows):
+        """Handle correction completed event."""
+        # Update UI to show correction results
+        if hasattr(self, "_set_header_status"):
+            self._set_header_status(f"Corrections applied: {affected_rows} rows affected")
+
+    @Slot(str)
+    def _on_operation_error(self, error_message):
+        """Handle operation error event."""
+        # Update UI to show error
+        if hasattr(self, "_set_header_status"):
+            self._set_header_status(f"Error: {error_message}")
+
+    @Slot(int)
+    def _on_table_populated(self, row_count):
+        """Handle table populated event."""
+        # Update UI to show table populated
+        if hasattr(self, "_set_header_status"):
+            self._set_header_status(f"Data loaded: {row_count} rows")
 
     def _add_action_buttons(self):
         """Add action buttons to the header."""
@@ -123,14 +237,18 @@ class DataViewAdapter(BaseView):
             self._last_data_state = {
                 "row_count": len(self._data_model.data),
                 "column_count": len(self._data_model.column_names),
-                "data_hash": self._data_model.data_hash,
+                "data_hash": self._data_model.data_hash
+                if hasattr(self._data_model, "data_hash")
+                else "",
                 "last_update_time": int(time.time() * 1000),
             }
         else:
             self._last_data_state = {
                 "row_count": 0,
                 "column_count": 0,
-                "data_hash": self._data_model.data_hash,
+                "data_hash": self._data_model.data_hash
+                if hasattr(self._data_model, "data_hash")
+                else "",
                 "last_update_time": int(time.time() * 1000),
             }
 
@@ -141,14 +259,20 @@ class DataViewAdapter(BaseView):
         Returns:
             bool: True if the view needs to be refreshed, False otherwise
         """
-        # Check if data has changed by comparing with our tracked state
+        # If we have a controller, use it to determine if refresh is needed
+        if self._controller:
+            return self._controller.needs_refresh()
+
+        # Fall back to old implementation if no controller
         current_state = {"row_count": 0, "column_count": 0, "data_hash": ""}
 
         if not self._data_model.is_empty:
             current_state = {
                 "row_count": len(self._data_model.data),
                 "column_count": len(self._data_model.column_names),
-                "data_hash": self._data_model.data_hash,
+                "data_hash": self._data_model.data_hash
+                if hasattr(self._data_model, "data_hash")
+                else "",
             }
 
         # Check for dimension changes or data content changes via hash
@@ -175,7 +299,12 @@ class DataViewAdapter(BaseView):
         Refresh the data view only if the data has changed since the last refresh.
         This prevents unnecessary table repopulation when switching views.
         """
-        # Use the needs_refresh method to check if we need to update
+        # If we have a controller, use it to refresh
+        if self._controller:
+            self._controller.refresh_data()
+            return
+
+        # Fall back to old implementation if no controller
         if self.needs_refresh():
             print(f"DataViewAdapter.refresh: Data changed, updating view.")
             if hasattr(self._data_view, "_update_view"):
@@ -191,6 +320,12 @@ class DataViewAdapter(BaseView):
         Explicitly populate the table with current data.
         This should be called once after data loading is complete.
         """
+        # If we have a controller, use it to populate the table
+        if self._controller:
+            self._controller.populate_table()
+            return
+
+        # Fall back to old implementation if no controller
         if hasattr(self._data_view, "populate_table"):
             self._data_view.populate_table()
         else:
@@ -202,10 +337,14 @@ class DataViewAdapter(BaseView):
 
     def enable_auto_update(self) -> None:
         """Enable automatic table updates on data changes."""
-        if hasattr(self._data_view, "enable_auto_update"):
+        if self._controller:
+            self._controller.enable_auto_update()
+        elif hasattr(self._data_view, "enable_auto_update"):
             self._data_view.enable_auto_update()
 
     def disable_auto_update(self) -> None:
         """Disable automatic table updates on data changes."""
-        if hasattr(self._data_view, "disable_auto_update"):
+        if self._controller:
+            self._controller.disable_auto_update()
+        elif hasattr(self._data_view, "disable_auto_update"):
             self._data_view.disable_auto_update()

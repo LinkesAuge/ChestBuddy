@@ -9,6 +9,7 @@ Usage:
 
 import logging
 from typing import Optional, Any, Callable, Tuple
+import time
 
 from PySide6.QtCore import QObject, Signal, Slot, Qt, QTimer, QSettings
 from PySide6.QtWidgets import QStackedWidget, QWidget, QMessageBox
@@ -115,7 +116,15 @@ class ViewStateController(QObject):
         """Connect to relevant signals."""
         # Connect to data model signals to track data state
         self._data_model.data_changed.connect(self._on_data_changed)
-        self._data_model.data_cleared.connect(self._on_data_cleared)
+
+        # Check if data_cleared signal exists, otherwise use data_changed
+        if hasattr(self._data_model, "data_cleared"):
+            self._data_model.data_cleared.connect(self._on_data_cleared)
+        else:
+            logger.warning(
+                "data_cleared signal not found in data model, using data_changed instead"
+            )
+            # We'll handle data clearing in the data_changed handler
 
     def set_ui_components(
         self, views: dict[str, QWidget], sidebar: SidebarNavigation, content_stack: QStackedWidget
@@ -334,7 +343,7 @@ class ViewStateController(QObject):
         Update availability of all views based on their dependencies and prerequisites.
         """
         # Don't update if throttled to avoid UI flicker
-        current_time = QTimer.currentTime().msecsSinceStartOfDay()
+        current_time = time.time() * 1000  # Use time.time() instead of QTimer.currentTime()
         if self._update_throttled and (
             current_time - self._last_throttle_time < self._throttle_interval_ms
         ):

@@ -15,3 +15,633 @@
 2025-03-25 05:54:58,588 - __main__ - INFO - Logging initialized
 2025-03-25 05:54:58,590 - chestbuddy.core.models.chest_data_model - DEBUG - Updated data hash to: 1d4f9f63b040166415e97d034fc84c19
 2025-03-25 05:54:58,590 - __main__ - CRITICAL - Failed to initialize application: ChartService.__init__() missing 1 required positional argument: 'data_model'
+2025-03-25 05:57:32,547 - __main__ - INFO - Logging initialized
+2025-03-25 05:57:32,549 - chestbuddy.core.models.chest_data_model - DEBUG - Updated data hash to: 1d4f9f63b040166415e97d034fc84c19
+2025-03-25 05:57:32,550 - __main__ - CRITICAL - Failed to initialize application: DataManager.__init__() takes 3 positional arguments but 4 were given
+2025-03-25 05:57:32,551 - chestbuddy.core.controllers.error_handling_controller - ERROR - Exception: Failed to initialize application: DataManager.__init__() takes 3 positional arguments but 4 were given
+Traceback (most recent call last):
+  File "D:\Projekte\ChestBuddy\chestbuddy\app.py", line 92, in _initialize_application
+    self._data_manager = DataManager(
+                         ^^^^^^^^^^^^
+TypeError: DataManager.__init__() takes 3 positional arguments but 4 were given
+
+2025-03-25 05:57:32,551 - chestbuddy.core.controllers.error_handling_controller - CRITICAL - Failed to initialize application: DataManager.__init__() takes 3 positional arguments but 4 were given
+Details: Traceback (most recent call last):
+  File "D:\Projekte\ChestBuddy\chestbuddy\app.py", line 92, in _initialize_application
+    self._data_manager = DataManager(
+                         ^^^^^^^^^^^^
+TypeError: DataManager.__init__() takes 3 positional arguments but 4 were given
+
+2025-03-25 05:57:57,389 - __main__ - INFO - Logging initialized
+2025-03-25 05:57:57,391 - chestbuddy.core.models.chest_data_model - DEBUG - Updated data hash to: 1d4f9f63b040166415e97d034fc84c19
+2025-03-25 05:57:57,391 - __main__ - CRITICAL - Failed to initialize application: 'NoneType' object is not iterable
+2025-03-25 05:57:57,392 - chestbuddy.core.controllers.error_handling_controller - ERROR - Exception: Failed to initialize application: 'NoneType' object is not iterable
+Traceback (most recent call last):
+  File "D:\Projekte\ChestBuddy\chestbuddy\app.py", line 95, in _initialize_application
+    self._file_controller = FileOperationsController(
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projekte\ChestBuddy\chestbuddy\core\controllers\file_operations_controller.py", line 59, in __init__
+    self._load_recent_files()
+  File "D:\Projekte\ChestBuddy\chestbuddy\core\controllers\file_operations_controller.py", line 221, in _load_recent_files
+    self._recent_files = [f for f in recent_files if Path(f).exists()]
+                                     ^^^^^^^^^^^^
+TypeError: 'NoneType' object is not iterable
+
+2025-03-25 05:57:57,393 - chestbuddy.core.controllers.error_handling_controller - CRITICAL - Failed to initialize application: 'NoneType' object is not iterable
+Details: Traceback (most recent call last):
+  File "D:\Projekte\ChestBuddy\chestbuddy\app.py", line 95, in _initialize_application
+    self._file_controller = FileOperationsController(
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projekte\ChestBuddy\chestbuddy\core\controllers\file_operations_controller.py", line 59, in __init__
+    self._load_recent_files()
+  File "D:\Projekte\ChestBuddy\chestbuddy\core\controllers\file_operations_controller.py", line 221, in _load_recent_files
+    self._recent_files = [f for f in recent_files if Path(f).exists()]
+                                     ^^^^^^^^^^^^
+TypeError: 'NoneType' object is not iterable
+
+2025-03-25 05:57:59,847 - chestbuddy.utils.background_processing - DEBUG - Qt C++ object already deleted during thread cleanup
+2025-03-25 05:58:19,804 - __main__ - INFO - Logging initialized
+2025-03-25 05:58:19,806 - chestbuddy.core.models.chest_data_model - DEBUG - Updated data hash to: 1d4f9f63b040166415e97d034fc84c19
+2025-03-25 05:58:19,806 - chestbuddy.core.controllers.file_operations_controller - DEBUG - Loaded 0 recent files from config
+2025-03-25 05:58:19,807 - __main__ - CRITICAL - Failed to initialize application: 'ChestDataModel' object has no attribute 'data_cleared'
+2025-03-25 05:58:19,808 - chestbuddy.core.controllers.error_handling_controller - ERROR - Exception: Failed to initialize application: 'ChestDataModel' object has no attribute 'data_cleared'
+Traceback (most recent call last):
+  File "D:\Projekte\ChestBuddy\chestbuddy\app.py", line 99, in _initialize_application
+    self._view_state_controller = ViewStateController(self._data_model)
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projekte\ChestBuddy\chestbuddy\core\controllers\view_state_controller.py", line 112, in __init__
+    self._connect_signals()
+  File "D:\Projekte\ChestBuddy\chestbuddy\core\controllers\view_state_controller.py", line 118, in _connect_signals
+    self._data_model.data_cleared.connect(self._on_data_cleared)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChestDataModel' object has no attribute 'data_cleared'. Did you mean: 'data_changed'?
+
+2025-03-25 05:58:19,809 - chestbuddy.core.controllers.error_handling_controller - CRITICAL - Failed to initialize application: 'ChestDataModel' object has no attribute 'data_cleared'
+Details: Traceback (most recent call last):
+  File "D:\Projekte\ChestBuddy\chestbuddy\app.py", line 99, in _initialize_application
+    self._view_state_controller = ViewStateController(self._data_model)
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projekte\ChestBuddy\chestbuddy\core\controllers\view_state_controller.py", line 112, in __init__
+    self._connect_signals()
+  File "D:\Projekte\ChestBuddy\chestbuddy\core\controllers\view_state_controller.py", line 118, in _connect_signals
+    self._data_model.data_cleared.connect(self._on_data_cleared)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChestDataModel' object has no attribute 'data_cleared'. Did you mean: 'data_changed'?
+
+2025-03-25 05:58:40,417 - chestbuddy.utils.background_processing - DEBUG - Qt C++ object already deleted during thread cleanup
+2025-03-25 05:58:41,101 - __main__ - INFO - Logging initialized
+2025-03-25 05:58:41,103 - chestbuddy.core.models.chest_data_model - DEBUG - Updated data hash to: 1d4f9f63b040166415e97d034fc84c19
+2025-03-25 05:58:41,104 - chestbuddy.core.controllers.file_operations_controller - DEBUG - Loaded 0 recent files from config
+2025-03-25 05:58:41,104 - __main__ - ERROR - Error initializing controllers: 'ChestDataModel' object has no attribute 'data_cleared'
+2025-03-25 05:58:41,106 - chestbuddy.core.controllers.error_handling_controller - ERROR - Exception: Error initializing controllers: 'ChestDataModel' object has no attribute 'data_cleared'
+Traceback (most recent call last):
+  File "D:\Projekte\ChestBuddy\chestbuddy\app.py", line 108, in _initialize_application
+    self._view_state_controller = ViewStateController(self._data_model)
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projekte\ChestBuddy\chestbuddy\core\controllers\view_state_controller.py", line 112, in __init__
+    self._connect_signals()
+  File "D:\Projekte\ChestBuddy\chestbuddy\core\controllers\view_state_controller.py", line 118, in _connect_signals
+    self._data_model.data_cleared.connect(self._on_data_cleared)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChestDataModel' object has no attribute 'data_cleared'. Did you mean: 'data_changed'?
+
+2025-03-25 05:58:41,107 - chestbuddy.core.controllers.error_handling_controller - CRITICAL - Error initializing controllers: 'ChestDataModel' object has no attribute 'data_cleared'
+Details: Traceback (most recent call last):
+  File "D:\Projekte\ChestBuddy\chestbuddy\app.py", line 108, in _initialize_application
+    self._view_state_controller = ViewStateController(self._data_model)
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projekte\ChestBuddy\chestbuddy\core\controllers\view_state_controller.py", line 112, in __init__
+    self._connect_signals()
+  File "D:\Projekte\ChestBuddy\chestbuddy\core\controllers\view_state_controller.py", line 118, in _connect_signals
+    self._data_model.data_cleared.connect(self._on_data_cleared)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChestDataModel' object has no attribute 'data_cleared'. Did you mean: 'data_changed'?
+
+2025-03-25 05:58:42,683 - __main__ - CRITICAL - Failed to initialize application: 'ChestDataModel' object has no attribute 'data_cleared'
+2025-03-25 05:58:42,684 - chestbuddy.core.controllers.error_handling_controller - ERROR - Exception: Failed to initialize application: 'ChestDataModel' object has no attribute 'data_cleared'
+Traceback (most recent call last):
+  File "D:\Projekte\ChestBuddy\chestbuddy\app.py", line 108, in _initialize_application
+    self._view_state_controller = ViewStateController(self._data_model)
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projekte\ChestBuddy\chestbuddy\core\controllers\view_state_controller.py", line 112, in __init__
+    self._connect_signals()
+  File "D:\Projekte\ChestBuddy\chestbuddy\core\controllers\view_state_controller.py", line 118, in _connect_signals
+    self._data_model.data_cleared.connect(self._on_data_cleared)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChestDataModel' object has no attribute 'data_cleared'. Did you mean: 'data_changed'?
+
+2025-03-25 05:58:42,685 - chestbuddy.core.controllers.error_handling_controller - CRITICAL - Failed to initialize application: 'ChestDataModel' object has no attribute 'data_cleared'
+Details: Traceback (most recent call last):
+  File "D:\Projekte\ChestBuddy\chestbuddy\app.py", line 108, in _initialize_application
+    self._view_state_controller = ViewStateController(self._data_model)
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projekte\ChestBuddy\chestbuddy\core\controllers\view_state_controller.py", line 112, in __init__
+    self._connect_signals()
+  File "D:\Projekte\ChestBuddy\chestbuddy\core\controllers\view_state_controller.py", line 118, in _connect_signals
+    self._data_model.data_cleared.connect(self._on_data_cleared)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChestDataModel' object has no attribute 'data_cleared'. Did you mean: 'data_changed'?
+
+2025-03-25 05:58:43,577 - chestbuddy.utils.background_processing - DEBUG - Qt C++ object already deleted during thread cleanup
+2025-03-25 05:58:58,325 - __main__ - INFO - Logging initialized
+2025-03-25 05:58:58,327 - chestbuddy.core.models.chest_data_model - DEBUG - Updated data hash to: 1d4f9f63b040166415e97d034fc84c19
+2025-03-25 05:58:58,327 - chestbuddy.core.controllers.file_operations_controller - DEBUG - Loaded 0 recent files from config
+2025-03-25 05:58:58,327 - chestbuddy.core.controllers.view_state_controller - WARNING - data_cleared signal not found in data model, using data_changed instead
+2025-03-25 05:58:58,328 - chestbuddy.core.controllers.view_state_controller - INFO - Data view controller set and signals connected
+2025-03-25 05:58:58,355 - __main__ - CRITICAL - Failed to create UI: 'PySide6.QtWidgets.QMainWindow.__init__' called with wrong argument types:
+  PySide6.QtWidgets.QMainWindow.__init__(ErrorHandlingController)
+Supported signatures:
+  PySide6.QtWidgets.QMainWindow.__init__(Optional[PySide6.QtWidgets.QWidget] = None, PySide6.QtCore.Qt.WindowType = Default(Qt.WindowFlags), *, Optional[PySide6.QtCore.QSize] = None, Optional[PySide6.QtCore.Qt.ToolButtonStyle] = None, Optional[bool] = None, Optional[bool] = None, Optional[PySide6.QtWidgets.QTabWidget.TabShape] = None, Optional[bool] = None, Optional[PySide6.QtWidgets.QMainWindow.DockOption] = None, Optional[bool] = None)
+2025-03-25 05:58:58,356 - chestbuddy.core.controllers.error_handling_controller - ERROR - Exception: Failed to create UI: 'PySide6.QtWidgets.QMainWindow.__init__' called with wrong argument types:
+  PySide6.QtWidgets.QMainWindow.__init__(ErrorHandlingController)
+Supported signatures:
+  PySide6.QtWidgets.QMainWindow.__init__(Optional[PySide6.QtWidgets.QWidget] = None, PySide6.QtCore.Qt.WindowType = Default(Qt.WindowFlags), *, Optional[PySide6.QtCore.QSize] = None, Optional[PySide6.QtCore.Qt.ToolButtonStyle] = None, Optional[bool] = None, Optional[bool] = None, Optional[PySide6.QtWidgets.QTabWidget.TabShape] = None, Optional[bool] = None, Optional[PySide6.QtWidgets.QMainWindow.DockOption] = None, Optional[bool] = None)
+Traceback (most recent call last):
+  File "D:\Projekte\ChestBuddy\chestbuddy\app.py", line 180, in _create_ui
+    self._main_window = MainWindow(
+                        ^^^^^^^^^^^
+  File "D:\Projekte\ChestBuddy\chestbuddy\ui\main_window.py", line 133, in __init__
+    super().__init__(parent)
+TypeError: 'PySide6.QtWidgets.QMainWindow.__init__' called with wrong argument types:
+  PySide6.QtWidgets.QMainWindow.__init__(ErrorHandlingController)
+Supported signatures:
+  PySide6.QtWidgets.QMainWindow.__init__(Optional[PySide6.QtWidgets.QWidget] = None, PySide6.QtCore.Qt.WindowType = Default(Qt.WindowFlags), *, Optional[PySide6.QtCore.QSize] = None, Optional[PySide6.QtCore.Qt.ToolButtonStyle] = None, Optional[bool] = None, Optional[bool] = None, Optional[PySide6.QtWidgets.QTabWidget.TabShape] = None, Optional[bool] = None, Optional[PySide6.QtWidgets.QMainWindow.DockOption] = None, Optional[bool] = None)
+
+2025-03-25 05:58:58,358 - chestbuddy.core.controllers.error_handling_controller - CRITICAL - Failed to create UI: 'PySide6.QtWidgets.QMainWindow.__init__' called with wrong argument types:
+  PySide6.QtWidgets.QMainWindow.__init__(ErrorHandlingController)
+Supported signatures:
+  PySide6.QtWidgets.QMainWindow.__init__(Optional[PySide6.QtWidgets.QWidget] = None, PySide6.QtCore.Qt.WindowType = Default(Qt.WindowFlags), *, Optional[PySide6.QtCore.QSize] = None, Optional[PySide6.QtCore.Qt.ToolButtonStyle] = None, Optional[bool] = None, Optional[bool] = None, Optional[PySide6.QtWidgets.QTabWidget.TabShape] = None, Optional[bool] = None, Optional[PySide6.QtWidgets.QMainWindow.DockOption] = None, Optional[bool] = None)
+Details: Traceback (most recent call last):
+  File "D:\Projekte\ChestBuddy\chestbuddy\app.py", line 180, in _create_ui
+    self._main_window = MainWindow(
+                        ^^^^^^^^^^^
+  File "D:\Projekte\ChestBuddy\chestbuddy\ui\main_window.py", line 133, in __init__
+    super().__init__(parent)
+TypeError: 'PySide6.QtWidgets.QMainWindow.__init__' called with wrong argument types:
+  PySide6.QtWidgets.QMainWindow.__init__(ErrorHandlingController)
+Supported signatures:
+  PySide6.QtWidgets.QMainWindow.__init__(Optional[PySide6.QtWidgets.QWidget] = None, PySide6.QtCore.Qt.WindowType = Default(Qt.WindowFlags), *, Optional[PySide6.QtCore.QSize] = None, Optional[PySide6.QtCore.Qt.ToolButtonStyle] = None, Optional[bool] = None, Optional[bool] = None, Optional[PySide6.QtWidgets.QTabWidget.TabShape] = None, Optional[bool] = None, Optional[PySide6.QtWidgets.QMainWindow.DockOption] = None, Optional[bool] = None)
+
+2025-03-25 05:59:10,144 - chestbuddy.utils.background_processing - DEBUG - Qt C++ object already deleted during thread cleanup
+2025-03-25 05:59:29,740 - __main__ - INFO - Logging initialized
+2025-03-25 05:59:29,743 - chestbuddy.core.models.chest_data_model - DEBUG - Updated data hash to: 1d4f9f63b040166415e97d034fc84c19
+2025-03-25 05:59:29,743 - chestbuddy.core.controllers.file_operations_controller - DEBUG - Loaded 0 recent files from config
+2025-03-25 05:59:29,743 - chestbuddy.core.controllers.view_state_controller - INFO - Data view controller set and signals connected
+2025-03-25 05:59:29,768 - __main__ - CRITICAL - Failed to create UI: 'PySide6.QtWidgets.QMainWindow.__init__' called with wrong argument types:
+  PySide6.QtWidgets.QMainWindow.__init__(ErrorHandlingController)
+Supported signatures:
+  PySide6.QtWidgets.QMainWindow.__init__(Optional[PySide6.QtWidgets.QWidget] = None, PySide6.QtCore.Qt.WindowType = Default(Qt.WindowFlags), *, Optional[PySide6.QtCore.QSize] = None, Optional[PySide6.QtCore.Qt.ToolButtonStyle] = None, Optional[bool] = None, Optional[bool] = None, Optional[PySide6.QtWidgets.QTabWidget.TabShape] = None, Optional[bool] = None, Optional[PySide6.QtWidgets.QMainWindow.DockOption] = None, Optional[bool] = None)
+2025-03-25 05:59:29,769 - chestbuddy.core.controllers.error_handling_controller - ERROR - Exception: Failed to create UI: 'PySide6.QtWidgets.QMainWindow.__init__' called with wrong argument types:
+  PySide6.QtWidgets.QMainWindow.__init__(ErrorHandlingController)
+Supported signatures:
+  PySide6.QtWidgets.QMainWindow.__init__(Optional[PySide6.QtWidgets.QWidget] = None, PySide6.QtCore.Qt.WindowType = Default(Qt.WindowFlags), *, Optional[PySide6.QtCore.QSize] = None, Optional[PySide6.QtCore.Qt.ToolButtonStyle] = None, Optional[bool] = None, Optional[bool] = None, Optional[PySide6.QtWidgets.QTabWidget.TabShape] = None, Optional[bool] = None, Optional[PySide6.QtWidgets.QMainWindow.DockOption] = None, Optional[bool] = None)
+Traceback (most recent call last):
+  File "D:\Projekte\ChestBuddy\chestbuddy\app.py", line 180, in _create_ui
+    self._main_window = MainWindow(
+                        ^^^^^^^^^^^
+  File "D:\Projekte\ChestBuddy\chestbuddy\ui\main_window.py", line 133, in __init__
+    super().__init__(parent)
+TypeError: 'PySide6.QtWidgets.QMainWindow.__init__' called with wrong argument types:
+  PySide6.QtWidgets.QMainWindow.__init__(ErrorHandlingController)
+Supported signatures:
+  PySide6.QtWidgets.QMainWindow.__init__(Optional[PySide6.QtWidgets.QWidget] = None, PySide6.QtCore.Qt.WindowType = Default(Qt.WindowFlags), *, Optional[PySide6.QtCore.QSize] = None, Optional[PySide6.QtCore.Qt.ToolButtonStyle] = None, Optional[bool] = None, Optional[bool] = None, Optional[PySide6.QtWidgets.QTabWidget.TabShape] = None, Optional[bool] = None, Optional[PySide6.QtWidgets.QMainWindow.DockOption] = None, Optional[bool] = None)
+
+2025-03-25 05:59:29,771 - chestbuddy.core.controllers.error_handling_controller - CRITICAL - Failed to create UI: 'PySide6.QtWidgets.QMainWindow.__init__' called with wrong argument types:
+  PySide6.QtWidgets.QMainWindow.__init__(ErrorHandlingController)
+Supported signatures:
+  PySide6.QtWidgets.QMainWindow.__init__(Optional[PySide6.QtWidgets.QWidget] = None, PySide6.QtCore.Qt.WindowType = Default(Qt.WindowFlags), *, Optional[PySide6.QtCore.QSize] = None, Optional[PySide6.QtCore.Qt.ToolButtonStyle] = None, Optional[bool] = None, Optional[bool] = None, Optional[PySide6.QtWidgets.QTabWidget.TabShape] = None, Optional[bool] = None, Optional[PySide6.QtWidgets.QMainWindow.DockOption] = None, Optional[bool] = None)
+Details: Traceback (most recent call last):
+  File "D:\Projekte\ChestBuddy\chestbuddy\app.py", line 180, in _create_ui
+    self._main_window = MainWindow(
+                        ^^^^^^^^^^^
+  File "D:\Projekte\ChestBuddy\chestbuddy\ui\main_window.py", line 133, in __init__
+    super().__init__(parent)
+TypeError: 'PySide6.QtWidgets.QMainWindow.__init__' called with wrong argument types:
+  PySide6.QtWidgets.QMainWindow.__init__(ErrorHandlingController)
+Supported signatures:
+  PySide6.QtWidgets.QMainWindow.__init__(Optional[PySide6.QtWidgets.QWidget] = None, PySide6.QtCore.Qt.WindowType = Default(Qt.WindowFlags), *, Optional[PySide6.QtCore.QSize] = None, Optional[PySide6.QtCore.Qt.ToolButtonStyle] = None, Optional[bool] = None, Optional[bool] = None, Optional[PySide6.QtWidgets.QTabWidget.TabShape] = None, Optional[bool] = None, Optional[PySide6.QtWidgets.QMainWindow.DockOption] = None, Optional[bool] = None)
+
+2025-03-25 05:59:32,496 - chestbuddy.utils.background_processing - DEBUG - Qt C++ object already deleted during thread cleanup
+2025-03-25 05:59:52,264 - __main__ - INFO - Logging initialized
+2025-03-25 05:59:52,266 - chestbuddy.core.models.chest_data_model - DEBUG - Updated data hash to: 1d4f9f63b040166415e97d034fc84c19
+2025-03-25 05:59:52,267 - chestbuddy.core.controllers.file_operations_controller - DEBUG - Loaded 0 recent files from config
+2025-03-25 05:59:52,267 - chestbuddy.core.controllers.view_state_controller - INFO - Data view controller set and signals connected
+2025-03-25 05:59:52,268 - chestbuddy.ui.main_window - DEBUG - MainWindow initialized with data_manager
+2025-03-25 05:59:52,679 - chestbuddy.ui.data_view - INFO - Installed event filter on table view
+2025-03-25 05:59:52,681 - chestbuddy.ui.data_view - INFO - Registered Ctrl+C shortcut for copying (table-specific)
+2025-03-25 05:59:52,681 - chestbuddy.ui.data_view - INFO - Registered widget-level Ctrl+V shortcut for pasting (widget hierarchy)
+2025-03-25 05:59:52,690 - chestbuddy.ui.data_view - INFO - Starting _update_view method
+2025-03-25 05:59:52,690 - chestbuddy.ui.data_view - INFO - Data model is empty, no data to display
+2025-03-25 05:59:52,708 - chestbuddy.ui.correction_tab - DEBUG - Skipping CorrectionTab._update_view call - recursive or uninitialized UI
+2025-03-25 05:59:52,726 - chestbuddy.core.controllers.view_state_controller - INFO - Registering dependencies for view 'Validation': {'Data'}
+2025-03-25 05:59:52,726 - __main__ - CRITICAL - Failed to create UI: type object 'PySide6.QtCore.QTimer' has no attribute 'currentTime'
+2025-03-25 05:59:52,728 - chestbuddy.core.controllers.error_handling_controller - ERROR - Exception: Failed to create UI: type object 'PySide6.QtCore.QTimer' has no attribute 'currentTime'
+Traceback (most recent call last):
+  File "D:\Projekte\ChestBuddy\chestbuddy\app.py", line 180, in _create_ui
+    self._main_window = MainWindow(
+                        ^^^^^^^^^^^
+  File "D:\Projekte\ChestBuddy\chestbuddy\ui\main_window.py", line 160, in __init__
+    self._init_ui()
+  File "D:\Projekte\ChestBuddy\chestbuddy\ui\main_window.py", line 351, in _init_ui
+    self._view_state_controller.set_ui_components(
+  File "D:\Projekte\ChestBuddy\chestbuddy\core\controllers\view_state_controller.py", line 155, in set_ui_components
+    self._setup_default_dependencies()
+  File "D:\Projekte\ChestBuddy\chestbuddy\core\controllers\view_state_controller.py", line 187, in _setup_default_dependencies
+    self.register_view_dependency("Validation", {"Data"})
+  File "D:\Projekte\ChestBuddy\chestbuddy\core\controllers\view_state_controller.py", line 284, in register_view_dependency
+    self._update_view_availability()
+  File "D:\Projekte\ChestBuddy\chestbuddy\core\controllers\view_state_controller.py", line 345, in _update_view_availability
+    current_time = QTimer.currentTime().msecsSinceStartOfDay()
+                   ^^^^^^^^^^^^^^^^^^
+AttributeError: type object 'PySide6.QtCore.QTimer' has no attribute 'currentTime'
+
+2025-03-25 05:59:52,730 - chestbuddy.core.controllers.error_handling_controller - CRITICAL - Failed to create UI: type object 'PySide6.QtCore.QTimer' has no attribute 'currentTime'
+Details: Traceback (most recent call last):
+  File "D:\Projekte\ChestBuddy\chestbuddy\app.py", line 180, in _create_ui
+    self._main_window = MainWindow(
+                        ^^^^^^^^^^^
+  File "D:\Projekte\ChestBuddy\chestbuddy\ui\main_window.py", line 160, in __init__
+    self._init_ui()
+  File "D:\Projekte\ChestBuddy\chestbuddy\ui\main_window.py", line 351, in _init_ui
+    self._view_state_controller.set_ui_components(
+  File "D:\Projekte\ChestBuddy\chestbuddy\core\controllers\view_state_controller.py", line 155, in set_ui_components
+    self._setup_default_dependencies()
+  File "D:\Projekte\ChestBuddy\chestbuddy\core\controllers\view_state_controller.py", line 187, in _setup_default_dependencies
+    self.register_view_dependency("Validation", {"Data"})
+  File "D:\Projekte\ChestBuddy\chestbuddy\core\controllers\view_state_controller.py", line 284, in register_view_dependency
+    self._update_view_availability()
+  File "D:\Projekte\ChestBuddy\chestbuddy\core\controllers\view_state_controller.py", line 345, in _update_view_availability
+    current_time = QTimer.currentTime().msecsSinceStartOfDay()
+                   ^^^^^^^^^^^^^^^^^^
+AttributeError: type object 'PySide6.QtCore.QTimer' has no attribute 'currentTime'
+
+2025-03-25 05:59:56,220 - chestbuddy.utils.background_processing - DEBUG - Qt C++ object already deleted during thread cleanup
+2025-03-25 06:00:29,183 - __main__ - INFO - Logging initialized
+2025-03-25 06:00:29,185 - chestbuddy.core.models.chest_data_model - DEBUG - Updated data hash to: 1d4f9f63b040166415e97d034fc84c19
+2025-03-25 06:00:29,185 - chestbuddy.core.controllers.file_operations_controller - DEBUG - Loaded 0 recent files from config
+2025-03-25 06:00:29,185 - chestbuddy.core.controllers.view_state_controller - INFO - Data view controller set and signals connected
+2025-03-25 06:00:29,186 - chestbuddy.ui.main_window - DEBUG - MainWindow initialized with data_manager
+2025-03-25 06:00:29,209 - chestbuddy.ui.data_view - INFO - Installed event filter on table view
+2025-03-25 06:00:29,210 - chestbuddy.ui.data_view - INFO - Registered Ctrl+C shortcut for copying (table-specific)
+2025-03-25 06:00:29,210 - chestbuddy.ui.data_view - INFO - Registered widget-level Ctrl+V shortcut for pasting (widget hierarchy)
+2025-03-25 06:00:29,213 - chestbuddy.ui.data_view - INFO - Starting _update_view method
+2025-03-25 06:00:29,213 - chestbuddy.ui.data_view - INFO - Data model is empty, no data to display
+2025-03-25 06:00:29,218 - chestbuddy.ui.correction_tab - DEBUG - Skipping CorrectionTab._update_view call - recursive or uninitialized UI
+2025-03-25 06:00:29,221 - chestbuddy.core.controllers.view_state_controller - INFO - Registering dependencies for view 'Validation': {'Data'}
+2025-03-25 06:00:29,222 - chestbuddy.core.controllers.view_state_controller - INFO - View availability changed: {'Validation': True, 'Correction': True, 'Charts': True}
+2025-03-25 06:00:29,223 - chestbuddy.core.controllers.view_state_controller - INFO - Registering dependencies for view 'Correction': {'Validation'}
+2025-03-25 06:00:29,223 - chestbuddy.core.controllers.view_state_controller - DEBUG - Skipping view availability update (throttled)
+2025-03-25 06:00:29,223 - chestbuddy.core.controllers.view_state_controller - INFO - Registering dependencies for view 'Charts': {'Data'}
+2025-03-25 06:00:29,223 - chestbuddy.core.controllers.view_state_controller - DEBUG - Skipping view availability update (throttled)
+2025-03-25 06:00:29,223 - chestbuddy.core.controllers.view_state_controller - INFO - Registered prerequisite check for view 'Validation'
+2025-03-25 06:00:29,224 - chestbuddy.core.controllers.view_state_controller - DEBUG - Skipping view availability update (throttled)
+2025-03-25 06:00:29,224 - chestbuddy.core.controllers.view_state_controller - INFO - Registered prerequisite check for view 'Correction'
+2025-03-25 06:00:29,224 - chestbuddy.core.controllers.view_state_controller - DEBUG - Skipping view availability update (throttled)
+2025-03-25 06:00:29,224 - chestbuddy.core.controllers.view_state_controller - INFO - Registered prerequisite check for view 'Charts'
+2025-03-25 06:00:29,224 - chestbuddy.core.controllers.view_state_controller - DEBUG - Skipping view availability update (throttled)
+2025-03-25 06:00:29,224 - chestbuddy.core.controllers.view_state_controller - INFO - View changed from '' to 'Dashboard'
+2025-03-25 06:00:30,435 - __main__ - INFO - UI created and shown
+2025-03-25 06:00:30,436 - __main__ - INFO - Signals connected
+2025-03-25 06:00:30,436 - __main__ - CRITICAL - Failed to initialize application: apply_application_style() missing 1 required positional argument: 'app'
+2025-03-25 06:00:30,437 - chestbuddy.core.controllers.error_handling_controller - ERROR - Exception: Failed to initialize application: apply_application_style() missing 1 required positional argument: 'app'
+Traceback (most recent call last):
+  File "D:\Projekte\ChestBuddy\chestbuddy\app.py", line 131, in _initialize_application
+    apply_application_style()
+TypeError: apply_application_style() missing 1 required positional argument: 'app'
+
+2025-03-25 06:00:30,438 - chestbuddy.core.controllers.error_handling_controller - CRITICAL - Failed to initialize application: apply_application_style() missing 1 required positional argument: 'app'
+Details: Traceback (most recent call last):
+  File "D:\Projekte\ChestBuddy\chestbuddy\app.py", line 131, in _initialize_application
+    apply_application_style()
+TypeError: apply_application_style() missing 1 required positional argument: 'app'
+
+2025-03-25 06:00:56,180 - chestbuddy.utils.background_processing - DEBUG - Qt C++ object already deleted during thread cleanup
+2025-03-25 06:01:13,720 - __main__ - INFO - Logging initialized
+2025-03-25 06:01:13,722 - chestbuddy.core.models.chest_data_model - DEBUG - Updated data hash to: 1d4f9f63b040166415e97d034fc84c19
+2025-03-25 06:01:13,723 - chestbuddy.core.controllers.file_operations_controller - DEBUG - Loaded 0 recent files from config
+2025-03-25 06:01:13,723 - chestbuddy.core.controllers.view_state_controller - INFO - Data view controller set and signals connected
+2025-03-25 06:01:13,724 - chestbuddy.ui.main_window - DEBUG - MainWindow initialized with data_manager
+2025-03-25 06:01:13,863 - chestbuddy.ui.data_view - INFO - Installed event filter on table view
+2025-03-25 06:01:13,863 - chestbuddy.ui.data_view - INFO - Registered Ctrl+C shortcut for copying (table-specific)
+2025-03-25 06:01:13,864 - chestbuddy.ui.data_view - INFO - Registered widget-level Ctrl+V shortcut for pasting (widget hierarchy)
+2025-03-25 06:01:13,866 - chestbuddy.ui.data_view - INFO - Starting _update_view method
+2025-03-25 06:01:13,866 - chestbuddy.ui.data_view - INFO - Data model is empty, no data to display
+2025-03-25 06:01:13,871 - chestbuddy.ui.correction_tab - DEBUG - Skipping CorrectionTab._update_view call - recursive or uninitialized UI
+2025-03-25 06:01:13,874 - chestbuddy.core.controllers.view_state_controller - INFO - Registering dependencies for view 'Validation': {'Data'}
+2025-03-25 06:01:13,874 - chestbuddy.core.controllers.view_state_controller - INFO - View availability changed: {'Validation': True, 'Correction': True, 'Charts': True}
+2025-03-25 06:01:13,874 - chestbuddy.core.controllers.view_state_controller - INFO - Registering dependencies for view 'Correction': {'Validation'}
+2025-03-25 06:01:13,875 - chestbuddy.core.controllers.view_state_controller - DEBUG - Skipping view availability update (throttled)
+2025-03-25 06:01:13,875 - chestbuddy.core.controllers.view_state_controller - INFO - Registering dependencies for view 'Charts': {'Data'}
+2025-03-25 06:01:13,875 - chestbuddy.core.controllers.view_state_controller - DEBUG - Skipping view availability update (throttled)
+2025-03-25 06:01:13,875 - chestbuddy.core.controllers.view_state_controller - INFO - Registered prerequisite check for view 'Validation'
+2025-03-25 06:01:13,875 - chestbuddy.core.controllers.view_state_controller - DEBUG - Skipping view availability update (throttled)
+2025-03-25 06:01:13,876 - chestbuddy.core.controllers.view_state_controller - INFO - Registered prerequisite check for view 'Correction'
+2025-03-25 06:01:13,876 - chestbuddy.core.controllers.view_state_controller - DEBUG - Skipping view availability update (throttled)
+2025-03-25 06:01:13,876 - chestbuddy.core.controllers.view_state_controller - INFO - Registered prerequisite check for view 'Charts'
+2025-03-25 06:01:13,876 - chestbuddy.core.controllers.view_state_controller - DEBUG - Skipping view availability update (throttled)
+2025-03-25 06:01:13,876 - chestbuddy.core.controllers.view_state_controller - INFO - View changed from '' to 'Dashboard'
+2025-03-25 06:01:14,152 - __main__ - INFO - UI created and shown
+2025-03-25 06:01:14,153 - __main__ - INFO - Signals connected
+2025-03-25 06:01:14,195 - __main__ - INFO - Application initialized successfully
+2025-03-25 06:01:45,742 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Data - 
+2025-03-25 06:01:45,744 - chestbuddy.core.controllers.view_state_controller - DEBUG - Navigation history updated: position=1, history=['Dashboard', 'Data']
+2025-03-25 06:01:45,744 - chestbuddy.core.controllers.view_state_controller - INFO - View changed from 'Dashboard' to 'Data'
+2025-03-25 06:01:45,744 - chestbuddy.core.controllers.view_state_controller - INFO - View transition already in progress, queuing change to 'Data'
+2025-03-25 06:01:45,744 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Data - 
+2025-03-25 06:01:45,744 - chestbuddy.core.controllers.view_state_controller - INFO - View transition already in progress, queuing change to 'Data'
+2025-03-25 06:01:45,745 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Data - 
+2025-03-25 06:01:45,745 - chestbuddy.core.controllers.view_state_controller - INFO - View transition already in progress, queuing change to 'Data'
+2025-03-25 06:01:45,745 - chestbuddy.core.controllers.view_state_controller - INFO - View transition already in progress, queuing change to 'Data'
+2025-03-25 06:01:45,745 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Data - 
+2025-03-25 06:01:45,745 - chestbuddy.core.controllers.view_state_controller - INFO - View transition already in progress, queuing change to 'Data'
+2025-03-25 06:01:45,806 - chestbuddy.core.controllers.view_state_controller - INFO - Processing pending view change to 'Data'
+2025-03-25 06:01:46,291 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Dashboard - 
+2025-03-25 06:01:46,292 - chestbuddy.core.controllers.view_state_controller - DEBUG - Navigation history updated: position=2, history=['Dashboard', 'Data', 'Dashboard']
+2025-03-25 06:01:46,292 - chestbuddy.core.controllers.view_state_controller - INFO - View changed from 'Data' to 'Dashboard'
+2025-03-25 06:01:46,293 - chestbuddy.core.controllers.view_state_controller - INFO - View transition already in progress, queuing change to 'Dashboard'
+2025-03-25 06:01:46,293 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Dashboard - 
+2025-03-25 06:01:46,293 - chestbuddy.core.controllers.view_state_controller - INFO - View transition already in progress, queuing change to 'Dashboard'
+2025-03-25 06:01:46,294 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Dashboard - 
+2025-03-25 06:01:46,294 - chestbuddy.core.controllers.view_state_controller - INFO - View transition already in progress, queuing change to 'Dashboard'
+2025-03-25 06:01:46,294 - chestbuddy.core.controllers.view_state_controller - INFO - View transition already in progress, queuing change to 'Dashboard'
+2025-03-25 06:01:46,294 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Dashboard - 
+2025-03-25 06:01:46,294 - chestbuddy.core.controllers.view_state_controller - INFO - View transition already in progress, queuing change to 'Dashboard'
+2025-03-25 06:01:46,348 - chestbuddy.core.controllers.view_state_controller - INFO - Processing pending view change to 'Dashboard'
+2025-03-25 06:01:47,296 - chestbuddy.ui.main_window - INFO - Cancelling any ongoing operations before closing
+2025-03-25 06:01:47,296 - chestbuddy.core.services.data_manager - INFO - DataManager.cancel_loading called
+2025-03-25 06:01:47,296 - chestbuddy.core.services.data_manager - DEBUG - Loading operation cancelled successfully
+2025-03-25 06:01:47,352 - chestbuddy.utils.background_processing - DEBUG - Qt C++ object already deleted during thread cleanup
+2025-03-25 06:03:12,778 - __main__ - INFO - Logging initialized
+2025-03-25 06:03:12,781 - chestbuddy.core.models.chest_data_model - DEBUG - Updated data hash to: 1d4f9f63b040166415e97d034fc84c19
+2025-03-25 06:03:12,781 - chestbuddy.core.controllers.file_operations_controller - DEBUG - Loaded 0 recent files from config
+2025-03-25 06:03:12,781 - chestbuddy.core.controllers.view_state_controller - INFO - Data view controller set and signals connected
+2025-03-25 06:03:12,781 - chestbuddy.ui.main_window - DEBUG - MainWindow initialized with data_manager
+2025-03-25 06:03:12,810 - chestbuddy.ui.data_view - INFO - Installed event filter on table view
+2025-03-25 06:03:12,811 - chestbuddy.ui.data_view - INFO - Registered Ctrl+C shortcut for copying (table-specific)
+2025-03-25 06:03:12,811 - chestbuddy.ui.data_view - INFO - Registered widget-level Ctrl+V shortcut for pasting (widget hierarchy)
+2025-03-25 06:03:12,814 - chestbuddy.ui.data_view - INFO - Starting _update_view method
+2025-03-25 06:03:12,814 - chestbuddy.ui.data_view - INFO - Data model is empty, no data to display
+2025-03-25 06:03:12,819 - chestbuddy.ui.correction_tab - DEBUG - Skipping CorrectionTab._update_view call - recursive or uninitialized UI
+2025-03-25 06:03:12,822 - chestbuddy.core.controllers.view_state_controller - INFO - Registering dependencies for view 'Validation': {'Data'}
+2025-03-25 06:03:12,822 - chestbuddy.core.controllers.view_state_controller - INFO - View availability changed: {'Validation': True, 'Correction': True, 'Charts': True}
+2025-03-25 06:03:12,822 - chestbuddy.core.controllers.view_state_controller - INFO - Registering dependencies for view 'Correction': {'Validation'}
+2025-03-25 06:03:12,822 - chestbuddy.core.controllers.view_state_controller - DEBUG - Skipping view availability update (throttled)
+2025-03-25 06:03:12,822 - chestbuddy.core.controllers.view_state_controller - INFO - Registering dependencies for view 'Charts': {'Data'}
+2025-03-25 06:03:12,823 - chestbuddy.core.controllers.view_state_controller - DEBUG - Skipping view availability update (throttled)
+2025-03-25 06:03:12,823 - chestbuddy.core.controllers.view_state_controller - INFO - Registered prerequisite check for view 'Validation'
+2025-03-25 06:03:12,823 - chestbuddy.core.controllers.view_state_controller - DEBUG - Skipping view availability update (throttled)
+2025-03-25 06:03:12,823 - chestbuddy.core.controllers.view_state_controller - INFO - Registered prerequisite check for view 'Correction'
+2025-03-25 06:03:12,823 - chestbuddy.core.controllers.view_state_controller - DEBUG - Skipping view availability update (throttled)
+2025-03-25 06:03:12,823 - chestbuddy.core.controllers.view_state_controller - INFO - Registered prerequisite check for view 'Charts'
+2025-03-25 06:03:12,824 - chestbuddy.core.controllers.view_state_controller - DEBUG - Skipping view availability update (throttled)
+2025-03-25 06:03:12,824 - chestbuddy.core.controllers.view_state_controller - INFO - View changed from '' to 'Dashboard'
+2025-03-25 06:03:12,958 - __main__ - INFO - UI created and shown
+2025-03-25 06:03:12,959 - __main__ - INFO - Signals connected
+2025-03-25 06:03:13,002 - __main__ - INFO - Application initialized successfully
+2025-03-25 06:03:17,103 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Data - 
+2025-03-25 06:03:17,104 - chestbuddy.core.controllers.view_state_controller - DEBUG - Navigation history updated: position=1, history=['Dashboard', 'Data']
+2025-03-25 06:03:17,105 - chestbuddy.core.controllers.view_state_controller - INFO - View changed from 'Dashboard' to 'Data'
+2025-03-25 06:03:17,105 - chestbuddy.core.controllers.view_state_controller - INFO - View transition already in progress, queuing change to 'Data'
+2025-03-25 06:03:17,105 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Data - 
+2025-03-25 06:03:17,105 - chestbuddy.core.controllers.view_state_controller - INFO - View transition already in progress, queuing change to 'Data'
+2025-03-25 06:03:17,106 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Data - 
+2025-03-25 06:03:17,106 - chestbuddy.core.controllers.view_state_controller - INFO - View transition already in progress, queuing change to 'Data'
+2025-03-25 06:03:17,106 - chestbuddy.core.controllers.view_state_controller - INFO - View transition already in progress, queuing change to 'Data'
+2025-03-25 06:03:17,106 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Data - 
+2025-03-25 06:03:17,106 - chestbuddy.core.controllers.view_state_controller - INFO - View transition already in progress, queuing change to 'Data'
+2025-03-25 06:03:17,165 - chestbuddy.core.controllers.view_state_controller - INFO - Processing pending view change to 'Data'
+2025-03-25 06:03:18,597 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Dashboard - 
+2025-03-25 06:03:18,598 - chestbuddy.core.controllers.view_state_controller - DEBUG - Navigation history updated: position=2, history=['Dashboard', 'Data', 'Dashboard']
+2025-03-25 06:03:18,599 - chestbuddy.core.controllers.view_state_controller - INFO - View changed from 'Data' to 'Dashboard'
+2025-03-25 06:03:18,599 - chestbuddy.core.controllers.view_state_controller - INFO - View transition already in progress, queuing change to 'Dashboard'
+2025-03-25 06:03:18,599 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Dashboard - 
+2025-03-25 06:03:18,599 - chestbuddy.core.controllers.view_state_controller - INFO - View transition already in progress, queuing change to 'Dashboard'
+2025-03-25 06:03:18,600 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Dashboard - 
+2025-03-25 06:03:18,600 - chestbuddy.core.controllers.view_state_controller - INFO - View transition already in progress, queuing change to 'Dashboard'
+2025-03-25 06:03:18,600 - chestbuddy.core.controllers.view_state_controller - INFO - View transition already in progress, queuing change to 'Dashboard'
+2025-03-25 06:03:18,600 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Dashboard - 
+2025-03-25 06:03:18,600 - chestbuddy.core.controllers.view_state_controller - INFO - View transition already in progress, queuing change to 'Dashboard'
+2025-03-25 06:03:18,662 - chestbuddy.core.controllers.view_state_controller - INFO - Processing pending view change to 'Dashboard'
+2025-03-25 06:03:19,671 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Validation - 
+2025-03-25 06:03:19,671 - chestbuddy.core.controllers.view_state_controller - WARNING - Cannot activate view 'Validation': Data must be loaded first
+2025-03-25 06:03:19,671 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Validation - 
+2025-03-25 06:03:19,672 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Validation - 
+2025-03-25 06:03:19,672 - chestbuddy.core.controllers.view_state_controller - WARNING - Cannot activate view 'Validation': Data must be loaded first
+2025-03-25 06:03:19,672 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Validation - 
+2025-03-25 06:03:20,228 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Correction - 
+2025-03-25 06:03:20,228 - chestbuddy.core.controllers.view_state_controller - WARNING - Cannot activate view 'Correction': Data must be loaded first
+2025-03-25 06:03:20,228 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Correction - 
+2025-03-25 06:03:20,229 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Correction - 
+2025-03-25 06:03:20,229 - chestbuddy.core.controllers.view_state_controller - WARNING - Cannot activate view 'Correction': Data must be loaded first
+2025-03-25 06:03:20,229 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Correction - 
+2025-03-25 06:03:20,788 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Data - 
+2025-03-25 06:03:20,788 - chestbuddy.core.controllers.view_state_controller - DEBUG - Navigation history updated: position=3, history=['Dashboard', 'Data', 'Dashboard', 'Data']
+2025-03-25 06:03:20,789 - chestbuddy.core.controllers.view_state_controller - INFO - View changed from 'Dashboard' to 'Data'
+2025-03-25 06:03:20,789 - chestbuddy.core.controllers.view_state_controller - INFO - View transition already in progress, queuing change to 'Data'
+2025-03-25 06:03:20,789 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Data - 
+2025-03-25 06:03:20,789 - chestbuddy.core.controllers.view_state_controller - INFO - View transition already in progress, queuing change to 'Data'
+2025-03-25 06:03:20,790 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Data - 
+2025-03-25 06:03:20,790 - chestbuddy.core.controllers.view_state_controller - INFO - View transition already in progress, queuing change to 'Data'
+2025-03-25 06:03:20,790 - chestbuddy.core.controllers.view_state_controller - INFO - View transition already in progress, queuing change to 'Data'
+2025-03-25 06:03:20,790 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Data - 
+2025-03-25 06:03:20,790 - chestbuddy.core.controllers.view_state_controller - INFO - View transition already in progress, queuing change to 'Data'
+2025-03-25 06:03:20,853 - chestbuddy.core.controllers.view_state_controller - INFO - Processing pending view change to 'Data'
+2025-03-25 06:03:21,319 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Charts - 
+2025-03-25 06:03:21,319 - chestbuddy.core.controllers.view_state_controller - WARNING - Cannot activate view 'Charts': Data must be loaded first
+2025-03-25 06:03:21,319 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Charts - 
+2025-03-25 06:03:21,320 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Charts - 
+2025-03-25 06:03:21,320 - chestbuddy.core.controllers.view_state_controller - WARNING - Cannot activate view 'Charts': Data must be loaded first
+2025-03-25 06:03:21,320 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Charts - 
+2025-03-25 06:03:21,942 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Settings - 
+2025-03-25 06:03:21,942 - chestbuddy.core.controllers.view_state_controller - ERROR - View 'Settings' not found in registered views
+2025-03-25 06:03:21,943 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Settings - 
+2025-03-25 06:03:21,943 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Settings - 
+2025-03-25 06:03:21,943 - chestbuddy.core.controllers.view_state_controller - ERROR - View 'Settings' not found in registered views
+2025-03-25 06:03:21,943 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Settings - 
+2025-03-25 06:03:23,712 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Dashboard - 
+2025-03-25 06:03:23,713 - chestbuddy.core.controllers.view_state_controller - DEBUG - Navigation history updated: position=4, history=['Dashboard', 'Data', 'Dashboard', 'Data', 'Dashboard']
+2025-03-25 06:03:23,713 - chestbuddy.core.controllers.view_state_controller - INFO - View changed from 'Data' to 'Dashboard'
+2025-03-25 06:03:23,714 - chestbuddy.core.controllers.view_state_controller - INFO - View transition already in progress, queuing change to 'Dashboard'
+2025-03-25 06:03:23,714 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Dashboard - 
+2025-03-25 06:03:23,714 - chestbuddy.core.controllers.view_state_controller - INFO - View transition already in progress, queuing change to 'Dashboard'
+2025-03-25 06:03:23,715 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Dashboard - 
+2025-03-25 06:03:23,715 - chestbuddy.core.controllers.view_state_controller - INFO - View transition already in progress, queuing change to 'Dashboard'
+2025-03-25 06:03:23,715 - chestbuddy.core.controllers.view_state_controller - INFO - View transition already in progress, queuing change to 'Dashboard'
+2025-03-25 06:03:23,715 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Dashboard - 
+2025-03-25 06:03:23,715 - chestbuddy.core.controllers.view_state_controller - INFO - View transition already in progress, queuing change to 'Dashboard'
+2025-03-25 06:03:23,783 - chestbuddy.core.controllers.view_state_controller - INFO - Processing pending view change to 'Dashboard'
+2025-03-25 06:03:28,300 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Data - 
+2025-03-25 06:03:28,301 - chestbuddy.core.controllers.view_state_controller - DEBUG - Navigation history updated: position=5, history=['Dashboard', 'Data', 'Dashboard', 'Data', 'Dashboard', 'Data']
+2025-03-25 06:03:28,301 - chestbuddy.core.controllers.view_state_controller - INFO - View changed from 'Dashboard' to 'Data'
+2025-03-25 06:03:28,301 - chestbuddy.core.controllers.view_state_controller - INFO - View transition already in progress, queuing change to 'Data'
+2025-03-25 06:03:28,301 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Data - 
+2025-03-25 06:03:28,301 - chestbuddy.core.controllers.view_state_controller - INFO - View transition already in progress, queuing change to 'Data'
+2025-03-25 06:03:28,302 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Data - 
+2025-03-25 06:03:28,302 - chestbuddy.core.controllers.view_state_controller - INFO - View transition already in progress, queuing change to 'Data'
+2025-03-25 06:03:28,302 - chestbuddy.core.controllers.view_state_controller - INFO - View transition already in progress, queuing change to 'Data'
+2025-03-25 06:03:28,302 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Data - 
+2025-03-25 06:03:28,302 - chestbuddy.core.controllers.view_state_controller - INFO - View transition already in progress, queuing change to 'Data'
+2025-03-25 06:03:28,376 - chestbuddy.core.controllers.view_state_controller - INFO - Processing pending view change to 'Data'
+2025-03-25 06:03:29,848 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Dashboard - 
+2025-03-25 06:03:29,849 - chestbuddy.core.controllers.view_state_controller - DEBUG - Navigation history updated: position=6, history=['Dashboard', 'Data', 'Dashboard', 'Data', 'Dashboard', 'Data', 'Dashboard']
+2025-03-25 06:03:29,849 - chestbuddy.core.controllers.view_state_controller - INFO - View changed from 'Data' to 'Dashboard'
+2025-03-25 06:03:29,849 - chestbuddy.core.controllers.view_state_controller - INFO - View transition already in progress, queuing change to 'Dashboard'
+2025-03-25 06:03:29,849 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Dashboard - 
+2025-03-25 06:03:29,849 - chestbuddy.core.controllers.view_state_controller - INFO - View transition already in progress, queuing change to 'Dashboard'
+2025-03-25 06:03:29,850 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Dashboard - 
+2025-03-25 06:03:29,850 - chestbuddy.core.controllers.view_state_controller - INFO - View transition already in progress, queuing change to 'Dashboard'
+2025-03-25 06:03:29,850 - chestbuddy.core.controllers.view_state_controller - INFO - View transition already in progress, queuing change to 'Dashboard'
+2025-03-25 06:03:29,850 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Dashboard - 
+2025-03-25 06:03:29,850 - chestbuddy.core.controllers.view_state_controller - INFO - View transition already in progress, queuing change to 'Dashboard'
+2025-03-25 06:03:29,918 - chestbuddy.core.controllers.view_state_controller - INFO - Processing pending view change to 'Dashboard'
+2025-03-25 06:03:41,850 - chestbuddy.ui.main_window - INFO - Cancelling any ongoing operations before closing
+2025-03-25 06:03:41,850 - chestbuddy.core.services.data_manager - INFO - DataManager.cancel_loading called
+2025-03-25 06:03:41,850 - chestbuddy.core.services.data_manager - DEBUG - Loading operation cancelled successfully
+2025-03-25 06:03:41,900 - chestbuddy.utils.background_processing - DEBUG - Qt C++ object already deleted during thread cleanup
+2025-03-25 06:52:20,368 - __main__ - INFO - Logging initialized
+2025-03-25 06:52:20,370 - chestbuddy.core.models.chest_data_model - DEBUG - Updated data hash to: 1d4f9f63b040166415e97d034fc84c19
+2025-03-25 06:52:20,371 - chestbuddy.core.controllers.file_operations_controller - DEBUG - Loaded 0 recent files from config
+2025-03-25 06:52:20,371 - chestbuddy.core.controllers.ui_state_controller - INFO - UIStateController initialized
+2025-03-25 06:52:20,371 - chestbuddy.core.controllers.view_state_controller - INFO - Data view controller set and signals connected
+2025-03-25 06:52:20,372 - chestbuddy.ui.main_window - DEBUG - MainWindow initialized with data_manager
+2025-03-25 06:52:20,395 - chestbuddy.ui.data_view - INFO - Installed event filter on table view
+2025-03-25 06:52:20,396 - chestbuddy.ui.data_view - INFO - Registered Ctrl+C shortcut for copying (table-specific)
+2025-03-25 06:52:20,396 - chestbuddy.ui.data_view - INFO - Registered widget-level Ctrl+V shortcut for pasting (widget hierarchy)
+2025-03-25 06:52:20,399 - chestbuddy.ui.data_view - INFO - Starting _update_view method
+2025-03-25 06:52:20,399 - chestbuddy.ui.data_view - INFO - Data model is empty, no data to display
+2025-03-25 06:52:20,402 - __main__ - CRITICAL - Failed to create UI: 'ValidationViewAdapter' object has no attribute 'action_clicked'
+2025-03-25 06:52:20,406 - chestbuddy.core.controllers.error_handling_controller - ERROR - Exception: Failed to create UI: 'ValidationViewAdapter' object has no attribute 'action_clicked'
+Traceback (most recent call last):
+  File "d:\Projekte\ChestBuddy\chestbuddy\app.py", line 183, in _create_ui
+    self._main_window = MainWindow(
+                        ^^^^^^^^^^^
+  File "D:\Projekte\ChestBuddy\chestbuddy\ui\main_window.py", line 165, in __init__
+    self._init_ui()
+  File "D:\Projekte\ChestBuddy\chestbuddy\ui\main_window.py", line 397, in _init_ui
+    self._create_views()
+  File "D:\Projekte\ChestBuddy\chestbuddy\ui\main_window.py", line 436, in _create_views
+    validation_view = ValidationViewAdapter(self._data_model, self._validation_service)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projekte\ChestBuddy\chestbuddy\ui\views\validation_view_adapter.py", line 64, in __init__
+    super().__init__("Data Validation", parent)
+  File "D:\Projekte\ChestBuddy\chestbuddy\ui\views\base_view.py", line 131, in __init__
+    self._connect_signals()
+  File "D:\Projekte\ChestBuddy\chestbuddy\ui\views\validation_view_adapter.py", line 99, in _connect_signals
+    self.action_clicked.connect(self._on_action_clicked)
+    ^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ValidationViewAdapter' object has no attribute 'action_clicked'. Did you mean: '_on_action_clicked'?
+
+2025-03-25 06:52:20,408 - chestbuddy.core.controllers.error_handling_controller - CRITICAL - Failed to create UI: 'ValidationViewAdapter' object has no attribute 'action_clicked'
+Details: Traceback (most recent call last):
+  File "d:\Projekte\ChestBuddy\chestbuddy\app.py", line 183, in _create_ui
+    self._main_window = MainWindow(
+                        ^^^^^^^^^^^
+  File "D:\Projekte\ChestBuddy\chestbuddy\ui\main_window.py", line 165, in __init__
+    self._init_ui()
+  File "D:\Projekte\ChestBuddy\chestbuddy\ui\main_window.py", line 397, in _init_ui
+    self._create_views()
+  File "D:\Projekte\ChestBuddy\chestbuddy\ui\main_window.py", line 436, in _create_views
+    validation_view = ValidationViewAdapter(self._data_model, self._validation_service)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projekte\ChestBuddy\chestbuddy\ui\views\validation_view_adapter.py", line 64, in __init__
+    super().__init__("Data Validation", parent)
+  File "D:\Projekte\ChestBuddy\chestbuddy\ui\views\base_view.py", line 131, in __init__
+    self._connect_signals()
+  File "D:\Projekte\ChestBuddy\chestbuddy\ui\views\validation_view_adapter.py", line 99, in _connect_signals
+    self.action_clicked.connect(self._on_action_clicked)
+    ^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ValidationViewAdapter' object has no attribute 'action_clicked'. Did you mean: '_on_action_clicked'?
+
+2025-03-25 06:52:21,815 - chestbuddy.utils.background_processing - DEBUG - Thread was not running during cleanup
+2025-03-25 06:55:32,186 - __main__ - INFO - Logging initialized
+2025-03-25 06:55:32,188 - chestbuddy.core.models.chest_data_model - DEBUG - Updated data hash to: 1d4f9f63b040166415e97d034fc84c19
+2025-03-25 06:55:32,189 - chestbuddy.core.controllers.file_operations_controller - DEBUG - Loaded 0 recent files from config
+2025-03-25 06:55:32,189 - chestbuddy.core.controllers.ui_state_controller - INFO - UIStateController initialized
+2025-03-25 06:55:32,189 - chestbuddy.core.controllers.view_state_controller - INFO - Data view controller set and signals connected
+2025-03-25 06:55:32,190 - chestbuddy.ui.main_window - DEBUG - MainWindow initialized with data_manager
+2025-03-25 06:55:32,212 - chestbuddy.ui.data_view - INFO - Installed event filter on table view
+2025-03-25 06:55:32,212 - chestbuddy.ui.data_view - INFO - Registered Ctrl+C shortcut for copying (table-specific)
+2025-03-25 06:55:32,213 - chestbuddy.ui.data_view - INFO - Registered widget-level Ctrl+V shortcut for pasting (widget hierarchy)
+2025-03-25 06:55:32,215 - chestbuddy.ui.data_view - INFO - Starting _update_view method
+2025-03-25 06:55:32,216 - chestbuddy.ui.data_view - INFO - Data model is empty, no data to display
+2025-03-25 06:55:32,220 - chestbuddy.ui.correction_tab - DEBUG - Skipping CorrectionTab._update_view call - recursive or uninitialized UI
+2025-03-25 06:55:32,221 - __main__ - CRITICAL - Failed to create UI: 'CorrectionViewAdapter' object has no attribute 'action_clicked'
+2025-03-25 06:55:32,226 - chestbuddy.core.controllers.error_handling_controller - ERROR - Exception: Failed to create UI: 'CorrectionViewAdapter' object has no attribute 'action_clicked'
+Traceback (most recent call last):
+  File "D:\Projekte\ChestBuddy\chestbuddy\app.py", line 183, in _create_ui
+    self._main_window = MainWindow(
+                        ^^^^^^^^^^^
+  File "D:\Projekte\ChestBuddy\chestbuddy\ui\main_window.py", line 165, in __init__
+    self._init_ui()
+  File "D:\Projekte\ChestBuddy\chestbuddy\ui\main_window.py", line 397, in _init_ui
+    self._create_views()
+  File "D:\Projekte\ChestBuddy\chestbuddy\ui\main_window.py", line 443, in _create_views
+    correction_view = CorrectionViewAdapter(self._data_model, self._correction_service)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projekte\ChestBuddy\chestbuddy\ui\views\correction_view_adapter.py", line 64, in __init__
+    super().__init__("Data Correction", parent)
+  File "D:\Projekte\ChestBuddy\chestbuddy\ui\views\base_view.py", line 134, in __init__
+    self._connect_signals()
+  File "D:\Projekte\ChestBuddy\chestbuddy\ui\views\correction_view_adapter.py", line 99, in _connect_signals
+    self.action_clicked.connect(self._on_action_clicked)
+    ^^^^^^^^^^^^^^^^^^^
+AttributeError: 'CorrectionViewAdapter' object has no attribute 'action_clicked'. Did you mean: '_on_action_clicked'?
+
+2025-03-25 06:55:32,226 - chestbuddy.core.controllers.error_handling_controller - CRITICAL - Failed to create UI: 'CorrectionViewAdapter' object has no attribute 'action_clicked'
+Details: Traceback (most recent call last):
+  File "D:\Projekte\ChestBuddy\chestbuddy\app.py", line 183, in _create_ui
+    self._main_window = MainWindow(
+                        ^^^^^^^^^^^
+  File "D:\Projekte\ChestBuddy\chestbuddy\ui\main_window.py", line 165, in __init__
+    self._init_ui()
+  File "D:\Projekte\ChestBuddy\chestbuddy\ui\main_window.py", line 397, in _init_ui
+    self._create_views()
+  File "D:\Projekte\ChestBuddy\chestbuddy\ui\main_window.py", line 443, in _create_views
+    correction_view = CorrectionViewAdapter(self._data_model, self._correction_service)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projekte\ChestBuddy\chestbuddy\ui\views\correction_view_adapter.py", line 64, in __init__
+    super().__init__("Data Correction", parent)
+  File "D:\Projekte\ChestBuddy\chestbuddy\ui\views\base_view.py", line 134, in __init__
+    self._connect_signals()
+  File "D:\Projekte\ChestBuddy\chestbuddy\ui\views\correction_view_adapter.py", line 99, in _connect_signals
+    self.action_clicked.connect(self._on_action_clicked)
+    ^^^^^^^^^^^^^^^^^^^
+AttributeError: 'CorrectionViewAdapter' object has no attribute 'action_clicked'. Did you mean: '_on_action_clicked'?
+
+2025-03-25 06:55:37,996 - chestbuddy.utils.background_processing - DEBUG - Qt C++ object already deleted during thread cleanup
+2025-03-25 06:55:57,489 - __main__ - INFO - Logging initialized
+2025-03-25 06:55:57,491 - chestbuddy.core.models.chest_data_model - DEBUG - Updated data hash to: 1d4f9f63b040166415e97d034fc84c19
+2025-03-25 06:55:57,491 - chestbuddy.core.controllers.file_operations_controller - DEBUG - Loaded 0 recent files from config
+2025-03-25 06:55:57,492 - chestbuddy.core.controllers.ui_state_controller - INFO - UIStateController initialized
+2025-03-25 06:55:57,492 - chestbuddy.core.controllers.view_state_controller - INFO - Data view controller set and signals connected
+2025-03-25 06:55:57,492 - chestbuddy.ui.main_window - DEBUG - MainWindow initialized with data_manager
+2025-03-25 06:55:57,516 - chestbuddy.ui.data_view - INFO - Installed event filter on table view
+2025-03-25 06:55:57,516 - chestbuddy.ui.data_view - INFO - Registered Ctrl+C shortcut for copying (table-specific)
+2025-03-25 06:55:57,516 - chestbuddy.ui.data_view - INFO - Registered widget-level Ctrl+V shortcut for pasting (widget hierarchy)
+2025-03-25 06:55:57,518 - chestbuddy.ui.data_view - INFO - Starting _update_view method
+2025-03-25 06:55:57,518 - chestbuddy.ui.data_view - INFO - Data model is empty, no data to display
+2025-03-25 06:55:57,524 - chestbuddy.ui.correction_tab - DEBUG - Skipping CorrectionTab._update_view call - recursive or uninitialized UI
+2025-03-25 06:55:57,527 - chestbuddy.core.controllers.view_state_controller - INFO - Registering dependencies for view 'Validation': {'Data'}
+2025-03-25 06:55:57,527 - chestbuddy.core.controllers.view_state_controller - INFO - View availability changed: {'Validation': True, 'Correction': True, 'Charts': True}
+2025-03-25 06:55:57,528 - chestbuddy.core.controllers.view_state_controller - INFO - Registering dependencies for view 'Correction': {'Validation'}
+2025-03-25 06:55:57,528 - chestbuddy.core.controllers.view_state_controller - DEBUG - Skipping view availability update (throttled)
+2025-03-25 06:55:57,528 - chestbuddy.core.controllers.view_state_controller - INFO - Registering dependencies for view 'Charts': {'Data'}
+2025-03-25 06:55:57,528 - chestbuddy.core.controllers.view_state_controller - DEBUG - Skipping view availability update (throttled)
+2025-03-25 06:55:57,529 - chestbuddy.core.controllers.view_state_controller - INFO - Registered prerequisite check for view 'Validation'
+2025-03-25 06:55:57,529 - chestbuddy.core.controllers.view_state_controller - DEBUG - Skipping view availability update (throttled)
+2025-03-25 06:55:57,529 - chestbuddy.core.controllers.view_state_controller - INFO - Registered prerequisite check for view 'Correction'
+2025-03-25 06:55:57,529 - chestbuddy.core.controllers.view_state_controller - DEBUG - Skipping view availability update (throttled)
+2025-03-25 06:55:57,529 - chestbuddy.core.controllers.view_state_controller - INFO - Registered prerequisite check for view 'Charts'
+2025-03-25 06:55:57,530 - chestbuddy.core.controllers.view_state_controller - DEBUG - Skipping view availability update (throttled)
+2025-03-25 06:55:57,530 - chestbuddy.core.controllers.view_state_controller - INFO - View changed from '' to 'Dashboard'
+2025-03-25 06:55:57,533 - chestbuddy.core.controllers.ui_state_controller - DEBUG - Action states updated: {'save': False, 'save_as': False, 'export': False, 'validate': False, 'correct': False, 'chart': False, 'filter': False, 'sort': False}
+2025-03-25 06:55:57,533 - chestbuddy.core.controllers.ui_state_controller - DEBUG - Status message updated: No data loaded
+2025-03-25 06:55:57,533 - chestbuddy.core.controllers.ui_state_controller - DEBUG - Updated data-dependent UI state: has_data=False
+2025-03-25 06:55:57,799 - __main__ - INFO - UI created and shown
+2025-03-25 06:55:57,800 - __main__ - INFO - Signals connected
+2025-03-25 06:55:57,843 - __main__ - INFO - Application initialized successfully
+2025-03-25 06:55:57,854 - chestbuddy.core.controllers.ui_state_controller - DEBUG - Updated data-dependent UI state: has_data=False
+2025-03-25 06:56:12,943 - chestbuddy.ui.main_window - INFO - Cancelling any ongoing operations before closing
+2025-03-25 06:56:12,943 - chestbuddy.core.services.data_manager - INFO - DataManager.cancel_loading called
+2025-03-25 06:56:12,944 - chestbuddy.core.services.data_manager - DEBUG - Loading operation cancelled successfully
+2025-03-25 06:56:12,992 - chestbuddy.utils.background_processing - DEBUG - Qt C++ object already deleted during thread cleanup
