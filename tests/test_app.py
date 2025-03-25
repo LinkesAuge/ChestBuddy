@@ -58,8 +58,16 @@ class TestChestBuddyApp:
     def setup_patches(self, monkeypatch):
         """Set up common patches for all tests."""
         # Skip initialization methods
-        monkeypatch.setattr("chestbuddy.app.ChestBuddyApp._init_logging", lambda self: None)
-        monkeypatch.setattr("chestbuddy.app.ChestBuddyApp._setup_autosave", lambda self: None)
+        monkeypatch.setattr("chestbuddy.app.ChestBuddyApp._setup_logging", lambda self: None)
+        monkeypatch.setattr("chestbuddy.app.ChestBuddyApp._create_ui", lambda self: None)
+        monkeypatch.setattr("chestbuddy.app.apply_application_style", lambda: None)
+        monkeypatch.setattr(
+            "chestbuddy.app.ChestBuddyApp._initialize_application", lambda self: None
+        )
+
+        # Patch QApplication
+        self.mock_app = MagicMock()
+        monkeypatch.setattr("chestbuddy.app.QApplication", MagicMock(return_value=self.mock_app))
 
         # Create a mock QApplication
         self.mock_qapp = MagicMock()

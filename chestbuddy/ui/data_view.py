@@ -1071,14 +1071,12 @@ class DataView(QWidget):
                 break
             parent = parent.parent()
 
-        # If we found MainWindow, check if it's in a loading state
+        # Check for main window and cancel any operations
         if (
-            main_window
-            and hasattr(main_window, "_progress_dialog")
-            and main_window._progress_dialog
-            and main_window._progress_dialog.isVisible()
+            hasattr(main_window, "_progress_controller")
+            and main_window._progress_controller.is_progress_showing()
         ):
-            # Skip if progress dialog is visible - prevents duplicate file dialog
+            # Don't close on filter changes if operations are in progress
             return
 
         # This empty method should just pass - the adapter will handle the actual connection to MainWindow

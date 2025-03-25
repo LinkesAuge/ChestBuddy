@@ -28,6 +28,7 @@ from chestbuddy.core.controllers import (
     ProgressController,
     ViewStateController,
     DataViewController,
+    ErrorHandlingController,
 )
 from chestbuddy.ui.main_window import MainWindow
 from chestbuddy.utils.config import ConfigManager
@@ -96,6 +97,10 @@ class ChestBuddyApp(QObject):
             self._progress_controller = ProgressController()
             self._view_state_controller = ViewStateController(self._data_model)
             self._data_view_controller = DataViewController(self._data_model)
+            self._error_controller = ErrorHandlingController()
+
+            # Set up controller relationships
+            self._error_controller.set_progress_controller(self._progress_controller)
 
             # Create resource manager
             self._resource_manager = ResourceManager()
@@ -112,7 +117,7 @@ class ChestBuddyApp(QObject):
             logger.info("Application initialized successfully")
         except Exception as e:
             logger.critical(f"Failed to initialize application: {e}")
-            self._show_error_message(f"Failed to initialize application: {e}")
+            self._error_controller.handle_exception(e, "Failed to initialize application")
             sys.exit(1)
 
     def _setup_logging(self) -> None:
@@ -167,6 +172,7 @@ class ChestBuddyApp(QObject):
                 self._progress_controller,
                 self._view_state_controller,
                 self._data_view_controller,
+                self._error_controller,
             )
 
             # Show the main window
@@ -175,7 +181,7 @@ class ChestBuddyApp(QObject):
             logger.info("UI created and shown")
         except Exception as e:
             logger.critical(f"Failed to create UI: {e}")
-            self._show_error_message(f"Failed to create UI: {e}")
+            self._error_controller.handle_exception(e, "Failed to create UI")
             sys.exit(1)
 
     def _connect_signals(self) -> None:
@@ -203,26 +209,8 @@ class ChestBuddyApp(QObject):
             logger.info("Signals connected")
         except Exception as e:
             logger.critical(f"Failed to connect signals: {e}")
-            self._show_error_message(f"Failed to connect signals: {e}")
+            self._error_controller.handle_exception(e, "Failed to connect signals")
             sys.exit(1)
-
-    def _show_error_message(self, message: str) -> None:
-        """
-        Show an error message box.
-
-        Args:
-            message: The error message to display.
-        """
-        logger.error(message)
-        from PySide6.QtWidgets import QMessageBox
-
-        # Update progress dialog if it exists and if the error is related to loading
-        if hasattr(self, "_progress_controller") and self._progress_controller:
-            if self._progress_controller.is_progress_showing():
-                self._progress_controller.finish_progress(f"Error: {message}", is_error=True)
-
-        # Show error message box
-        QMessageBox.critical(None, "Error", message)
 
     # ===== Slots =====
 
@@ -235,7 +223,7 @@ class ChestBuddyApp(QObject):
             error_message (str): Error message
         """
         logger.error(f"Data view error: {error_message}")
-        self._show_error_message(error_message)
+        self._error_controller.show_error(error_message, "Data View Error")
 
     @Slot()
     def _on_load_started(self) -> None:
@@ -285,8 +273,7 @@ class ChestBuddyApp(QObject):
             error_message: Error message
         """
         logger.error(f"Load error: {error_message}")
-        self._progress_controller.finish_progress(f"Error: {error_message}", True)
-        self._show_error_message(f"Error loading data: {error_message}")
+        self._error_controller.show_error(error_message, "Load Error")
 
     @Slot(str)
     def _on_save_success(self, file_path: str) -> None:
@@ -309,7 +296,7 @@ class ChestBuddyApp(QObject):
             error_message: Error message
         """
         logger.error(f"Save error: {error_message}")
-        self._show_error_message(f"Error saving data: {error_message}")
+        self._error_controller.show_error(error_message, "Save Error")
 
     @Slot(list)
     def _on_recent_files_changed(self, recent_files: List[str]) -> None:
