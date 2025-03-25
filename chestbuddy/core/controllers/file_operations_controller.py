@@ -75,7 +75,7 @@ class FileOperationsController(QObject):
         else:
             # Use the last directory from config or default to documents
             last_dir = self._config_manager.get(
-                "last_import_directory", str(Path.home() / "Documents")
+                "Files", "last_import_directory", str(Path.home() / "Documents")
             )
             # Fix: Ensure last_dir is a string, not a list
             if isinstance(last_dir, list):
@@ -86,7 +86,9 @@ class FileOperationsController(QObject):
             file_paths = file_dialog.selectedFiles()
             if file_paths:
                 # Save the directory for next time
-                self._config_manager.set("last_import_directory", str(Path(file_paths[0]).parent))
+                self._config_manager.set(
+                    "Files", "last_import_directory", str(Path(file_paths[0]).parent)
+                )
 
                 # Trigger file load
                 self.load_csv_triggered.emit([str(path) for path in file_paths])
@@ -159,7 +161,7 @@ class FileOperationsController(QObject):
         else:
             # Use the last directory from config or default to documents
             last_dir = self._config_manager.get(
-                "last_export_directory", str(Path.home() / "Documents")
+                "Files", "last_export_directory", str(Path.home() / "Documents")
             )
             # Fix: Ensure last_dir is a string, not a list
             if isinstance(last_dir, list):
@@ -173,7 +175,9 @@ class FileOperationsController(QObject):
                 file_path = file_paths[0]
 
                 # Save the directory for next time
-                self._config_manager.set("last_export_directory", str(Path(file_path).parent))
+                self._config_manager.set(
+                    "Files", "last_export_directory", str(Path(file_path).parent)
+                )
 
                 # Trigger file save
                 self.save_csv_triggered.emit(file_path)
@@ -216,7 +220,7 @@ class FileOperationsController(QObject):
 
     def _load_recent_files(self):
         """Load recent files from config."""
-        recent_files = self._config_manager.get("recent_files", [])
+        recent_files = self._config_manager.get_list("Files", "recent_files", [])
         # Handle case where config returns None
         if recent_files is None:
             recent_files = []
@@ -226,7 +230,7 @@ class FileOperationsController(QObject):
 
     def _save_recent_files(self):
         """Save recent files to config."""
-        self._config_manager.set("recent_files", self._recent_files)
+        self._config_manager.set_list("Files", "recent_files", self._recent_files)
         logger.debug(f"Saved {len(self._recent_files)} recent files to config")
 
     def get_current_file_path(self) -> Optional[str]:

@@ -417,3 +417,70 @@ In `MainWindow._ensure_data_table_populated`, when the user was not on the Data 
 ### Next Integration Steps
 - Complete the refactoring of `ChartViewAdapter` to use the `ChartController` in a similar way.
 - Consider further refactoring the correction UI to eliminate the need to call the tab's methods directly.
+
+# Bug Fixing Documentation
+
+## File Import Error in FileOperationsController
+
+**Date:** 2023-03-25
+
+### Problem
+
+When attempting to import a file in the ChestBuddy application, the following error occurred:
+
+```
+TypeError: ConfigManager.set() missing 1 required positional argument: 'value'
+```
+
+The error was traced to the `FileOperationsController.open_file` method, where the `ConfigManager.set()` method was being called with incorrect parameters.
+
+### Root Cause Analysis
+
+The `ConfigManager.set()` method requires three parameters:
+1. `section`: The configuration section name
+2. `option`: The configuration option name
+3. `value`: The value to set
+
+However, in `FileOperationsController`, it was being called with only two parameters:
+```python
+self._config_manager.set("last_import_directory", str(Path(file_paths[0]).parent))
+```
+
+This issue also existed in multiple other locations where `ConfigManager.get()` and `ConfigManager.set()` methods were being called.
+
+### Solution
+
+Updated all occurrences of `ConfigManager` method calls in `FileOperationsController` to include the correct section parameter:
+
+1. Updated the `set` method calls:
+   ```python
+   # Before
+   self._config_manager.set("last_import_directory", str(Path(file_paths[0]).parent))
+   
+   # After
+   self._config_manager.set("Files", "last_import_directory", str(Path(file_paths[0]).parent))
+   ```
+
+2. Updated the `get` method calls:
+   ```python
+   # Before
+   last_dir = self._config_manager.get("last_import_directory", str(Path.home() / "Documents"))
+   
+   # After
+   last_dir = self._config_manager.get("Files", "last_import_directory", str(Path.home() / "Documents"))
+   ```
+
+3. Updated the methods for handling recent files to use the specialized list methods:
+   ```python
+   # Before
+   recent_files = self._config_manager.get("recent_files", [])
+   self._config_manager.set("recent_files", self._recent_files)
+   
+   # After
+   recent_files = self._config_manager.get_list("Files", "recent_files", [])
+   self._config_manager.set_list("Files", "recent_files", self._recent_files)
+   ```
+
+### Verification
+
+The changes were applied and the application was tested. The file import functionality now works correctly without the TypeError.

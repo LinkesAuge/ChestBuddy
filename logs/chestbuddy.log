@@ -645,3 +645,39 @@ AttributeError: 'CorrectionViewAdapter' object has no attribute 'action_clicked'
 2025-03-25 06:56:12,943 - chestbuddy.core.services.data_manager - INFO - DataManager.cancel_loading called
 2025-03-25 06:56:12,944 - chestbuddy.core.services.data_manager - DEBUG - Loading operation cancelled successfully
 2025-03-25 06:56:12,992 - chestbuddy.utils.background_processing - DEBUG - Qt C++ object already deleted during thread cleanup
+2025-03-25 06:58:29,327 - __main__ - INFO - Logging initialized
+2025-03-25 06:58:29,329 - chestbuddy.core.models.chest_data_model - DEBUG - Updated data hash to: 1d4f9f63b040166415e97d034fc84c19
+2025-03-25 06:58:29,329 - chestbuddy.core.controllers.file_operations_controller - DEBUG - Loaded 0 recent files from config
+2025-03-25 06:58:29,329 - chestbuddy.core.controllers.ui_state_controller - INFO - UIStateController initialized
+2025-03-25 06:58:29,330 - chestbuddy.core.controllers.view_state_controller - INFO - Data view controller set and signals connected
+2025-03-25 06:58:29,330 - chestbuddy.ui.main_window - DEBUG - MainWindow initialized with data_manager
+2025-03-25 06:58:29,356 - chestbuddy.ui.data_view - INFO - Installed event filter on table view
+2025-03-25 06:58:29,357 - chestbuddy.ui.data_view - INFO - Registered Ctrl+C shortcut for copying (table-specific)
+2025-03-25 06:58:29,357 - chestbuddy.ui.data_view - INFO - Registered widget-level Ctrl+V shortcut for pasting (widget hierarchy)
+2025-03-25 06:58:29,360 - chestbuddy.ui.data_view - INFO - Starting _update_view method
+2025-03-25 06:58:29,360 - chestbuddy.ui.data_view - INFO - Data model is empty, no data to display
+2025-03-25 06:58:29,365 - chestbuddy.ui.correction_tab - DEBUG - Skipping CorrectionTab._update_view call - recursive or uninitialized UI
+2025-03-25 06:58:29,368 - chestbuddy.core.controllers.view_state_controller - INFO - Registering dependencies for view 'Validation': {'Data'}
+2025-03-25 06:58:29,368 - chestbuddy.core.controllers.view_state_controller - INFO - View availability changed: {'Validation': True, 'Correction': True, 'Charts': True}
+2025-03-25 06:58:29,368 - chestbuddy.core.controllers.view_state_controller - INFO - Registering dependencies for view 'Correction': {'Validation'}
+2025-03-25 06:58:29,369 - chestbuddy.core.controllers.view_state_controller - DEBUG - Skipping view availability update (throttled)
+2025-03-25 06:58:29,369 - chestbuddy.core.controllers.view_state_controller - INFO - Registering dependencies for view 'Charts': {'Data'}
+2025-03-25 06:58:29,369 - chestbuddy.core.controllers.view_state_controller - DEBUG - Skipping view availability update (throttled)
+2025-03-25 06:58:29,369 - chestbuddy.core.controllers.view_state_controller - INFO - Registered prerequisite check for view 'Validation'
+2025-03-25 06:58:29,369 - chestbuddy.core.controllers.view_state_controller - DEBUG - Skipping view availability update (throttled)
+2025-03-25 06:58:29,369 - chestbuddy.core.controllers.view_state_controller - INFO - Registered prerequisite check for view 'Correction'
+2025-03-25 06:58:29,369 - chestbuddy.core.controllers.view_state_controller - DEBUG - Skipping view availability update (throttled)
+2025-03-25 06:58:29,370 - chestbuddy.core.controllers.view_state_controller - INFO - Registered prerequisite check for view 'Charts'
+2025-03-25 06:58:29,370 - chestbuddy.core.controllers.view_state_controller - DEBUG - Skipping view availability update (throttled)
+2025-03-25 06:58:29,370 - chestbuddy.core.controllers.view_state_controller - INFO - View changed from '' to 'Dashboard'
+2025-03-25 06:58:29,372 - chestbuddy.core.controllers.ui_state_controller - DEBUG - Action states updated: {'save': False, 'save_as': False, 'export': False, 'validate': False, 'correct': False, 'chart': False, 'filter': False, 'sort': False}
+2025-03-25 06:58:29,373 - chestbuddy.core.controllers.ui_state_controller - DEBUG - Status message updated: No data loaded
+2025-03-25 06:58:29,373 - chestbuddy.core.controllers.ui_state_controller - DEBUG - Updated data-dependent UI state: has_data=False
+2025-03-25 06:58:29,700 - __main__ - INFO - UI created and shown
+2025-03-25 06:58:29,700 - __main__ - INFO - Signals connected
+2025-03-25 06:58:29,752 - __main__ - INFO - Application initialized successfully
+2025-03-25 06:58:29,766 - chestbuddy.core.controllers.ui_state_controller - DEBUG - Updated data-dependent UI state: has_data=False
+2025-03-25 06:58:36,825 - chestbuddy.ui.main_window - INFO - Cancelling any ongoing operations before closing
+2025-03-25 06:58:36,826 - chestbuddy.core.services.data_manager - INFO - DataManager.cancel_loading called
+2025-03-25 06:58:36,826 - chestbuddy.core.services.data_manager - DEBUG - Loading operation cancelled successfully
+2025-03-25 06:58:36,990 - chestbuddy.utils.background_processing - DEBUG - Qt C++ object already deleted during thread cleanup
