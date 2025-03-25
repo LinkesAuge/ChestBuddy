@@ -3,7 +3,7 @@ progress_controller.py
 
 Description: Controller for progress reporting in the ChestBuddy application
 Usage:
-    controller = ProgressController()
+    controller = ProgressController(signal_manager)
     controller.start_progress("Loading", "Loading file...")
     controller.update_progress(50, 100, "Processing...")
     controller.finish_progress("Complete")
@@ -18,12 +18,13 @@ from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QApplication
 
 from chestbuddy.ui.widgets import ProgressDialog, ProgressBar
+from chestbuddy.core.controllers.base_controller import BaseController
 
 # Set up logger
 logger = logging.getLogger(__name__)
 
 
-class ProgressController(QObject):
+class ProgressController(BaseController):
     """
     Controller for progress reporting in ChestBuddy.
 
@@ -39,14 +40,15 @@ class ProgressController(QObject):
     progress_canceled = Signal()
     progress_completed = Signal()
 
-    def __init__(self, parent=None):
+    def __init__(self, signal_manager=None, parent=None):
         """
         Initialize the ProgressController.
 
         Args:
+            signal_manager: Optional SignalManager instance for connection tracking
             parent: Parent object
         """
-        super().__init__(parent)
+        super().__init__(signal_manager)
         self._progress_dialog = None
         self._cancel_callback = None
         self._is_cancelable = False

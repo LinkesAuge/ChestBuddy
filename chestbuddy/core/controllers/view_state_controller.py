@@ -3,7 +3,7 @@ view_state_controller.py
 
 Description: Controller for managing view state in the application
 Usage:
-    controller = ViewStateController(data_model)
+    controller = ViewStateController(data_model, signal_manager)
     controller.set_active_view("Dashboard")
 """
 
@@ -16,12 +16,13 @@ from PySide6.QtWidgets import QStackedWidget, QWidget, QMessageBox
 
 from chestbuddy.core.models import ChestDataModel
 from chestbuddy.ui.widgets.sidebar_navigation import SidebarNavigation
+from chestbuddy.core.controllers.base_controller import BaseController
 
 # Set up logger
 logger = logging.getLogger(__name__)
 
 
-class ViewStateController(QObject):
+class ViewStateController(BaseController):
     """
     Controller for managing view state in the application.
 
@@ -67,14 +68,15 @@ class ViewStateController(QObject):
     view_transition_started = Signal(str, str)  # from_view, to_view
     view_transition_completed = Signal(str)  # view_name
 
-    def __init__(self, data_model: ChestDataModel) -> None:
+    def __init__(self, data_model: ChestDataModel, signal_manager=None) -> None:
         """
         Initialize the ViewStateController.
 
         Args:
             data_model (ChestDataModel): The data model
+            signal_manager: Optional SignalManager instance for connection tracking
         """
-        super().__init__()
+        super().__init__(signal_manager)
 
         # Store references
         self._data_model = data_model
@@ -110,21 +112,31 @@ class ViewStateController(QObject):
         self._throttle_interval_ms = 250  # Minimum ms between updates
 
         # Connect to data model signals
-        self._connect_signals()
+        self.connect_to_model(data_model)
 
-    def _connect_signals(self) -> None:
-        """Connect to relevant signals."""
-        # Connect to data model signals to track data state
-        self._data_model.data_changed.connect(self._on_data_changed)
+    def connect_to_model(self, model) -> None:
+        """
+        Connect to data model signals.
+
+        Args:
+            model: The data model to connect to
+        """
+        super().connect_to_model(model)
+
+        # Connect to model signals using signal manager
+        if hasattr(model, "data_changed"):
+            self._signal_manager.connect(model, "data_changed", self, "_on_data_changed")
 
         # Check if data_cleared signal exists, otherwise use data_changed
-        if hasattr(self._data_model, "data_cleared"):
-            self._data_model.data_cleared.connect(self._on_data_cleared)
+        if hasattr(model, "data_cleared"):
+            self._signal_manager.connect(model, "data_cleared", self, "_on_data_cleared")
         else:
             logger.warning(
                 "data_cleared signal not found in data model, using data_changed instead"
             )
             # We'll handle data clearing in the data_changed handler
+
+        logger.debug(f"ViewStateController connected to model: {model.__class__.__name__}")
 
     def set_ui_components(
         self, views: dict[str, QWidget], sidebar: SidebarNavigation, content_stack: QStackedWidget
@@ -143,10 +155,18 @@ class ViewStateController(QObject):
         self._sidebar = sidebar
         self._content_stack = content_stack
 
-        # Connect to sidebar signals
+        # Connect to sidebar signals using signal manager
         if self._sidebar:
-            self._sidebar.navigation_changed.connect(self.set_active_view)
-            self._sidebar.data_dependent_view_clicked.connect(self._on_data_dependent_view_clicked)
+            self.connect_to_view(self._sidebar)
+            self._signal_manager.connect(
+                self._sidebar, "navigation_changed", self, "set_active_view"
+            )
+            self._signal_manager.connect(
+                self._sidebar,
+                "data_dependent_view_clicked",
+                self,
+                "_on_data_dependent_view_clicked",
+            )
 
         # Initialize view availability
         for view_name in self._views:
@@ -171,15 +191,22 @@ class ViewStateController(QObject):
         """
         self._data_view_controller = data_view_controller
 
-        # Connect relevant signals if available
-        if hasattr(data_view_controller, "filter_applied"):
-            data_view_controller.filter_applied.connect(self._on_data_filter_applied)
-        if hasattr(data_view_controller, "sort_applied"):
-            data_view_controller.sort_applied.connect(self._on_data_sort_applied)
-        if hasattr(data_view_controller, "operation_error"):
-            data_view_controller.operation_error.connect(self._on_data_operation_error)
+        # Connect relevant signals using signal manager
+        if data_view_controller and self._signal_manager:
+            if hasattr(data_view_controller, "filter_applied"):
+                self._signal_manager.connect(
+                    data_view_controller, "filter_applied", self, "_on_data_filter_applied"
+                )
+            if hasattr(data_view_controller, "sort_applied"):
+                self._signal_manager.connect(
+                    data_view_controller, "sort_applied", self, "_on_data_sort_applied"
+                )
+            if hasattr(data_view_controller, "operation_error"):
+                self._signal_manager.connect(
+                    data_view_controller, "operation_error", self, "_on_data_operation_error"
+                )
 
-        logger.info("Data view controller set and signals connected")
+            logger.info("Data view controller set and signals connected")
 
     def _setup_default_dependencies(self) -> None:
         """Set up default view dependencies based on standard workflow."""
@@ -842,7 +869,7 @@ class ViewStateController(QObject):
     @Slot()
     def _on_data_changed(self) -> None:
         """Handle data changed event from the data model."""
-        has_data = not self._data_model.is_empty()
+        has_data = not self._data_model.is_empty
 
         logger.info(f"Data changed event: has_data={has_data}")
 

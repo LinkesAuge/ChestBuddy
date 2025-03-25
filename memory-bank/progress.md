@@ -58,6 +58,18 @@ date: 2024-03-25
 - Created comprehensive tests for controller interactions
 - Updated main application to integrate all controllers
 
+### Phase 17: Signal Connection Management (in progress) 🔄
+- Implemented SignalManager utility class for centralized signal connection tracking
+- Created comprehensive unit tests for SignalManager functionality
+- Refactored ChestBuddyApp to use SignalManager for signal connections
+- Added proper signal disconnection during application cleanup
+- Added debug tools for signal connection tracking
+- Created signal_standards.py with naming conventions and connection patterns
+- Updated BaseView with standardized signal management
+- Refactored DataViewAdapter to use standardized patterns
+- Created unit tests for signal standards implementation
+- Improved signal connection safety through centralized management
+
 ## Completed Functionality
 
 ### Core Functionality
@@ -106,6 +118,18 @@ date: 2024-03-25
 - ✅ Unit tests for views and adapters
 - ✅ Integration tests for key component interactions
 
+### Signal Management
+- ✅ SignalManager utility for centralized signal management
+- ✅ Connection tracking and duplicate prevention
+- ✅ Safe disconnection methods
+- ✅ Signal blocking context managers
+- ✅ Connection debugging tools
+- ✅ Standardized signal connection patterns
+- ✅ Signal naming conventions
+- ✅ BaseView signal integration
+- ⏳ View adapter signal management (in progress)
+- ⏳ Controller signal integration (planned)
+
 ## Project Completion Status
 
 | Area | Status | Progress |
@@ -116,6 +140,7 @@ date: 2024-03-25
 | User Interface | Complete | 100% |
 | Controller Architecture | Complete | 100% |
 | Visualizations | Complete | 100% |
+| Signal Management | In Progress | 50% |
 | Testing | Complete | 95% |
 | Documentation | Complete | 95% |
 
@@ -164,26 +189,79 @@ Overall project completion: ~98%
 
 ## Recent Improvements
 
-### March 25, 2025: Fixed File Import Issues
+### March 25, 2025: Signal Connection Standards Implementation
 
-1. **Fixed File Import Dialog Duplication**
-   - Added state tracking flags to prevent opening multiple file dialogs
-   - Implemented try/finally blocks to ensure flags are reset
-   - Added better logging to track dialog state
+1. **Created Signal Standards Module**
+   - Implemented standardized naming conventions for signals and slots
+   - Added connection patterns for view adapters, controllers, and models
+   - Created detailed documentation with examples
+   - Established consistent error handling patterns
 
-2. **Improved Data Loading**
-   - Enhanced error handling in CSV load operations
-   - Fixed signal blockage to ensure data model signals are properly managed
-   - Improved cancellation handling to clean up state properly
-   - Added more detailed logging for debugging
+2. **Updated BaseView with Signal Management**
+   - Added SignalManager integration in BaseView
+   - Implemented standardized connection methods
+   - Added proper signal disconnection in close events
+   - Created UI, controller, and model signal connection hooks
 
-3. **Fixed Signal Connections**
-   - Added better connections between components for data loading signals
-   - Improved error handling for signal connections
-   - Added state tracking for data loaded status
+3. **Refactored DataViewAdapter**
+   - Updated to use standardized connection pattern
+   - Implemented separate methods for UI, controller, and model signals
+   - Added comprehensive error handling with logging
+   - Improved signal connection safety
+
+### March 25, 2025: Signal Connection Management Implementation
+
+1. **Created SignalManager Utility**
+   - Implemented centralized signal connection tracking
+   - Added prevention of duplicate connections
+   - Created safe disconnection methods
+   - Implemented signal blocking context manager
+   - Added connection debugging tools
+
+2. **Refactored ChestBuddyApp Signal Management**
+   - Updated _connect_signals method to use SignalManager
+   - Added proper cleanup for signal disconnection
+   - Improved connection debugging
+   - Enhanced signal connection safety
+
+3. **Added Unit Tests for SignalManager**
+   - Created comprehensive test coverage for all functionality
+   - Tested connection tracking
+   - Tested disconnection scenarios
+   - Tested signal blocking
+   - Tested debugging tools
 
 ## Known Issues
 
 * Performance can be slow with very large CSV files (>100,000 rows)
 * Some edge cases in validation may not be handled correctly
 * Minor QThread object deletion warning at shutdown (non-critical)
+* Signal management refactoring not yet complete across all components
+
+## Project Progress
+
+### Signal Connection Management
+
+- ✅ Phase 1: Designed and implemented SignalManager utility class
+  - ✅ Connection tracking
+  - ✅ Duplicate connection prevention
+  - ✅ Safe disconnection
+  - ✅ Connection querying
+
+- ✅ Phase 2: Safety Enhancements
+  - ✅ Blocked signals context manager
+  - ✅ Safe connect with optional disconnect
+  - ✅ Signal disconnection safety during emission
+  - ✅ Connection cleanup methods
+
+- ✅ Phase 3: Testing Framework
+  - ✅ Unit tests for all SignalManager functionality
+  - ✅ Integration tests with controllers and views
+  - ✅ Test for safety features
+  - ✅ Connection cleanup tests
+
+- 🔄 Phase 4: Migration (In Progress)
+  - ⬜ Update controllers to use SignalManager
+  - ⬜ Update view adapters to use SignalManager
+  - ⬜ Standardize handler naming
+  - ⬜ Implement signal throttling

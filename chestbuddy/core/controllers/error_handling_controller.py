@@ -3,7 +3,7 @@ error_handling_controller.py
 
 Description: Controller for error handling in the ChestBuddy application
 Usage:
-    controller = ErrorHandlingController()
+    controller = ErrorHandlingController(signal_manager)
     controller.show_error("Error message")
     controller.handle_exception(exception, "Operation failed")
 """
@@ -16,6 +16,8 @@ from typing import Callable, Optional, Dict, Any
 
 from PySide6.QtCore import QObject, Signal, Slot
 from PySide6.QtWidgets import QMessageBox, QApplication
+
+from chestbuddy.core.controllers.base_controller import BaseController
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -39,7 +41,7 @@ class ErrorType(Enum):
     UI_ERROR = auto()
 
 
-class ErrorHandlingController(QObject):
+class ErrorHandlingController(BaseController):
     """
     Controller for centralized error handling in ChestBuddy.
 
@@ -59,14 +61,15 @@ class ErrorHandlingController(QObject):
     info_occurred = Signal(str, object)  # message, error_type
     exception_occurred = Signal(str, Exception, object)  # message, exception, error_type
 
-    def __init__(self, parent=None):
+    def __init__(self, signal_manager=None, parent=None):
         """
         Initialize the ErrorHandlingController.
 
         Args:
+            signal_manager: Optional SignalManager instance for connection tracking
             parent: Parent object
         """
-        super().__init__(parent)
+        super().__init__(signal_manager, parent)
         self._progress_controller = None
         self._last_error = None
         self._error_handlers: Dict[ErrorType, Callable] = {}

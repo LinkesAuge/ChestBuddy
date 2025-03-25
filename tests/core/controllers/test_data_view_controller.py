@@ -8,31 +8,33 @@ operations in the ChestBuddy application.
 import pytest
 from unittest.mock import MagicMock, patch
 import pandas as pd
-from PySide6.QtCore import Signal, QObject
-from PySide6.QtWidgets import QWidget, QLineEdit, QComboBox, QCheckBox, QLabel
+from PySide6.QtCore import QObject, Signal
+from PySide6.QtWidgets import QWidget, QLineEdit, QComboBox, QCheckBox, QLabel, QTableView
 
 from chestbuddy.core.controllers.data_view_controller import DataViewController
 
 
-class MockDataModel:
+class MockDataModel(QObject):
     """Mock data model for testing."""
 
+    data_changed = Signal()
+    data_cleared = Signal()
+
     def __init__(self, with_data=True):
-        """Initialize with optional data."""
-        self.data_changed = Signal()
-        self.data = (
-            pd.DataFrame()
-            if not with_data
-            else pd.DataFrame(
-                {
-                    "Player Name": ["Player1", "Player2", "Player3"],
-                    "Date": ["2023-01-01", "2023-01-02", "2023-01-03"],
-                    "Quantity": [10, 20, 30],
-                }
-            )
-        )
-        self.column_names = [] if not with_data else ["Player Name", "Date", "Quantity"]
+        """Initialize the mock data model."""
+        super().__init__()
         self.is_empty = not with_data
+        if with_data:
+            data = {
+                "Player Name": ["Player1", "Player2", "Player3"],
+                "Value": [100, 200, 300],
+                "Team": ["Team1", "Team2", "Team3"],
+            }
+            self.data = pd.DataFrame(data)
+            self.column_names = list(data.keys())
+        else:
+            self.data = pd.DataFrame()
+            self.column_names = []
         self.data_hash = "test_hash" if with_data else ""
         self.filtered_data = None
 
@@ -127,15 +129,23 @@ def mock_view():
 
 
 @pytest.fixture
-def controller(mock_data_model):
-    """Fixture for controller with data model."""
-    return DataViewController(mock_data_model)
+def mock_signal_manager():
+    """Fixture for mock signal manager."""
+    from chestbuddy.utils.signal_manager import SignalManager
+
+    return SignalManager()
 
 
 @pytest.fixture
-def controller_with_view(mock_data_model, mock_view):
+def controller(mock_data_model, mock_signal_manager):
+    """Fixture for controller with data model."""
+    return DataViewController(mock_data_model, mock_signal_manager)
+
+
+@pytest.fixture
+def controller_with_view(mock_data_model, mock_view, mock_signal_manager):
     """Fixture for controller with data model and view."""
-    controller = DataViewController(mock_data_model)
+    controller = DataViewController(mock_data_model, mock_signal_manager)
     controller.set_view(mock_view)
     return controller
 
@@ -146,11 +156,10 @@ class TestDataViewController:
     def test_initialization(self, controller, mock_data_model):
         """Test controller initialization."""
         assert controller._data_model == mock_data_model
-        assert controller._view is None
-        assert controller._filtered_data is None
-        assert controller._current_filter == {}
-        assert controller._current_sort == {"column": "", "ascending": True}
-        assert controller._last_data_state["row_count"] == 0
+        assert not hasattr(controller, "_view") or controller._view is None
+        assert controller._current_filters == {}
+        assert controller._current_sort_column is None
+        assert controller._current_sort_ascending is True
 
     def test_set_view(self, controller, mock_view):
         """Test setting the view."""
@@ -183,6 +192,9 @@ class TestDataViewController:
         assert mock_view.filtered_data is not None
         assert len(mock_view.filtered_data) == 1
         assert mock_view.filtered_data.iloc[0]["Player Name"] == "Player1"
+        assert "column" in controller_with_view._current_filters
+        assert controller_with_view._current_filters["column"] == "Player Name"
+        assert controller_with_view._current_filters["text"] == "Player1"
 
     def test_filter_data_invalid_column(self, controller_with_view):
         """Test filtering with invalid column."""
@@ -241,6 +253,7 @@ class TestDataViewController:
         assert filter_params == {}
         assert mock_view.updated is True
         assert mock_view._filter_text.text() == ""
+        assert controller_with_view._current_filters == {}
 
     def test_sort_data(self, controller_with_view, mock_view):
         """Test sorting data."""
@@ -265,8 +278,8 @@ class TestDataViewController:
         assert sort_applied_called is True
         assert sort_column == "Player Name"
         assert sort_ascending is True
-        assert controller_with_view._current_sort["column"] == "Player Name"
-        assert controller_with_view._current_sort["ascending"] is True
+        assert controller_with_view._current_sort_column == "Player Name"
+        assert controller_with_view._current_sort_ascending is True
         mock_view._table_view.sortByColumn.assert_called_once_with(0, 0)  # First column, ascending
 
     def test_sort_data_invalid_column(self, controller_with_view):

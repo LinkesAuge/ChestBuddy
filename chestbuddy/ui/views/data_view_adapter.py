@@ -11,11 +11,15 @@ Usage:
 from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtWidgets import QWidget, QVBoxLayout
 import time
+import logging
 
 from chestbuddy.core.models import ChestDataModel
 from chestbuddy.core.controllers.data_view_controller import DataViewController
 from chestbuddy.ui.data_view import DataView
 from chestbuddy.ui.views.base_view import BaseView
+
+# Set up logger
+logger = logging.getLogger(__name__)
 
 
 class DataViewAdapter(BaseView):
@@ -27,6 +31,10 @@ class DataViewAdapter(BaseView):
         data_view (DataView): The wrapped DataView instance
         _controller (DataViewController): The controller for data view operations
 
+    Signals:
+        import_requested: Emitted when user requests data import
+        export_requested: Emitted when user requests data export
+
     Implementation Notes:
         - Inherits from BaseView to maintain UI consistency
         - Wraps the existing DataView component
@@ -34,17 +42,20 @@ class DataViewAdapter(BaseView):
         - Provides the same functionality as DataView but with the new UI styling
     """
 
-    # Add signals for data operations
+    # Define signals with consistent naming
     import_requested = Signal()
     export_requested = Signal()
 
-    def __init__(self, data_model: ChestDataModel, parent: QWidget = None):
+    def __init__(
+        self, data_model: ChestDataModel, parent: QWidget = None, debug_mode: bool = False
+    ):
         """
         Initialize the DataViewAdapter.
 
         Args:
             data_model (ChestDataModel): The data model to display
             parent (QWidget, optional): The parent widget. Defaults to None.
+            debug_mode (bool, optional): Enable debug mode for signal connections. Defaults to False.
         """
         # Store references
         self._data_model = data_model
@@ -66,8 +77,8 @@ class DataViewAdapter(BaseView):
         # Create the underlying DataView
         self._data_view = DataView(data_model)
 
-        # Initialize the base view
-        super().__init__("Data View", parent)
+        # Initialize the base view with debug mode option
+        super().__init__("Data View", parent, debug_mode=debug_mode)
         self.setObjectName("DataViewAdapter")
 
     def set_controller(self, controller: DataViewController) -> None:
@@ -84,17 +95,9 @@ class DataViewAdapter(BaseView):
             self._controller.set_view(self)
 
             # Connect controller signals
-            self._controller.validation_started.connect(self._on_validation_started)
-            self._controller.validation_completed.connect(self._on_validation_completed)
-            self._controller.correction_started.connect(self._on_correction_started)
-            self._controller.correction_completed.connect(self._on_correction_completed)
-            self._controller.operation_error.connect(self._on_operation_error)
-            self._controller.table_populated.connect(self._on_table_populated)
+            self._connect_controller_signals()
 
-            # Connect data model signals through the controller
-            self._controller.data_changed.connect(self._on_data_changed)
-
-            print("DataViewAdapter: Controller set and signals connected")
+            logger.info("DataViewAdapter: Controller set and signals connected")
 
     @property
     def needs_population(self) -> bool:
@@ -115,40 +118,96 @@ class DataViewAdapter(BaseView):
         self.get_content_layout().addWidget(self._data_view)
 
     def _connect_signals(self):
-        """Connect signals and slots."""
+        """Connect signals and slots using standardized pattern."""
         # First call the parent class's _connect_signals method
         super()._connect_signals()
 
-        # Connect DataView's action buttons to our controller
+        # Connect UI signals
         try:
-            # Get action toolbar from DataView
-            import_button = self._data_view._action_toolbar.get_button_by_name("import")
-            export_button = self._data_view._action_toolbar.get_button_by_name("export")
-            filter_button = self._data_view._action_toolbar.get_button_by_name("apply_filter")
-            clear_filter_button = self._data_view._action_toolbar.get_button_by_name("clear_filter")
+            self._connect_ui_signals()
+        except Exception as e:
+            logger.error(f"Error connecting UI signals in DataViewAdapter: {e}")
 
-            if import_button:
-                import_button.clicked.disconnect()  # Disconnect any existing connections
-                import_button.clicked.connect(self._on_import_requested)
+        # Connect model signals if model exists
+        if self._data_model:
+            self._connect_model_signals()
 
-            if export_button:
-                export_button.clicked.disconnect()  # Disconnect any existing connections
-                export_button.clicked.connect(self._on_export_requested)
+    def _connect_ui_signals(self):
+        """Connect UI component signals using safe connection pattern."""
+        # Get action toolbar from DataView
+        import_button = self._data_view._action_toolbar.get_button_by_name("import")
+        export_button = self._data_view._action_toolbar.get_button_by_name("export")
+        filter_button = self._data_view._action_toolbar.get_button_by_name("apply_filter")
+        clear_filter_button = self._data_view._action_toolbar.get_button_by_name("clear_filter")
 
-            if filter_button and self._controller:
-                filter_button.clicked.disconnect()  # Disconnect any existing connections
-                filter_button.clicked.connect(self._on_apply_filter_clicked)
+        # Connect buttons with safe_connect and disconnect_first for safety
+        if import_button:
+            self._signal_manager.safe_connect(
+                import_button, "clicked", self, "_on_import_requested", True
+            )
 
-            if clear_filter_button and self._controller:
-                clear_filter_button.clicked.disconnect()  # Disconnect any existing connections
-                clear_filter_button.clicked.connect(self._on_clear_filter_clicked)
+        if export_button:
+            self._signal_manager.safe_connect(
+                export_button, "clicked", self, "_on_export_requested", True
+            )
 
-            # Connect data model signals to update our state tracking through controller
+        if filter_button and self._controller:
+            self._signal_manager.safe_connect(
+                filter_button, "clicked", self, "_on_apply_filter_clicked", True
+            )
+
+        if clear_filter_button and self._controller:
+            self._signal_manager.safe_connect(
+                clear_filter_button, "clicked", self, "_on_clear_filter_clicked", True
+            )
+
+        # Connect header action signals
+        self._signal_manager.safe_connect(
+            self, "header_action_clicked", self, "_on_header_action_clicked"
+        )
+
+    def _connect_controller_signals(self):
+        """Connect controller signals using safe connection pattern."""
+        if not self._controller:
+            return
+
+        try:
+            # Standard operation signals
+            self._signal_manager.safe_connect(
+                self._controller, "validation_started", self, "_on_validation_started"
+            )
+            self._signal_manager.safe_connect(
+                self._controller, "validation_completed", self, "_on_validation_completed"
+            )
+            self._signal_manager.safe_connect(
+                self._controller, "correction_started", self, "_on_correction_started"
+            )
+            self._signal_manager.safe_connect(
+                self._controller, "correction_completed", self, "_on_correction_completed"
+            )
+            self._signal_manager.safe_connect(
+                self._controller, "operation_error", self, "_on_operation_error"
+            )
+            self._signal_manager.safe_connect(
+                self._controller, "table_populated", self, "_on_table_populated"
+            )
+
+            # Data change signal from controller
+            self._signal_manager.safe_connect(
+                self._controller, "data_changed", self, "_on_data_changed"
+            )
+        except Exception as e:
+            logger.error(f"Error connecting controller signals in DataViewAdapter: {e}")
+
+    def _connect_model_signals(self):
+        """Connect model signals using safe connection pattern."""
+        try:
             if hasattr(self._data_model, "data_changed"):
-                self._data_model.data_changed.connect(self._on_data_changed)
-        except (AttributeError, Exception) as e:
-            # Handle the case where the DataView structure might be different
-            print(f"Error connecting DataView signals: {e}")
+                self._signal_manager.safe_connect(
+                    self._data_model, "data_changed", self, "_on_data_changed", True
+                )
+        except Exception as e:
+            logger.error(f"Error connecting model signals in DataViewAdapter: {e}")
 
     def _on_import_requested(self):
         """Handle import button click."""
@@ -157,6 +216,17 @@ class DataViewAdapter(BaseView):
     def _on_export_requested(self):
         """Handle export button click."""
         self.export_requested.emit()
+
+    @Slot(str)
+    def _on_header_action_clicked(self, action_id: str):
+        """
+        Handle header action button clicks.
+
+        Args:
+            action_id (str): The ID of the action button clicked
+        """
+        logger.debug(f"Header action clicked: {action_id}")
+        # Handle specific actions as needed
 
     def _on_apply_filter_clicked(self):
         """Handle filter button click using controller."""

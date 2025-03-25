@@ -3,7 +3,7 @@ ui_state_controller.py
 
 Description: Controller for managing UI state across the application
 Usage:
-    ui_controller = UIStateController()
+    ui_controller = UIStateController(signal_manager)
     ui_controller.update_status_bar("Ready")
     ui_controller.update_action_states(has_data=True)
 """
@@ -13,11 +13,13 @@ from typing import Dict, Optional, List, Any
 
 from PySide6.QtCore import QObject, Signal, Slot
 
+from chestbuddy.core.controllers.base_controller import BaseController
+
 # Set up logger
 logger = logging.getLogger(__name__)
 
 
-class UIStateController(QObject):
+class UIStateController(BaseController):
     """
     Controller for managing UI state across the application.
 
@@ -42,9 +44,14 @@ class UIStateController(QObject):
     ui_theme_changed = Signal(str)
     ui_refresh_needed = Signal()
 
-    def __init__(self):
-        """Initialize the UIStateController."""
-        super().__init__()
+    def __init__(self, signal_manager=None):
+        """
+        Initialize the UIStateController.
+
+        Args:
+            signal_manager: Optional SignalManager instance for connection tracking
+        """
+        super().__init__(signal_manager)
 
         # Initialize state
         self._status_message = "Ready"

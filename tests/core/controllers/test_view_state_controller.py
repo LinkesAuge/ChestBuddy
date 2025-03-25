@@ -100,11 +100,15 @@ class MockDataViewController(QObject):
 @pytest.fixture
 def mock_data_model():
     """Create a mock data model."""
-    model = MagicMock(spec=ChestDataModel)
-    model.data_changed = Signal()
-    model.data_cleared = Signal()
-    model.is_empty.return_value = True
-    return model
+
+    class MockDataModel(QObject):
+        data_changed = Signal()
+        data_cleared = Signal()
+
+        def is_empty(self):
+            return True
+
+    return MockDataModel()
 
 
 @pytest.fixture
@@ -141,9 +145,17 @@ def mock_data_view_controller():
 
 
 @pytest.fixture
-def controller(mock_data_model, mock_sidebar, mock_content_stack, mock_views):
+def signal_manager():
+    """Create a SignalManager instance for testing."""
+    from chestbuddy.utils.signal_manager import SignalManager
+
+    return SignalManager(debug_mode=True)
+
+
+@pytest.fixture
+def controller(mock_data_model, mock_sidebar, mock_content_stack, mock_views, signal_manager):
     """Create a ViewStateController instance."""
-    controller = ViewStateController(mock_data_model)
+    controller = ViewStateController(mock_data_model, signal_manager)
     controller.set_ui_components(mock_views, mock_sidebar, mock_content_stack)
     return controller
 
@@ -661,3 +673,19 @@ class TestViewStateController:
         # Verify view was still changed despite the error
         assert controller._active_view == "Data"
         assert controller._view_transition_in_progress is False
+
+    def test_signal_manager_integration(self, controller, mock_data_model, signal_manager, qtbot):
+        """Test that the controller properly integrates with SignalManager."""
+        # Verify controller uses signal manager
+        assert controller._signal_manager == signal_manager
+
+        # Verify connections exist
+        connections = signal_manager.get_connections()
+        assert len(connections) > 0
+
+        # Test disconnect functionality
+        controller.disconnect_all()
+
+        # Verify connections were removed
+        all_connections = signal_manager.get_connections(receiver=controller)
+        assert len(all_connections) == 0

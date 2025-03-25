@@ -3,7 +3,7 @@ file_operations_controller.py
 
 Description: Controller for file operations in the ChestBuddy application
 Usage:
-    controller = FileOperationsController(data_manager, config_manager)
+    controller = FileOperationsController(data_manager, config_manager, signal_manager)
     controller.open_file()
 """
 
@@ -16,12 +16,13 @@ from PySide6.QtCore import QObject, Signal, QSettings
 from PySide6.QtWidgets import QFileDialog, QApplication, QMessageBox
 
 from chestbuddy.utils.config import ConfigManager
+from chestbuddy.core.controllers.base_controller import BaseController
 
 # Set up logger
 logger = logging.getLogger(__name__)
 
 
-class FileOperationsController(QObject):
+class FileOperationsController(BaseController):
     """
     Controller for file operations in the ChestBuddy application.
 
@@ -43,20 +44,38 @@ class FileOperationsController(QObject):
     load_csv_triggered = Signal(list)  # List of file paths to load
     save_csv_triggered = Signal(str)  # Path to save to
 
-    def __init__(self, data_manager, config_manager: ConfigManager):
+    def __init__(self, data_manager, config_manager: ConfigManager, signal_manager=None):
         """
         Initialize the FileOperationsController.
 
         Args:
             data_manager: The data manager instance
             config_manager: The configuration manager instance
+            signal_manager: Optional SignalManager instance for connection tracking
         """
-        super().__init__()
+        super().__init__(signal_manager)
         self._data_manager = data_manager
         self._config_manager = config_manager
         self._recent_files = []
         self._current_file_path = None
+
+        # Connect to data manager
+        self.connect_to_model(data_manager)
+
+        # Load recent files
         self._load_recent_files()
+
+    def connect_to_model(self, model) -> None:
+        """
+        Connect to data manager signals.
+
+        Args:
+            model: The data manager to connect to
+        """
+        super().connect_to_model(model)
+
+        # Add model-specific connections if needed
+        logger.debug(f"FileOperationsController connected to model: {model.__class__.__name__}")
 
     def open_file(self, parent=None):
         """

@@ -16,12 +16,13 @@ import pandas as pd
 
 from chestbuddy.core.services.validation_service import ValidationService
 from chestbuddy.core.services.correction_service import CorrectionService
+from chestbuddy.core.controllers.base_controller import BaseController
 
 # Set up logger
 logger = logging.getLogger(__name__)
 
 
-class DataViewController(QObject):
+class DataViewController(BaseController):
     """
     Controller for data view operations in ChestBuddy.
 
@@ -48,64 +49,82 @@ class DataViewController(QObject):
     filter_applied = Signal(dict)  # Filter parameters
     sort_applied = Signal(str, bool)  # Column, ascending
     table_populated = Signal(int)  # Number of rows
-    operation_error = Signal(str)  # Error message
-
-    # Validation signals
+    operation_error = Signal(str)
     validation_started = Signal()
-    validation_completed = Signal(dict)  # Validation results
-    validation_error = Signal(str)  # Error message
-
-    # Correction signals
-    correction_started = Signal(str)  # Strategy name
-    correction_completed = Signal(str, int)  # Strategy name, affected rows
-    correction_error = Signal(str)  # Error message
-
-    # Chart signals
+    validation_completed = Signal(dict)  # Results
+    validation_error = Signal(str)
+    correction_started = Signal()
+    correction_completed = Signal(dict)  # Results
+    correction_error = Signal(str)
     operation_started = Signal(str)  # Operation name
-    operation_completed = Signal(str, str)  # Operation name, result
-    chart_created = Signal(object)  # QChart object
+    operation_completed = Signal(str)  # Operation name
+    chart_created = Signal(object)  # Chart data
 
-    def __init__(self, data_model, validation_service=None, correction_service=None):
+    def __init__(self, data_model, signal_manager=None):
         """
-        Initialize the DataViewController.
+        Initialize the data view controller.
 
         Args:
-            data_model: The data model
-            validation_service: Optional ValidationService instance
-            correction_service: Optional CorrectionService instance
+            data_model: The data model to control
+            signal_manager: Optional SignalManager instance for connection tracking
         """
-        super().__init__()
+        super().__init__(signal_manager)
         self._data_model = data_model
-        self._validation_service = validation_service
-        self._correction_service = correction_service
-        self._view = None
-        self._filtered_data = None
-        self._current_filter = {}
-        self._current_sort = {"column": "", "ascending": True}
+        self._current_filters = {}
+        self._current_sort_column = None
+        self._current_sort_ascending = True
 
-        # State tracking to avoid unnecessary updates
-        self._last_data_state = {
-            "row_count": 0,
-            "column_count": 0,
-            "data_hash": "",
-            "last_update_time": 0,
-        }
+        # Connect to model signals
+        self.connect_to_model(data_model)
 
-        # Connect to data model signals
-        self._connect_signals()
+        logger.debug("DataViewController initialized")
 
-    def _connect_signals(self):
-        """Connect to relevant signals from the data model and services."""
-        if hasattr(self._data_model, "data_changed"):
-            self._data_model.data_changed.connect(self._on_data_changed)
+    def connect_to_model(self, model):
+        """
+        Connect to data model signals.
 
-        # Connect to validation service signals if available
-        if self._validation_service and hasattr(self._validation_service, "validation_completed"):
-            self._validation_service.validation_completed.connect(self._on_validation_completed)
+        Args:
+            model: The data model to connect to
+        """
+        super().connect_to_model(model)
 
-        # Connect to correction service signals if available
-        if self._correction_service and hasattr(self._correction_service, "correction_completed"):
-            self._correction_service.correction_completed.connect(self._on_correction_completed)
+        # Connect to model signals using signal manager
+        if hasattr(model, "data_changed"):
+            self._signal_manager.connect(model, "data_changed", self, "_on_data_changed")
+
+        if hasattr(model, "validation_complete"):
+            self._signal_manager.connect(
+                model, "validation_complete", self, "_on_validation_complete"
+            )
+
+        logger.debug(f"DataViewController connected to model: {model.__class__.__name__}")
+
+    def connect_to_view(self, view):
+        """
+        Connect to view signals.
+
+        Args:
+            view: The view to connect to
+        """
+        super().connect_to_view(view)
+
+        # Connect to view signals using signal manager
+        if hasattr(view, "filter_changed"):
+            self._signal_manager.connect(view, "filter_changed", self, "_on_filter_changed")
+
+        if hasattr(view, "sort_changed"):
+            self._signal_manager.connect(view, "sort_changed", self, "_on_sort_changed")
+
+        if hasattr(view, "selection_changed"):
+            self._signal_manager.connect(view, "selection_changed", self, "_on_selection_changed")
+
+        if hasattr(view, "validate_requested"):
+            self._signal_manager.connect(view, "validate_requested", self, "_on_validate_requested")
+
+        if hasattr(view, "correct_requested"):
+            self._signal_manager.connect(view, "correct_requested", self, "_on_correct_requested")
+
+        logger.debug(f"DataViewController connected to view: {view.__class__.__name__}")
 
     def set_view(self, view):
         """
@@ -234,7 +253,7 @@ class DataViewController(QObject):
             self._filtered_data = filtered_data
 
             # Save current filter
-            self._current_filter = {
+            self._current_filters = {
                 "column": column,
                 "text": value,
                 "mode": mode,
@@ -252,7 +271,7 @@ class DataViewController(QObject):
                     self._view._status_label.setText(f"Showing {row_count} of {total_count} rows")
 
             # Emit filter applied signal
-            self.filter_applied.emit(self._current_filter)
+            self.filter_applied.emit(self._current_filters)
 
             logger.info(
                 f"Filter applied: {column}={value} ({mode}), showing {len(filtered_data)} of {len(self._data_model.data)} rows"
@@ -279,7 +298,7 @@ class DataViewController(QObject):
             self._filtered_data = self._data_model.data
 
             # Clear current filter
-            self._current_filter = {}
+            self._current_filters = {}
 
             # Update view if attached
             if self._view:
@@ -329,10 +348,8 @@ class DataViewController(QObject):
                 return False
 
             # Save current sort
-            self._current_sort = {
-                "column": column,
-                "ascending": ascending,
-            }
+            self._current_sort_column = column
+            self._current_sort_ascending = ascending
 
             # Sort data - handle in view for now as it's UI-specific with Qt's sorting
             if self._view and hasattr(self._view, "_table_view"):
@@ -470,12 +487,12 @@ class DataViewController(QObject):
                 return False
 
             # Reapply filter if there's an active filter
-            if self._current_filter and self._current_filter.get("column"):
+            if self._current_filters and self._current_filters.get("column"):
                 self.filter_data(
-                    self._current_filter["column"],
-                    self._current_filter["text"],
-                    self._current_filter["mode"],
-                    self._current_filter["case_sensitive"],
+                    self._current_filters["column"],
+                    self._current_filters["text"],
+                    self._current_filters["mode"],
+                    self._current_filters["case_sensitive"],
                 )
 
             # Update our state tracking
@@ -496,7 +513,7 @@ class DataViewController(QObject):
         Returns:
             Dict: Current filter parameters
         """
-        return self._current_filter.copy()
+        return self._current_filters.copy()
 
     def get_current_sort(self) -> Dict:
         """
@@ -505,7 +522,10 @@ class DataViewController(QObject):
         Returns:
             Dict: Current sort parameters
         """
-        return self._current_sort.copy()
+        return {
+            "column": self._current_sort_column,
+            "ascending": self._current_sort_ascending,
+        }
 
     def validate_data(self, specific_rules: Optional[List[str]] = None) -> bool:
         """

@@ -8,8 +8,13 @@ Usage:
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame
+import logging
 
 from chestbuddy.ui.resources.style import Colors
+from chestbuddy.utils.signal_manager import SignalManager
+
+# Set up logger
+logger = logging.getLogger(__name__)
 
 
 class ViewHeader(QFrame):
@@ -114,22 +119,32 @@ class BaseView(QWidget):
     """
     Base class for all content views in the application.
 
-    This provides common structure and functionality for all views.
+    This provides common structure and functionality for all views,
+    including standardized signal management.
+
+    Signals:
+        header_action_clicked (str): Emitted when a header action is clicked with the action ID
     """
 
     # Define signals
     header_action_clicked = Signal(str)  # Action ID
 
-    def __init__(self, title, parent=None):
+    def __init__(self, title, parent=None, debug_mode=False):
         """
         Initialize the base view.
 
         Args:
             title (str): The view title
             parent (QWidget, optional): The parent widget
+            debug_mode (bool, optional): Enable debug mode for signal connections
         """
         super().__init__(parent)
         self._title = title
+        self._debug_mode = debug_mode
+
+        # Initialize signal manager
+        self._signal_manager = SignalManager(debug_mode=debug_mode)
+
         self._setup_ui()
         self._connect_signals()
         self._add_action_buttons()
@@ -153,8 +168,51 @@ class BaseView(QWidget):
         self._layout.addWidget(self._content)
 
     def _connect_signals(self):
-        """Connect signals to slots."""
-        pass  # To be implemented by subclasses
+        """
+        Connect signals to slots.
+
+        This method is called during initialization. Override in derived classes
+        to add specific signal connections, but always call the parent method first.
+        """
+        # BaseView signal connections
+        pass
+
+    def _connect_ui_signals(self):
+        """
+        Connect UI element signals.
+
+        Override in derived classes to connect UI element signals to handler methods.
+        """
+        pass
+
+    def _connect_controller_signals(self):
+        """
+        Connect controller signals.
+
+        Override in derived classes to connect controller signals to handler methods.
+        """
+        pass
+
+    def _connect_model_signals(self):
+        """
+        Connect data model signals.
+
+        Override in derived classes to connect model signals to handler methods.
+        """
+        pass
+
+    def _disconnect_signals(self):
+        """
+        Disconnect all signals connected to this view.
+
+        Call this method before destroying the view to prevent signal-related errors.
+        """
+        if hasattr(self, "_signal_manager"):
+            try:
+                self._signal_manager.disconnect_receiver(self)
+                logger.debug(f"Disconnected signals for {self.__class__.__name__}")
+            except Exception as e:
+                logger.error(f"Error disconnecting signals for {self.__class__.__name__}: {e}")
 
     def get_title(self):
         """
@@ -190,7 +248,9 @@ class BaseView(QWidget):
         button = self._header.add_action_button(name, text, button_type)
 
         # Connect the button to emit the header_action_clicked signal with the action ID
-        button.clicked.connect(lambda: self.header_action_clicked.emit(name))
+        self._signal_manager.safe_connect(
+            button, "clicked", lambda: self.header_action_clicked.emit(name), None, True
+        )
 
         return button
 
@@ -215,3 +275,21 @@ class BaseView(QWidget):
     def _add_action_buttons(self):
         """Add action buttons to the header. To be implemented by subclasses."""
         pass
+
+    def closeEvent(self, event):
+        """
+        Handle close event by properly disconnecting signals.
+
+        Args:
+            event: The close event
+        """
+        self._disconnect_signals()
+        super().closeEvent(event)
+
+    def __del__(self):
+        """Ensure signals are disconnected when the object is deleted."""
+        try:
+            self._disconnect_signals()
+        except:
+            # Prevent errors during deletion
+            pass

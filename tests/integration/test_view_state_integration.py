@@ -262,9 +262,17 @@ def mock_data_view_controller():
 
 
 @pytest.fixture
-def view_state_controller(data_model, mock_content_stack, mock_views, mock_sidebar):
+def signal_manager():
+    """Create a SignalManager instance for testing."""
+    from chestbuddy.utils.signal_manager import SignalManager
+
+    return SignalManager(debug_mode=True)
+
+
+@pytest.fixture
+def view_state_controller(data_model, mock_content_stack, mock_views, mock_sidebar, signal_manager):
     """Create a ViewStateController instance for testing."""
-    controller = ViewStateController(data_model)
+    controller = ViewStateController(data_model, signal_manager)
     controller.set_ui_components(mock_views, mock_sidebar, mock_content_stack)
     return controller
 
