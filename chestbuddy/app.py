@@ -1,33 +1,29 @@
-"""
-ChestBuddy application main entry point.
-
-This module provides the main ChestBuddy application class that initializes
-all services and UI components.
-"""
-
 import logging
-import os
 import sys
-import time
-from pathlib import Path
 from typing import List, Optional
+from pathlib import Path
 
+import pandas as pd
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QTimer, QObject, Signal, Slot, Qt, QMetaObject
 
-from chestbuddy.core.models import ChestDataModel
-from chestbuddy.core.services import (
-    CSVService,
-    ValidationService,
-    CorrectionService,
-    ChartService,
-    DataManager,
-)
+from chestbuddy.core.models.chest_data_model import ChestDataModel
+from chestbuddy.core.services.chart_service import ChartService
+from chestbuddy.core.services.correction_service import CorrectionService
+from chestbuddy.core.services.csv_service import CSVService
+from chestbuddy.core.services.data_manager import DataManager
+from chestbuddy.core.services.validation_service import ValidationService
+from chestbuddy.core.controllers.error_handling_controller import ErrorHandlingController
+from chestbuddy.core.controllers.view_state_controller import ViewStateController
+from chestbuddy.core.controllers.data_view_controller import DataViewController
+from chestbuddy.core.controllers.file_operations_controller import FileOperationsController
+from chestbuddy.core.controllers.progress_controller import ProgressController
+from chestbuddy.core.controllers.ui_state_controller import UIStateController
 from chestbuddy.ui.main_window import MainWindow
-from chestbuddy.utils.config import ConfigManager
-from chestbuddy.utils.background_processing import BackgroundWorker
 from chestbuddy.ui.resources.style import apply_application_style
 from chestbuddy.ui.resources.resource_manager import ResourceManager
+from chestbuddy.utils.signal_manager import SignalManager
+from chestbuddy.utils.config import ConfigManager
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -43,7 +39,7 @@ class ChestBuddyApp(QObject):
     Implementation Notes:
         - Manages the lifecycle of the application
         - Initializes services and UI components
-        - Connects signals between services and UI components
+        - Connects signals between services and UI components using SignalManager
         - Handles application-level events
     """
 
@@ -52,370 +48,408 @@ class ChestBuddyApp(QObject):
         Initialize the ChestBuddy application.
 
         Args:
-            args: Command-line arguments passed to the application.
+            args: Command-line arguments
         """
         super().__init__()
+        self._data_model = None
+        self._main_window = None
+        self._args = args or []
+        
+        # Create signal manager
+        self._signal_manager = SignalManager(debug_mode=False)
+        
+        # Initialize application
+        self._initialize_application()
 
-        # Initialize config manager
-        self._config = ConfigManager()
+    def _initialize_application(self) -> None:
+        """Initialize the application and its components."""
+        try:
+            # Set up logging
+            self._setup_logging()
 
-        # Initialize logging
-        self._init_logging()
+            # Create configuration manager
+            self._config_manager = ConfigManager("chestbuddy")
 
-        # Initialize QApplication with args
-        self._app = QApplication(args if args is not None else sys.argv)
-        self._app.setApplicationName("Chest Buddy")
-        self._app.setApplicationVersion("0.1.0")
-        self._app.setOrganizationName("ChestBuddy")
-        self._app.setOrganizationDomain("chestbuddy.org")
+            # Initialize data model
+            self._data_model = ChestDataModel()
 
-        # Initialize models
-        self._data_model = ChestDataModel()
+            # Create controllers - create error controller early
+            self._error_controller = ErrorHandlingController()
 
-        # Initialize services
-        self._csv_service = CSVService()
-        self._validation_service = ValidationService(self._data_model)
-        self._correction_service = CorrectionService(self._data_model)
-        self._chart_service = ChartService(self._data_model)
-        self._data_manager = DataManager(self._data_model, self._csv_service)
+            # Create services
+            try:
+                self._csv_service = CSVService()
+                self._validation_service = ValidationService(self._data_model)
+                self._correction_service = CorrectionService(self._data_model)
+                self._chart_service = ChartService(self._data_model)
+                self._data_manager = DataManager(self._data_model, self._csv_service)
 
-        # Initialize background worker
-        self._worker = BackgroundWorker()
+                # Initialize DataManager with config_manager
+                self._data_manager._config = self._config_manager
+            except Exception as e:
+                logger.error(f"Error initializing services: {e}")
+                self._error_controller.handle_exception(e, "Error initializing services")
+                raise
 
-        # Initialize UI
-        self._main_window = MainWindow(
-            self._data_model,
-            self._csv_service,
-            self._validation_service,
-            self._correction_service,
-            self._chart_service,
-            data_manager=self._data_manager,
-        )
+            # Create remaining controllers
+            try:
+                self._file_controller = FileOperationsController(
+                    self._data_manager, self._config_manager
+                )
+                self._progress_controller = ProgressController()
+                self._view_state_controller = ViewStateController(self._data_model)
+                self._data_view_controller = DataViewController(self._data_model)
+                self._ui_state_controller = UIStateController()
+            except Exception as e:
+                logger.error(f"Error initializing controllers: {e}")
+                self._error_controller.handle_exception(e, "Error initializing controllers")
+                raise
 
-        # Connect signals
-        self._connect_signals()
+            # Set up controller relationships
+            self._error_controller.set_progress_controller(self._progress_controller)
 
-        # Set up periodic autosave
-        self._setup_autosave()
+            # Connect ViewStateController and DataViewController
+            self._view_state_controller.set_data_view_controller(self._data_view_controller)
 
-        # Initialize resources
-        ResourceManager.initialize()
+            # Create resource manager
+            self._resource_manager = ResourceManager()
 
-        # Apply application style
-        apply_application_style(self._app)
+            # Create UI
+            self._create_ui()
 
-        logger.info("ChestBuddy application initialized")
+            # Connect signals
+            self._connect_signals()
 
-    def _init_logging(self) -> None:
-        """Initialize the logging system."""
-        # Use logs directory inside the chestbuddy package
-        logs_dir = Path(__file__).parent / "logs"
-        logs_dir.mkdir(exist_ok=True)
+            # Apply application-wide styling
+            app = QApplication.instance()
+            apply_application_style(app)
 
-        # Set up logging configuration
-        log_level = "DEBUG"  # Force DEBUG level
-        log_file = logs_dir / "chestbuddy.log"
+            logger.info("Application initialized successfully")
+        except Exception as e:
+            logger.critical(f"Failed to initialize application: {e}")
+            self._error_controller.handle_exception(e, "Failed to initialize application")
+            sys.exit(1)
 
-        # Configure root logger
-        logging.basicConfig(
-            level=getattr(logging, log_level),
-            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-            handlers=[logging.FileHandler(log_file), logging.StreamHandler()],
-        )
+    def _setup_logging(self) -> None:
+        """Set up logging for the application."""
+        try:
+            # Create logs directory if it doesn't exist
+            log_dir = Path("logs")
+            log_dir.mkdir(exist_ok=True)
 
-        logger.info(f"Logging initialized at level {log_level} to {log_file}")
+            # Set up file handler
+            log_file = log_dir / "chestbuddy.log"
+            file_handler = logging.FileHandler(log_file)
+            file_handler.setLevel(logging.DEBUG)
+
+            # Set up console handler
+            console_handler = logging.StreamHandler()
+            console_handler.setLevel(logging.INFO)
+
+            # Set up formatters
+            file_formatter = logging.Formatter(
+                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+            )
+            console_formatter = logging.Formatter("%(levelname)s: %(message)s")
+
+            # Apply formatters
+            file_handler.setFormatter(file_formatter)
+            console_handler.setFormatter(console_formatter)
+
+            # Configure root logger
+            root_logger = logging.getLogger()
+            root_logger.setLevel(logging.DEBUG)
+            root_logger.addHandler(file_handler)
+            root_logger.addHandler(console_handler)
+
+            logger.info("Logging initialized")
+        except Exception as e:
+            print(f"Error setting up logging: {e}")
+            # Continue without logging
+
+    def _create_ui(self) -> None:
+        """Create the user interface."""
+        try:
+            # Create main window
+            self._main_window = MainWindow(
+                self._data_model,
+                self._csv_service,
+                self._validation_service,
+                self._correction_service,
+                self._chart_service,
+                self._data_manager,
+                self._file_controller,
+                self._progress_controller,
+                self._view_state_controller,
+                self._data_view_controller,
+                self._ui_state_controller,
+            )
+
+            # Show the main window
+            self._main_window.show()
+
+            logger.info("UI created and shown")
+        except Exception as e:
+            logger.critical(f"Failed to create UI: {e}")
+            self._error_controller.handle_exception(e, "Failed to create UI")
+            sys.exit(1)
 
     def _connect_signals(self) -> None:
-        """Connect signals between services and UI components."""
-        # Connect application shutdown signal
-        self._app.aboutToQuit.connect(self._on_shutdown)
-
-        # Connect main window signals
-        self._main_window.load_csv_triggered.connect(self._data_manager.load_csv)
-        self._main_window.save_csv_triggered.connect(self._data_manager.save_csv)
-        self._main_window.validate_data_triggered.connect(self._validate_data)
-        self._main_window.apply_corrections_triggered.connect(self._apply_corrections)
-        self._main_window.export_validation_issues_triggered.connect(self._export_validation_issues)
-
-        # Connect data model signals
-        self._data_model.data_changed.connect(self._on_data_changed)
-
-        # Connect background worker signals
-        self._worker.task_completed.connect(self._on_background_task_completed)
-        self._worker.task_failed.connect(self._on_background_task_failed)
-
-        # Connect data manager signals
-        self._data_manager.load_success.connect(self._on_data_load_success)
-        self._data_manager.load_error.connect(self._show_error)
-        self._data_manager.save_success.connect(lambda path: logger.info(f"File saved: {path}"))
-        self._data_manager.save_error.connect(self._show_error)
-
-    def _on_data_load_success(self, row_count: str) -> None:
+        """Connect signals between components using SignalManager."""
+        try:
+            logger.info("Connecting application signals...")
+            
+            # Connect DataManager signals to app-level handlers
+            logger.debug("Connecting DataManager signals...")
+            self._signal_manager.connect(
+                self._data_manager, "load_started",
+                self, "_on_load_started"
+            )
+            self._signal_manager.connect(
+                self._data_manager, "load_progress",
+                self, "_on_load_progress"
+            )
+            self._signal_manager.connect(
+                self._data_manager, "load_finished",
+                self, "_on_load_finished"
+            )
+            self._signal_manager.connect(
+                self._data_manager, "load_error",
+                self, "_on_load_error"
+            )
+            self._signal_manager.connect(
+                self._data_manager, "save_success",
+                self, "_on_save_success"
+            )
+            self._signal_manager.connect(
+                self._data_manager, "save_error",
+                self, "_on_save_error"
+            )
+            
+            # Add connections for data loading state changes
+            logger.debug("Connecting data state signals...")
+            self._signal_manager.connect(
+                self._data_manager, "data_loaded",
+                lambda: logger.info("App: Data loaded signal received")
+            )
+            
+            # Connect directly to data model to track changes
+            if hasattr(self._data_model, "data_changed"):
+                logger.debug("Connecting data model signals...")
+                self._signal_manager.connect(
+                    self._data_model, "data_changed",
+                    lambda: logger.info("App: Data model changed signal received")
+                )
+                self._signal_manager.connect(
+                    self._data_model, "data_cleared",
+                    lambda: logger.info("App: Data model cleared signal received")
+                )
+            
+            # Connect FileOperationsController signals
+            logger.debug("Connecting FileOperationsController signals...")
+            self._signal_manager.connect(
+                self._file_controller, "load_csv_triggered",
+                self._data_manager, "load_csv"
+            )
+            self._signal_manager.connect(
+                self._file_controller, "save_csv_triggered",
+                self._data_manager, "save_csv"
+            )
+            self._signal_manager.connect(
+                self._file_controller, "recent_files_changed",
+                self, "_on_recent_files_changed"
+            )
+            
+            # Connect MainWindow signals for file operations
+            if hasattr(self._main_window, "file_opened"):
+                logger.debug("Connecting MainWindow file operation signals...")
+                self._signal_manager.connect(
+                    self._main_window, "file_opened",
+                    lambda path: logger.info(f"App: File opened signal received: {path}")
+                )
+            
+            # Connect ProgressController signals
+            logger.debug("Connecting ProgressController signals...")
+            self._signal_manager.connect(
+                self._progress_controller, "progress_canceled",
+                self._data_manager, "cancel_loading"
+            )
+            
+            # Connect cancellation signals bidirectionally
+            self._signal_manager.connect(
+                self._progress_controller, "progress_canceled",
+                lambda: logger.info("App: Progress canceled signal received")
+            )
+            
+            # Connect DataViewController signals
+            logger.debug("Connecting DataViewController signals...")
+            self._signal_manager.connect(
+                self._data_view_controller, "operation_error",
+                self, "_on_data_view_error"
+            )
+            self._signal_manager.connect(
+                self._data_view_controller, "table_populated",
+                lambda rows: logger.info(f"App: Table populated with {rows} rows")
+            )
+            
+            logger.info("All signals connected successfully")
+            
+            # In debug mode, print all connections
+            if __debug__:
+                logger.debug("Signal connections summary:")
+                self._signal_manager.print_connections()
+                
+        except Exception as e:
+            logger.critical(f"Failed to connect signals: {e}", exc_info=True)
+            self._error_controller.handle_exception(e, "Failed to connect signals")
+            sys.exit(1)
+    
+    def cleanup(self) -> None:
         """
-        Handle successful data load.
+        Clean up resources before application exit.
+        
+        This method disconnects all signal connections to prevent
+        signals firing during shutdown.
+        """
+        try:
+            # Disconnect all signals
+            logger.info("Disconnecting all signals...")
+            count = self._signal_manager.disconnect_all()
+            logger.info(f"Disconnected {count} signal connections")
+            
+            # Add other cleanup as needed
+        except Exception as e:
+            logger.error(f"Error during cleanup: {e}")
+
+    # ===== Slots =====
+
+    @Slot(str)
+    def _on_data_view_error(self, error_message: str) -> None:
+        """
+        Handle data view error.
 
         Args:
-            row_count: Number of rows loaded
+            error_message (str): Error message
         """
-        logger.info(f"Data loaded successfully with {row_count} rows")
+        logger.error(f"Data view error: {error_message}")
+        self._error_controller.show_error(error_message, "Data View Error")
 
-        # Switch to the Data view in the main window using a thread-safe approach
-        # Comment out the automatic tab change as requested by the user
-        # if self._main_window:
-        #     # Use QTimer.singleShot for thread-safety in PySide6
-        #     QTimer.singleShot(0, lambda: self._main_window._set_active_view("Data"))
-        #     logger.info("Requested switch to Data view (thread-safe)")
+    @Slot()
+    def _on_load_started(self) -> None:
+        """Handle load started signal."""
+        logger.info("Load started")
 
-    def _setup_autosave(self) -> None:
-        """Set up periodic autosave functionality."""
-        # Check if autosave is enabled
-        if self._config.get_bool("Autosave", "enabled", True):
-            interval = self._config.get_int("Autosave", "interval_minutes", 5)
-
-            # Convert minutes to milliseconds
-            interval_ms = interval * 60 * 1000
-
-            # Create autosave timer
-            self._autosave_timer = QTimer(self._app)
-            self._autosave_timer.timeout.connect(self._on_autosave)
-            self._autosave_timer.start(interval_ms)
-
-            logger.info(f"Autosave enabled with interval of {interval} minutes")
-
-    def _on_autosave(self) -> None:
-        """Handle autosave timer timeout."""
-        if self._data_model.is_empty:
-            logger.debug("Autosave skipped: No data in model")
-            return
-
-        # Get the last autosave path or use a default
-        autosave_path = self._config.get_path("Autosave", "path", Path("data") / "autosave.csv")
-
-        # Create parent directory if it doesn't exist
-        autosave_path.parent.mkdir(exist_ok=True)
-
-        # Save the data using the data manager
-        self._data_manager.save_csv(str(autosave_path))
-
-    def _on_shutdown(self) -> None:
-        """Handle application shutdown."""
-        logger.info("Starting application shutdown sequence")
-
-        # Check for any running background tasks and wait for them to complete
-        data_manager = self._data_manager
-        if data_manager:
-            try:
-                # Cancel any running tasks first
-                if hasattr(data_manager, "_worker") and hasattr(data_manager._worker, "is_running"):
-                    if data_manager._worker.is_running and data_manager._current_task:
-                        logger.info("Cancelling running background tasks")
-                        try:
-                            # Request cancellation
-                            data_manager._current_task.cancel()
-
-                            # Give a brief moment for tasks to clean up
-                            for _ in range(5):  # Process some events to allow tasks to clean up
-                                self._app.processEvents()
-
-                        except Exception as e:
-                            logger.error(f"Error cancelling background tasks: {e}")
-            except Exception as e:
-                logger.error(f"Error handling background tasks during shutdown: {e}")
-
-        # Auto-save data if model is not empty
-        if data_manager and hasattr(data_manager, "model") and data_manager.model:
-            if not data_manager.model.empty():
-                try:
-                    logger.info("Auto-saving data before shutdown")
-                    data_manager.save_csv(
-                        self._config.get_path("Autosave", "path", Path("data") / "autosave.csv")
-                    )
-                except Exception as e:
-                    logger.error(f"Error during auto-save on shutdown: {e}")
-
-        # Save application configuration
-        try:
-            logger.info("Saving configuration")
-            self._config.save()
-        except Exception as e:
-            logger.error(f"Error saving configuration during shutdown: {e}")
-
-        logger.info("Application shutdown complete")
-
-    def _validate_data(self):
-        """Validate the data in the model."""
-        logger.info("Validating data")
-
-        # Get the dataframe from the model
-        df = self._data_model.data
-
-        # Use the background worker to validate the data
-        self._worker.run_task(
-            self._validation_service.validate_data,
-            df,
-            task_id="validate_data",
-            on_success=lambda issues: self._data_model.set_validation_status(issues),
+        # Start progress with cancellation callback
+        self._progress_controller.start_progress(
+            "Loading Data", "Preparing to load data...", True, self._data_manager.cancel_loading
         )
 
-    def _apply_corrections(self):
-        """Apply corrections to the data."""
-        logger.info("Applying corrections")
+        # Set total files if available
+        if hasattr(self._data_manager, "total_files"):
+            self._progress_controller.set_total_files(self._data_manager.total_files)
 
-        # Get the dataframe from the model
-        df = self._data_model.data
-
-        # Use the background worker to apply corrections
-        self._worker.run_task(
-            self._correction_service.apply_corrections,
-            df,
-            task_id="apply_corrections",
-            on_success=lambda df: self._data_model.update_data(df),
-        )
-
-    def _export_validation_issues(self, file_path):
+    @Slot(str, int, int)
+    def _on_load_progress(self, file_path: str, current: int, total: int) -> None:
         """
-        Export validation issues to a file.
+        Handle load progress signal.
 
         Args:
-            file_path (str): Path to save the validation issues.
+            file_path: Path of the file being processed
+            current: Current progress value
+            total: Total progress value
         """
-        logger.info(f"Exporting validation issues: {file_path}")
+        # Use enhanced file progress tracking in the controller
+        self._progress_controller.update_file_progress(file_path, current, total)
 
-        # Get the validation issues from the model
-        issues = self._data_model.get_validation_status()
-
-        # Use the background worker to export the issues
-        self._worker.run_task(
-            self._validation_service.export_issues,
-            issues,
-            file_path,
-            task_id="export_issues",
-        )
-
-    def _on_data_changed(self) -> None:
-        """Handle data changed event from the data model."""
-        try:
-            # Implement a rate limiter for logging
-            current_time = time.time()
-
-            # Initialize class variable if it doesn't exist
-            if not hasattr(ChestBuddyApp, "_last_log_time"):
-                ChestBuddyApp._last_log_time = 0
-
-            # Log data changes at most once per second
-            if current_time - ChestBuddyApp._last_log_time >= 1.0:
-                logger.info("Data model changed")
-                ChestBuddyApp._last_log_time = current_time
-
-            # Update the UI as needed
-            self._update_ui()
-
-        except RecursionError:
-            # Silently handle recursion errors to prevent application crashes
-            pass
-        except Exception as e:
-            # Log other errors but don't let them crash the application
-            logger.error(f"Error handling data changed event: {str(e)}")
-
-    def _update_ui(self) -> None:
-        """Update UI components after data model changes."""
-        try:
-            # No need to explicitly update UI components as they are connected
-            # to the data_changed signal and will update themselves
-            # Just refresh the main window if needed
-            if hasattr(self, "_main_window") and self._main_window is not None:
-                self._main_window.refresh_ui()
-        except Exception as e:
-            logger.error(f"Error updating UI: {str(e)}")
-
-    def _on_background_task_completed(self, task_id, result):
-        """Handle background task completion."""
-        logger.info(f"Background task completed: {task_id}")
-
-    def _on_background_task_failed(self, task_id, error):
-        """Handle background task failure."""
-        logger.error(f"Background task failed: {task_id}, error: {error}")
-
-    def _show_error(self, message: str) -> None:
+    @Slot(str)
+    def _on_load_finished(self, message: str) -> None:
         """
-        Show an error message to the user.
+        Handle load finished signal.
 
         Args:
-            message: The error message to display.
+            message: Completion message
         """
-        logger.error(message)
-        from PySide6.QtWidgets import QMessageBox
+        logger.info(f"Load finished: {message}")
+        is_error = "error" in message.lower() or "failed" in message.lower()
 
-        # Update progress dialog if it exists and if the error is related to loading
-        if hasattr(self, "_main_window") and self._main_window:
-            if (
-                hasattr(self._main_window, "_progress_dialog")
-                and self._main_window._progress_dialog
-            ):
-                if self._main_window._progress_dialog.isVisible():
-                    # Import needed for the enum
-                    from chestbuddy.ui.widgets.progress_bar import ProgressBar
+        # First finish the progress with the final message
+        self._progress_controller.finish_progress(message, is_error)
 
-                    # Set error state in progress dialog
-                    self._main_window._progress_dialog.setState(ProgressBar.State.ERROR)
-                    self._main_window._progress_dialog.setStatusText(f"Error: {message}")
-                    self._main_window._progress_dialog.setCancelButtonText("Close")
+        # Wait a brief moment for UI to update before closing
+        QTimer.singleShot(1500, self._progress_controller.close_progress)
 
-                    # Disconnect previous connections and connect to close dialog
-                    try:
-                        self._main_window._progress_dialog.canceled.disconnect()
-                    except:
-                        pass
-                    self._main_window._progress_dialog.canceled.connect(
-                        self._main_window._progress_dialog.close
-                    )
+        # If it was successful, schedule the data table to be populated
+        if not is_error and self._main_window:
+            QTimer.singleShot(2000, self._main_window.populate_data_table)
 
-        # Show error message box
-        QMessageBox.critical(None, "Error", message)
-
-    def run(self) -> int:
+    @Slot(str)
+    def _on_load_error(self, error_message: str) -> None:
         """
-        Run the application.
+        Handle load error signal.
 
-        Returns:
-            Application exit code.
+        Args:
+            error_message: Error message
         """
-        # Show the main window
-        self._main_window.show()
+        logger.error(f"Load error: {error_message}")
+        self._error_controller.show_error(error_message, "Load Error")
 
-        # Check for initial file to load from command-line args
-        file_to_load = self._parse_args()
-        if file_to_load:
-            self._data_manager.load_csv(str(file_to_load))
-
-        # Enter main event loop
-        logger.info("Starting application main event loop")
-        return self._app.exec()
-
-    def _parse_args(self) -> Optional[Path]:
+    @Slot(str)
+    def _on_save_success(self, file_path: str) -> None:
         """
-        Parse command-line arguments.
+        Handle save success signal.
 
-        Returns:
-            Path to file to load, if specified, otherwise None.
+        Args:
+            file_path: Path where the file was saved
         """
-        args = self._app.arguments()
-        if len(args) > 1:
-            file_path = Path(args[1])
-            if file_path.exists() and file_path.suffix.lower() == ".csv":
-                return file_path
-        return None
+        logger.info(f"Save success: {file_path}")
+        if self._main_window:
+            self._main_window.statusBar().showMessage(f"Saved to {file_path}", 5000)
+
+    @Slot(str)
+    def _on_save_error(self, error_message: str) -> None:
+        """
+        Handle save error signal.
+
+        Args:
+            error_message: Error message
+        """
+        logger.error(f"Save error: {error_message}")
+        self._error_controller.show_error(error_message, "Save Error")
+
+    @Slot(list)
+    def _on_recent_files_changed(self, recent_files: List[str]) -> None:
+        """
+        Handle recent files changed signal.
+
+        Args:
+            recent_files: List of recent files
+        """
+        # Update the recent files in the main window
+        if self._main_window and hasattr(self._main_window, "set_recent_files"):
+            self._main_window.set_recent_files(recent_files)
 
 
 def main():
-    """Main entry point for the ChestBuddy application."""
-    # Initialize and run the application
-    app = ChestBuddyApp()
-    exit_code = app.run()
+    """Main entry point for the application."""
+    try:
+        # Create QApplication instance
+        app = QApplication(sys.argv)
+        app.setApplicationName("ChestBuddy")
+        app.setOrganizationName("ChestBuddy")
+        app.setOrganizationDomain("chestbuddy.org")
 
-    # Return exit code to OS
-    sys.exit(exit_code)
+        # Create and initialize ChestBuddyApp
+        chest_buddy_app = ChestBuddyApp(sys.argv)
+        
+        # Connect aboutToQuit signal to cleanup
+        app.aboutToQuit.connect(chest_buddy_app.cleanup)
+
+        # Start the event loop
+        return app.exec()
+    except Exception as e:
+        print(f"Critical error: {e}")
+        return 1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
