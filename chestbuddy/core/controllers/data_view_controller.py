@@ -39,6 +39,9 @@ class DataViewController(QObject):
         correction_started (Signal): Emitted when correction starts
         correction_completed (Signal): Emitted when correction completes
         correction_error (Signal): Emitted when correction fails
+        operation_started (Signal): Emitted when an operation starts
+        operation_completed (Signal): Emitted when an operation completes
+        chart_created (Signal): Emitted when a chart is created
     """
 
     # Define signals
@@ -56,6 +59,11 @@ class DataViewController(QObject):
     correction_started = Signal(str)  # Strategy name
     correction_completed = Signal(str, int)  # Strategy name, affected rows
     correction_error = Signal(str)  # Error message
+
+    # Chart signals
+    operation_started = Signal(str)  # Operation name
+    operation_completed = Signal(str, str)  # Operation name, result
+    chart_created = Signal(object)  # QChart object
 
     def __init__(self, data_model, validation_service=None, correction_service=None):
         """
@@ -859,3 +867,138 @@ class DataViewController(QObject):
             logger.error(error_msg)
             self.operation_error.emit(error_msg)
             return False, error_msg
+
+    # ===== Chart Operations =====
+
+    def create_chart(
+        self,
+        chart_type: str,
+        x_column: str,
+        y_column: str,
+        title: str = "Chart",
+        group_by: Optional[str] = None,
+    ) -> bool:
+        """
+        Create a chart using the chart service.
+
+        Args:
+            chart_type (str): Type of chart to create (Bar Chart, Pie Chart, Line Chart)
+            x_column (str): Column to use for x-axis or categories
+            y_column (str): Column to use for y-axis or values
+            title (str, optional): Chart title. Defaults to "Chart".
+            group_by (str, optional): Column to group by for line charts. Defaults to None.
+
+        Returns:
+            bool: Success status
+        """
+        try:
+            # Signal chart creation started
+            self.operation_started.emit("chart_creation")
+
+            # Validate data model
+            if self._data_model.is_empty:
+                logger.warning("Cannot create chart: Data model is empty")
+                self.operation_error.emit("No data available for chart creation")
+                return False
+
+            # Validate columns
+            if not x_column or not y_column:
+                logger.warning(f"Invalid chart columns: x={x_column}, y={y_column}")
+                self.operation_error.emit("Invalid chart columns")
+                return False
+
+            # Get the chart service from the view
+            chart_service = None
+            if hasattr(self._view, "_chart_service"):
+                chart_service = self._view._chart_service
+            elif (
+                self._view
+                and hasattr(self._view, "_chart_tab")
+                and hasattr(self._view._chart_tab, "chart_service")
+            ):
+                chart_service = self._view._chart_tab.chart_service
+
+            if not chart_service:
+                logger.warning("Chart service not available")
+                self.operation_error.emit("Chart service not available")
+                return False
+
+            # Create the chart based on chart type
+            chart = None
+            if chart_type == "Bar Chart":
+                chart = chart_service.create_bar_chart(x_column, y_column, title)
+            elif chart_type == "Pie Chart":
+                chart = chart_service.create_pie_chart(x_column, y_column, title)
+            elif chart_type == "Line Chart":
+                chart = chart_service.create_line_chart(
+                    x_column, y_column, title, group_by=group_by
+                )
+            else:
+                logger.warning(f"Unsupported chart type: {chart_type}")
+                self.operation_error.emit(f"Unsupported chart type: {chart_type}")
+                return False
+
+            # If the view has the chart tab and chart view, set the chart
+            if (
+                self._view
+                and hasattr(self._view, "_chart_tab")
+                and hasattr(self._view._chart_tab, "chart_view")
+            ):
+                self._view._chart_tab.chart_view.setChart(chart)
+                self._view._chart_tab.export_button.setEnabled(True)
+
+            # Emit signals
+            self.chart_created.emit(chart)
+            self.operation_completed.emit("chart_creation", chart_type)
+
+            logger.info(f"Chart created: {chart_type}, {title}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error creating chart: {e}")
+            self.operation_error.emit("chart_creation", f"Error creating chart: {str(e)}")
+            return False
+
+    def export_chart(self) -> bool:
+        """
+        Export the currently displayed chart to a file.
+
+        Returns:
+            bool: Success status
+        """
+        try:
+            # Signal chart export started
+            self.operation_started.emit("chart_export")
+
+            # Check if view exists
+            if not self._view:
+                logger.warning("Cannot export chart: View not set")
+                self.operation_error.emit("View not set")
+                return False
+
+            # Check if chart tab exists and has a current chart
+            if (
+                not hasattr(self._view, "_chart_tab")
+                or not hasattr(self._view._chart_tab, "_current_chart")
+                or not self._view._chart_tab._current_chart
+            ):
+                logger.warning("No chart available for export")
+                self.operation_error.emit("No chart available for export")
+                return False
+
+            # Call export method on chart tab
+            file_path = self._view._chart_tab._export_chart()
+
+            if file_path:
+                # Emit signal
+                self.operation_completed.emit("chart_export", file_path)
+                logger.info(f"Chart exported to {file_path}")
+                return True
+            else:
+                self.operation_error.emit("chart_export", "Chart export cancelled or failed")
+                return False
+
+        except Exception as e:
+            logger.error(f"Error exporting chart: {e}")
+            self.operation_error.emit("chart_export", f"Error exporting chart: {str(e)}")
+            return False

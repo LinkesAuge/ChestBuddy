@@ -39,6 +39,8 @@ from chestbuddy.core.controllers import (
     ProgressController,
     ViewStateController,
     DataViewController,
+    ErrorHandlingController,
+    UIStateController,
 )
 from chestbuddy.ui.resources.style import Colors
 from chestbuddy.ui.resources.icons import Icons
@@ -112,6 +114,7 @@ class MainWindow(QMainWindow):
         progress_controller: ProgressController,
         view_state_controller: ViewStateController,
         data_view_controller: DataViewController,
+        ui_state_controller: UIStateController,
         parent: Optional[QWidget] = None,
     ) -> None:
         """
@@ -128,6 +131,7 @@ class MainWindow(QMainWindow):
             progress_controller: Controller for progress reporting.
             view_state_controller: Controller for view state management.
             data_view_controller: Controller for data view operations.
+            ui_state_controller: Controller for UI state management.
             parent: The parent widget.
         """
         super().__init__(parent)
@@ -143,6 +147,7 @@ class MainWindow(QMainWindow):
         self._progress_controller = progress_controller
         self._view_state_controller = view_state_controller
         self._data_view_controller = data_view_controller
+        self._ui_state_controller = ui_state_controller
 
         if self._data_manager:
             logger.debug("MainWindow initialized with data_manager")
@@ -201,6 +206,11 @@ class MainWindow(QMainWindow):
         self._data_view_controller.filter_applied.connect(self._on_filter_applied)
         self._data_view_controller.sort_applied.connect(self._on_sort_applied)
         self._data_view_controller.table_populated.connect(self._on_table_populated)
+
+        # Connect ui state controller signals
+        self._ui_state_controller.status_message_changed.connect(self._on_status_message_changed)
+        self._ui_state_controller.actions_state_changed.connect(self._on_actions_state_changed)
+        self._ui_state_controller.ui_refresh_needed.connect(self.refresh_ui)
 
     @Slot(dict)
     def _on_filter_applied(self, filter_params: Dict) -> None:
@@ -315,6 +325,45 @@ class MainWindow(QMainWindow):
         if dashboard_view and isinstance(dashboard_view, DashboardView):
             dashboard_view.set_recent_files(recent_files)
 
+    @Slot(str)
+    def _on_status_message_changed(self, message: str) -> None:
+        """
+        Handle changes to the status message.
+
+        Args:
+            message: The new status message
+        """
+        if hasattr(self, "_status_bar") and self._status_bar is not None:
+            self._status_bar.set_status(message)
+
+    @Slot(dict)
+    def _on_actions_state_changed(self, action_states: Dict[str, bool]) -> None:
+        """
+        Handle changes to action states.
+
+        Args:
+            action_states: Dictionary mapping action names to boolean states
+        """
+        # Update actions based on their names
+        for action_name, enabled in action_states.items():
+            action = None
+
+            # Map action names to actual action objects
+            if action_name == "save":
+                action = self._save_action
+            elif action_name == "save_as":
+                action = self._save_as_action
+            elif action_name == "export":
+                action = self._export_validation_action
+            elif action_name == "validate":
+                action = self._validate_action
+            elif action_name == "correct":
+                action = self._correct_action
+
+            # Enable/disable the action if found
+            if action is not None:
+                action.setEnabled(enabled)
+
     def _init_ui(self) -> None:
         """Initialize the user interface."""
         # Create central widget
@@ -385,16 +434,22 @@ class MainWindow(QMainWindow):
 
         # Create Validation view
         validation_view = ValidationViewAdapter(self._data_model, self._validation_service)
+        # Set up the validation view to use the data view controller
+        validation_view.set_controller(self._data_view_controller)
         self._content_stack.addWidget(validation_view)
         self._views["Validation"] = validation_view
 
         # Create Correction view
         correction_view = CorrectionViewAdapter(self._data_model, self._correction_service)
+        # Set up the correction view to use the data view controller
+        correction_view.set_controller(self._data_view_controller)
         self._content_stack.addWidget(correction_view)
         self._views["Correction"] = correction_view
 
         # Create Analysis/Charts view
         chart_view = ChartViewAdapter(self._data_model, self._chart_service)
+        # Set up the chart view to use the data view controller
+        chart_view.set_data_view_controller(self._data_view_controller)
         self._content_stack.addWidget(chart_view)
         self._views["Charts"] = chart_view
 
@@ -589,10 +644,10 @@ class MainWindow(QMainWindow):
         # Get data model state
         has_data = self._data_model is not None and not self._data_model.is_empty
 
-        # Update data loaded state
-        self._update_data_loaded_state(has_data)
+        # Update data loaded state through UI state controller
+        self._ui_state_controller.update_data_dependent_ui(has_data)
 
-        # Update recent files in dashboard
+        # Update dashboard information
         if "Dashboard" in self._views:
             dashboard_view = self._views["Dashboard"]
             dashboard_view.set_recent_files(self._recent_files)
@@ -621,11 +676,11 @@ class MainWindow(QMainWindow):
         # Delegate to the view state controller
         self._view_state_controller.update_data_loaded_state(has_data)
 
-        # Update actions - keeping this here since it's UI-specific
-        self._save_action.setEnabled(has_data)
-        self._save_as_action.setEnabled(has_data)
-        self._validate_action.setEnabled(has_data)
-        self._correct_action.setEnabled(has_data)
+        # Delegate to the UI state controller for action states
+        self._ui_state_controller.update_data_dependent_ui(has_data)
+
+        # Store the data loaded state
+        self._has_data_loaded = has_data
 
     @Slot(str)
     def _set_active_view(self, view_name: str) -> None:
@@ -1042,21 +1097,19 @@ class MainWindow(QMainWindow):
 
     def _update_status_bar(self) -> None:
         """Update the status bar with current information."""
-        try:
-            if (
-                hasattr(self, "_status_bar")
-                and self._status_bar is not None
-                and hasattr(self, "_data_model")
-            ):
-                # Show row count in status bar
-                row_count = (
-                    self._data_model.row_count if hasattr(self._data_model, "row_count") else 0
-                )
-                self._status_bar.showMessage(f"Rows: {row_count}")
-        except Exception as e:
-            import logging
+        if hasattr(self, "_data_model") and self._data_model:
+            if not self._data_model.is_empty:
+                # Get row count
+                row_count = len(self._data_model.data)
 
-            logging.getLogger(__name__).error(f"Error updating status bar: {e}")
+                # Delegate to UI state controller
+                self._ui_state_controller.update_status_message(f"Data loaded: {row_count:,} rows")
+            else:
+                # Delegate to UI state controller
+                self._ui_state_controller.update_status_message("No data loaded")
+        else:
+            # Delegate to UI state controller
+            self._ui_state_controller.update_status_message("No data model available")
 
     def _update_table_population_progress(self):
         """
