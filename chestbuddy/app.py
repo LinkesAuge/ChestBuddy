@@ -38,6 +38,8 @@ from chestbuddy.utils.background_processing import BackgroundWorker
 from chestbuddy.ui.resources.style import apply_application_style
 from chestbuddy.ui.resources.resource_manager import ResourceManager
 from chestbuddy.utils.signal_manager import SignalManager
+from chestbuddy.utils.service_locator import ServiceLocator
+from chestbuddy.ui.utils.update_manager import UpdateManager
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -121,6 +123,16 @@ class ChestBuddyApp(QObject):
             except Exception as e:
                 logger.error(f"Error initializing controllers: {e}")
                 self._error_controller.handle_exception(e, "Error initializing controllers")
+                raise
+
+            # Initialize UpdateManager and register with ServiceLocator
+            try:
+                self._update_manager = UpdateManager()
+                ServiceLocator.register("update_manager", self._update_manager)
+                logger.info("UpdateManager initialized and registered with ServiceLocator")
+            except Exception as e:
+                logger.error(f"Error initializing UpdateManager: {e}")
+                self._error_controller.handle_exception(e, "Error initializing UpdateManager")
                 raise
 
             # Set up controller relationships
@@ -300,21 +312,33 @@ class ChestBuddyApp(QObject):
             sys.exit(1)
 
     def cleanup(self) -> None:
-        """
-        Clean up resources before application exit.
-
-        This method disconnects all signal connections to prevent
-        signals firing during shutdown.
-        """
+        """Clean up application resources before exit."""
         try:
-            # Disconnect all signals
-            logger.info("Disconnecting all signals...")
-            count = self._signal_manager.disconnect_all()
-            logger.info(f"Disconnected {count} signal connections")
+            logger.info("Cleaning up application resources")
 
-            # Add other cleanup as needed
+            # Process pending signals
+            QMetaObject.invokeMethod(self, "_process_pending", Qt.ConnectionType.DirectConnection)
+
+            # Disconnect all signals
+            self._signal_manager.disconnect_all()
+
+            # Clear the ServiceLocator
+            ServiceLocator.clear()
+
+            # If main window exists, close it
+            if self._main_window is not None:
+                self._main_window.close()
+
+            # Save configuration
+            if hasattr(self, "_config_manager"):
+                self._config_manager.save()
+
+            # Clean up BackgroundWorker threads
+            BackgroundWorker.shutdown()
+
+            logger.info("Application cleanup completed")
         except Exception as e:
-            logger.error(f"Error during cleanup: {e}")
+            logger.error(f"Error during application cleanup: {e}")
 
     # ===== Slots =====
 

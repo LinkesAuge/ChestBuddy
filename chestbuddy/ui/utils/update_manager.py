@@ -159,11 +159,18 @@ class UpdateManager(QObject):
 
     def cancel_updates(self) -> None:
         """Cancel all pending updates."""
-        for timer in self._timers.values():
-            timer.stop()
+        try:
+            for timer in list(self._timers.values()):
+                try:
+                    timer.stop()
+                except RuntimeError:
+                    # Timer might have already been deleted
+                    pass
 
-        self._pending_updates.clear()
-        logger.debug("All updates cancelled")
+            self._pending_updates.clear()
+            logger.debug("All updates cancelled")
+        except Exception as e:
+            logger.error(f"Error cancelling updates: {e}")
 
     def cancel_component_update(self, component: T) -> None:
         """
@@ -264,14 +271,24 @@ class UpdateManager(QObject):
 
     def __del__(self) -> None:
         """Clean up resources on deletion."""
-        self.cancel_updates()
+        try:
+            # Cancel updates
+            self.cancel_updates()
 
-        # Explicitly delete all timers
-        for timer in self._timers.values():
-            timer.stop()
-            timer.deleteLater()
+            # Explicitly delete all timers
+            for timer in list(self._timers.values()):
+                try:
+                    timer.stop()
+                    timer.deleteLater()
+                except RuntimeError:
+                    # Timer might have already been deleted
+                    pass
 
-        self._timers.clear()
-        self._pending_updates.clear()
-        self._dependencies.clear()
-        self._debounce_intervals.clear()
+            # Clear collections
+            self._timers.clear()
+            self._pending_updates.clear()
+            self._dependencies.clear()
+            self._debounce_intervals.clear()
+        except (RuntimeError, AttributeError, TypeError):
+            # Handle cases where Qt objects are already deleted or app is shutting down
+            pass
