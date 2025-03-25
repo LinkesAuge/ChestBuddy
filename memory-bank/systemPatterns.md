@@ -199,13 +199,11 @@ graph TD
     CS --> VV[ValidationViewAdapter]
     CS --> CV[CorrectionViewAdapter]
     CS --> CHV[ChartViewAdapter]
-    CS -.planned.-> RPV[ReportViewAdapter]
     
     DV -.wraps.-> DO[DataView]
     VV -.wraps.-> VO[ValidationTab]
     CV -.wraps.-> CO[CorrectionTab]
     CHV -.wraps.-> CHO[ChartTab]
-    RPV -.will wrap.-> RPO[ReportView]
     
     style MW fill:#1a3055,color:#fff
     style SB fill:#1a3055,color:#fff
@@ -216,12 +214,10 @@ graph TD
     style VV fill:#234a87,color:#fff
     style CV fill:#234a87,color:#fff
     style CHV fill:#234a87,color:#fff
-    style RPV fill:#234a87,color:#fff,stroke-dasharray: 5 5
     style DO fill:#2e62b5,color:#fff
     style VO fill:#2e62b5,color:#fff
     style CO fill:#2e62b5,color:#fff
     style CHO fill:#2e62b5,color:#fff
-    style RPO fill:#2e62b5,color:#fff,stroke-dasharray: 5 5
 ```
 
 ### Reusable UI Components
@@ -334,19 +330,76 @@ The application implements a comprehensive error handling architecture:
    - Debug logs for troubleshooting
    - Log rotation and management
 
-## Future Architecture Considerations
+## Controller Architecture
 
-1. **Report Generation Service**
-   - Template-based report generation
-   - PDF export with embedded charts
-   - Custom styling and branding options
+The application follows a controller-based architecture that separates UI from business logic:
 
-2. **Settings System**
-   - User preferences persistence
-   - UI customization options
-   - Feature toggles for advanced capabilities
+```mermaid
+graph TD
+    App[ChestBuddyApp] --> VSCT[ViewStateController]
+    App --> DVCT[DataViewController]
+    App --> UICT[UIStateController]
+    App --> FOCT[FileOperationsController]
+    App --> PRCT[ProgressController]
+    App --> ERCT[ErrorHandlingController]
+    
+    VSCT <-->|View State Coordination| DVCT
+    UICT <-->|UI Updates| VSCT
+    UICT <-->|Action States| DVCT
+    ERCT -->|Error Handling| PRCT
+    
+    style VSCT fill:#2C5282,color:#fff
+    style DVCT fill:#2C5282,color:#fff
+    style UICT fill:#2C5282,color:#fff
+    style FOCT fill:#2C5282,color:#fff
+    style PRCT fill:#2C5282,color:#fff
+    style ERCT fill:#2C5282,color:#fff
+```
 
-3. **Help Documentation System**
-   - Context-sensitive help
-   - Tutorial integration
-   - Searchable documentation 
+### Key Controllers
+
+1. **ViewStateController**: Manages active view, navigation history, and view transitions
+   - Tracks view dependencies and prerequisites
+   - Manages navigation history
+   - Handles view availability based on data state
+
+2. **DataViewController**: Centralizes data operations, validation, and correction
+   - Handles data filtering and sorting
+   - Coordinates validation processes
+   - Manages correction application
+
+3. **UIStateController**: Manages UI-specific state not related to data or views
+   - Updates status bar messages
+   - Controls action enablement states
+   - Handles UI theme changes
+
+4. **FileOperationsController**: Manages file operations
+   - Handles file opening and saving
+   - Tracks recent files
+   - Manages file dialogs
+
+5. **ProgressController**: Manages long-running operations feedback
+   - Shows progress dialogs with status information
+   - Updates progress indicators
+   - Provides cancellation options
+
+6. **ErrorHandlingController**: Centralizes error management
+   - Displays error messages
+   - Logs errors with context
+   - Provides recovery options
+
+### Controller-UI Communication
+
+The controllers communicate with UI components via signals:
+
+```python
+# Controller emits signals when state changes
+self._ui_state_controller.status_message_changed.connect(self._on_status_message_changed)
+self._view_state_controller.navigation_history_changed.connect(self._on_navigation_history_changed)
+
+# UI components emit signals that controllers handle
+self._data_view.filter_changed.connect(self._data_controller.apply_filter)
+self._validation_view.validate_clicked.connect(self._data_controller.validate_data)
+```
+
+This signal-based communication ensures loose coupling between UI and business logic components. 

@@ -125,7 +125,7 @@ alwaysApply: false
   - Fixed notification logic to ensure data changes are properly communicated
   - Added more detailed logging for debugging
 
-# Remaining Issues
+# Current Known Issues
 
 ## Minor Issues
 - QThread object deletion warning at shutdown
@@ -134,28 +134,9 @@ alwaysApply: false
   - Implemented a more graceful shutdown process to avoid thread termination
   - Improved warning messages to debug level to avoid alarming users
 
-- **Memory usage during large file imports**: While improved, importing very large files still requires significant memory. 
-  - Could be further improved by implementing disk-based intermediate storage for extremely large datasets.
-
-- **UI responsiveness during intensive operations**: Very large datasets (50,000+ rows) can occasionally cause UI freezing despite background processing.
-  - Additional throttling and chunking mechanisms could improve this further.
-
-## Current Technical Challenges
-
-- **Report generation**: Design and implementation of the PDF export functionality
-  - Need to select appropriate PDF generation library
-  - Challenge with embedding charts with proper resolution
-  - Handling pagination for large reports
-
-- **Settings persistence**: More robust storage of application settings
-  - Ensuring backward compatibility when adding new settings
-  - Providing defaults for missing settings
-  - Supporting user profiles in the future
-
-- **Enhanced error recovery**: More sophisticated error recovery mechanisms
-  - Providing better options to users when errors occur
-  - Preserving partial data when possible
-  - Automatic recovery attempts for common issues
+- Large file processing memory usage
+  - Very large datasets (>100,000 rows) can consume significant memory
+  - Performance can degrade with extremely large files
 
 ## Lessons Learned
 
@@ -183,125 +164,6 @@ alwaysApply: false
   - Implement throttling for high-frequency progress updates
   - Always disconnect signals when done to prevent memory leaks
   - Use try/except blocks around Qt object interactions that might be deleted
-
-## [2025-03-24] CSV Loading Error
-
-### Issue
-CSV loading functionality was failing with an error:
-```
-Error setting up CSV loading task: BackgroundWorker.execute_task() takes 2 positional arguments but 3 were given
-```
-
-### Root Cause
-During implementation of progress dialog improvements, the DataManager.load_csv method was modified to call `self._worker.execute_task(task, result_key)` with three arguments, but the BackgroundWorker.execute_task method only accepts two parameters (self and task).
-
-### Solution
-1. Fixed the DataManager.load_csv method to call execute_task correctly:
-   ```python
-   # Changed from
-   result_key = "load_csv"
-   self._worker.execute_task(task, result_key)
-   
-   # To
-   self._worker.execute_task(task)
-   ```
-
-2. Updated the BackgroundWorker._on_thread_started method to properly emit the task_completed signal with the task ID after completion:
-   ```python
-   task_id = getattr(self._task, "task_id", "unknown")
-   self.finished.emit(result)
-   self.task_completed.emit(task_id, result)
-   ```
-
-3. Enhanced the DataManager._on_background_task_completed method to better handle task results:
-   ```python
-   if isinstance(result, tuple) and len(result) == 2:
-       success, data_or_error = result
-       if success and isinstance(data_or_error, pd.DataFrame):
-           # Handle successful CSV load
-           self._on_csv_load_success((data_or_error, None))
-       else:
-           # Handle CSV load error
-           error_msg = data_or_error if isinstance(data_or_error, str) else str(data_or_error)
-           self._on_csv_load_success((None, error_msg))
-   ```
-
-### Verification
-Tested by loading multiple CSV files, which now works correctly with proper progress reporting.
-
-## [2025-03-25] ViewStateController Type Annotation Issues
-
-### Issue
-The ViewStateController was using typing module type annotations (Dict, List, Set) which are incompatible with PySide6 signals that expect built-in Python types.
-
-### Root Cause
-PySide6 signals cannot properly handle typing module types like Dict, List, and Set. When a signal emits a value with these types, it can cause type errors or serialization issues.
-
-### Solution
-1. Updated all type annotations in ViewStateController to use built-in Python types:
-   ```python
-   # Changed from
-   self._view_dependencies: Dict[str, Set[str]] = {}
-   self._view_prerequisites: Dict[str, List[Callable]] = {}
-   self._view_availability: Dict[str, bool] = {}
-
-   # To
-   self._view_dependencies: dict[str, set[str]] = {}
-   self._view_prerequisites: dict[str, list[Callable]] = {}
-   self._view_availability: dict[str, bool] = {}
-   ```
-
-2. Updated class docstring to reflect the correct types:
-   ```python
-   """
-   Attributes:
-       _view_dependencies (dict[str, set[str]]): View dependencies (key depends on values)
-       _view_prerequisites (dict[str, list[Callable]]): View prerequisites functions
-       _view_availability (dict[str, bool]): Current availability of views
-   """
-   ```
-
-3. Created comprehensive type annotation tests that verify:
-   - Signal documentation uses correct types
-   - Attributes use built-in Python types
-   - Method parameters use built-in Python types
-   - Emitted signal values are properly typed
-
-### Verification
-Created and implemented `tests/core/controllers/test_view_state_controller_type_annotations.py` which verifies all type annotations are compatible with PySide6 signals. All tests pass successfully.
-
-### Lessons Learned
-1. Always use built-in Python types (dict, list, set) instead of typing module equivalents (Dict, List, Set) when working with PySide6 signals
-2. Create dedicated tests for type annotations when working with cross-language bindings like PySide6
-3. Document signal parameter types clearly in docstrings using consistent syntax
-
-## Startup Errors (2025-03-25)
-
-### Issues Fixed
-1. **ChartService initialization error**: The ChartService constructor expected a data_model parameter but none was provided.
-   - Fixed by adding the data_model parameter: `self._chart_service = ChartService(self._data_model)`
-
-2. **DataManager initialization error**: The DataManager was being initialized with a config_manager parameter which wasn't expected by its constructor.
-   - Fixed by removing the extra parameter: `self._data_manager = DataManager(self._data_model, self._csv_service)`
-   - Added a separate line to set the config attribute: `self._data_manager._config = self._config_manager`
-
-3. **Missing data_cleared signal**: The ViewStateController was trying to connect to a data_cleared signal that didn't exist in ChestDataModel.
-   - Fixed by adding the signal to ChestDataModel: `data_cleared = Signal()`
-   - Updated the clear() method to emit this signal: `self.data_cleared.emit()`
-
-4. **QTimer.currentTime() error**: The ViewStateController was using QTimer.currentTime() which doesn't exist.
-   - Fixed by using time.time() instead: `current_time = time.time() * 1000`
-
-5. **apply_application_style missing parameter**: The apply_application_style function was called without its required app parameter.
-   - Fixed by adding the parameter: `app = QApplication.instance(); apply_application_style(app)`
-
-6. **MainWindow initialization error**: The MainWindow was being initialized with an error_controller parameter which wasn't expected in its constructor.
-   - Fixed by removing the parameter from the MainWindow initialization call.
-
-### Known Issues
-- There's a TypeError when trying to use the file dialog: `ConfigManager.set() missing 1 required positional argument: 'value'`
-  - This happens in FileOperationsController.open_file() method when trying to save the last directory.
-  - This is a separate issue not directly related to the startup problems.
 
 # Bug Tracking and Fixing Log
 
@@ -370,20 +232,7 @@ In `MainWindow._ensure_data_table_populated`, when the user was not on the Data 
 
 **Resolved:** March 24, 2025
 
-## Known Limitations
-
-1. **Memory usage with large datasets** - Loading very large datasets (>100k rows) can be memory-intensive
-   - Status: To be optimized
-   - Potential solution: Implement data paging/virtualization
-
-2. **UI responsiveness during data loading** - UI can become less responsive during loading of large files
-   - Status: Partially mitigated
-   - Current solution: Background processing with progress reporting
-   - Further improvements planned: Chunked processing with yield points for UI updates
-
-## Recent Fixes
-
-### Type Annotation Fix for PySide6 Signals (2024-03-29)
+## Type Annotation Fix for PySide6 Signals (2024-03-29)
 
 **Issue**: PySide6 signal handling in ViewStateController and related classes was causing issues due to incorrect type annotations - using `typing.Dict` instead of Python built-in `dict` type.
 
@@ -417,8 +266,6 @@ In `MainWindow._ensure_data_table_populated`, when the user was not on the Data 
 ### Next Integration Steps
 - Complete the refactoring of `ChartViewAdapter` to use the `ChartController` in a similar way.
 - Consider further refactoring the correction UI to eliminate the need to call the tab's methods directly.
-
-# Bug Fixing Documentation
 
 ## File Import Error in FileOperationsController
 
