@@ -75,6 +75,7 @@ class ProgressDialog(QDialog):
         self._show_cancel_button = show_cancel_button
         self._cancel_button_text = cancel_button_text
         self._was_canceled = False
+        self._is_fully_initialized = False  # Track when dialog is fully shown
 
         # Ensure we have references to UI elements
         self._label = None
@@ -454,6 +455,16 @@ class ProgressDialog(QDialog):
             except Exception as e:
                 logger.error(f"Error resetting cancel button: {e}")
 
+    def show(self) -> None:
+        """
+        Show the dialog and mark it as fully initialized.
+        Overridden to prevent premature cancel signal.
+        """
+        result = super().show()
+        # Set initialization flag after super().show() to ensure dialog is truly visible
+        self._is_fully_initialized = True
+        return result
+
     def exec(self) -> int:
         """
         Execute the dialog.
@@ -473,6 +484,9 @@ class ProgressDialog(QDialog):
         self.raise_()
         self.activateWindow()
 
+        # Set initialization flag to ensure closeEvent will emit cancel signal if needed
+        self._is_fully_initialized = True
+
         # Process events to ensure UI is responsive
         QApplication.processEvents()
 
@@ -486,12 +500,13 @@ class ProgressDialog(QDialog):
         Overridden to ensure the canceled signal is emitted when the dialog is closed,
         which ensures background processes are properly cancelled.
         """
-        # Only emit the signal if it hasn't been canceled already
-        # This prevents emitting twice when Cancel button is used
-        if not self._was_canceled:
+        # Only emit the signal if it hasn't been canceled already AND the dialog was properly shown
+        if not self._was_canceled and self._is_fully_initialized:
             logger.debug("Dialog closed via window close button, emitting canceled signal")
             self._was_canceled = True
             self.canceled.emit()
+        elif not self._is_fully_initialized:
+            logger.debug("Ignoring closeEvent during initialization")
 
         # Call the parent class's closeEvent
         super().closeEvent(event)
