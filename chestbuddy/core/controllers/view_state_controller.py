@@ -431,18 +431,19 @@ class ViewStateController(BaseController):
         """Reset throttle status to allow updates again."""
         self._update_throttled = False
 
-    @Slot(str)
-    def set_active_view(self, view_name: str) -> None:
+    @Slot(str, str)
+    def set_active_view(self, view_name: str, subsection: Optional[str] = None) -> None:
         """
         Set the active view.
 
         Args:
             view_name (str): The name of the view to set as active
+            subsection (Optional[str]): The subsection, if any
         """
         # If a transition is already in progress, queue this request
         if self._view_transition_in_progress:
             logger.info(f"View transition already in progress, queuing change to '{view_name}'")
-            self._pending_view_change = view_name
+            self._pending_view_change = (view_name, subsection)
             return
 
         if view_name not in self._views:
@@ -532,24 +533,25 @@ class ViewStateController(BaseController):
 
     def _complete_transition(self, view_name: str) -> None:
         """
-        Complete the view transition process.
+        Complete the view transition after animations or async operations.
 
         Args:
-            view_name (str): The name of the view that was activated
+            view_name (str): The name of the view that was transitioned to
         """
-        # Mark transition as complete
         self._view_transition_in_progress = False
+        logger.debug(f"View transition to '{view_name}' completed")
 
-        # Emit signal
-        self.view_changed.emit(view_name)
+        # Emit view transition completed signal
         self.view_transition_completed.emit(view_name)
 
         # Process any pending view change
         if self._pending_view_change:
-            pending = self._pending_view_change
+            pending_view, pending_subsection = self._pending_view_change
             self._pending_view_change = None
-            logger.info(f"Processing pending view change to '{pending}'")
-            self.set_active_view(pending)
+            logger.info(
+                f"Processing pending view change to '{pending_view}' with subsection '{pending_subsection}'"
+            )
+            self.set_active_view(pending_view, pending_subsection)
 
     def _save_view_state(self, view_name: str) -> None:
         """
