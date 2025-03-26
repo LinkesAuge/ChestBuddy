@@ -78,10 +78,15 @@ class DataViewAdapter(UpdatableView):
 
         # Create the underlying DataView
         self._data_view = DataView(data_model)
+        # Disable auto-update to prevent double population
+        self._data_view.disable_auto_update()
 
         # Initialize the base view with debug mode option
         super().__init__("Data View", parent, debug_mode=debug_mode)
         self.setObjectName("DataViewAdapter")
+
+        # Ensure the adapter itself has auto-update enabled
+        self.enable_auto_update()
 
     def set_controller(self, controller: DataViewController) -> None:
         """
@@ -190,31 +195,42 @@ class DataViewAdapter(UpdatableView):
 
     def _connect_ui_signals(self):
         """Connect UI component signals using safe connection pattern."""
-        # Get action toolbar from DataView
-        import_button = self._data_view._action_toolbar.get_button_by_name("import")
-        export_button = self._data_view._action_toolbar.get_button_by_name("export")
+        # Connect to DataView signals instead of directly to buttons
+        logger.info("DataViewAdapter: Setting up UI signal connections")
+
+        # Use direct Qt signal connection for more reliable connection
+        if hasattr(self._data_view, "import_clicked"):
+            try:
+                logger.info("DataViewAdapter: Connecting to import_clicked signal from DataView")
+                # Connect the signal directly
+                self._data_view.import_clicked.connect(self._on_import_requested)
+                logger.info("DataViewAdapter: Successfully connected to import_clicked signal")
+            except Exception as e:
+                logger.error(f"Error connecting to import_clicked signal: {e}")
+        else:
+            logger.error("DataViewAdapter: DataView does not have import_clicked signal!")
+
+        if hasattr(self._data_view, "export_clicked"):
+            try:
+                logger.info("DataViewAdapter: Connecting to export_clicked signal from DataView")
+                # Connect the signal directly
+                self._data_view.export_clicked.connect(self._on_export_requested)
+                logger.info("DataViewAdapter: Successfully connected to export_clicked signal")
+            except Exception as e:
+                logger.error(f"Error connecting to export_clicked signal: {e}")
+
+        # Get action toolbar from DataView for the filter buttons
         filter_button = self._data_view._action_toolbar.get_button_by_name("apply_filter")
         clear_filter_button = self._data_view._action_toolbar.get_button_by_name("clear_filter")
 
-        # Connect buttons with safe_connect and disconnect_first for safety
-        if import_button:
-            self._signal_manager.safe_connect(
-                import_button, "clicked", self, "_on_import_requested", True
-            )
-
-        if export_button:
-            self._signal_manager.safe_connect(
-                export_button, "clicked", self, "_on_export_requested", True
-            )
-
         if filter_button and self._controller:
             self._signal_manager.safe_connect(
-                filter_button, "clicked", self, "_on_apply_filter_clicked", True
+                filter_button, "clicked", self, "_on_apply_filter_clicked"
             )
 
         if clear_filter_button and self._controller:
             self._signal_manager.safe_connect(
-                clear_filter_button, "clicked", self, "_on_clear_filter_clicked", True
+                clear_filter_button, "clicked", self, "_on_clear_filter_clicked"
             )
 
         # Connect header action signals
@@ -267,7 +283,31 @@ class DataViewAdapter(UpdatableView):
 
     def _on_import_requested(self):
         """Handle import button click."""
+        logger.info(
+            "DataViewAdapter: _on_import_requested called, emitting import_requested signal"
+        )
         self.import_requested.emit()
+        logger.info("DataViewAdapter: import_requested signal emitted")
+
+        # For debug purposes, trace the parent chain
+        parent = self.parent()
+        if parent:
+            logger.debug(f"DataViewAdapter: Parent is {parent.__class__.__name__}")
+            # Try to find MainWindow in the parent chain
+            main_window = None
+            current = parent
+            while current is not None:
+                logger.debug(
+                    f"DataViewAdapter: Checking parent chain: {current.__class__.__name__}"
+                )
+                if current.__class__.__name__ == "MainWindow":
+                    main_window = current
+                    logger.debug("DataViewAdapter: Found MainWindow in parent chain")
+                    break
+                current = current.parent()
+
+        # No need to call the file controller directly - the signal will handle it
+        # Removing the direct fallback call that was causing double file dialogs
 
     def _on_export_requested(self):
         """Handle export button click."""
@@ -430,6 +470,18 @@ class DataViewAdapter(UpdatableView):
         This is used for initial population and when data changes completely.
         """
         try:
+            # Check if population is already in progress in the underlying DataView
+            if (
+                hasattr(self._data_view, "_population_in_progress")
+                and self._data_view._population_in_progress
+            ):
+                logger.debug(
+                    "DataViewAdapter: Skipping population (already in progress in DataView)"
+                )
+                # Still mark as not needing population since we detected it's already happening
+                self._needs_population = False
+                return
+
             if self._controller and not self._data_model.is_empty:
                 logger.debug("DataViewAdapter: Populating table via controller")
                 self._controller.populate_table()
@@ -441,6 +493,8 @@ class DataViewAdapter(UpdatableView):
             self._needs_population = False
         except Exception as e:
             logger.error(f"Error populating table: {e}")
+            # Reset the needs_population flag even on error to avoid getting stuck
+            self._needs_population = False
 
     def enable_auto_update(self) -> None:
         """Enable automatic updates when data changes."""

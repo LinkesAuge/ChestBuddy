@@ -39,6 +39,102 @@ alwaysApply: false
 - **Fix**: Refactored tests to properly use the pytest-qt plugin for QApplication setup
 - **Status**: Fixed, all controller tests now run correctly
 
+## 2025-03-26: Double Table Population Issue
+
+### Problem
+When data was loaded in the ChestBuddy application, the data table would sometimes be populated twice, especially when switching to the Data view before the initial population was complete. This caused performance issues and potential UI inconsistencies.
+
+### Root Cause
+We identified that there were two parallel signal paths leading to table population:
+1. The `DataView` directly connected to the `ChestDataModel.data_changed` signal, triggering `_update_view`
+2. The `DataViewAdapter` connected to the same signal, and would also trigger population through the `UpdateManager`
+
+This dual pathway led to duplicate population in some edge cases, especially during view transitions.
+
+### Solution
+Modified `DataViewAdapter.__init__` to disable auto-update on the underlying `DataView`:
+```python
+# Create the underlying DataView
+self._data_view = DataView(data_model)
+# Disable auto-update to prevent double population
+self._data_view.disable_auto_update()
+```
+
+This change ensures that all updates go through the `DataViewAdapter` and the `UpdateManager`, preventing the `DataView` from responding directly to `data_changed` signals, which eliminated the duplicate population issue.
+
+### Testing
+We verified that the table population occurs exactly once when loading data and switching between views. The log shows:
+```
+2025-03-26 05:04:50,181 - chestbuddy.ui.data_view - DEBUG - Auto-update disabled, skipping table update
+```
+Which confirms that the DataView is no longer reacting to direct data change events.
+
+## 2025-03-26: Fixed Missing Auto-Update in DataViewAdapter
+
+### Problem
+After fixing the double table population issue, we encountered a new problem where data wouldn't automatically load in the DataView at all, requiring manual refresh to see any data.
+
+### Root Cause
+When we disabled auto-update on the DataView to prevent double population, we didn't ensure that the DataViewAdapter itself had auto-update enabled to receive and process data change events through the proper channel (UpdateManager).
+
+### Solution
+Modified `DataViewAdapter.__init__` to explicitly enable auto-update on the adapter itself after disabling it on the DataView:
+```python
+# Create the underlying DataView
+self._data_view = DataView(data_model)
+# Disable auto-update to prevent double population
+self._data_view.disable_auto_update()
+# Ensure the adapter itself has auto-update enabled
+self.enable_auto_update()
+```
+
+This change ensures that:
+1. The DataView doesn't respond directly to data change events (preventing double population)
+2. The DataViewAdapter properly receives and processes data change events through the UpdateManager
+3. Data is automatically loaded and displayed without manual intervention
+
+### Testing
+We verified that:
+- Data now correctly loads automatically when files are opened
+- There is still no double population of the table
+- The user experience is seamless, with data appearing as expected without manual refreshes
+
+## 2025-03-26: Fixed DataViewAdapter Initialization Order Issue
+
+### Problem
+After adding auto-update to the DataViewAdapter, the application would fail to start with an error:
+```
+Failed to create UI: 'DataViewAdapter' object has no attribute '_signal_manager'
+```
+
+### Root Cause
+We were calling `self.enable_auto_update()` in the DataViewAdapter's `__init__` method before the parent class constructor (`super().__init__()`) was called. Since the `_signal_manager` attribute is initialized in the parent class, it wasn't available yet when we tried to use it.
+
+### Solution
+Moved the `self.enable_auto_update()` call to after the `super().__init__()` call in DataViewAdapter's `__init__` method:
+```python
+# Create the underlying DataView
+self._data_view = DataView(data_model)
+# Disable auto-update to prevent double population
+self._data_view.disable_auto_update()
+
+# Initialize the base view with debug mode option
+super().__init__("Data View", parent, debug_mode=debug_mode)
+self.setObjectName("DataViewAdapter")
+
+# Ensure the adapter itself has auto-update enabled
+self.enable_auto_update()
+```
+
+This fix ensures that all parent class initialization (including the creation of the `_signal_manager`) happens before we try to use it in the `enable_auto_update()` method.
+
+### Testing
+We verified that:
+- The application starts correctly without errors
+- Auto-update functionality works as expected
+- Data is displayed automatically when files are opened
+- No double population occurs
+
 ## Ongoing Issues
 
 All known issues have been resolved. The application is now stable and ready for release.

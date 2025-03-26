@@ -31,6 +31,11 @@ alwaysApply: true
 - Use QSplitter for resizable layouts
 - Implement custom table delegates for specialized cell rendering/editing
 - Avoid direct manipulation of Qt widgets from non-UI classes
+- Always call super().__init__() before using any attributes initialized by parent classes
+- Ensure proper initialization order in component constructors (parent init before attribute usage)
+- Only enable/disable signals after all necessary attributes are initialized
+- Avoid redundant signal connections that could cause double updates
+- Use debug logging to trace signal emissions and connections in complex components
 
 ## Background Processing
 
@@ -100,7 +105,9 @@ alwaysApply: true
 
 ### Adapter Pattern
 - Used for transforming data between formats
-- Key adapters: TableModelAdapter, FileParserAdapter
+- Follows initialization sequence: 1) Create/config wrapped component, 2) Call super().__init__(), 3) Setup attributes that depend on parent
+- Carefully manages signal connections to prevent redundant update paths
+- Key adapters: TableModelAdapter, FileParserAdapter, DataViewAdapter
 
 ### Command Pattern
 - Used for user actions that can be undone/redone
@@ -159,6 +166,9 @@ alwaysApply: true
 - Adapters inherit from BaseView
 - Adapters redirect signals to maintain compatibility
 - Original components are embedded in the adapter's content area
+- Follow proper initialization sequence to prevent attribute errors
+- Disable redundant signal connections in the wrapped component
+- Enable adapter signal connections after parent initialization
 
 ### Navigation Flow
 - MainWindow manages view switching through _set_active_view method
@@ -171,6 +181,8 @@ alwaysApply: true
 - Signals should be clearly named with their purpose
 - MainWindow emits application-level signals to app.py
 - Signal connections should be set up in _setup_connections methods
+- Prevent redundant signal paths that could cause double updates
+- Use debug logging to trace signal flow in complex interactions
 
 ## UI Styling Conventions
 
@@ -253,6 +265,8 @@ alwaysApply: true
 3. Add the original component to content_layout
 4. Connect the original component's signals
 5. Implement methods to expose needed functionality
+6. Follow proper initialization order (wrapped component init → parent init → signal setup)
+7. Manage signal connections to prevent redundant update paths
 
 ### Component Integration Checklist
 - View added to MainWindow._views dictionary
@@ -342,4 +356,38 @@ alwaysApply: true
 - `DataManager._on_load_progress` / `_on_file_progress` → `load_progress.emit`
 - `DataManager._on_csv_load_success` → `load_finished.emit` with "Processing" message → data model update → `load_success.emit`
 - `MainWindow._on_load_progress` → Updates `ProgressDialog` with file and total progress
-- `MainWindow._on_load_finished` → Handles processing state → Updates dialog to show in-progress state 
+- `MainWindow._on_load_finished` → Handles processing state → Updates dialog to show in-progress state
+
+# Initialization and Signal Management Best Practices
+
+## Component Initialization Order
+1. Initialize basic properties and state tracking variables
+2. Create and configure sub-components that don't depend on parent initialization
+3. Call parent class constructor (super().__init__())
+4. Initialize properties that depend on parent class attributes
+5. Connect signals and slots
+6. Complete any final setup steps
+
+## Signal Connection Guidelines
+1. Use descriptive signal/slot names that clearly indicate purpose
+2. Prefer dedicated methods for signal handling over lambda functions
+3. Group related signal connections together in dedicated methods
+4. Document signal flow in complex interactions with comments
+5. Use debug logging to trace signal emissions and connections
+6. Avoid redundant signal paths that could cause double updates
+7. Ensure proper cleanup of connections when components are destroyed
+
+## Common Initialization Pitfalls
+1. Using attributes initialized by the parent class before calling super().__init__()
+2. Connecting signals before both sender and receiver are fully initialized
+3. Creating circular signal connections that lead to infinite loops
+4. Forgetting to disconnect signals when components are destroyed
+5. Using direct connections when queued connections would be more appropriate
+
+## Debug Strategies for Initialization Issues
+1. Add detailed logging at each initialization step
+2. Use try/except blocks to catch and log specific initialization errors
+3. Temporarily add print statements to trace the initialization sequence
+4. Check attribute existence before use during initialization
+5. Use defensive programming techniques during initialization
+6. Implement proper component lifecycle management (creation, initialization, use, cleanup) 

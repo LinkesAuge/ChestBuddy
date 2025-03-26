@@ -161,13 +161,13 @@ class ActionToolbar(QWidget):
         Get a button by its name.
 
         Args:
-            name (str): Button name
+            name: The name of the button to find
 
         Returns:
-            Optional[ActionButton]: The button with the specified name or None if not found
+            The button if found, None otherwise
         """
         for button in self._buttons:
-            if button.name() == name:
+            if button.name == name:
                 return button
         return None
 

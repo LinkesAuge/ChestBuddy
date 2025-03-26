@@ -13,6 +13,8 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QIcon, QCursor
 from PySide6.QtWidgets import QPushButton, QSizePolicy
 
+from chestbuddy.ui.resources.style import Colors
+
 
 class ActionButton(QPushButton):
     """
@@ -55,6 +57,9 @@ class ActionButton(QPushButton):
         self._compact = compact
         self._primary = primary
 
+        # Make name accessible as an attribute as well for compatibility
+        self.name = name
+
         # Set button properties
         if text:
             self.setText(text)
@@ -75,75 +80,75 @@ class ActionButton(QPushButton):
     def _update_style(self):
         """Update the button styling based on current properties."""
         # Default style
-        style = """
-        QPushButton {
+        style = f"""
+        QPushButton {{
             padding: 6px 12px;
-            border: 1px solid #BBBBBB;
+            border: 1px solid {Colors.BORDER};
             border-radius: 4px;
-            background-color: #F5F5F5;
-            color: #333333;
-        }
-        QPushButton:hover {
-            background-color: #E6E6E6;
-            border-color: #AAAAAA;
-        }
-        QPushButton:pressed {
-            background-color: #D6D6D6;
-        }
-        QPushButton:disabled {
-            background-color: #F8F8F8;
-            border-color: #DDDDDD;
-            color: #AAAAAA;
-        }
+            background-color: {Colors.PRIMARY};
+            color: {Colors.TEXT_LIGHT};
+        }}
+        QPushButton:hover {{
+            background-color: {Colors.PRIMARY_LIGHT};
+            border-color: {Colors.BORDER_DARK};
+        }}
+        QPushButton:pressed {{
+            background-color: {Colors.PRIMARY_DARK};
+        }}
+        QPushButton:disabled {{
+            background-color: {Colors.BG_DARK};
+            border-color: {Colors.BORDER};
+            color: {Colors.TEXT_DISABLED};
+        }}
         """
 
         # Adjust for compact mode
         if self._compact:
-            style = """
-            QPushButton {
+            style = f"""
+            QPushButton {{
                 padding: 4px 8px;
-                border: 1px solid #BBBBBB;
+                border: 1px solid {Colors.BORDER};
                 border-radius: 3px;
-                background-color: #F5F5F5;
-                color: #333333;
-            }
-            QPushButton:hover {
-                background-color: #E6E6E6;
-                border-color: #AAAAAA;
-            }
-            QPushButton:pressed {
-                background-color: #D6D6D6;
-            }
-            QPushButton:disabled {
-                background-color: #F8F8F8;
-                border-color: #DDDDDD;
-                color: #AAAAAA;
-            }
+                background-color: {Colors.PRIMARY};
+                color: {Colors.TEXT_LIGHT};
+            }}
+            QPushButton:hover {{
+                background-color: {Colors.PRIMARY_LIGHT};
+                border-color: {Colors.BORDER_DARK};
+            }}
+            QPushButton:pressed {{
+                background-color: {Colors.PRIMARY_DARK};
+            }}
+            QPushButton:disabled {{
+                background-color: {Colors.BG_DARK};
+                border-color: {Colors.BORDER};
+                color: {Colors.TEXT_DISABLED};
+            }}
             """
 
         # Adjust for primary style
         if self._primary:
-            style = """
-            QPushButton {
-                padding: %s;
-                border: 1px solid #2C82C9;
-                border-radius: %s;
-                background-color: #3498DB;
-                color: white;
-            }
-            QPushButton:hover {
-                background-color: #2980B9;
-                border-color: #2573B3;
-            }
-            QPushButton:pressed {
-                background-color: #2471A3;
-            }
-            QPushButton:disabled {
-                background-color: #85C1E9;
-                border-color: #7FB3D5;
-                color: #F8F8F8;
-            }
-            """ % ("4px 8px" if self._compact else "6px 12px", "3px" if self._compact else "4px")
+            style = f"""
+            QPushButton {{
+                padding: {("4px 8px" if self._compact else "6px 12px")};
+                border: 1px solid {Colors.ACCENT};
+                border-radius: {("3px" if self._compact else "4px")};
+                background-color: {Colors.ACCENT};
+                color: {Colors.TEXT_LIGHT};
+            }}
+            QPushButton:hover {{
+                background-color: {Colors.SECONDARY};
+                border-color: {Colors.SECONDARY};
+            }}
+            QPushButton:pressed {{
+                background-color: {Colors.PRIMARY_DARK};
+            }}
+            QPushButton:disabled {{
+                background-color: {Colors.BG_MEDIUM};
+                border-color: {Colors.BG_LIGHT};
+                color: {Colors.TEXT_DISABLED};
+            }}
+            """
 
         self.setStyleSheet(style)
 

@@ -64,6 +64,16 @@ class DataView(QWidget):
     _last_update_time = 0.0
     _update_debounce_ms = 500  # Minimum time between updates in milliseconds
 
+    # Define signals
+    import_clicked = Signal()  # Emitted when the import button is clicked
+    export_clicked = Signal()  # Emitted when the export button is clicked
+    selection_changed = Signal(list)  # Emitted when selection changes with list of selected rows
+    filter_changed = Signal(dict)  # Emitted when filter criteria change
+    data_edited = Signal(int, int, object)  # Row, column, new value
+    data_corrected = Signal(list)  # List of correction operations
+    data_removed = Signal(list)  # List of row indices removed
+    status_updated = Signal(str, bool)  # Status message, is_error
+
     def __init__(self, data_model: ChestDataModel, parent: Optional[QWidget] = None) -> None:
         """
         Initialize the DataView.
@@ -81,6 +91,7 @@ class DataView(QWidget):
         self._current_filter: Dict[str, str] = {}
         self._is_updating = False  # Guard against recursive updates
         self._auto_update_enabled = True  # Enable auto-update by default
+        self._population_in_progress = False  # Track if table population is in progress
 
         # Set up UI
         self._init_ui()
@@ -233,44 +244,70 @@ class DataView(QWidget):
 
     def _connect_signals(self) -> None:
         """Connect signals and slots."""
-        # Connect model signals
-        self._data_model.data_changed.connect(self._on_data_changed)
-        self._data_model.validation_changed.connect(self._on_validation_changed)
-        self._data_model.correction_applied.connect(self._on_correction_applied)
+        # Connect action buttons
+        import_button = self._action_toolbar.get_button_by_name("import")
+        if import_button:
+            logger.debug("Connecting import button clicked signal to _on_import_clicked handler")
+            import_button.clicked.connect(self._on_import_clicked)
 
-        # Connect UI signals - update for ActionToolbar
-        self._action_toolbar.get_button_by_name("apply_filter").clicked.connect(self._apply_filter)
-        self._action_toolbar.get_button_by_name("clear_filter").clicked.connect(self._clear_filter)
-        self._action_toolbar.get_button_by_name("refresh").clicked.connect(self._update_view)
+        export_button = self._action_toolbar.get_button_by_name("export")
+        if export_button:
+            logger.debug("Connecting export button clicked signal to _on_export_clicked handler")
+            export_button.clicked.connect(self._on_export_clicked)
 
-        # Additional actions
-        if self._action_toolbar.get_button_by_name("import"):
-            self._action_toolbar.get_button_by_name("import").clicked.connect(
-                self._on_import_clicked
-            )
-        if self._action_toolbar.get_button_by_name("export"):
-            self._action_toolbar.get_button_by_name("export").clicked.connect(
-                self._on_export_clicked
-            )
+        # Connect filter controls
+        filter_button = self._action_toolbar.get_button_by_name("apply_filter")
+        if filter_button:
+            filter_button.clicked.connect(self._apply_filter)
 
-        # Connect filter text return key
-        self._filter_text.returnPressed.connect(self._apply_filter)
+        clear_button = self._action_toolbar.get_button_by_name("clear_filter")
+        if clear_button:
+            clear_button.clicked.connect(self._clear_filter)
 
-        # Connect table signals
-        self._table_view.customContextMenuRequested.connect(self._show_context_menu)
+        # Connect and install event filter on the table view for key events
+        self._table_view.installEventFilter(self)
+        logger.info("Installed event filter on table view")
 
-        # Connect table model signals
-        self._table_model.itemChanged.connect(self._on_item_changed)
+        # Register custom shortcuts since the event filter might not capture all key combinations
+        # Create a shortcut for copying (table-specific)
+        self._copy_shortcut = QShortcut(QKeySequence.Copy, self._table_view)
+        self._copy_shortcut.activated.connect(self._copy_selected_cells)
+        logger.info("Registered Ctrl+C shortcut for copying (table-specific)")
+
+        # Create a shortcut for pasting (widget-level)
+        self._paste_shortcut = QShortcut(QKeySequence.Paste, self)
+        self._paste_shortcut.activated.connect(self._paste_to_selected_cells)
+        logger.info("Registered widget-level Ctrl+V shortcut for pasting (widget hierarchy)")
+
+        # Connect table model for data editing
+        if isinstance(self._table_model, QStandardItemModel):
+            self._table_model.itemChanged.connect(self._on_item_changed)
+
+        # Connect to model signals for updates
+        if hasattr(self._data_model, "data_changed"):
+            self._data_model.data_changed.connect(self._on_data_changed)
+        if hasattr(self._data_model, "validation_changed"):
+            self._data_model.validation_changed.connect(self._on_validation_changed)
+        if hasattr(self._data_model, "correction_applied"):
+            self._data_model.correction_applied.connect(self._on_correction_applied)
 
     def _update_view(self) -> None:
         """Update the view with current data."""
         # Guard against recursive calls
         if self._is_updating:
             print("Skipping recursive _update_view call")
+            logger.debug("Skipping recursive _update_view call")
+            return
+
+        # Skip if population is already in progress
+        if self._population_in_progress:
+            print("Skipping _update_view call - population already in progress")
+            logger.debug("Skipping _update_view call - population already in progress")
             return
 
         try:
             self._is_updating = True
+            self._population_in_progress = True  # Set flag that population is starting
             print("Starting _update_view method")
             logger.info("Starting _update_view method")
 
@@ -285,6 +322,7 @@ class DataView(QWidget):
                 self._status_label.setText("No data loaded")
                 self._filtered_rows = []  # Initialize to empty list when no data
                 self._is_updating = False
+                self._population_in_progress = False  # Clear flag when aborting early
                 print("_update_view aborted: No data in model")
                 return
 
@@ -445,9 +483,14 @@ class DataView(QWidget):
                         print(f"Error re-enabling table: {enable_error}")
                         traceback.print_exc()
 
+        except Exception as e:
+            logger.error(f"Error in _update_view: {e}")
+            print(f"Error in _update_view: {e}")
         finally:
             self._is_updating = False
+            self._population_in_progress = False  # Clear flag when population is done
             print("_update_view completed")
+            logger.info("_update_view completed")
 
     def _apply_filter(self) -> None:
         """Apply the current filter to the data."""
@@ -1057,47 +1100,26 @@ class DataView(QWidget):
 
     def _on_import_clicked(self):
         """Handle import button click."""
-        # Don't directly open a file dialog, emit a signal that MainWindow has already connected to the proper handler
-        # Check if we're in the middle of a loading process first
-        from PySide6.QtWidgets import QApplication
-
-        # Get MainWindow (the parent of this widget's parent chain)
-        main_window = None
-        parent = self.parent()
-        while parent is not None:
-            if parent.__class__.__name__ == "MainWindow":
-                main_window = parent
-                break
-            parent = parent.parent()
-
-        # Check for main window and cancel any operations
-        if (
-            hasattr(main_window, "_progress_controller")
-            and main_window._progress_controller.is_progress_showing()
-        ):
-            # Don't close on filter changes if operations are in progress
-            return
-
-        # This empty method should just pass - the adapter will handle the actual connection to MainWindow
-        # The actual file dialog opening is handled by the MainWindow._open_file method
-        pass
+        # Emit the import_clicked signal for the adapter to handle
+        logger.info("Import button clicked in DataView - emitting import_clicked signal")
+        self.import_clicked.emit()
+        logger.debug("DataView import_clicked signal emitted")
 
     def _on_export_clicked(self):
         """Handle export button click."""
-        # Implementation would depend on the application architecture
-        # This might emit a signal that the MainWindow would connect to
-        pass
+        # Emit the export_clicked signal for the adapter to handle
+        logger.debug("Export button clicked in DataView, emitting export_clicked signal")
+        self.export_clicked.emit()
 
     def populate_table(self) -> None:
-        """
-        Explicitly populate the table with current data.
-        This should be called once after data loading is complete.
-        """
-        logger.info("DataView.populate_table explicitly called")
-        print("DataView.populate_table explicitly called")
+        """Populate the table with data from the data model."""
+        # Check if population is already in progress
+        if self._population_in_progress:
+            logger.debug("Table population already in progress, skipping duplicate call")
+            return
+
+        # Use the existing _update_view method to do the actual population
         self._update_view()
-        logger.info("DataView.populate_table completed")
-        print("DataView.populate_table completed")
 
     def enable_auto_update(self) -> None:
         """Enable automatic table updates on data changes."""

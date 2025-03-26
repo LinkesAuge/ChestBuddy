@@ -647,3 +647,37 @@ Key benefits of the implemented system:
 7. **Documentation**: Complete and up-to-date
 
 The ChestBuddy application is now feature-complete and ready for use, with a robust architecture that supports all planned functionality.
+
+## Current Focus
+
+### Data Population and UI Update Issues
+
+We've resolved a series of issues related to data population and updates within the UI:
+
+1. **Double Table Population Issue** - Fixed by disabling auto-update on the DataView component while ensuring the DataViewAdapter handles updates via the UpdateManager. This prevents redundant update paths.
+
+2. **Missing Auto-Update Issue** - Fixed by explicitly enabling auto-update on the DataViewAdapter after disabling it on the DataView, ensuring proper data propagation.
+
+3. **Initialization Order Issue** - Fixed by ensuring proper initialization sequence in component constructors, specifically moving the `enable_auto_update()` call after the parent class constructor.
+
+#### Key Lessons Learned:
+
+1. **Component Initialization Order** - When extending Qt/PySide6 classes, always ensure that parent class initialization (`super().__init__()`) is called before using any attributes or methods that might be initialized in the parent. This is especially critical for complex components with signal management.
+
+2. **Signal Connection Patterns** - Maintain clear signal pathways to prevent redundant updates. When adapting existing components, carefully analyze all signal connections to ensure no duplicate update paths exist.
+
+3. **Initialization Sequence Documentation** - Document initialization sequences in components, particularly those with complex hierarchies, to make future maintenance easier.
+
+4. **Debugging Initialization Issues** - Initialization errors often manifest as attribute errors during application startup. Debugging these requires careful analysis of the constructor sequence and object lifecycle.
+
+5. **Architecture Pattern Validation** - The adapter pattern we're using (wrapping DataView with DataViewAdapter) requires careful coordination of signals and events between layers. Having a visual diagram of these connections helps prevent issues.
+
+### Implementation Guidelines for Component Initialization:
+
+1. Always call `super().__init__()` before using any attributes that might be initialized by parent classes
+2. Never call instance methods that rely on initialized attributes before the initialization is complete
+3. Document the initialization sequence in complex components
+4. For adapters or wrappers, carefully manage signal connections to prevent duplicate update paths
+5. Use debug logging to trace initialization and update sequences in complex components
+
+These lessons will guide our implementation of other adapter components and help prevent similar issues in the future.
