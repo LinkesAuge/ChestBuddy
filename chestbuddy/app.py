@@ -116,10 +116,12 @@ class ChestBuddyApp(QObject):
                 self._view_state_controller = ViewStateController(
                     self._data_model, self._signal_manager
                 )
-                self._data_view_controller = DataViewController(
-                    self._data_model, self._signal_manager
-                )
                 self._ui_state_controller = UIStateController(self._signal_manager)
+                self._data_view_controller = DataViewController(
+                    self._data_model,
+                    self._signal_manager,
+                    ui_state_controller=self._ui_state_controller,
+                )
             except Exception as e:
                 logger.error(f"Error initializing controllers: {e}")
                 self._error_controller.handle_exception(e, "Error initializing controllers")
@@ -225,91 +227,54 @@ class ChestBuddyApp(QObject):
             sys.exit(1)
 
     def _connect_signals(self) -> None:
-        """Connect signals between components using SignalManager."""
+        """Connect application-level signals."""
         try:
-            logger.info("Connecting application signals...")
-
-            # Connect DataManager signals to app-level handlers
-            logger.debug("Connecting DataManager signals...")
+            # Connect data manager signals
             self._signal_manager.connect(
-                self._data_manager, "load_started", self, "_on_load_started"
+                self._data_manager, "load_error", self._error_controller, "show_error"
             )
-            self._signal_manager.connect(
-                self._data_manager, "load_progress", self, "_on_load_progress"
-            )
-            self._signal_manager.connect(
-                self._data_manager, "load_finished", self, "_on_load_finished"
-            )
-            self._signal_manager.connect(self._data_manager, "load_error", self, "_on_load_error")
-            self._signal_manager.connect(
-                self._data_manager, "save_success", self, "_on_save_success"
-            )
-            self._signal_manager.connect(self._data_manager, "save_error", self, "_on_save_error")
 
-            # Add connections for data loading state changes
-            logger.debug("Connecting data state signals...")
-            self._signal_manager.connect(self._data_manager, "data_loaded", self, "_on_data_loaded")
+            # Connect file controller signals
+            self._signal_manager.connect(
+                self._file_controller,
+                "operation_error",
+                self._error_controller,
+                "show_error",
+            )
 
-            # Connect directly to data model to track changes
-            if hasattr(self._data_model, "data_changed"):
-                logger.debug("Connecting data model signals...")
-                self._signal_manager.connect(
-                    self._data_model, "data_changed", self, "_on_data_changed"
-                )
-                self._signal_manager.connect(
-                    self._data_model, "data_cleared", self, "_on_data_cleared"
-                )
-
-            # Connect FileOperationsController signals
-            logger.debug("Connecting FileOperationsController signals...")
+            # Connect file controller's load_csv_triggered to data_manager.load_csv
+            # This is crucial for file import functionality to work properly
             self._signal_manager.connect(
                 self._file_controller, "load_csv_triggered", self._data_manager, "load_csv"
             )
-            self._signal_manager.connect(
-                self._file_controller, "save_csv_triggered", self._data_manager, "save_csv"
-            )
-            self._signal_manager.connect(
-                self._file_controller, "recent_files_changed", self, "_on_recent_files_changed"
-            )
 
-            # Connect MainWindow signals for file operations
-            if hasattr(self._main_window, "file_opened"):
-                logger.debug("Connecting MainWindow file operation signals...")
-                self._signal_manager.connect(
-                    self._main_window, "file_opened", self, "_on_file_opened"
-                )
-
-            # Connect ProgressController signals
-            logger.debug("Connecting ProgressController signals...")
+            # Connect data view controller signals
             self._signal_manager.connect(
-                self._progress_controller, "progress_canceled", self._data_manager, "cancel_loading"
+                self._data_view_controller,
+                "operation_error",
+                self._error_controller,
+                "show_error",
             )
 
-            # Connect cancellation signals bidirectionally
+            # Connect validation-related signals to UIStateController
             self._signal_manager.connect(
-                self._progress_controller, "progress_canceled", self, "_on_progress_canceled"
+                self._data_view_controller,
+                "validation_completed",
+                self._ui_state_controller,
+                "handle_validation_results",
             )
 
-            # Connect DataViewController signals
-            logger.debug("Connecting DataViewController signals...")
             self._signal_manager.connect(
-                self._data_view_controller, "operation_error", self, "_on_data_view_error"
-            )
-            self._signal_manager.connect(
-                self._data_view_controller, "table_populated", self, "_on_table_populated"
+                self._validation_service,
+                "validation_preferences_changed",
+                self._data_view_controller,
+                "validate_data",
             )
 
-            logger.info("All signals connected successfully")
-
-            # In debug mode, print all connections
-            if __debug__:
-                logger.debug("Signal connections summary:")
-                self._signal_manager.print_connections()
-
+            logger.info("Application signals connected")
         except Exception as e:
-            logger.critical(f"Failed to connect signals: {e}", exc_info=True)
-            self._error_controller.handle_exception(e, "Failed to connect signals")
-            sys.exit(1)
+            logger.error(f"Error connecting signals: {e}")
+            self._error_controller.handle_exception(e, "Error connecting signals")
 
     def cleanup(self) -> None:
         """Clean up application resources before exit."""

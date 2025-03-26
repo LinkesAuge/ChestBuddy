@@ -41,6 +41,8 @@ from PySide6.QtGui import (
 from chestbuddy.core.models import ChestDataModel
 from chestbuddy.ui.widgets.action_toolbar import ActionToolbar
 from chestbuddy.ui.widgets.action_button import ActionButton
+from chestbuddy.ui.widgets.validation_delegate import ValidationStatusDelegate
+from chestbuddy.core.validation_enums import ValidationStatus
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -210,6 +212,10 @@ class DataView(QWidget):
         self._table_view.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
         self._table_view.verticalHeader().setDefaultSectionSize(24)  # Compact rows
         self._table_view.verticalHeader().setVisible(True)
+
+        # Set up custom delegate for validation visualization
+        self._validation_delegate = ValidationStatusDelegate(self)
+        self._table_view.setItemDelegate(self._validation_delegate)
 
         # Install event filter on table view to capture key events
         self._table_view.installEventFilter(self)
@@ -744,8 +750,76 @@ class DataView(QWidget):
         paste_action.triggered.connect(lambda: self._paste_cell(index))
         context_menu.addAction(paste_action)
 
+        # Add validation-related options
+        if index.isValid():
+            # Get column and value
+            row = index.row()
+            col = index.column()
+
+            if (
+                0 <= row < self._table_model.rowCount()
+                and 0 <= col < self._table_model.columnCount()
+            ):
+                # Get the actual row index if we're using filtered data
+                actual_row = row
+                if self._filtered_rows and row < len(self._filtered_rows):
+                    actual_row = self._filtered_rows[row]
+
+                column_name = self._data_model.column_names[col]
+                cell_value = self._table_model.data(index, Qt.DisplayRole)
+
+                # Get validation status for this cell
+                validation_status = index.data(Qt.ItemDataRole.UserRole + 1)
+
+                # Add option to add to validation list if this is a validation-related column
+                validation_columns = {
+                    "PLAYER": "player",
+                    "CHEST": "chest",
+                    "SOURCE": "source",
+                }
+
+                if (
+                    column_name in validation_columns
+                    and validation_status == ValidationStatus.INVALID
+                ):
+                    # Add separator
+                    context_menu.addSeparator()
+
+                    # Add action to add to validation list
+                    field_type = validation_columns[column_name]
+                    add_action = QAction(
+                        f"Add '{cell_value}' to {field_type.title()} validation list", self
+                    )
+                    add_action.triggered.connect(
+                        lambda checked=False,
+                        ft=field_type,
+                        val=cell_value: self._add_to_validation_list(ft, val)
+                    )
+                    context_menu.addAction(add_action)
+
         # Show the menu
         context_menu.exec_(self._table_view.viewport().mapToGlobal(position))
+
+    def _add_to_validation_list(self, field_type: str, value: str) -> None:
+        """
+        Add a value to the validation list.
+
+        Args:
+            field_type: The type of field (player, chest, source)
+            value: The value to add to the validation list
+        """
+        if not value or not field_type:
+            return
+
+        # Emit signal for adding to validation list
+        # This will be connected to a controller or service that handles the actual addition
+        self.status_updated.emit(f"Adding '{value}' to {field_type} validation list...", False)
+
+        # The actual addition will happen in the controller or service
+        # We'll emit a signal that will be handled by the data view controller
+        self.data_corrected.emit(
+            [{"action": "add_to_validation", "field_type": field_type, "value": value}]
+        )
 
     def _copy_cell(self, index) -> None:
         """
@@ -878,15 +952,54 @@ class DataView(QWidget):
         logger.debug("_update_view completed from _on_data_changed")
 
     @Slot(object)
-    def _on_validation_changed(self, validation_status) -> None:
+    def _on_validation_changed(self, validation_status=None) -> None:
         """
         Handle validation changed signal.
 
         Args:
             validation_status: The validation status.
         """
-        # Update the view to reflect validation changes
-        self._on_data_changed()
+        logger.debug("Handling validation changed in DataView")
+
+        # Update the view with validation status
+        if self._data_model.is_empty:
+            return
+
+        try:
+            # Get validation status for each cell
+            for row in range(self._table_model.rowCount()):
+                for col in range(self._table_model.columnCount()):
+                    # Get the actual row index if filtered
+                    actual_row = row
+                    if self._filtered_rows and row < len(self._filtered_rows):
+                        actual_row = self._filtered_rows[row]
+
+                    column_name = self._data_model.column_names[col]
+
+                    # Get cell validation status
+                    validation_info = self._data_model.get_cell_validation_status(
+                        actual_row, column_name
+                    )
+
+                    if validation_info and "status" in validation_info:
+                        # Set validation status as user role data
+                        status_value = (
+                            ValidationStatus.INVALID
+                            if validation_info["status"] == "invalid"
+                            else (
+                                ValidationStatus.WARNING
+                                if validation_info["status"] == "warning"
+                                else ValidationStatus.VALID
+                            )
+                        )
+
+                        index = self._table_model.index(row, col)
+                        self._table_model.setData(index, status_value, Qt.ItemDataRole.UserRole + 1)
+        except Exception as e:
+            logger.error(f"Error updating validation status in view: {e}")
+
+        # Refresh the view
+        self._table_view.viewport().update()
 
     @Slot(object)
     def _on_correction_applied(self, correction_status) -> None:

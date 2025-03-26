@@ -10,6 +10,7 @@ from typing import Dict, List, Optional, Tuple, Union, Any, Set
 
 import pandas as pd
 import numpy as np
+from PySide6.QtCore import Signal, QObject
 
 from chestbuddy.core.models.chest_data_model import ChestDataModel
 from chestbuddy.core.models.validation_list_model import ValidationListModel
@@ -19,7 +20,7 @@ from chestbuddy.utils.config import ConfigManager
 logger = logging.getLogger(__name__)
 
 
-class ValidationService:
+class ValidationService(QObject):
     """
     Service for validating chest data.
 
@@ -28,12 +29,18 @@ class ValidationService:
     inconsistent data types. It also validates against reference lists for
     players, chest types, and sources.
 
+    Signals:
+        validation_preferences_changed (Signal): Emitted when validation preferences change
+
     Implementation Notes:
         - Uses statistical methods for outlier detection
         - Provides customizable validation rules
         - Works with the ChestDataModel to update validation statuses
         - Uses ValidationListModel for reference list validation
     """
+
+    # Define signals
+    validation_preferences_changed = Signal(dict)  # Dict of preferences
 
     # Define column names for validation
     PLAYER_COLUMN = "PLAYER"
@@ -50,6 +57,7 @@ class ValidationService:
             data_model: The ChestDataModel instance to validate.
             config_manager: Optional configuration manager for settings
         """
+        super().__init__()
         self._data_model = data_model
         self._validation_rules = {}
         self._initialize_default_rules()
@@ -89,132 +97,188 @@ class ValidationService:
         self.add_validation_rule("chest_type_validation", self._check_chest_types)
         self.add_validation_rule("source_validation", self._check_sources)
 
-    def _check_missing_values(self, df: pd.DataFrame) -> Dict[int, str]:
+    def _check_missing_values(self, df=None) -> Dict[int, str]:
         """
-        Check for missing values in the dataframe.
+        Check for missing values in the data.
+
+        Args:
+            df (pd.DataFrame, optional): The DataFrame to check. If not provided, uses the model's data.
 
         Returns:
             Dict[int, str]: Dictionary mapping row indices to error messages.
         """
-        result = {}
+        if df is None:
+            df = self._data_model.data
 
-        # Check each row for missing values
-        for idx, row in df.iterrows():
+        try:
+            result = {}
+
+            # Check each column
             for column in df.columns:
-                if pd.isna(row[column]):
-                    result[idx] = result.get(idx, "") + f"Missing value in {column}. "
+                # Skip columns that are not used for validation
+                if self._should_skip_column(column):
+                    continue
 
-        return result
+                # Check for missing values
+                for idx, value in df[column].items():
+                    if pd.isna(value) or value == "":
+                        result[idx] = result.get(idx, "") + f"Missing value in column: {column}. "
 
-    def _check_outliers(self, df: pd.DataFrame) -> Dict[int, str]:
+            return result
+        except Exception as e:
+            logger.error(f"Error checking missing values: {e}")
+            return {}
+
+    def _should_skip_column(self, column: str) -> bool:
+        """
+        Check if a column should be skipped during validation.
+
+        Args:
+            column (str): Column name to check
+
+        Returns:
+            bool: True if column should be skipped, False otherwise
+        """
+        # Skip system or internal columns
+        if column.startswith("_") or column.endswith("_valid") or column.endswith("_corrected"):
+            return True
+
+        return False
+
+    def _check_outliers(self, df=None) -> Dict[int, str]:
         """
         Check for outliers in numerical columns.
 
-        Returns:
-            Dict[int, str]: Dictionary mapping row indices to error messages.
-        """
-        result = {}
-
-        # Find numerical columns
-        numerical_columns = df.select_dtypes(include=["number"]).columns
-
-        # Check each numerical column for outliers
-        for column in numerical_columns:
-            # Calculate Q1, Q3, and IQR
-            q1 = df[column].quantile(0.25)
-            q3 = df[column].quantile(0.75)
-            iqr = q3 - q1
-
-            # Define outlier bounds
-            lower_bound = q1 - 1.5 * iqr
-            upper_bound = q3 + 1.5 * iqr
-
-            # Find outliers
-            outliers = df[(df[column] < lower_bound) | (df[column] > upper_bound)]
-
-            # Add outliers to result
-            for idx in outliers.index:
-                value = df.loc[idx, column]
-                result[idx] = result.get(idx, "") + f"Outlier in {column}: {value}. "
-
-        return result
-
-    def _check_duplicates(self, df: pd.DataFrame) -> Dict[int, str]:
-        """
-        Check for duplicate rows in the dataframe.
+        Args:
+            df (pd.DataFrame, optional): The DataFrame to check. If not provided, uses the model's data.
 
         Returns:
             Dict[int, str]: Dictionary mapping row indices to error messages.
         """
-        result = {}
+        if df is None:
+            df = self._data_model.data
 
-        # Find duplicate rows
-        duplicates = df.duplicated(keep="first")
+        try:
+            result = {}
+            # Only check numeric columns
+            numeric_cols = df.select_dtypes(include=["number"]).columns
 
-        # Add duplicates to result
-        for idx in df[duplicates].index:
-            result[idx] = "Duplicate row."
+            for column in numeric_cols:
+                # Skip columns that are not used for validation
+                if self._should_skip_column(column):
+                    continue
 
-        return result
+                # Calculate Q1, Q3, and IQR
+                q1 = df[column].quantile(0.25)
+                q3 = df[column].quantile(0.75)
+                iqr = q3 - q1
 
-    def _check_data_types(self, df: pd.DataFrame) -> Dict[int, str]:
+                # Define outlier bounds
+                lower_bound = q1 - 1.5 * iqr
+                upper_bound = q3 + 1.5 * iqr
+
+                # Find outliers
+                for idx, value in df[column].items():
+                    if not pd.isna(value) and (value < lower_bound or value > upper_bound):
+                        result[idx] = (
+                            result.get(idx, "")
+                            + f"Outlier detected in {column}: {value} (bounds: {lower_bound:.2f}-{upper_bound:.2f}). "
+                        )
+
+            return result
+        except Exception as e:
+            logger.error(f"Error checking outliers: {e}")
+            return {}
+
+    def _check_duplicates(self, df=None) -> Dict[int, str]:
         """
-        Check for inconsistent data types in the dataframe.
+        Check for duplicate rows in the data.
+
+        Args:
+            df (pd.DataFrame, optional): The DataFrame to check. If not provided, uses the model's data.
 
         Returns:
             Dict[int, str]: Dictionary mapping row indices to error messages.
         """
-        result = {}
+        if df is None:
+            df = self._data_model.data
 
-        # Define expected types for known columns
-        expected_types = {"VALUE": "number", "DATE": "datetime", "SCORE": "number"}
+        try:
+            result = {}
 
-        # Check each column for inconsistent types
-        for column, expected_type in expected_types.items():
-            if column in df.columns:
-                # Check if column is numerical
-                if expected_type == "number":
-                    try:
-                        # Try to convert to numeric, will produce NaN for non-numeric values
-                        numeric_values = pd.to_numeric(df[column], errors="coerce")
+            # Check for duplicate rows
+            duplicates = df.duplicated(keep="first")
+            duplicate_indices = duplicates[duplicates].index
 
-                        # Find rows where conversion produced NaN but original wasn't NaN
-                        for idx in df.index:
-                            if pd.isna(numeric_values[idx]) and not pd.isna(df.loc[idx, column]):
-                                result[idx] = (
-                                    result.get(idx, "")
-                                    + f"Non-numeric value in {column}: {df.loc[idx, column]}. "
-                                )
-                    except Exception as e:
-                        logger.error(f"Error checking numeric type for column {column}: {e}")
+            # Add error message for each duplicate row
+            for idx in duplicate_indices:
+                result[idx] = "Duplicate row detected."
 
-                # Check if column is datetime
-                elif expected_type == "datetime":
-                    try:
-                        # Try to convert to datetime, will produce NaN for invalid dates
-                        datetime_values = pd.to_datetime(df[column], errors="coerce")
+            return result
+        except Exception as e:
+            logger.error(f"Error checking duplicates: {e}")
+            return {}
 
-                        # Find rows where conversion produced NaN but original wasn't NaN
-                        for idx in df.index:
-                            if pd.isna(datetime_values[idx]) and not pd.isna(df.loc[idx, column]):
+    def _check_data_types(self, df=None) -> Dict[int, str]:
+        """
+        Check for data type mismatches in the data.
+
+        Args:
+            df (pd.DataFrame, optional): The DataFrame to check. If not provided, uses the model's data.
+
+        Returns:
+            Dict[int, str]: Dictionary mapping row indices to error messages.
+        """
+        if df is None:
+            df = self._data_model.data
+
+        try:
+            result = {}
+
+            # Check each column
+            for column in df.columns:
+                # Skip columns that are not used for validation
+                if self._should_skip_column(column):
+                    continue
+
+                # Try to determine column type
+                try:
+                    # Check numeric columns
+                    if pd.api.types.is_numeric_dtype(df[column]):
+                        for idx, value in df[column].items():
+                            if not pd.isna(value) and not isinstance(value, (int, float)):
+                                try:
+                                    # Try to convert to numeric
+                                    float(value)
+                                except (ValueError, TypeError):
+                                    result[idx] = (
+                                        result.get(idx, "")
+                                        + f"Non-numeric value in numeric column {column}: {value}. "
+                                    )
+
+                    # Check date columns
+                    elif column.lower() in ["date", "datetime", "time"]:
+                        for idx, value in df[column].items():
+                            if not pd.isna(value) and not self._is_valid_date(value):
                                 result[idx] = (
                                     result.get(idx, "")
                                     + f"Invalid date in {column}: {df.loc[idx, column]}. "
                                 )
-                    except Exception as e:
-                        logger.error(f"Error checking datetime type for column {column}: {e}")
+                except Exception as e:
+                    logger.error(f"Error checking data type for column {column}: {e}")
 
-        return result
+            return result
+        except Exception as e:
+            logger.error(f"Error checking data types: {e}")
+            return {}
 
     def _initialize_validation_lists(self) -> None:
         """Initialize the validation list models."""
         try:
-            # Define validation list file paths
-            data_dir = Path(__file__).parents[3] / "data" / "validation"
-
-            player_file = data_dir / "players.txt"
-            chest_file = data_dir / "chest_types.txt"
-            source_file = data_dir / "sources.txt"
+            # Use the resolver method instead of direct path construction
+            player_file = self._resolve_validation_path("player")
+            chest_file = self._resolve_validation_path("chest_type")
+            source_file = self._resolve_validation_path("source")
 
             # Create validation list models
             self._player_list_model = ValidationListModel(player_file, self._case_sensitive)
@@ -231,6 +295,27 @@ class ValidationService:
             self._player_list_model = None
             self._chest_type_list_model = None
             self._source_list_model = None
+
+    def _resolve_validation_path(self, list_type: str) -> Path:
+        """
+        Resolve the path to a validation list file.
+
+        Args:
+            list_type (str): The type of validation list ('player', 'chest_type', 'source')
+
+        Returns:
+            Path: The path to the validation list file
+        """
+        data_dir = Path(__file__).parents[3] / "data" / "validation"
+
+        if list_type == "player":
+            return data_dir / "players.txt"
+        elif list_type == "chest_type":
+            return data_dir / "chest_types.txt"
+        elif list_type == "source":
+            return data_dir / "sources.txt"
+
+        return None
 
     def add_validation_rule(self, rule_name: str, rule_function: callable) -> None:
         """
@@ -276,32 +361,37 @@ class ValidationService:
             return {}
 
         validation_results = {}
-        df = self._data_model.get_dataframe()
+        df = self._data_model.data
 
         # Determine which rules to run
-        rules_to_run = specific_rules or list(self._validation_rules.keys())
+        rules_to_run = specific_rules or self._validation_rules.keys()
 
-        # Run each specified rule
+        # Run each validation rule
         for rule_name in rules_to_run:
             if rule_name in self._validation_rules:
                 try:
-                    rule_function = self._validation_rules[rule_name]
-                    # Check if the rule requires a dataframe parameter
-                    if rule_name in ["missing_values", "outliers", "duplicates", "data_types"]:
-                        result = rule_function(df)
+                    # Special case for validation list rules that don't take the dataframe
+                    if rule_name in [
+                        "player_validation",
+                        "chest_type_validation",
+                        "source_validation",
+                    ]:
+                        results = self._validation_rules[rule_name]()
                     else:
-                        result = rule_function()
+                        results = self._validation_rules[rule_name](df)
 
-                    if result:  # If there are validation issues
-                        validation_results[rule_name] = result
+                    if results:
+                        validation_results[rule_name] = results
                 except Exception as e:
-                    logger.error(f"Error running validation rule '{rule_name}': {e}")
+                    logger.error(f"Error running validation rule {rule_name}: {e}")
+                    validation_results[rule_name] = {-1: f"Error running validation rule: {str(e)}"}
             else:
-                logger.warning(f"Validation rule '{rule_name}' not found.")
+                logger.warning(f"Validation rule {rule_name} not found.")
 
         # Update the validation status in the data model
         self._update_validation_status(validation_results)
 
+        # Return all validation results
         return validation_results
 
     def _check_players(self) -> Dict[int, str]:
@@ -317,7 +407,7 @@ class ValidationService:
 
         try:
             result = {}
-            df = self._data_model.get_dataframe()
+            df = self._data_model.data
 
             if self.PLAYER_COLUMN not in df.columns:
                 logger.warning(f"Player column '{self.PLAYER_COLUMN}' not found in dataframe.")
@@ -349,7 +439,7 @@ class ValidationService:
 
         try:
             result = {}
-            df = self._data_model.get_dataframe()
+            df = self._data_model.data
 
             if self.CHEST_COLUMN not in df.columns:
                 logger.warning(f"Chest column '{self.CHEST_COLUMN}' not found in dataframe.")
@@ -381,7 +471,7 @@ class ValidationService:
 
         try:
             result = {}
-            df = self._data_model.get_dataframe()
+            df = self._data_model.data
 
             if self.SOURCE_COLUMN not in df.columns:
                 logger.warning(f"Source column '{self.SOURCE_COLUMN}' not found in dataframe.")
@@ -493,6 +583,9 @@ class ValidationService:
 
             logger.info(f"Set case sensitivity to: {case_sensitive}")
 
+            # Emit signal
+            self.validation_preferences_changed.emit({"case_sensitive": case_sensitive})
+
     def is_case_sensitive(self) -> bool:
         """
         Get whether validation is case-sensitive.
@@ -520,6 +613,9 @@ class ValidationService:
                 self._config_manager.save()
 
             logger.info(f"Set validate on import to: {validate_on_import}")
+
+            # Emit signal
+            self.validation_preferences_changed.emit({"validate_on_import": validate_on_import})
 
     def get_validate_on_import(self) -> bool:
         """
@@ -586,6 +682,9 @@ class ValidationService:
 
         logger.info(f"Updated validation preferences: {preferences}")
 
+        # Emit signal
+        self.validation_preferences_changed.emit(preferences)
+
     def _update_validation_status(self, validation_results: Dict[str, Dict[int, str]]) -> None:
         """
         Update the validation status in the data model.
@@ -610,7 +709,7 @@ class ValidationService:
 
             stats = {"total": 0, "valid": 0, "invalid": 0, "missing": 0}
 
-            df = self._data_model.get_dataframe()
+            df = self._data_model.data
 
             # Count total rows
             stats["total"] = len(df)
@@ -730,3 +829,17 @@ class ValidationService:
         except Exception as e:
             logger.error(f"Error exporting validation report: {e}")
             return False, f"Error exporting validation report. Error: {e}"
+
+    def _reset_for_testing(self) -> None:
+        """Reset service state for testing purposes."""
+        # Reset validation list models if they exist
+        if self._player_list_model:
+            self._player_list_model.reset()
+        if self._chest_type_list_model:
+            self._chest_type_list_model.reset()
+        if self._source_list_model:
+            self._source_list_model.reset()
+
+        # Clear any cached validation results
+        if hasattr(self, "_validation_results"):
+            self._validation_results = {}

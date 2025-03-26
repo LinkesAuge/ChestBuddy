@@ -35,6 +35,7 @@ class FileOperationsController(BaseController):
         recent_files_changed (Signal): Emitted when the recent files list changes
         load_csv_triggered (Signal): Emitted when CSV load is triggered
         save_csv_triggered (Signal): Emitted when CSV save is triggered
+        operation_error (Signal): Emitted when an error occurs, with error message
     """
 
     # Define signals
@@ -43,6 +44,7 @@ class FileOperationsController(BaseController):
     recent_files_changed = Signal(list)  # List of recent files
     load_csv_triggered = Signal(list)  # List of file paths to load
     save_csv_triggered = Signal(str)  # Path to save to
+    operation_error = Signal(str)  # Error message
 
     def __init__(self, data_manager, config_manager: ConfigManager, signal_manager=None):
         """

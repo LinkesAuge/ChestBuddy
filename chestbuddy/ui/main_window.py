@@ -13,7 +13,7 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Optional, Union, Any, Set, Tuple
 
-from PySide6.QtCore import Qt, Signal, Slot, QSettings, QSize, QTimer
+from PySide6.QtCore import Qt, Signal, Slot, QSettings, QSize, QTimer, QObject
 from PySide6.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -29,8 +29,9 @@ from PySide6.QtWidgets import (
     QApplication,
     QStackedWidget,
     QProgressDialog,
+    QToolBar,
 )
-from PySide6.QtGui import QAction, QIcon, QKeySequence
+from PySide6.QtGui import QAction, QIcon, QKeySequence, QCloseEvent
 
 from chestbuddy.core.models import ChestDataModel
 from chestbuddy.core.services import CSVService, ValidationService, CorrectionService, ChartService
@@ -215,6 +216,49 @@ class MainWindow(QMainWindow):
         self._ui_state_controller.status_message_changed.connect(self._on_status_message_changed)
         self._ui_state_controller.actions_state_changed.connect(self._on_actions_state_changed)
         self._ui_state_controller.ui_refresh_needed.connect(self.refresh_ui)
+
+        # Connect view import signals to the handler method directly
+        # This uses direct Qt connections instead of SignalManager to fix the startup error
+        for view_name, view in self._views.items():
+            if hasattr(view, "import_requested"):
+                logger.debug(
+                    f"Connecting {view_name}.import_requested to _on_import_requested handler"
+                )
+                # Use direct Qt connection to the handler method that prevents duplicate dialogs
+                view.import_requested.connect(self._on_import_requested)
+
+    @Slot()
+    def _on_import_requested(self):
+        """
+        Handle import requests from views.
+
+        This slot is connected to view import_requested signals via SignalManager.
+        It delegates to the FileOperationsController but adds guard logic
+        to prevent duplicate dialogs.
+        """
+        # Check if we're already handling an import to prevent duplicate dialogs
+        if hasattr(self, "_is_handling_import") and self._is_handling_import:
+            logger.debug("Already handling an import request, ignoring duplicate")
+            return
+
+        # Check if we're already showing a progress dialog
+        if (
+            hasattr(self, "_progress_controller")
+            and self._progress_controller.is_progress_showing()
+        ):
+            logger.debug("Progress dialog is showing, ignoring import request")
+            return
+
+        # Set flag to prevent duplicate dialogs during processing
+        try:
+            self._is_handling_import = True
+            logger.debug("Handling import request via FileOperationsController")
+
+            # Delegate to file controller
+            self._file_controller.open_file(self)
+        finally:
+            # Always clear the flag when done
+            self._is_handling_import = False
 
     @Slot(dict)
     def _on_filter_applied(self, filter_params: Dict) -> None:
@@ -413,13 +457,11 @@ class MainWindow(QMainWindow):
         dashboard_view = DashboardView(self._data_model)
         dashboard_view.action_triggered.connect(self._on_dashboard_action)
         dashboard_view.file_selected.connect(self._on_recent_file_selected)
-        dashboard_view.import_requested.connect(self._open_file)
         self._content_stack.addWidget(dashboard_view)
         self._views["Dashboard"] = dashboard_view
 
         # Create Data view
         data_view = DataViewAdapter(self._data_model)
-        data_view.import_requested.connect(self._open_file)
         data_view.export_requested.connect(self._save_file_as)
 
         # Set up the data view controller with the view
@@ -959,7 +1001,9 @@ class MainWindow(QMainWindow):
             # Set flag to prevent duplicate dialogs
             self._is_opening_file = True
 
-            # Delegate to the controller
+            # Note: This method is directly connected to UI actions like menu items
+            # Import requests from views are now handled by _on_import_requested
+            # which uses the SignalManager to avoid duplicate connections
             self._file_controller.open_file(self)
         finally:
             # Always reset the flag when done

@@ -4,36 +4,52 @@ Tests for the UIStateController.
 
 import logging
 import pytest
+import time
+from unittest.mock import MagicMock, patch
 from PySide6.QtCore import QObject, Signal, Slot
+from PySide6.QtWidgets import QApplication
 
 from chestbuddy.core.controllers.ui_state_controller import UIStateController
 
 
-class SignalCatcher(QObject):
-    """Helper class to catch signals for testing."""
+class SignalCatcher:
+    """Utility class for catching signals in tests."""
 
     def __init__(self):
-        super().__init__()
+        """Initialize the signal catcher."""
         self.status_message = None
         self.action_states = None
         self.ui_theme = None
         self.ui_refresh_requested = False
+        self.validation_state = None
 
-    @Slot(str)
     def on_status_message_changed(self, message):
+        """Handle status message changed signal."""
         self.status_message = message
 
-    @Slot(dict)
     def on_actions_state_changed(self, states):
+        """Handle actions state changed signal."""
         self.action_states = states
 
-    @Slot(str)
     def on_ui_theme_changed(self, theme):
+        """Handle UI theme changed signal."""
         self.ui_theme = theme
 
-    @Slot()
     def on_ui_refresh_needed(self):
+        """Handle UI refresh needed signal."""
         self.ui_refresh_requested = True
+
+    def on_validation_state_changed(self, state):
+        """Handle validation state changed signal."""
+        self.validation_state = state
+
+    def reset(self):
+        """Reset all tracked signal values."""
+        self.status_message = None
+        self.action_states = None
+        self.ui_theme = None
+        self.ui_refresh_requested = False
+        self.validation_state = None
 
 
 class TestUIStateController:
@@ -201,3 +217,108 @@ class TestUIStateController:
 
         # Check refresh request
         assert signal_catcher.ui_refresh_requested is True
+
+    def test_update_validation_state(self, ui_controller, signal_catcher):
+        """Test updating validation state emits a signal."""
+        # Connect signal
+        ui_controller.validation_state_changed.connect(signal_catcher.on_validation_state_changed)
+
+        # Update validation state
+        ui_controller.update_validation_state(has_issues=True, issue_count=5)
+
+        # Check internal state
+        validation_state = ui_controller.get_validation_state()
+        assert validation_state["has_issues"] is True
+        assert validation_state["issue_count"] == 5
+        assert validation_state["last_validation_time"] is not None
+
+        # Check signal emission
+        assert signal_catcher.validation_state["has_issues"] is True
+        assert signal_catcher.validation_state["issue_count"] == 5
+
+        # Check status message update
+        assert signal_catcher.status_message == "Validation complete: 5 issues found"
+
+        # Reset validation state
+        signal_catcher.reset()
+        ui_controller.update_validation_state(reset=True)
+
+        # Check internal state
+        validation_state = ui_controller.get_validation_state()
+        assert validation_state["has_issues"] is False
+        assert validation_state["issue_count"] == 0
+        assert validation_state["last_validation_time"] is None
+
+        # Check signal emission
+        assert signal_catcher.validation_state["has_issues"] is False
+        assert signal_catcher.validation_state["issue_count"] == 0
+
+    def test_handle_validation_results(self, ui_controller, signal_catcher):
+        """Test handling validation results."""
+        # Connect signals
+        ui_controller.validation_state_changed.connect(signal_catcher.on_validation_state_changed)
+        ui_controller.actions_state_changed.connect(signal_catcher.on_actions_state_changed)
+        ui_controller.status_message_changed.connect(signal_catcher.on_status_message_changed)
+
+        # Create mock validation results
+        validation_results = {
+            "player_name": ["Player1 is invalid", "Player2 is invalid"],
+            "chest_type": ["Chest1 is invalid"],
+            "source": [],
+        }
+
+        # Handle validation results
+        ui_controller.handle_validation_results(validation_results)
+
+        # Check validation state
+        assert signal_catcher.validation_state["has_issues"] is True
+        assert signal_catcher.validation_state["issue_count"] == 3
+        assert signal_catcher.validation_state["categories"]["player_name"] == 2
+        assert signal_catcher.validation_state["categories"]["chest_type"] == 1
+        assert "source" not in signal_catcher.validation_state["categories"]
+
+        # Check action states
+        assert signal_catcher.action_states["add_to_validation"] is True
+        assert signal_catcher.action_states["clear_validation"] is True
+
+        # Check status message
+        assert signal_catcher.status_message == "Validation complete: 3 issues found"
+
+        # Test with no issues
+        signal_catcher.reset()
+        validation_results = {"player_name": [], "chest_type": [], "source": []}
+
+        ui_controller.handle_validation_results(validation_results)
+
+        # Check validation state
+        assert signal_catcher.validation_state["has_issues"] is False
+        assert signal_catcher.validation_state["issue_count"] == 0
+        assert signal_catcher.validation_state["categories"] == {}
+
+        # Check status message
+        assert signal_catcher.status_message == "Validation complete: No issues found"
+
+    def test_data_dependent_ui_resets_validation(self, ui_controller, signal_catcher):
+        """Test that setting data_dependent_ui to False resets validation state."""
+        # Connect signals
+        ui_controller.validation_state_changed.connect(signal_catcher.on_validation_state_changed)
+
+        # Set some validation state
+        ui_controller.update_validation_state(has_issues=True, issue_count=5)
+
+        # Reset signal catcher
+        signal_catcher.reset()
+
+        # Update data dependent UI to no data
+        ui_controller.update_data_dependent_ui(False)
+
+        # Check validation state was reset
+        assert signal_catcher.validation_state["has_issues"] is False
+        assert signal_catcher.validation_state["issue_count"] == 0
+        assert signal_catcher.validation_state["last_validation_time"] is None
+
+        # Check validation-related action states are properly set
+        assert signal_catcher.action_states["validate"] is False
+        assert signal_catcher.action_states["add_to_validation"] is False
+        assert signal_catcher.action_states["clear_validation"] is False
+        assert signal_catcher.action_states["refresh_validation"] is False

@@ -405,3 +405,45 @@ class TestDataViewController:
 
         # Assert results
         controller_with_view.clear_filter.assert_called_once()
+
+    def test_on_data_corrected(self, mock_data_model, mock_signal_manager):
+        """Test that the _on_data_corrected method properly handles validation list additions."""
+        # Setup
+        validation_service = MagicMock()
+        validation_service.add_to_validation_list.return_value = True
+
+        controller = DataViewController(mock_data_model, mock_signal_manager)
+        controller._validation_service = validation_service
+        controller.validate_data = MagicMock()
+
+        # Test adding to validation list
+        correction_operations = [
+            {"action": "add_to_validation", "field_type": "player", "value": "TestPlayer"}
+        ]
+
+        controller._on_data_corrected(correction_operations)
+
+        # Verify validation service was called
+        validation_service.add_to_validation_list.assert_called_once_with("player", "TestPlayer")
+
+        # Verify validate_data was called to refresh validation status
+        controller.validate_data.assert_called_once()
+
+        # Test error handling
+        validation_service.add_to_validation_list.reset_mock()
+        validation_service.add_to_validation_list.return_value = False
+        controller.validate_data.reset_mock()
+        controller.correction_error = MagicMock()
+
+        controller._on_data_corrected(correction_operations)
+
+        # Verify validation service was called
+        validation_service.add_to_validation_list.assert_called_once_with("player", "TestPlayer")
+
+        # Verify validate_data was not called when add fails
+        controller.validate_data.assert_not_called()
+
+        # Verify error signal was emitted with the correct message
+        controller.correction_error.emit.assert_called_once_with(
+            "Failed to add 'TestPlayer' to player validation list"
+        )

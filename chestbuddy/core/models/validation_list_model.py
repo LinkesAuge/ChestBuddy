@@ -247,3 +247,8 @@ class ValidationListModel(QObject):
             bool: Whether validation is case sensitive
         """
         return self._case_sensitive
+
+    def reset(self) -> None:
+        """Reset the validation list to its original state from the file."""
+        self.entries.clear()
+        self._load_entries()

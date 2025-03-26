@@ -20,3 +20,7 @@ def _init_defaults(self) -> None:
     self.set("Import", "normalize_text", "True")
     self.set("Import", "robust_mode", "True")
     self.set("Import", "chunk_size", "100")
+
+    # Validation defaults
+    self.set("Validation", "case_sensitive", "False")
+    self.set("Validation", "validate_on_import", "True")

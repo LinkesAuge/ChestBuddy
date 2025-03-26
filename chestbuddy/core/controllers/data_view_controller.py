@@ -60,22 +60,28 @@ class DataViewController(BaseController):
     operation_completed = Signal(str)  # Operation name
     chart_created = Signal(object)  # Chart data
 
-    def __init__(self, data_model, signal_manager=None):
+    def __init__(self, data_model, signal_manager=None, ui_state_controller=None):
         """
         Initialize the data view controller.
 
         Args:
             data_model: The data model to control
             signal_manager: Optional SignalManager instance for connection tracking
+            ui_state_controller: Optional UIStateController for UI state updates
         """
         super().__init__(signal_manager)
         self._data_model = data_model
         self._current_filters = {}
         self._current_sort_column = None
         self._current_sort_ascending = True
+        self._ui_state_controller = ui_state_controller
 
         # Connect to model signals
         self.connect_to_model(data_model)
+
+        # Connect to UI state controller if provided
+        if self._ui_state_controller:
+            self._connect_to_ui_state_controller()
 
         logger.debug("DataViewController initialized")
 
@@ -123,6 +129,10 @@ class DataViewController(BaseController):
 
         if hasattr(view, "correct_requested"):
             self._signal_manager.connect(view, "correct_requested", self, "_on_correct_requested")
+
+        # Connect to data correction signal for validation list additions
+        if hasattr(view, "data_corrected"):
+            self._signal_manager.connect(view, "data_corrected", self, "_on_data_corrected")
 
         logger.debug(f"DataViewController connected to view: {view.__class__.__name__}")
 
@@ -555,6 +565,10 @@ class DataViewController(BaseController):
 
             # Emit validation started signal
             self.validation_started.emit()
+
+            # Update UI state if controller is available
+            if self._ui_state_controller:
+                self._ui_state_controller.update_status_message("Validating data...")
 
             # Run validation
             results = self._validation_service.validate_data(specific_rules)
@@ -1027,3 +1041,88 @@ class DataViewController(BaseController):
             logger.error(f"Error exporting chart: {e}")
             self.operation_error.emit("chart_export", f"Error exporting chart: {str(e)}")
             return False
+
+    def _on_data_corrected(self, correction_operations: List[Dict]) -> None:
+        """
+        Handle data correction operations from the view.
+
+        Args:
+            correction_operations: List of correction operations to apply
+        """
+        if not correction_operations:
+            return
+
+        try:
+            for operation in correction_operations:
+                operation_type = operation.get("action", "")
+
+                # Handle add_to_validation action
+                if operation_type == "add_to_validation":
+                    field_type = operation.get("field_type", "")
+                    value = operation.get("value", "")
+
+                    if field_type and value and hasattr(self, "_validation_service"):
+                        # Add to validation list
+                        success = self._validation_service.add_to_validation_list(field_type, value)
+
+                        if success:
+                            # Validate data again to update validation status
+                            self.validate_data()
+
+                            # Emit signal that correction was completed
+                            self.correction_completed.emit(
+                                {
+                                    "action": "add_to_validation",
+                                    "field_type": field_type,
+                                    "value": value,
+                                    "success": True,
+                                }
+                            )
+
+                            # Update UI state if controller is available
+                            if self._ui_state_controller:
+                                self._ui_state_controller.update_status_message(
+                                    f"Added '{value}' to {field_type} validation list"
+                                )
+
+                            # Log the success
+                            logger.info(f"Added '{value}' to {field_type} validation list")
+                        else:
+                            # Emit error signal
+                            self.correction_error.emit(
+                                f"Failed to add '{value}' to {field_type} validation list"
+                            )
+
+                            # Update UI state if controller is available
+                            if self._ui_state_controller:
+                                self._ui_state_controller.update_status_message(
+                                    f"Failed to add '{value}' to {field_type} validation list"
+                                )
+
+                            logger.error(f"Failed to add '{value}' to {field_type} validation list")
+                else:
+                    # Handle other correction operations (existing implementation)
+                    logger.debug(f"Received unhandled correction operation: {operation_type}")
+        except Exception as e:
+            self.correction_error.emit(f"Error processing correction operation: {str(e)}")
+            logger.error(f"Error in _on_data_corrected: {str(e)}")
+
+    def _connect_to_ui_state_controller(self):
+        """Connect to UI state controller signals."""
+        if not self._ui_state_controller:
+            return
+
+        # Connect validation completed signal to UI state controller
+        self.validation_completed.connect(self._ui_state_controller.handle_validation_results)
+
+        # Connect validation started signal to update status message
+        self.validation_started.connect(
+            lambda: self._ui_state_controller.update_status_message("Validating data...")
+        )
+
+        # Connect validation error signal to update status message
+        self.validation_error.connect(
+            lambda msg: self._ui_state_controller.update_status_message(f"Validation error: {msg}")
+        )
+
+        logger.debug("DataViewController connected to UIStateController")

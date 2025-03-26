@@ -10,6 +10,7 @@ Usage:
 
 import logging
 from typing import Dict, Optional, List, Any
+import time
 
 from PySide6.QtCore import QObject, Signal, Slot
 
@@ -31,11 +32,13 @@ class UIStateController(BaseController):
         actions_state_changed(dict): Signal emitted when the state of actions changes
         ui_theme_changed(str): Signal emitted when the UI theme changes
         ui_refresh_needed(): Signal emitted when the UI needs a complete refresh
+        validation_state_changed(dict): Signal emitted when validation state changes
 
     Attributes:
         _status_message (str): Current status message
         _action_states (dict): Dictionary of action states (enabled/disabled)
         _ui_theme (str): Current UI theme
+        _validation_state (dict): Current validation state information
     """
 
     # Signals
@@ -43,6 +46,7 @@ class UIStateController(BaseController):
     actions_state_changed = Signal(dict)
     ui_theme_changed = Signal(str)
     ui_refresh_needed = Signal()
+    validation_state_changed = Signal(dict)
 
     def __init__(self, signal_manager=None):
         """
@@ -57,6 +61,12 @@ class UIStateController(BaseController):
         self._status_message = "Ready"
         self._action_states = {}
         self._ui_theme = "default"
+        self._validation_state = {
+            "has_issues": False,
+            "issue_count": 0,
+            "categories": {},
+            "last_validation_time": None,
+        }
 
         logger.info("UIStateController initialized")
 
@@ -163,6 +173,9 @@ class UIStateController(BaseController):
             chart=has_data,
             filter=has_data,
             sort=has_data,
+            add_to_validation=has_data,
+            clear_validation=has_data,
+            refresh_validation=has_data,
         )
 
         # Update status message based on data state
@@ -170,6 +183,8 @@ class UIStateController(BaseController):
             self.update_status_message("Data loaded and ready")
         else:
             self.update_status_message("No data loaded")
+            # Reset validation state when no data
+            self.update_validation_state(reset=True)
 
         logger.debug(f"Updated data-dependent UI state: has_data={has_data}")
 
@@ -177,6 +192,62 @@ class UIStateController(BaseController):
         """Request a complete refresh of the UI."""
         self.ui_refresh_needed.emit()
         logger.debug("UI refresh requested")
+
+    def update_validation_state(self, **validation_info) -> None:
+        """
+        Update validation state information and notify listeners.
+
+        Args:
+            **validation_info: Keyword arguments containing validation state information
+                - has_issues (bool): Whether there are validation issues
+                - issue_count (int): Number of validation issues
+                - categories (dict): Validation issues by category
+                - reset (bool): Whether to reset validation state to default
+        """
+        changed = False
+
+        if validation_info.get("reset", False):
+            new_state = {
+                "has_issues": False,
+                "issue_count": 0,
+                "categories": {},
+                "last_validation_time": None,
+            }
+            if self._validation_state != new_state:
+                self._validation_state = new_state
+                changed = True
+        else:
+            # Update individual state items
+            for key, value in validation_info.items():
+                if key != "reset" and (
+                    key not in self._validation_state or self._validation_state[key] != value
+                ):
+                    self._validation_state[key] = value
+                    changed = True
+
+            # Update last validation time if anything changed
+            if changed:
+                self._validation_state["last_validation_time"] = time.time()
+
+        if changed:
+            self.validation_state_changed.emit(self._validation_state.copy())
+            logger.debug(f"Validation state updated: {validation_info}")
+
+            # Update status message based on validation state
+            if self._validation_state["has_issues"]:
+                issues = self._validation_state["issue_count"]
+                self.update_status_message(f"Validation complete: {issues} issues found")
+            elif self._validation_state["last_validation_time"] is not None:
+                self.update_status_message("Validation complete: No issues found")
+
+    def get_validation_state(self) -> dict:
+        """
+        Get current validation state information.
+
+        Returns:
+            Dictionary containing validation state information
+        """
+        return self._validation_state.copy()
 
     @Slot(dict)
     def handle_app_state_update(self, state: Dict[str, Any]) -> None:
@@ -206,3 +277,37 @@ class UIStateController(BaseController):
             self.request_ui_refresh()
 
         logger.debug(f"Handled app state update: {state}")
+
+    @Slot(dict)
+    def handle_validation_results(self, results: dict) -> None:
+        """
+        Handle validation results and update UI state accordingly.
+
+        Args:
+            results: Dictionary of validation results by category
+        """
+        # Calculate issue count and categories
+        has_issues = False
+        issue_count = 0
+        categories = {}
+
+        for category, issues in results.items():
+            cat_count = len(issues) if issues else 0
+            if cat_count > 0:
+                has_issues = True
+                issue_count += cat_count
+                categories[category] = cat_count
+
+        # Update validation state
+        self.update_validation_state(
+            has_issues=has_issues, issue_count=issue_count, categories=categories
+        )
+
+        # Update action states based on validation results
+        self.update_action_states(
+            add_to_validation=has_issues,
+            clear_validation=has_issues
+            or self._validation_state["last_validation_time"] is not None,
+        )
+
+        logger.debug(f"Handled validation results: {issue_count} issues found")

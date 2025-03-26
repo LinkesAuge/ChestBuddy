@@ -173,15 +173,15 @@ class TestChestDataModel:
         # Update model with sample data
         model.update_data(sample_data)
 
-        # Create validation status DataFrame
+        # Create validation status DataFrame with correct number of rows
         validation_df = pd.DataFrame(
             {
-                "Date_valid": [True, True, True, True],
-                "Player Name_valid": [True, False, True, True],
-                "Source/Location_valid": [True, True, True, True],
-                "Chest Type_valid": [True, True, True, True],
-                "Value_valid": [True, True, False, True],
-                "Clan_valid": [True, True, True, True],
+                "Date_valid": [True, True],
+                "Player Name_valid": [True, False],
+                "Source/Location_valid": [True, True],
+                "Chest Type_valid": [True, True],
+                "Value_valid": [True, True],
+                "Clan_valid": [True, True],
             },
             index=sample_data.index,
         )

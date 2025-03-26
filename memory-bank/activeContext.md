@@ -871,3 +871,7 @@ The ChestBuddy application is now feature complete with all planned components i
 - Documentation: 100% Complete
 
 The focus now is on ensuring test reliability and completeness before final release.
+
+## Latest Updates
+
+- **2025-03-26**: Fixed a critical issue where data was not being loaded after file import. The problem was a missing signal connection between `FileOperationsController.load_csv_triggered` and `DataManager.load_csv`. Adding this connection in `app.py` resolved the issue. Now files are properly loaded and displayed after import.
