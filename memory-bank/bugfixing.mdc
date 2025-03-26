@@ -139,3 +139,74 @@ We verified that:
 
 All known issues have been resolved. The application is now stable and ready for release.
 
+## 2025-03-26: Fixed DataView Import Button Not Working
+
+### Problem
+The import button in the DataView was not functioning correctly. Clicking it did not open a file dialog as expected, even though the import functionality worked correctly in other parts of the application like the Dashboard.
+
+### Root Cause
+We identified several issues in the signal chain:
+
+1. The `ActionButton` class had an inconsistency between its `name()` method and how the `get_button_by_name()` method in `ActionToolbar` was accessing button names (as attributes vs. method calls)
+2. The `_on_import_clicked` method in `DataView` had complex conditional checks and parent chain traversal that were preventing the signal from being emitted
+3. An incorrect attempt to use `SignalManager.disconnect_all()` with multiple parameters was causing errors in the signal connection
+4. A fallback mechanism in `DataViewAdapter._on_import_requested` was causing a second file dialog to open after the first one
+
+### Solution
+
+1. Fixed the `ActionButton` class to provide a consistent way to access button names:
+   ```python
+   # Make name accessible as an attribute as well for compatibility
+   self.name = name
+   ```
+
+2. Simplified the `_on_import_clicked` method in `DataView` to simply emit the signal:
+   ```python
+   def _on_import_clicked(self):
+       """Handle import button click."""
+       # Simply emit the signal to be handled by the adapter
+       self.import_clicked.emit()
+   ```
+
+3. Fixed the signal connections in `DataViewAdapter._connect_ui_signals()` to use direct Qt connections:
+   ```python
+   # Connect the import button signal
+   self._data_view.import_clicked.connect(self._on_import_requested)
+   ```
+
+4. Removed the fallback mechanism from `DataViewAdapter._on_import_requested`:
+   ```python
+   def _on_import_requested(self):
+       """Handle import button click."""
+       # Simply emit the signal to be handled by MainWindow
+       self.import_requested.emit()
+   ```
+
+### Testing
+We verified that:
+- The import button in DataView now works correctly, opening a single file dialog
+- The signal chain flows properly: Button click → DataView → DataViewAdapter → MainWindow → FileController
+- No duplicate file dialogs are opened
+- All tests related to DataViewAdapter still pass
+
+## 2025-03-26: Code Cleanup - Removed Obsolete DataViewAdapter Fragment
+
+### Description
+Identified and removed an outdated partial implementation of `DataViewAdapter` in `chestbuddy/ui/data_view_adapter.py`. This file contained only two methods (`needs_refresh` and `refresh`) and was not being imported or used by any other code in the project.
+
+### Analysis
+- The file appeared to be a fragment from an earlier implementation.
+- No other files were importing or referencing it.
+- The functionality has been properly implemented in the newer `chestbuddy/ui/views/data_view_adapter.py` module.
+- The modern implementation includes similar methods (`needs_update` and `refresh`) with improved functionality.
+
+### Action Taken
+- Verified through code search that no imports or dependencies existed.
+- Removed the file to avoid confusion and maintain a cleaner codebase.
+- Kept the `chestbuddy/ui/data_view.py` file as it is still actively used by the new adapter.
+
+### Impact
+- No functional impact; this was purely a code cleanup operation.
+- Reduces potential confusion during future development.
+- Maintains a cleaner codebase by removing obsolete fragments.
+

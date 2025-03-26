@@ -1100,15 +1100,12 @@ class DataView(QWidget):
 
     def _on_import_clicked(self):
         """Handle import button click."""
-        # Emit the import_clicked signal for the adapter to handle
-        logger.info("Import button clicked in DataView - emitting import_clicked signal")
+        # Simply emit the signal to be handled by the adapter
         self.import_clicked.emit()
-        logger.debug("DataView import_clicked signal emitted")
 
     def _on_export_clicked(self):
         """Handle export button click."""
-        # Emit the export_clicked signal for the adapter to handle
-        logger.debug("Export button clicked in DataView, emitting export_clicked signal")
+        # Simply emit the signal to be handled by the adapter
         self.export_clicked.emit()
 
     def populate_table(self) -> None:

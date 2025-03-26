@@ -141,6 +141,51 @@ class DataViewAdapter(BaseView):
 
 This allows for incremental modernization while maintaining compatibility.
 
+#### DataView/DataViewAdapter Implementation
+
+The `DataViewAdapter` is a prime example of the adapter pattern in this application:
+
+1. **Component Wrapping**: The adapter creates and embeds the original `DataView` component:
+   ```python
+   self._data_view = DataView(data_model)
+   self._data_view.disable_auto_update()  # Control update behavior
+   ```
+
+2. **Method Delegation**: The adapter implements methods with similar names that delegate to the wrapped component:
+   ```python
+   def populate_table(self):
+       if self._controller and not self._data_model.is_empty:
+           self._controller.populate_table()
+       # Update state tracking
+       self._update_data_state()
+   ```
+
+3. **Signal Redirection**: The adapter connects to signals from the wrapped component and emits its own signals:
+   ```python
+   # In _connect_ui_signals
+   self._data_view.import_clicked.connect(self._on_import_requested)
+   
+   # In _on_import_requested
+   def _on_import_requested(self):
+       self.import_requested.emit()
+   ```
+
+4. **Enhanced Functionality**: The adapter adds controller integration, state management, and other features not present in the original component:
+   ```python
+   # Auto-update management
+   def enable_auto_update(self):
+       self._signal_manager.connect(self._data_model, "data_changed", self, "request_update")
+   
+   def disable_auto_update(self):
+       self._signal_manager.disconnect(self._data_model, "data_changed", self, "request_update")
+   ```
+
+5. **Parallel Methods**: The adapter implements methods that appear redundant with the wrapped component, but serve different purposes:
+   - `DataView.populate_table()`: Directly updates the table UI
+   - `DataViewAdapter.populate_table()`: Coordinates with the controller and manages state
+
+This implementation enables the original `DataView` component to be seamlessly integrated into the new UI architecture while adding new capabilities through the adapter layer.
+
 ### 6. Factory Pattern
 
 Used for creating various chart types and UI components:
@@ -525,63 +570,3 @@ This architecture provides several key benefits:
 5. **Safety**: Automatic disconnection prevents memory leaks
 
 The signal management and debugging architecture is fundamental to the application's maintainability and helps developers understand the complex interactions between components. 
-
-## Adapter Pattern Implementation
-
-The ChestBuddy application makes extensive use of the Adapter pattern to integrate legacy components with the new architecture. The most notable example is the `DataViewAdapter` which wraps the original `DataView` component.
-
-### Key Implementation Details
-
-- **Component Wrapping**: Original components are wrapped by adapter classes that inherit from `BaseView` or `UpdatableView`
-- **Signal Redirection**: Signals from the wrapped component are captured and re-emitted by the adapter
-- **Consistent Interface**: Adapters provide a standardized interface that conforms to the new architecture
-- **Update Management**: Adapters use the `UpdateManager` for scheduling view updates
-
-### Critical Considerations in Adapter Pattern
-
-#### Initialization Order
-
-A critical aspect of implementing adapters is ensuring proper initialization order. Based on our experience with the `DataViewAdapter`, the following sequence should be followed:
-
-1. Create the wrapped component
-2. Configure basic properties of the wrapped component
-3. Call the parent class constructor (`super().__init__()`)
-4. Perform any operations that rely on parent-initialized attributes or methods
-5. Connect signals between the adapter and wrapped component
-
-Incorrect initialization order can lead to runtime errors, such as attempting to use attributes before they are initialized.
-
-#### Signal Connection Management
-
-The adapter pattern requires careful management of signal connections to prevent issues like double updates or missed events. Key guidelines:
-
-1. **Avoid Redundant Signal Paths**: When adapting a component that already has signal connections, carefully analyze and potentially disable its direct connections
-2. **Signal Ownership**: Decide whether the adapter or the adapted component should respond to model signals
-3. **Connection Documentation**: Clearly document all signal connections in adapter classes
-4. **Signal Debugging**: Add debug logging for signal emissions and connections to trace the flow of events
-
-#### Example: DataView Adaptation
-
-In the `DataViewAdapter`, we encountered and resolved several issues related to initialization and signal management:
-
-```python
-# Create the underlying DataView
-self._data_view = DataView(data_model)
-# Disable auto-update to prevent double population
-self._data_view.disable_auto_update()
-
-# Initialize the base view with debug mode option
-super().__init__("Data View", parent, debug_mode=debug_mode)
-self.setObjectName("DataViewAdapter")
-
-# Ensure the adapter itself has auto-update enabled
-self.enable_auto_update()
-```
-
-This implementation:
-1. Creates and configures the DataView component
-2. Calls the parent constructor to initialize base view functionality
-3. Enables auto-update on the adapter only after parent initialization is complete
-4. Prevents redundant update paths by disabling auto-update on the wrapped component
-
-This ensures a single, controlled update pathway through the adapter while preventing initialization errors. 

@@ -195,31 +195,22 @@ class DataViewAdapter(UpdatableView):
 
     def _connect_ui_signals(self):
         """Connect UI component signals using safe connection pattern."""
-        # Connect to DataView signals instead of directly to buttons
-        logger.info("DataViewAdapter: Setting up UI signal connections")
-
-        # Use direct Qt signal connection for more reliable connection
+        # Connect to DataView signals using direct connections
         if hasattr(self._data_view, "import_clicked"):
             try:
-                logger.info("DataViewAdapter: Connecting to import_clicked signal from DataView")
-                # Connect the signal directly
+                # Connect the import button signal
                 self._data_view.import_clicked.connect(self._on_import_requested)
-                logger.info("DataViewAdapter: Successfully connected to import_clicked signal")
             except Exception as e:
                 logger.error(f"Error connecting to import_clicked signal: {e}")
-        else:
-            logger.error("DataViewAdapter: DataView does not have import_clicked signal!")
 
         if hasattr(self._data_view, "export_clicked"):
             try:
-                logger.info("DataViewAdapter: Connecting to export_clicked signal from DataView")
-                # Connect the signal directly
+                # Connect the export button signal
                 self._data_view.export_clicked.connect(self._on_export_requested)
-                logger.info("DataViewAdapter: Successfully connected to export_clicked signal")
             except Exception as e:
                 logger.error(f"Error connecting to export_clicked signal: {e}")
 
-        # Get action toolbar from DataView for the filter buttons
+        # Connect filter buttons using signal manager
         filter_button = self._data_view._action_toolbar.get_button_by_name("apply_filter")
         clear_filter_button = self._data_view._action_toolbar.get_button_by_name("clear_filter")
 
@@ -283,34 +274,12 @@ class DataViewAdapter(UpdatableView):
 
     def _on_import_requested(self):
         """Handle import button click."""
-        logger.info(
-            "DataViewAdapter: _on_import_requested called, emitting import_requested signal"
-        )
+        # Simply emit the signal to be handled by MainWindow
         self.import_requested.emit()
-        logger.info("DataViewAdapter: import_requested signal emitted")
-
-        # For debug purposes, trace the parent chain
-        parent = self.parent()
-        if parent:
-            logger.debug(f"DataViewAdapter: Parent is {parent.__class__.__name__}")
-            # Try to find MainWindow in the parent chain
-            main_window = None
-            current = parent
-            while current is not None:
-                logger.debug(
-                    f"DataViewAdapter: Checking parent chain: {current.__class__.__name__}"
-                )
-                if current.__class__.__name__ == "MainWindow":
-                    main_window = current
-                    logger.debug("DataViewAdapter: Found MainWindow in parent chain")
-                    break
-                current = current.parent()
-
-        # No need to call the file controller directly - the signal will handle it
-        # Removing the direct fallback call that was causing double file dialogs
 
     def _on_export_requested(self):
         """Handle export button click."""
+        # Simply emit the signal to be handled by MainWindow
         self.export_requested.emit()
 
     @Slot(str)
