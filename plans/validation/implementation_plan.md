@@ -1136,3 +1136,69 @@ All planned validation system components have been successfully implemented and 
 8. ✅ End-to-End Regression Testing
 9. ✅ Update Project Memory Documentation
 10. ✅ Conduct Final Technical Review 
+
+## UI Design Alignment
+
+### Validation List View Mockup
+A detailed mockup for the validation list view has been created, following the UI/UX requirements for achieving an "A" rating on the design rubric. The mockup is available at `plans/validation/validation_list_view_mockup.md` and shows:
+
+1. **Three-Column Layout**:
+   - Players list (left column)
+   - Chest Types list (middle column) 
+   - Sources list (right column)
+   - Resizable panels using QSplitter
+
+2. **Per-Column Components**:
+   - Header with list name and count (e.g., "Players (102)")
+   - Search input field
+   - Scrollable list of validation entries
+   - Add/Remove/Filter buttons at bottom
+
+3. **Bottom Toolbar**:
+   - Save All, Reload All, Preferences, and Validate buttons
+   - Status bar showing validation statistics
+
+4. **Visual Cues**:
+   - Light red background (#FFCCCC) for invalid values
+   - Light yellow background (#FFFFCC) for missing values
+   - Blue left border with light blue background for selected items
+
+### Current Implementation vs. Mockup
+The current implementation differs from the mockup in several ways:
+
+1. **Layout Structure**:
+   - Current: Vertical split with controls at top, results at bottom
+   - Mockup: Three-column layout with resizable panels
+
+2. **Component Organization**:
+   - Current: Results display in a tree widget
+   - Mockup: Each validation list in its own column with search capability
+
+3. **Visual Design**:
+   - Current: Basic styling without consistent visual indicators
+   - Mockup: Detailed styling with consistent colors, spacing, and interaction states
+
+### Required Changes
+To align the implementation with the mockup, the following changes are needed:
+
+1. **ValidationTabView Updates**:
+   - Replace current vertical split with horizontal three-column layout
+   - Implement QSplitter for resizable panels
+   - Add bottom toolbar with action buttons
+
+2. **ValidationListView Component**:
+   - Create a reusable component for each validation list column
+   - Implement search functionality
+   - Add add/remove/filter buttons
+   - Implement proper list styling with visual indicators
+
+3. **Status Reporting**:
+   - Add status bar with validation statistics
+   - Implement real-time update of validation counts
+
+4. **Visual Styling**:
+   - Apply consistent colors for validation states
+   - Implement proper spacing and alignment
+   - Add hover effects and selection styling
+
+These changes will ensure the implementation achieves an "A" rating on the UI/UX evaluation criteria while maintaining the functionality outlined in the implementation plan. 

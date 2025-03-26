@@ -875,3 +875,51 @@ The focus now is on ensuring test reliability and completeness before final rele
 ## Latest Updates
 
 - **2025-03-26**: Fixed a critical issue where data was not being loaded after file import. The problem was a missing signal connection between `FileOperationsController.load_csv_triggered` and `DataManager.load_csv`. Adding this connection in `app.py` resolved the issue. Now files are properly loaded and displayed after import.
+
+## Validation UI Implementation
+
+### Validation List View Design
+The validation system has been designed with a three-column layout based on a detailed mockup:
+
+1. **Layout Structure**:
+   - Three-column layout with resizable panels using QSplitter
+   - Each column represents a different validation list (Players, Chest Types, Sources)
+   - Bottom toolbar with Save All, Reload All, Preferences, and Validate buttons
+   - Status bar showing overall validation statistics
+
+2. **Per-Column Components**:
+   - Header showing list name and count (e.g., "Players (102)")
+   - Search input field for filtering entries
+   - Scrollable list of validation entries
+   - Add/Remove/Filter buttons at the bottom of each column
+
+3. **Visual Indicators**:
+   - Invalid values: Light red background (#FFCCCC)
+   - Missing values: Light yellow background (#FFFFCC)
+   - Selected items: Blue left border with light blue background
+   - Hover states for interactive elements
+
+4. **Context Menu Integration**:
+   - Right-click on data cells to show context menu
+   - Options to add entries to validation lists
+   - Support for adding multiple selected items at once
+
+### Implementation Status
+The validation list management view mockup is complete and serves as the design reference. The current implementation needs to be updated to align with this design:
+
+1. **Required Changes**:
+   - Update ValidationTabView to use the three-column layout instead of the current vertical split
+   - Implement proper ValidationListView for each column
+   - Add search functionality to each validation list
+   - Implement proper visual indicators for invalid/missing entries
+   - Add the bottom toolbar with action buttons
+   - Create proper status bar for validation statistics
+
+2. **Priority Tasks**:
+   - Implement the three-column layout with QSplitter
+   - Create ValidationListView component for list management
+   - Integrate search functionality into each list view
+   - Connect list operations to the ValidationListModel
+   - Implement visual indicators for validation status
+
+The mockup provides a detailed reference for all UI components and their styling, ensuring the implementation can achieve an "A" rating on the UI/UX evaluation criteria.
