@@ -31,6 +31,7 @@ class ValidationViewAdapter(UpdatableView):
         validation_service (ValidationService): The service for data validation
         validation_tab (ValidationTabView): The wrapped ValidationTabView instance
         _controller (DataViewController): The controller for validation operations
+        _is_updating (bool): Flag to prevent recursive updates
 
     Implementation Notes:
         - Inherits from UpdatableView to maintain UI consistency and implement IUpdatable
@@ -64,6 +65,7 @@ class ValidationViewAdapter(UpdatableView):
         self._data_model = data_model
         self._validation_service = validation_service
         self._controller = None
+        self._is_updating = False  # Flag to prevent recursive updates
 
         # Create the underlying ValidationTabView
         self._validation_tab = ValidationTabView(validation_service)
@@ -138,6 +140,12 @@ class ValidationViewAdapter(UpdatableView):
         this method schedules a debounced update through the UpdateManager.
         """
         logger.debug("ValidationViewAdapter: Validation updated")
+
+        # Prevent recursive updates
+        if self._is_updating:
+            logger.debug("ValidationViewAdapter: Update already in progress, skipping")
+            return
+
         # Don't call refresh directly as it causes recursion with the validation tab view
         # Instead, use a debounced update request to avoid infinite recursive calls
         self.schedule_update(
@@ -153,20 +161,38 @@ class ValidationViewAdapter(UpdatableView):
         Args:
             data: Optional data to use for update (unused in this implementation)
         """
-        # Use the ValidationTabView's own refresh method if available
-        if hasattr(self._validation_tab, "_on_reset"):
-            self._validation_tab._on_reset()
+        # Set updating flag to prevent recursive updates
+        self._is_updating = True
 
-        logger.debug("ValidationViewAdapter: View content updated")
+        try:
+            # Use the ValidationTabView's own refresh method if available
+            if hasattr(self._validation_tab, "refresh"):
+                self._validation_tab.refresh()
+            elif hasattr(self._validation_tab, "_on_reset"):
+                self._validation_tab._on_reset()
+
+            logger.debug("ValidationViewAdapter: View content updated")
+        finally:
+            # Always reset the flag, even if an exception occurs
+            self._is_updating = False
 
     def _refresh_view_content(self) -> None:
         """
         Refresh the view content without changing the underlying data.
         """
-        if hasattr(self._validation_tab, "_on_reset"):
-            self._validation_tab._on_reset()
+        # Set updating flag to prevent recursive updates
+        self._is_updating = True
 
-        logger.debug("ValidationViewAdapter: View content refreshed")
+        try:
+            if hasattr(self._validation_tab, "refresh"):
+                self._validation_tab.refresh()
+            elif hasattr(self._validation_tab, "_on_reset"):
+                self._validation_tab._on_reset()
+
+            logger.debug("ValidationViewAdapter: View content refreshed")
+        finally:
+            # Always reset the flag, even if an exception occurs
+            self._is_updating = False
 
     def _populate_view_content(self, data=None) -> None:
         """
@@ -181,6 +207,8 @@ class ValidationViewAdapter(UpdatableView):
         if self._controller:
             self._controller.validate_data()
         # Fallback to direct validation if controller not set
+        elif hasattr(self._validation_tab, "validate"):
+            self._validation_tab.validate()
         elif hasattr(self._validation_tab, "_on_validate_now"):
             self._validation_tab._on_validate_now()
 
@@ -190,10 +218,19 @@ class ValidationViewAdapter(UpdatableView):
         """
         Reset the view content to its initial state.
         """
-        if hasattr(self._validation_tab, "_on_reset"):
-            self._validation_tab._on_reset()
+        # Set updating flag to prevent recursive updates
+        self._is_updating = True
 
-        logger.debug("ValidationViewAdapter: View content reset")
+        try:
+            if hasattr(self._validation_tab, "clear_validation"):
+                self._validation_tab.clear_validation()
+            elif hasattr(self._validation_tab, "_on_reset"):
+                self._validation_tab._on_reset()
+
+            logger.debug("ValidationViewAdapter: View content reset")
+        finally:
+            # Always reset the flag, even if an exception occurs
+            self._is_updating = False
 
     @Slot(str)
     def _on_action_clicked(self, action_id: str) -> None:
