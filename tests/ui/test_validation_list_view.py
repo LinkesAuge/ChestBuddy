@@ -111,6 +111,9 @@ class TestValidationListView:
         mock_info = MagicMock()
         monkeypatch.setattr(QMessageBox, "information", mock_info)
 
+        # Save the initial entry count
+        initial_count = validation_list_view.validation_model.count()
+
         # Set search text to an existing entry
         validation_list_view.search_input.setText("Entry1")
 
@@ -120,8 +123,19 @@ class TestValidationListView:
         # Directly call the handler method instead of clicking the button
         validation_list_view._on_add_clicked()
 
-        # Check that entry wasn't added (entry count remains the same)
-        assert validation_list_view.list_widget.count() == 3
+        # Check that entry wasn't added to the model (entry count remains the same)
+        assert validation_list_view.validation_model.count() == initial_count
+
+        # Check that filtered list shows the searched entry
+        assert validation_list_view.list_widget.count() == 1
+        assert validation_list_view.list_widget.item(0).text() == "Entry1"
+
+        # Clear search to check full list
+        validation_list_view.search_input.clear()
+        validation_list_view._filter_entries("")
+
+        # Verify that the full list still has the original entries
+        assert validation_list_view.list_widget.count() == initial_count
 
         # Check that message box was shown
         mock_info.assert_called_once()

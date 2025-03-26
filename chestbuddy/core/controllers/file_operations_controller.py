@@ -13,10 +13,11 @@ from pathlib import Path
 from typing import List, Optional, Union
 
 from PySide6.QtCore import QObject, Signal, QSettings
-from PySide6.QtWidgets import QFileDialog, QApplication, QMessageBox
+from PySide6.QtWidgets import QFileDialog, QApplication, QMessageBox, QDialog, QWidget
 
 from chestbuddy.utils.config import ConfigManager
 from chestbuddy.core.controllers.base_controller import BaseController
+from chestbuddy.core.models.chest_data_model import ChestDataModel
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -36,6 +37,7 @@ class FileOperationsController(BaseController):
         load_csv_triggered (Signal): Emitted when CSV load is triggered
         save_csv_triggered (Signal): Emitted when CSV save is triggered
         operation_error (Signal): Emitted when an error occurs, with error message
+        file_dialog_canceled (Signal): Emitted when a file dialog is canceled without selection
     """
 
     # Define signals
@@ -45,6 +47,7 @@ class FileOperationsController(BaseController):
     load_csv_triggered = Signal(list)  # List of file paths to load
     save_csv_triggered = Signal(str)  # Path to save to
     operation_error = Signal(str)  # Error message
+    file_dialog_canceled = Signal()  # Emitted when a file dialog is canceled without selection
 
     def __init__(self, data_manager, config_manager: ConfigManager, signal_manager=None):
         """
@@ -60,6 +63,7 @@ class FileOperationsController(BaseController):
         self._config_manager = config_manager
         self._recent_files = []
         self._current_file_path = None
+        self._is_showing_dialog = False  # Flag to prevent duplicate dialogs
 
         # Connect to data manager
         self.connect_to_model(data_manager)
@@ -79,49 +83,63 @@ class FileOperationsController(BaseController):
         # Add model-specific connections if needed
         logger.debug(f"FileOperationsController connected to model: {model.__class__.__name__}")
 
-    def open_file(self, parent=None):
+    def open_file(self, parent: QWidget = None) -> List[str]:
         """
-        Show a file dialog to open one or more CSV files.
+        Open a file dialog for selecting and opening CSV files.
 
         Args:
-            parent: Parent widget for the dialog
+            parent (QWidget, optional): Parent widget for the file dialog. Defaults to None.
+
+        Returns:
+            List[str]: List of selected file paths, or empty list if canceled.
         """
-        file_dialog = QFileDialog(parent)
-        file_dialog.setFileMode(QFileDialog.FileMode.ExistingFiles)
-        file_dialog.setNameFilter("CSV files (*.csv);;All files (*.*)")
-        file_dialog.setViewMode(QFileDialog.ViewMode.Detail)
+        logger.debug(f"FileOperationsController.open_file called with parent={parent}")
 
-        if self._current_file_path:
-            file_dialog.setDirectory(str(Path(self._current_file_path).parent))
-        else:
-            # Use the last directory from config or default to documents
-            last_dir = self._config_manager.get(
-                "Files", "last_import_directory", str(Path.home() / "Documents")
-            )
-            # Fix: Ensure last_dir is a string, not a list
-            if isinstance(last_dir, list):
-                last_dir = str(Path.home() / "Documents")
-            file_dialog.setDirectory(last_dir)
+        # Prevent duplicate dialogs
+        if self._is_showing_dialog:
+            logger.debug("File dialog already showing, ignoring duplicate request")
+            return []
 
-        if file_dialog.exec():
-            file_paths = file_dialog.selectedFiles()
-            if file_paths:
-                # Save the directory for next time
-                self._config_manager.set(
-                    "Files", "last_import_directory", str(Path(file_paths[0]).parent)
-                )
+        try:
+            self._is_showing_dialog = True
+            logger.debug("About to show file open dialog")
 
-                # Trigger file load
-                self.load_csv_triggered.emit([str(path) for path in file_paths])
+            dialog = QFileDialog(parent)
+            dialog.setWindowTitle("Open CSV Files")
+            dialog.setFileMode(QFileDialog.ExistingFiles)
+            dialog.setNameFilter("CSV Files (*.csv);;All Files (*)")
+            dialog.selectNameFilter("CSV Files (*.csv)")
 
-                # Update recent files
-                for file_path in file_paths:
-                    self.add_recent_file(file_path)
+            # Set the initial directory to the last used directory or the default
+            last_dir = self._get_last_directory()
+            if last_dir and os.path.exists(last_dir):
+                dialog.setDirectory(last_dir)
 
-                # Update current file path if single file
-                if len(file_paths) == 1:
-                    self._current_file_path = file_paths[0]
-                    self.file_opened.emit(file_paths[0])
+            if dialog.exec() == QDialog.Accepted:
+                selected_files = dialog.selectedFiles()
+                logger.debug(f"User selected {len(selected_files)} files")
+
+                if selected_files:
+                    # Save the directory for next time
+                    self._save_last_directory(os.path.dirname(selected_files[0]))
+
+                    # Emit signal to trigger data loading and update current file path
+                    if selected_files:
+                        self.load_csv_triggered.emit(selected_files)
+                        if len(selected_files) == 1:
+                            self._current_file_path = selected_files[0]
+                            self.file_opened.emit(selected_files[0])
+                            # Add to recent files
+                            self.add_recent_file(selected_files[0])
+
+                    return selected_files
+            else:
+                logger.debug("User canceled file dialog")
+                self.file_dialog_canceled.emit()
+
+            return []
+        finally:
+            self._is_showing_dialog = False
 
     def open_recent_file(self, file_path: str):
         """
@@ -164,49 +182,73 @@ class FileOperationsController(BaseController):
         else:
             self.save_file_as(parent)
 
-    def save_file_as(self, parent=None):
+    def save_file_as(self, parent: QWidget = None, initial_path: str = None) -> str:
         """
-        Show a save dialog to save the current data.
+        Open a file dialog for saving a file.
 
         Args:
-            parent: Parent widget for the dialog
+            parent (QWidget, optional): Parent widget for the file dialog. Defaults to None.
+            initial_path (str, optional): Suggested initial path for the save dialog. Defaults to None.
+
+        Returns:
+            str: Selected file path, or empty string if canceled.
         """
-        file_dialog = QFileDialog(parent)
-        file_dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
-        file_dialog.setNameFilter("CSV files (*.csv);;All files (*.*)")
-        file_dialog.setDefaultSuffix("csv")
+        # Prevent duplicate dialogs
+        if self._is_showing_dialog:
+            logger.debug("File dialog already showing, ignoring duplicate request")
+            return ""
 
-        if self._current_file_path:
-            file_dialog.setDirectory(str(Path(self._current_file_path).parent))
-            file_dialog.selectFile(str(Path(self._current_file_path).name))
-        else:
-            # Use the last directory from config or default to documents
-            last_dir = self._config_manager.get(
-                "Files", "last_export_directory", str(Path.home() / "Documents")
-            )
-            # Fix: Ensure last_dir is a string, not a list
-            if isinstance(last_dir, list):
-                last_dir = str(Path.home() / "Documents")
-            file_dialog.setDirectory(last_dir)
-            file_dialog.selectFile("chest_data.csv")
+        try:
+            self._is_showing_dialog = True
+            logger.debug("About to show save file dialog")
 
-        if file_dialog.exec():
-            file_paths = file_dialog.selectedFiles()
-            if file_paths:
-                file_path = file_paths[0]
+            dialog = QFileDialog(parent)
+            dialog.setWindowTitle("Save As CSV File")
+            dialog.setAcceptMode(QFileDialog.AcceptSave)
+            dialog.setFileMode(QFileDialog.AnyFile)
+            dialog.setNameFilter("CSV Files (*.csv);;All Files (*)")
+            dialog.selectNameFilter("CSV Files (*.csv)")
+
+            # Set default file name
+            if initial_path:
+                dialog.selectFile(initial_path)
+            else:
+                dialog.selectFile("chest_data.csv")
+
+            # Set the initial directory to the last used directory or the default
+            last_dir = self._get_last_directory()
+            if last_dir and os.path.exists(last_dir):
+                dialog.setDirectory(last_dir)
+
+            if dialog.exec() == QDialog.Accepted:
+                selected_path = dialog.selectedFiles()[0]
+                logger.debug(f"User selected file: {selected_path}")
+
+                # If CSV filter was selected and file doesn't have .csv extension, add it
+                selected_filter = dialog.selectedNameFilter()
+                if selected_filter == "CSV Files (*.csv)" and not selected_path.lower().endswith(
+                    ".csv"
+                ):
+                    selected_path += ".csv"
 
                 # Save the directory for next time
-                self._config_manager.set(
-                    "Files", "last_export_directory", str(Path(file_path).parent)
-                )
+                self._save_last_directory(os.path.dirname(selected_path))
 
-                # Trigger file save
-                self.save_csv_triggered.emit(file_path)
-                self._current_file_path = file_path
-                self.file_saved.emit(file_path)
+                # Emit signal to trigger data saving and update current file path
+                self.save_csv_triggered.emit(selected_path)
+                self._current_file_path = selected_path
+                self.file_saved.emit(selected_path)
+                # Add to recent files
+                self.add_recent_file(selected_path)
 
-                # Update recent files
-                self.add_recent_file(file_path)
+                return selected_path
+            else:
+                logger.debug("User canceled save dialog")
+                self.file_dialog_canceled.emit()
+
+            return ""
+        finally:
+            self._is_showing_dialog = False
 
     def add_recent_file(self, file_path: str):
         """
@@ -271,3 +313,34 @@ class FileOperationsController(BaseController):
             file_path: New current file path or None to clear
         """
         self._current_file_path = file_path
+
+    def _get_last_directory(self):
+        """
+        Get the last directory used for file operations from config.
+
+        Returns:
+            str: Path to the last used directory or user's documents folder if not set
+        """
+        from pathlib import Path
+
+        # Get the last directory from config or default to documents
+        last_dir = self._config_manager.get(
+            "Files", "last_directory", str(Path.home() / "Documents")
+        )
+
+        # Fix: Ensure last_dir is a string, not a list
+        if isinstance(last_dir, list):
+            last_dir = str(Path.home() / "Documents")
+
+        logger.debug(f"Retrieved last directory: {last_dir}")
+        return last_dir
+
+    def _save_last_directory(self, directory):
+        """
+        Save the last directory used for file operations to config.
+
+        Args:
+            directory (str): Path to save
+        """
+        logger.debug(f"Saving last directory: {directory}")
+        self._config_manager.set("Files", "last_directory", directory)

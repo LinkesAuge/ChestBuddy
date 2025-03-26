@@ -638,7 +638,248 @@ This ensures that when files are selected in the file dialog, the `load_csv_trig
 ✅ All known issues resolved  
 ✅ Application stable and ready for release
 
+## ValidationViewAdapter Recursive Update Issue (2025-03-26)
+
+#### Issue Description
+The ValidationViewAdapter was causing an infinite recursion loop due to the `_on_validation_updated` method directly calling `self.refresh()`. This created a cycle where validation updates triggered further validation updates without proper debouncing.
+
+#### Error Message
+```
+TypeError: UpdatableView.request_update() got an unexpected keyword argument 'delay'
+```
+
+#### Root Cause
+The method was incorrectly trying to use `request_update(delay=100)` parameter, but the `request_update` method in `UpdatableView` doesn't accept a `delay` parameter.
+
+#### Solution
+Changed the implementation to use the `schedule_update` method instead, which properly supports debouncing with the `debounce_ms` parameter:
+
+```python
+def _on_validation_updated(self) -> None:
+    """
+    Handle validation updates from the validation service.
+    
+    This method is called when the validation service emits a validation_updated signal.
+    It schedules an update to refresh the view with a debounce to prevent recursive calls.
+    """
+    logger.debug("ValidationViewAdapter: Validation updated")
+    # Use schedule_update with debounce instead of request_update with delay
+    # to prevent recursive calls when validation updates trigger further validation updates
+    self.schedule_update(debounce_ms=100)
+```
+
+#### Verification
+Confirmed that the application can now load and navigate to the validation tab without encountering recursion errors.
+
+## File Import Dialog Cancellation Bug (2025-03-26)
+
+#### Issue Description
+When attempting to import files in the ChestBuddy application, if the user closed the file browser dialog without selecting files, a flag (`_is_handling_import`) was not properly reset. This caused subsequent import attempts to fail because the application incorrectly thought it was still handling the previous import request.
+
+#### Error Behavior
+1. User clicks the import button
+2. File dialog opens
+3. User closes the dialog without selecting files
+4. User tries to click import button again
+5. Nothing happens - import button doesn't work anymore
+
+#### Root Cause
+The issue was in how the MainWindow class tracked the import process:
+
+1. When initiating an import, MainWindow set `_is_handling_import = True` in the `_on_import_requested` method
+2. This flag was only reset in the `_on_load_finished` method, which is only called when files are actually loaded
+3. If the user canceled the file dialog, the loading process never started, so `_on_load_finished` was never called
+4. As a result, the `_is_handling_import` flag remained set to `True`, blocking future import attempts
+
+#### Solution
+1. Added a new signal `file_dialog_canceled` to the `FileOperationsController` that is emitted when a file dialog is canceled
+2. Modified `FileOperationsController.open_file()` and `save_file_as()` to emit this signal when their dialogs are canceled
+3. Added a handler `_on_file_dialog_canceled()` in MainWindow that properly resets both `_is_handling_import` and `_is_opening_file` flags
+4. Connected this handler to the new signal in the `_register_with_controllers` method
+
+```python
+# In FileOperationsController
+def open_file(self, parent=None):
+    # ...existing code...
+    if file_dialog.exec():
+        # ...file selection handling...
+        return files
+    else:
+        logger.debug("File dialog canceled by user - no files selected")
+        self.file_dialog_canceled.emit()
+        return None
+
+# In MainWindow
+@Slot()
+def _on_file_dialog_canceled(self):
+    """
+    Handle cancellation of file dialog.
+    
+    This resets the import handling flags to ensure future import requests work correctly.
+    """
+    logger.debug("File dialog canceled, resetting import handling flags")
+    self._is_handling_import = False
+    self._is_opening_file = False
+```
+
+#### Verification
+Confirmed that the application now correctly handles file dialog cancellation:
+1. When the file dialog is canceled, the flags are properly reset
+2. Subsequent import attempts work correctly
+3. The import button remains functional even after a user cancels import
+4. No error messages or freezes occur when the user cancels multiple imports
+
+## 2025-03-26: Fixed File Dialog Cancellation Issue
+
+### Problem
+When canceling a file browser dialog during an import or save operation, a second dialog would sometimes appear. This issue affected user experience and made file operations confusing.
+
+### Root Cause
+We identified two key causes:
+1. The `FileOperationsController` wasn't properly emitting a `file_dialog_canceled` signal when users canceled file dialogs
+2. The controller was missing methods to properly track and save the last used directory
+3. There was no reliable flag mechanism to prevent duplicate dialogs from appearing
+
+### Solution
+Modified `FileOperationsController` with several improvements:
+
+1. Added a flag mechanism to prevent duplicate dialogs:
+```python
+def __init__(self, data_manager, config_manager: ConfigManager, signal_manager=None):
+    # ...existing code...
+    self._is_showing_dialog = False  # Flag to prevent duplicate dialogs
+```
+
+2. Added explicit cancel signal emission in both dialog methods:
+```python
+def open_file(self, parent=None):
+    # ...existing code...
+    if files:
+        # ...handle file selection...
+        return files
+    else:
+        logger.debug("File dialog canceled by user - no files selected")
+        self.file_dialog_canceled.emit()
+        return None
+```
+
+3. Implemented proper directory management methods:
+```python
+def _get_last_directory(self):
+    """
+    Get the last directory used for file operations from config.
+    
+    Returns:
+        str: Path to the last used directory or user's documents folder if not set
+    """
+    from pathlib import Path
+    
+    # Get the last directory from config or default to documents
+    last_dir = self._config_manager.get(
+        "Files", "last_directory", str(Path.home() / "Documents")
+    )
+    
+    # Fix: Ensure last_dir is a string, not a list
+    if isinstance(last_dir, list):
+        last_dir = str(Path.home() / "Documents")
+        
+    logger.debug(f"Retrieved last directory: {last_dir}")
+    return last_dir
+
+def _save_last_directory(self, directory):
+    """
+    Save the last directory used for file operations to config.
+    
+    Args:
+        directory (str): Path to save
+    """
+    logger.debug(f"Saving last directory: {directory}")
+    self._config_manager.set("Files", "last_directory", directory)
+```
+
+### Testing
+We verified that:
+- Only one file dialog opens at a time
+- When a dialog is canceled, the state is properly reset
+- The last used directory is correctly remembered between operations
+- Debug logs confirm the correct operation of dialog opening, file selection, and dialog cancellation
+
+While there is still a double call to `_on_import_requested` after file selection (due to a different issue), our flag mechanism prevents this from causing duplicate dialogs.
+
 ## Ongoing Issues
 
 All known issues have been resolved. The application is now stable and ready for release.
+
+# Bugfixing Diary
+
+## 2024-03-27: Fixed ValidationListView Test Issues After UI Enhancement
+
+### Bug: ValidationListView Tests Failing After UI Enhancements
+
+**Description:**  
+After implementing UI enhancements to the ValidationListView (adding search functionality, visual indicators, and improved styling), the test_add_duplicate_entry test started failing. The test expected exactly 3 items in the list widget after attempting to add a duplicate entry, but there was only 1 item due to the new filtering behavior.
+
+**Root Cause:**  
+The UI enhancement added filtering functionality that changed how the list behaves when searching. When a duplicate entry was attempted to be added using the search text, the list remained filtered to show only the matching entry instead of showing all entries.
+
+**Resolution:**  
+1. Updated the test_add_duplicate_entry test to:
+   - Save the initial entry count from the model rather than assuming 3 entries
+   - Check that the filtered list properly shows just the searched item
+   - Explicitly clear the search to verify the full list still has the original count
+   - Verify both model state and view representation
+
+2. Enhanced ValidationListView class to:
+   - Ensure consistent behavior between model and view during filtering
+   - Add _load_entries() calls to refresh the full list when needed
+   - Properly handle the filtered state after duplicate entry attempts
+   - Maintain consistent state between model and view
+
+**Prevention:**  
+- Added more robust tests that verify both model state and view representation
+- Improved separation between filtering logic and entry manipulation
+- Enhanced documentation for the filtering behavior
+- Made tests more resilient to UI changes by avoiding hard-coded assumptions
+
+**Impact:**  
+- All tests now pass correctly with the enhanced UI
+- Filtering behavior works consistently in both the UI and tests
+- The test suite is more robust against future UI changes
+
+## Validation System Bugs
+
+### ValidationViewAdapter Recursive Update Issue (2025-03-26)
+
+#### Issue Description
+The ValidationViewAdapter was causing an infinite recursion loop due to the `_on_validation_updated` method directly calling `self.refresh()`. This created a cycle where validation updates triggered further validation updates without proper debouncing.
+
+#### Error Message
+```
+TypeError: UpdatableView.request_update() got an unexpected keyword argument 'delay'
+```
+
+#### Root Cause
+The method was incorrectly trying to use `request_update(delay=100)` parameter, but the `request_update` method in `UpdatableView` doesn't accept a `delay` parameter.
+
+#### Solution
+Changed the implementation to use the `schedule_update` method instead, which properly supports debouncing with the `debounce_ms` parameter:
+
+```python
+def _on_validation_updated(self) -> None:
+    """
+    Handle validation updates from the validation service.
+    
+    This method is called when the validation service emits a validation_updated signal.
+    It schedules an update to refresh the view with a debounce to prevent recursive calls.
+    """
+    logger.debug("ValidationViewAdapter: Validation updated")
+    # Use schedule_update with debounce instead of request_update with delay
+    # to prevent recursive calls when validation updates trigger further validation updates
+    self.schedule_update(debounce_ms=100)
+```
+
+#### Verification
+Confirmed that the application can now load and navigate to the validation tab without encountering recursion errors.
+
+## Previous bug entries...
 

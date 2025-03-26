@@ -13,7 +13,7 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Optional, Union, Any, Set, Tuple
 
-from PySide6.QtCore import Qt, Signal, Slot, QSettings, QSize, QTimer, QObject
+from PySide6.QtCore import Qt, Signal, Slot, QSettings, QSize, QTimer, QObject, QDateTime
 from PySide6.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -209,6 +209,10 @@ class MainWindow(QMainWindow):
         self._file_controller.file_saved.connect(self._on_file_saved)
         self._file_controller.recent_files_changed.connect(self._on_recent_files_changed)
 
+        # Connect to dialog canceled signal to reset import flags
+        if hasattr(self._file_controller, "file_dialog_canceled"):
+            self._file_controller.file_dialog_canceled.connect(self._on_file_dialog_canceled)
+
         # Connect data view controller signals
         self._data_view_controller.filter_applied.connect(self._on_filter_applied)
         self._data_view_controller.sort_applied.connect(self._on_sort_applied)
@@ -238,14 +242,25 @@ class MainWindow(QMainWindow):
         It delegates to the FileOperationsController but adds guard logic
         to prevent duplicate dialogs.
         """
+        logger.debug(
+            f"_on_import_requested called with flags: _is_handling_import={getattr(self, '_is_handling_import', False)}, _is_loading_files={getattr(self, '_is_loading_files', False)}"
+        )
+
+        # Get current time to implement debounce
+        current_time = QDateTime.currentMSecsSinceEpoch()
+        last_cancel_time = getattr(self, "_last_dialog_cancel_time", 0)
+
+        # Add a debounce period to prevent rapid successive dialog requests (e.g., after cancellation)
+        DEBOUNCE_MS = 500  # 500ms debounce
+        if (current_time - last_cancel_time) < DEBOUNCE_MS:
+            logger.debug(
+                f"Import request too soon after cancellation ({current_time - last_cancel_time}ms), debouncing"
+            )
+            return
+
         # Check if we're already handling an import to prevent duplicate dialogs
         if hasattr(self, "_is_handling_import") and self._is_handling_import:
             logger.debug("Already handling an import request, ignoring duplicate")
-            return
-
-        # Also check the file opening flag to prevent duplicate dialogs
-        if hasattr(self, "_is_opening_file") and self._is_opening_file:
-            logger.debug("Already opening a file, ignoring duplicate import request")
             return
 
         # Check if we're already loading files to prevent duplicate dialogs
@@ -261,18 +276,14 @@ class MainWindow(QMainWindow):
             logger.debug("Progress dialog is showing, ignoring import request")
             return
 
-        # Set flags to prevent duplicate dialogs
-        try:
-            self._is_handling_import = True
-            self._is_opening_file = True  # Also set the file opening flag
-            logger.debug("Handling import request via FileOperationsController")
+        # Set flag to prevent duplicate dialogs
+        self._is_handling_import = True
+        logger.debug(
+            "Handling import request via FileOperationsController - set flag: _is_handling_import=True"
+        )
 
-            # Delegate to file controller
-            self._file_controller.open_file(self)
-        finally:
-            # Clear only the file opening flag when done
-            # Keep _is_handling_import set until loading completes in _on_load_finished
-            self._is_opening_file = False
+        # Delegate to file controller - let _on_file_dialog_canceled handle cancellation
+        self._file_controller.open_file(self)
 
     @Slot(dict)
     def _on_filter_applied(self, filter_params: Dict) -> None:
@@ -417,6 +428,60 @@ class MainWindow(QMainWindow):
             # Enable/disable the action if found
             if action is not None:
                 action.setEnabled(enabled)
+
+    @Slot()
+    def _on_file_dialog_canceled(self):
+        """
+        Handle cancellation of file dialog.
+
+        This resets the import handling flag to ensure future import requests work correctly.
+        Also blocks signals temporarily to prevent duplicate dialog requests.
+        """
+        logger.debug(
+            f"_on_file_dialog_canceled called with flags before reset: _is_handling_import={getattr(self, '_is_handling_import', False)}"
+        )
+
+        # Record cancellation time to support debouncing in _on_import_requested
+        self._last_dialog_cancel_time = QDateTime.currentMSecsSinceEpoch()
+
+        # Get all views that might emit import_requested signals
+        dashboard_view = self._views.get("Dashboard")
+        data_view = self._views.get("Data")
+        sidebar = self._sidebar if hasattr(self, "_sidebar") else None
+
+        # Block signals from all possible sources of import requests
+        blocked_widgets = []
+
+        try:
+            # Block signals to prevent new import requests during cleanup
+            for widget in [dashboard_view, data_view, sidebar]:
+                if widget and hasattr(widget, "blockSignals"):
+                    widget.blockSignals(True)
+                    blocked_widgets.append(widget)
+
+            # Also block empty state widgets if they exist
+            if dashboard_view and hasattr(dashboard_view, "_empty_state_widget"):
+                if hasattr(dashboard_view._empty_state_widget, "blockSignals"):
+                    dashboard_view._empty_state_widget.blockSignals(True)
+                    blocked_widgets.append(dashboard_view._empty_state_widget)
+
+            # Reset the import handling flag to ensure future import requests work correctly
+            self._is_handling_import = False
+
+            # Also check if we need to reset any other states
+            if hasattr(self, "_is_loading_files") and self._is_loading_files:
+                logger.debug("Also resetting _is_loading_files flag that was still set")
+                self._is_loading_files = False
+
+            logger.debug("File dialog canceled, reset import handling flag to False")
+        finally:
+            # Process events before re-enabling signals, to avoid queued events triggering another dialog
+            QApplication.processEvents()
+
+            # Re-enable signals
+            for widget in blocked_widgets:
+                if widget and hasattr(widget, "blockSignals"):
+                    widget.blockSignals(False)
 
     def _init_ui(self) -> None:
         """Initialize the user interface."""
@@ -791,7 +856,13 @@ class MainWindow(QMainWindow):
             # Handle subsections
             if section == "Data":
                 if subsection == "Import":
-                    self._open_file()
+                    # Check if we're already handling an import to prevent duplicate dialogs
+                    if hasattr(self, "_is_handling_import") and self._is_handling_import:
+                        logger.debug(
+                            "Already handling an import request, ignoring navigation request"
+                        )
+                        return
+                    self._on_import_requested()
                 elif subsection == "Validate":
                     self._view_state_controller.set_active_view("Validation")
                 elif subsection == "Correct":
@@ -834,7 +905,8 @@ class MainWindow(QMainWindow):
             action: The action name.
         """
         if action == "import":
-            self._open_file()
+            # Use the same method that handles import requests to prevent duplicate dialogs
+            self._on_import_requested()
         elif action == "validate":
             self._validate_data()
             self._view_state_controller.set_active_view("Validation")
@@ -995,12 +1067,7 @@ class MainWindow(QMainWindow):
 
     def _open_file(self) -> None:
         """Open one or more CSV files."""
-        # Track if we're currently opening a file to prevent duplicate dialogs
-        if hasattr(self, "_is_opening_file") and self._is_opening_file:
-            logger.debug("Preventing duplicate file dialog")
-            return
-
-        # Also check the import handling flag to prevent duplicate dialogs
+        # Check if we're already handling an import to prevent duplicate dialogs
         if hasattr(self, "_is_handling_import") and self._is_handling_import:
             logger.debug("Already handling an import request, ignoring open file")
             return
@@ -1018,19 +1085,13 @@ class MainWindow(QMainWindow):
             logger.debug("Preventing file dialog while progress dialog is visible")
             return
 
-        try:
-            # Set flags to prevent duplicate dialogs
-            self._is_opening_file = True
-            self._is_handling_import = True  # Also set the import handling flag
+        # Set flag to prevent duplicate dialogs
+        self._is_handling_import = True
 
-            # Note: This method is directly connected to UI actions like menu items
-            # Import requests from views are now handled by _on_import_requested
-            # which uses the SignalManager to avoid duplicate connections
-            self._file_controller.open_file(self)
-        finally:
-            # Always reset the flags when done
-            self._is_opening_file = False
-            self._is_handling_import = False  # Also clear the import handling flag
+        # Note: This method is directly connected to UI actions like menu items
+        # Import requests from views are now handled by _on_import_requested
+        # which uses the SignalManager to avoid duplicate connections
+        self._file_controller.open_file(self)
 
     def _open_recent_file(self, file_path: str) -> None:
         """
@@ -1060,15 +1121,11 @@ class MainWindow(QMainWindow):
             logger.debug("Preventing duplicate file save dialog")
             return
 
-        try:
-            # Set flag to prevent duplicate dialogs
-            self._is_saving_file = True
+        # Set flag to prevent duplicate dialogs
+        self._is_saving_file = True
 
-            # Delegate to the controller
-            self._file_controller.save_file_as(self)
-        finally:
-            # Always reset the flag when done
-            self._is_saving_file = False
+        # Delegate to the controller
+        self._file_controller.save_file_as(self)
 
     def _validate_data(self) -> None:
         """Validate the data."""

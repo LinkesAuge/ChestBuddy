@@ -16,13 +16,16 @@ from PySide6.QtWidgets import (
     QPushButton,
     QLabel,
     QFrame,
-    QTabWidget,
+    QStatusBar,
+    QToolBar,
 )
 
 from chestbuddy.core.services.validation_service import ValidationService
 from chestbuddy.core.models.validation_list_model import ValidationListModel
 from chestbuddy.ui.views.validation_list_view import ValidationListView
 from chestbuddy.ui.views.validation_preferences_view import ValidationPreferencesView
+from chestbuddy.ui.resources.style import Colors
+from chestbuddy.ui.resources.icons import Icons
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +56,7 @@ class ValidationTabView(QWidget):
         """
         super().__init__(parent)
         self.validation_service = validation_service
+        self.validation_stats = {"players": 0, "chest_types": 0, "sources": 0}
 
         # Setup UI
         self._setup_ui()
@@ -63,8 +67,22 @@ class ValidationTabView(QWidget):
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(10)
 
-        # Create validation list views
-        splitter = QSplitter(Qt.Orientation.Horizontal)
+        # Create the central content widget
+        content_widget = QWidget()
+        content_layout = QVBoxLayout(content_widget)
+        content_layout.setContentsMargins(10, 10, 10, 10)
+        content_layout.setSpacing(10)
+
+        # Add title label
+        title_label = QLabel("Validation Lists")
+        title_label.setStyleSheet(
+            f"font-weight: bold; font-size: 16px; color: {Colors.TEXT_LIGHT};"
+        )
+        content_layout.addWidget(title_label)
+
+        # Create three-column splitter
+        self.splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.splitter.setChildrenCollapsible(False)
 
         # Players list view
         self.player_list_view = ValidationListView(
@@ -81,47 +99,74 @@ class ValidationTabView(QWidget):
             "Sources", self.validation_service.get_source_list_model(), self
         )
 
-        # Preferences view
-        self.preferences_view = ValidationPreferencesView(self.validation_service, self)
-
         # Add views to splitter
-        splitter.addWidget(self.player_list_view)
-        splitter.addWidget(self.chest_type_list_view)
-        splitter.addWidget(self.source_list_view)
+        self.splitter.addWidget(self.player_list_view)
+        self.splitter.addWidget(self.chest_type_list_view)
+        self.splitter.addWidget(self.source_list_view)
 
         # Set splitter sizes
-        splitter.setSizes([1, 1, 1])  # Equal sizes
+        self.splitter.setSizes([1, 1, 1])  # Equal sizes
 
-        # Add splitter to main layout
-        main_layout.addWidget(splitter, 1)  # Stretch factor 1
+        # Add splitter to content layout
+        content_layout.addWidget(self.splitter, 1)  # Stretch factor 1
+
+        # Create bottom toolbar
+        self.toolbar = QToolBar("Validation Actions")
+        self.toolbar.setMovable(False)
+        self.toolbar.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+
+        # Add save all button
+        self.save_all_button = QPushButton("Save All")
+        self.save_all_button.setIcon(Icons.get_icon(Icons.SAVE))
+        self.save_all_button.setToolTip("Save all validation lists")
+        self.save_all_button.clicked.connect(self._on_save_all)
+        self.toolbar.addWidget(self.save_all_button)
+
+        # Add spacer
+        self.toolbar.addSeparator()
+
+        # Add reload all button
+        self.reload_all_button = QPushButton("Reload All")
+        self.reload_all_button.setToolTip("Reload all validation lists from disk")
+        self.reload_all_button.clicked.connect(self._on_reset)
+        self.toolbar.addWidget(self.reload_all_button)
+
+        # Add validate now button
+        self.validate_now_button = QPushButton("Validate Now")
+        self.validate_now_button.setIcon(Icons.get_icon(Icons.VALIDATE))
+        self.validate_now_button.setToolTip("Validate all data against current validation lists")
+        self.validate_now_button.clicked.connect(self._on_validate_now)
+        self.toolbar.addWidget(self.validate_now_button)
+
+        # Add preferences button
+        self.preferences_button = QPushButton("Preferences")
+        self.preferences_button.setIcon(Icons.get_icon(Icons.SETTINGS))
+        self.preferences_button.setToolTip("Configure validation preferences")
+        self.preferences_button.clicked.connect(self._on_show_preferences)
+        self.toolbar.addWidget(self.preferences_button)
+
+        # Add toolbar to content layout
+        content_layout.addWidget(self.toolbar)
 
         # Add horizontal line
         line = QFrame()
         line.setFrameShape(QFrame.Shape.HLine)
         line.setFrameShadow(QFrame.Shadow.Sunken)
-        main_layout.addWidget(line)
+        content_layout.addWidget(line)
 
-        # Add preferences view
-        main_layout.addWidget(self.preferences_view, 0)  # No stretch
+        # Add preferences view (initially hidden)
+        self.preferences_view = ValidationPreferencesView(self.validation_service, self)
+        self.preferences_view.setVisible(False)
+        content_layout.addWidget(self.preferences_view, 0)  # No stretch
 
-        # Add button panel
-        button_layout = QHBoxLayout()
-        button_layout.setContentsMargins(10, 5, 10, 10)
+        # Add status bar
+        self.status_bar = QStatusBar()
+        self.status_bar.setSizeGripEnabled(False)
+        self._update_status_bar()
+        content_layout.addWidget(self.status_bar)
 
-        # Add validate now button
-        self.validate_now_button = QPushButton("Validate Now")
-        self.validate_now_button.setToolTip("Validate all data against current validation lists")
-        self.validate_now_button.clicked.connect(self._on_validate_now)
-        button_layout.addWidget(self.validate_now_button)
-
-        # Add reset button
-        self.reset_button = QPushButton("Reset Lists")
-        self.reset_button.setToolTip("Reload all validation lists from disk")
-        self.reset_button.clicked.connect(self._on_reset)
-        button_layout.addWidget(self.reset_button)
-
-        # Add button layout to main layout
-        main_layout.addLayout(button_layout)
+        # Add content widget to main layout
+        main_layout.addWidget(content_widget)
 
         # Connect signals
         self._connect_signals()
@@ -146,6 +191,19 @@ class ValidationTabView(QWidget):
             count (int): Number of entries
         """
         logger.debug(f"Validation list '{category}' status changed: {count} entries")
+
+        # Update validation stats
+        if category == "Players":
+            self.validation_stats["players"] = count
+        elif category == "Chest Types":
+            self.validation_stats["chest_types"] = count
+        elif category == "Sources":
+            self.validation_stats["sources"] = count
+
+        # Update status bar
+        self._update_status_bar()
+
+        # Emit validation updated signal
         self.validation_updated.emit()
 
     @Slot(dict)
@@ -179,6 +237,44 @@ class ValidationTabView(QWidget):
 
         logger.info("Validation lists and preferences reset")
         self.validation_updated.emit()
+
+    @Slot()
+    def _on_save_all(self) -> None:
+        """Handle save all button click."""
+        # Save all validation lists
+        player_model = self.validation_service.get_player_list_model()
+        chest_type_model = self.validation_service.get_chest_type_list_model()
+        source_model = self.validation_service.get_source_list_model()
+
+        player_model.save()
+        chest_type_model.save()
+        source_model.save()
+
+        logger.info("All validation lists saved")
+        self.status_bar.showMessage("All validation lists saved", 3000)
+
+    @Slot()
+    def _on_show_preferences(self) -> None:
+        """Handle preferences button click."""
+        # Toggle preferences view visibility
+        self.preferences_view.setVisible(not self.preferences_view.isVisible())
+
+        # Update button text
+        if self.preferences_view.isVisible():
+            self.preferences_button.setText("Hide Preferences")
+        else:
+            self.preferences_button.setText("Preferences")
+
+    def _update_status_bar(self) -> None:
+        """Update the status bar with validation statistics."""
+        total_entries = sum(self.validation_stats.values())
+        status_text = (
+            f"Total Entries: {total_entries} | "
+            f"Players: {self.validation_stats['players']} | "
+            f"Chest Types: {self.validation_stats['chest_types']} | "
+            f"Sources: {self.validation_stats['sources']}"
+        )
+        self.status_bar.showMessage(status_text)
 
     def refresh(self) -> None:
         """Refresh the validation tab view."""
