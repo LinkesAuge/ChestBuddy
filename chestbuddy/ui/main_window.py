@@ -908,7 +908,7 @@ class MainWindow(QMainWindow):
         self._is_loading_files = True
 
         if self._progress_controller:
-            self._progress_controller.show_progress("Loading data...", "Please wait")
+            self._progress_controller.start_progress("Loading Data", "Loading data...", True)
         self._update_ui()
 
     @Slot(str)
