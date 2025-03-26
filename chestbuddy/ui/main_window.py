@@ -241,6 +241,11 @@ class MainWindow(QMainWindow):
             logger.debug("Already handling an import request, ignoring duplicate")
             return
 
+        # Also check the file opening flag to prevent duplicate dialogs
+        if hasattr(self, "_is_opening_file") and self._is_opening_file:
+            logger.debug("Already opening a file, ignoring duplicate import request")
+            return
+
         # Check if we're already showing a progress dialog
         if (
             hasattr(self, "_progress_controller")
@@ -249,16 +254,18 @@ class MainWindow(QMainWindow):
             logger.debug("Progress dialog is showing, ignoring import request")
             return
 
-        # Set flag to prevent duplicate dialogs during processing
+        # Set flags to prevent duplicate dialogs
         try:
             self._is_handling_import = True
+            self._is_opening_file = True  # Also set the file opening flag
             logger.debug("Handling import request via FileOperationsController")
 
             # Delegate to file controller
             self._file_controller.open_file(self)
         finally:
-            # Always clear the flag when done
+            # Always clear the flags when done
             self._is_handling_import = False
+            self._is_opening_file = False  # Also clear the file opening flag
 
     @Slot(dict)
     def _on_filter_applied(self, filter_params: Dict) -> None:
@@ -984,6 +991,11 @@ class MainWindow(QMainWindow):
             logger.debug("Preventing duplicate file dialog")
             return
 
+        # Also check the import handling flag to prevent duplicate dialogs
+        if hasattr(self, "_is_handling_import") and self._is_handling_import:
+            logger.debug("Already handling an import request, ignoring open file")
+            return
+
         # Prevent opening a file dialog if we're already finishing a load operation
         if hasattr(self, "_is_finishing_load") and self._is_finishing_load:
             logger.debug("Preventing file dialog during load completion")
@@ -998,16 +1010,18 @@ class MainWindow(QMainWindow):
             return
 
         try:
-            # Set flag to prevent duplicate dialogs
+            # Set flags to prevent duplicate dialogs
             self._is_opening_file = True
+            self._is_handling_import = True  # Also set the import handling flag
 
             # Note: This method is directly connected to UI actions like menu items
             # Import requests from views are now handled by _on_import_requested
             # which uses the SignalManager to avoid duplicate connections
             self._file_controller.open_file(self)
         finally:
-            # Always reset the flag when done
+            # Always reset the flags when done
             self._is_opening_file = False
+            self._is_handling_import = False  # Also clear the import handling flag
 
     def _open_recent_file(self, file_path: str) -> None:
         """
