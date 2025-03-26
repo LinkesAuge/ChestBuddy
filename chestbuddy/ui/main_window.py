@@ -193,6 +193,8 @@ class MainWindow(QMainWindow):
         # UI state flags to prevent duplicate dialogs
         self._is_opening_file = False
         self._is_saving_file = False
+        self._is_handling_import = False
+        self._is_loading_files = False  # New flag to track if files are currently loading
 
         # Update UI
         self._update_ui()
@@ -246,6 +248,11 @@ class MainWindow(QMainWindow):
             logger.debug("Already opening a file, ignoring duplicate import request")
             return
 
+        # Check if we're already loading files to prevent duplicate dialogs
+        if hasattr(self, "_is_loading_files") and self._is_loading_files:
+            logger.debug("Already loading files, ignoring duplicate import request")
+            return
+
         # Check if we're already showing a progress dialog
         if (
             hasattr(self, "_progress_controller")
@@ -263,9 +270,9 @@ class MainWindow(QMainWindow):
             # Delegate to file controller
             self._file_controller.open_file(self)
         finally:
-            # Always clear the flags when done
-            self._is_handling_import = False
-            self._is_opening_file = False  # Also clear the file opening flag
+            # Clear only the file opening flag when done
+            # Keep _is_handling_import set until loading completes in _on_load_finished
+            self._is_opening_file = False
 
     @Slot(dict)
     def _on_filter_applied(self, filter_params: Dict) -> None:
@@ -894,55 +901,57 @@ class MainWindow(QMainWindow):
 
     @Slot()
     def _on_load_started(self) -> None:
-        """Handle when a loading operation starts."""
+        """Handle load started signal."""
         logger.debug("MainWindow._on_load_started called")
 
-        # The progress controller now handles all loading state tracking
-        # No need to duplicate that logic here
+        # Set the loading flag to prevent duplicate import dialogs
+        self._is_loading_files = True
 
+        if self._progress_controller:
+            self._progress_controller.show_progress("Loading data...", "Please wait")
+        self._update_ui()
+
+    @Slot(str)
     def _on_load_finished(self, status_message: str) -> None:
         """
-        Handle the completion of a loading operation.
+        Handle load finished signal.
 
         Args:
-            status_message: Message indicating the status of the loading operation
+            status_message: Status message to display
         """
         logger.debug(f"Load finished signal received: {status_message}")
 
-        # Set a flag to prevent any recursive file opening
-        self._is_finishing_load = True
+        # Reset the loading flag when file loading completes
+        self._is_loading_files = False
 
+        # Reset the handling import flag as well
+        self._is_handling_import = False
+
+        if self._progress_controller:
+            if "Processing" in status_message:
+                # If we're processing data, update the progress dialog
+                # but don't close it yet
+                self._progress_controller.update_progress(
+                    100,
+                    100,
+                    f"{status_message}...",
+                    None,  # No file path needed for processing stage
+                )
+            else:
+                # Loading is completely finished, close the progress dialog
+                self._progress_controller.close_progress()
+
+        # Set is_finishing_load flag to prevent duplicate dialogs during finalization
         try:
-            # Check if this is an error message
-            is_error = "error" in status_message.lower() or "failed" in status_message.lower()
+            self._is_finishing_load = True
 
-            # Update data loaded state after successful loading
-            if not is_error:
-                self._update_data_loaded_state(True)
-
-        except Exception as e:
-            logger.error(f"Error in _on_load_finished: {e}")
+            # Update views
+            self._view_state_controller.update_data_loaded_state(not self._data_model.is_empty)
         finally:
-            # Clear the flag after processing
             self._is_finishing_load = False
 
-    def _on_populate_table_requested(self, data: pd.DataFrame) -> None:
-        """
-        Handle request to populate table during data loading.
-        This synchronizes table population with file import.
-
-        Args:
-            data: The data to populate in the table
-        """
-        logger.debug(f"Received request to populate table with {len(data):,} rows")
-
-        # Mark file loading as complete in progress controller
-        if hasattr(self._progress_controller, "mark_file_loading_complete"):
-            self._progress_controller.mark_file_loading_complete()
-
-        # The actual table population occurs in the data model and views
-        # No need to show progress dialog for this step anymore
-        # Table population will happen automatically after this method returns
+        # Update UI
+        self._update_ui()
 
     def _on_load_progress(self, file_path: str, current: int, total: int) -> None:
         """
