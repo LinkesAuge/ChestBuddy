@@ -1,246 +1,175 @@
-# Technical Context
+# Technical Context: ChestBuddy
 
-## Technology Stack
+## Final Technical Stack
+
+The ChestBuddy application is built using the following technologies:
 
 ### Core Technologies
-- **Python 3.12+**: Base programming language
-- **PySide6**: GUI framework (Qt for Python)
-- **Pandas**: Data manipulation and analysis
-- **Matplotlib**: Visualization library
-- **Jinja2**: HTML template engine for reports
-
-### Dependency Management
-- **UV**: Modern Python package installer and resolver
-
-### Text Processing
-- **ftfy**: Fixes text encoding issues
-- **charset-normalizer**: Charset detection
-- **unidecode**: Unicode character conversion
-
-### Development Tools
+- **Python 3.9+**: Primary development language
+- **PySide6 (Qt 6)**: GUI framework
+- **pandas**: Data manipulation and analysis
+- **numpy**: Numerical operations supporting pandas
+- **matplotlib**: Charting and data visualization
+- **openpyxl**: Excel file reading/writing
+- **lxml**: XML parsing for data import/export
 - **pytest**: Testing framework
-- **Ruff**: Python linter and formatter
-- **pytestqt**: Qt testing plugin for pytest
+- **pytestqt**: Qt-specific testing utilities
+- **UV**: Package management and virtual environment
 
-## Development Environment
+### Application Architecture
+- **Model-View-Controller (MVC)**: Core architectural pattern
+- **Service Layer**: Business logic encapsulation
+- **Controllers Layer**: Coordination between UI and services
+- **Adapter Pattern**: UI component wrapping
+- **Signal-Slot System**: Event-based communication
+- **Observer Pattern**: Data change notification
+- **Command Pattern**: For undoable operations
+- **Strategy Pattern**: For validation and correction strategies
 
-### Setup Requirements
-- Python 3.12 or newer
-- UV package manager
-- Git for version control
-- Virtual environment (managed by UV)
-
-### Project Structure
-```
-ChestBuddy/
-├── chestbuddy/         # Main package
-│   ├── core/           # Core business logic
-│   │   ├── models/     # Data models
-│   │   ├── services/   # Service classes
-│   │   └── controllers/ # Controllers
-│   ├── ui/             # User interface components
-│   │   ├── views/      # View adapters and components
-│   │   ├── widgets/    # Reusable UI widgets
-│   │   └── resources/  # UI resources (icons, styles)
-│   └── utils/          # Utility modules
-│       └── background_processing.py  # Background processing utilities
-├── data/               # Sample data and resources
-├── docs/               # Documentation
-├── memory-bank/        # Project memory
-├── scripts/            # Utility scripts
-├── tests/              # Test suite
-│   ├── test_background_worker.py  # Background worker tests
-│   ├── test_csv_background_tasks.py  # CSV background task tests
-│   └── test_files/  # Test data files
-├── .cursor/            # Cursor IDE settings
-│   └── rules/          # Project rules
-├── .gitignore          # Git ignore file
-├── pyproject.toml      # Project configuration
-├── README.md           # Project readme
-└── .python-version     # Python version spec
-```
-
-## PySide6 Framework
-
-ChestBuddy uses PySide6 (Qt for Python) as its GUI framework. Key components include:
+### Data Management
+- **DataFrameStore**: Central data storage mechanism
+- **ValidationService**: Rules-based data validation
+- **CorrectionService**: Automatic and manual data correction
+- **ImportExportService**: Data import/export functionality
+- **ChartService**: Data visualization generation
 
 ### UI Components
-- **QMainWindow**: Main application window structure
-- **QWidget**: Base for all custom UI components
-- **QVBoxLayout/QHBoxLayout**: Layout management for components
-- **QStackedWidget**: Content view switching mechanism
-- **QTableView**: Display of tabular data
-- **QSplitter**: Resizable panel divisions
-- **QProgressDialog**: Progress indication for long operations
+- **Qt Widgets**: For UI components 
+- **QTableView**: Main data display
+- **Custom Delegates**: For specialized cell rendering
+- **QSplitter**: For resizable layouts
+- **QStackedWidget**: For view switching
+- **QWebEngineView**: For advanced visualization (optional)
+- **Style Sheets**: For UI appearance customization
 
-### Event System
-- **Signal/Slot**: Event-driven communication between components
-- **QThread**: Background task execution
+### Custom Utilities
+- **SignalManager**: Signal connection tracking and management
+- **UpdateManager**: UI update scheduling and optimization
+- **ConfigManager**: Application configuration management
+- **BackgroundWorker**: Asynchronous task processing
+- **ValidationStatusDelegate**: Custom rendering of validation status
+- **ServiceLocator**: Service access utility
 
-### Styling System
-- **QSS (Qt Style Sheets)**: CSS-like styling for components
-- **Custom Colors Class**: Centralized color definitions
-- **Theme Variables**: Consistent styling across the application
+## Development Tools and Environment
 
-Example QSS usage:
-```python
-def get_sidebar_style():
-    return f"""
-        QListWidget {{
-            background-color: {Colors.PRIMARY_DARK};
-            border: none;
-            border-radius: 0px;
-            outline: 0;
-            padding: 5px;
-        }}
-        QListWidget::item {{
-            color: {Colors.TEXT_LIGHT};
-            border-radius: 4px;
-            padding: 8px;
-            margin: 2px 5px;
-        }}
-        QListWidget::item:selected {{
-            background-color: {Colors.ACCENT};
-            color: {Colors.TEXT_DARK};
-        }}
-    """
-```
+- **Visual Studio Code**: Primary IDE
+- **Git**: Version control system
+- **GitHub**: Code repository hosting
+- **GitHub Actions**: CI/CD for automated testing
+- **Ruff**: Code linting and formatting
+- **pytest**: Test running and reporting
+- **UV**: Package management and dependency resolution
+- **pyenv**: Python version management
 
-## Pandas Integration
+## Project Structure
 
-Pandas is used extensively for data management and analysis:
+The project follows a clear, modular structure with these key directories:
 
-### DataFrame Usage
-- **Core Data Structure**: All chest data stored in DataFrame
-- **Validation Status**: Separate DataFrame for validation results
-- **Correction Status**: Separate DataFrame for correction tracking
-- **Filtering**: Query and filtering operations
-- **Aggregation**: Grouping and summarizing data
-- **Import/Export**: Reading and writing CSV files
+- `chestbuddy/`: Main package
+  - `core/`: Core application logic
+    - `controllers/`: Controller components for UI and data coordination
+    - `models/`: Data models and abstractions
+    - `services/`: Business logic services
+    - `enums/`: Enumeration types
+  - `ui/`: User interface components
+    - `views/`: UI view components
+    - `widgets/`: Custom widgets
+    - `dialogs/`: Dialog windows
+    - `resources/`: UI resources (icons, styles)
+  - `utils/`: Utility functions and helpers
+- `tests/`: Test suite
+  - `unit/`: Unit tests
+  - `integration/`: Integration tests
+  - `ui/`: UI component tests
+  - `fixtures/`: Test fixtures and data
+- `scripts/`: Utility scripts
+- `docs/`: Documentation
+- `memory-bank/`: Project memory files
 
-### Performance Considerations
-- **Vectorized Operations**: Optimize performance with vectorized pandas operations
-- **Chunked Reading**: Process large files in chunks
-- **DataFrame Indexing**: Proper indexing for frequently filtered columns
-- **Memory Management**: Copy vs view operations for data integrity
+## Key Technical Decisions
 
-## Background Processing
+1. **Controller-Based Architecture**: Implemented a clean controller-based architecture with proper separation of concerns, with controllers as the mediators between the UI and the data/services.
 
-ChestBuddy implements a robust background processing framework:
+2. **Signal Management**: Developed a robust signal management system with the SignalManager utility for tracking, connecting, and disconnecting signals, improving debugging and reducing memory leaks.
 
-### Worker Pattern
-- **BackgroundWorker**: Manages threads and task execution
-- **BackgroundTask**: Base class for all asynchronous tasks
-- **Signal-Based Communication**: Progress reporting and completion notification
+3. **UI Update Interface**: Created an optimized UI update system with the UpdateManager utility, allowing components to register for updates based on specific data changes rather than reacting to all changes.
 
-### CSV Processing
-- **MultiCSVLoadTask**: Load multiple CSV files with progress tracking
-- **Chunked Processing**: Read large files in manageable chunks
-- **Cancellation Support**: Allow user to cancel long-running operations
+4. **Background Processing**: Implemented the BackgroundWorker system for handling long-running operations in separate threads, keeping the UI responsive.
 
-### Progress Reporting
-- **ProgressDialog**: Custom dialog with visual feedback
-- **ProgressBar**: State-based progress indicator (normal, success, error)
-- **Throttled Updates**: Prevent UI flooding during frequent updates
+5. **Validation System**: Designed a flexible validation system using a rules-based approach with different validation levels and strategies.
 
-## Signal Debugging and Visualization
+6. **View Adapter Pattern**: Adopted the adapter pattern for UI components, allowing for cleaner integration and easier testing.
 
-ChestBuddy includes advanced tools for debugging Qt signal flow:
+7. **Service-Oriented Design**: Encapsulated business logic in dedicated services with clear responsibilities.
 
-### SignalTracer
-- **Signal Path Tracing**: Track signal emissions through the application
-- **Timing Analysis**: Measure signal handling performance
-- **Nested Signal Detection**: Identify signal chains and dependencies
-- **Slow Handler Detection**: Find performance bottlenecks in signal handlers
+8. **Configuration Management**: Created a centralized configuration system for managing application settings.
 
-### Implementation
-- **SignalEmission class**: Represents individual signal emission events
-- **Global signal_tracer instance**: Provides app-wide access to tracing functionality
-- **Text-based Reporting**: Generate detailed signal flow reports
-- **Integration with SignalManager**: Automatic tracking of registered signals
+9. **Error Handling**: Implemented a comprehensive error handling system with proper error reporting and user feedback.
 
-### Usage
-```python
-# Start tracing
-signal_tracer.start_tracing()
+10. **Testing Approach**: Adopted a comprehensive testing strategy with unit, integration, and end-to-end tests.
 
-# Run code that emits signals
-# ...
+## Technical Implementation Challenges and Solutions
 
-# Stop tracing and get report
-signal_tracer.stop_tracing()
-report = signal_tracer.generate_report()
-print(report)
-```
+### Challenge 1: Signal Connection Management
+- **Problem**: Tracking and managing signal connections between components was complex and error-prone.
+- **Solution**: Created the SignalManager utility for centralized signal connection management, with support for connection tracking, disconnection, and debugging.
 
-### Features
-- **Connection to SignalManager**: Works with existing signal management system
-- **Customizable Thresholds**: Configure slow handler detection thresholds
-- **Signal Registration**: Explicitly register signals for detailed tracking
-- **Signal Path Visualization**: Format nested signal calls as tree structures
-- **Performance Analysis**: List slow signal handlers by duration
+### Challenge 2: UI Update Optimization
+- **Problem**: Inefficient UI updates causing performance issues with larger datasets.
+- **Solution**: Implemented the UpdateManager with support for data dependency tracking and optimized update scheduling.
 
-## Testing Infrastructure
+### Challenge 3: Background Processing
+- **Problem**: Long-running operations blocking the UI thread.
+- **Solution**: Developed the BackgroundWorker system for asynchronous processing with proper progress reporting.
 
-A comprehensive testing framework ensures reliability:
+### Challenge 4: Data Validation Complexity
+- **Problem**: Complex validation requirements with different validation levels and strategies.
+- **Solution**: Created a flexible validation system with support for different validation strategies and configurable validation levels.
 
-### Test Types
-- **Unit Tests**: Testing individual components
-- **Widget Tests**: Testing UI components with QtBot
-- **Integration Tests**: Testing component interactions
-- **End-to-End Tests**: Testing complete workflows
+### Challenge 5: UI Component Integration
+- **Problem**: Integrating Qt components with custom business logic.
+- **Solution**: Adopted the adapter pattern for UI components, providing a clean interface for controller interaction.
 
-### Test Tools
-- **pytest**: Main testing framework
-- **pytestqt**: Testing Qt components and signals
-- **fixtures**: Reusable test components and data
+## System Requirements
 
-### Test Considerations
-- **Async Testing**: Special handling for background operations
-- **Signal Testing**: Testing signal emissions and connections
-- **UI Testing**: Testing user interface behavior
-- **Mocking**: Isolating components for targeted testing
+- **Operating System**: Windows 10+, macOS 10.14+, Linux with Qt support
+- **Python Version**: 3.9 or higher
+- **Minimum RAM**: 4GB (8GB recommended for larger datasets)
+- **Disk Space**: 200MB for application, additional space for data
+- **Display**: 1280x720 minimum resolution
+- **Dependencies**: All Python dependencies are managed through UV
 
-## Technical Requirements
+## Final Technical Architecture
 
-### Performance Requirements
-- Handle CSV files with 10,000+ rows efficiently
-- Responsive UI during data processing
-- Efficient chart generation
-- Memory-optimized for large datasets
+The ChestBuddy application follows a layered architecture:
 
-### Compatibility
-- Windows 10/11 (primary target)
-- macOS support (secondary target)
-- Linux support (potential future target)
+1. **Presentation Layer**: UI components and adapters
+   - Main application window and views
+   - Input validation and user feedback
+   - Progress reporting and status updates
 
-### Security Considerations
-- Local file operations only
-- No external data transmission
-- Secure file handling
+2. **Controller Layer**: Mediators between UI and business logic
+   - DataViewController for data operations
+   - UIStateController for UI state management
+   - FileOperationsController for file operations
+   - ViewStateController for view state management
+   - ErrorHandlingController for error handling
 
-## Implementation Considerations
+3. **Service Layer**: Business logic encapsulation
+   - ValidationService for data validation
+   - CorrectionService for data correction
+   - ImportExportService for data import/export
+   - ChartService for data visualization
 
-### Character Encoding
-- Special handling for German umlauts (ä, ö, ü, ß)
-- Automatic detection of file encoding
-- Normalization of Unicode characters
-- Conversion between different encoding formats
+4. **Data Layer**: Data storage and access
+   - DataFrameStore for central data storage
+   - ConfigManager for configuration management
+   - FileService for file operations
 
-### CSV Format Support
-```
-Date,Player Name,Source/Location,Chest Type,Value,Clan
-2023-03-11,Feldjäger,Level 25 Crypt,Fire Chest,275,MY_CLAN
-```
+5. **Utility Layer**: Supporting utilities
+   - SignalManager for signal management
+   - UpdateManager for UI update optimization
+   - BackgroundWorker for asynchronous processing
+   - ServiceLocator for service access
 
-### Validation System
-- Maintain lists for valid player names, chest types, and sources
-- Visual highlight of validation errors in data table
-- Toggles for automatic validation on import
-- Error reporting with suggested corrections
-
-### Correction System
-- String replacement based on correction rules
-- Fuzzy matching with configurable strictness
-- Correction history tracking
-- Rule management interface
+This layered approach provides a clean separation of concerns and facilitates maintainability, testability, and extensibility.
