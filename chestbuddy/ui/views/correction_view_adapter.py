@@ -9,15 +9,20 @@ Usage:
 
 from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtWidgets import QWidget, QVBoxLayout
+import logging
 
 from chestbuddy.core.models import ChestDataModel
 from chestbuddy.core.services import CorrectionService
 from chestbuddy.core.controllers.data_view_controller import DataViewController
 from chestbuddy.ui.correction_tab import CorrectionTab
-from chestbuddy.ui.views.base_view import BaseView
+from chestbuddy.ui.views.updatable_view import UpdatableView
+from chestbuddy.ui.utils import get_update_manager
+
+# Set up logger
+logger = logging.getLogger(__name__)
 
 
-class CorrectionViewAdapter(BaseView):
+class CorrectionViewAdapter(UpdatableView):
     """
     Adapter that wraps the existing CorrectionTab component to integrate with the new UI structure.
 
@@ -28,10 +33,11 @@ class CorrectionViewAdapter(BaseView):
         _controller (DataViewController): The controller for correction operations
 
     Implementation Notes:
-        - Inherits from BaseView to maintain UI consistency
+        - Inherits from UpdatableView to maintain UI consistency and implement IUpdatable
         - Wraps the existing CorrectionTab component
         - Provides the same functionality as CorrectionTab but with the new UI styling
         - Uses DataViewController for correction operations
+        - Uses UpdateManager for scheduling updates
     """
 
     # Define signals
@@ -43,6 +49,7 @@ class CorrectionViewAdapter(BaseView):
         data_model: ChestDataModel,
         correction_service: CorrectionService,
         parent: QWidget = None,
+        debug_mode: bool = False,
     ):
         """
         Initialize the CorrectionViewAdapter.
@@ -51,6 +58,7 @@ class CorrectionViewAdapter(BaseView):
             data_model (ChestDataModel): The data model to correct
             correction_service (CorrectionService): The correction service to use
             parent (QWidget, optional): The parent widget. Defaults to None.
+            debug_mode (bool, optional): Enable debug mode for signal connections. Defaults to False.
         """
         # Store references
         self._data_model = data_model
@@ -61,7 +69,7 @@ class CorrectionViewAdapter(BaseView):
         self._correction_tab = CorrectionTab(data_model, correction_service)
 
         # Initialize the base view
-        super().__init__("Data Correction", parent)
+        super().__init__("Data Correction", parent, debug_mode=debug_mode)
         self.setObjectName("CorrectionViewAdapter")
 
     def set_controller(self, controller: DataViewController) -> None:
@@ -80,7 +88,7 @@ class CorrectionViewAdapter(BaseView):
             self._controller.correction_error.connect(self._on_correction_error)
             self._controller.operation_error.connect(self._on_operation_error)
 
-            print("CorrectionViewAdapter: Controller set and signals connected")
+            logger.info("CorrectionViewAdapter: Controller set and signals connected")
 
     def _setup_ui(self):
         """Set up the UI components."""
@@ -98,6 +106,18 @@ class CorrectionViewAdapter(BaseView):
         # Connect header action buttons
         self.header_action_clicked.connect(self._on_action_clicked)
 
+        # Connect to data model if available
+        if hasattr(self._data_model, "data_changed") and hasattr(self, "request_update"):
+            try:
+                self._signal_manager.connect(
+                    self._data_model, "data_changed", self, "request_update"
+                )
+                logger.debug(
+                    "Connected data_model.data_changed to CorrectionViewAdapter.request_update"
+                )
+            except Exception as e:
+                logger.error(f"Error connecting data model signals: {e}")
+
     def _add_action_buttons(self):
         """Add action buttons to the header."""
         # Add action buttons for common correction operations
@@ -105,10 +125,57 @@ class CorrectionViewAdapter(BaseView):
         self.add_header_action("history", "View History")
         self.add_header_action("refresh", "Refresh")
 
-    def refresh(self) -> None:
-        """Refresh the correction view."""
+    def _update_view_content(self, data=None) -> None:
+        """
+        Update the view content with current data.
+
+        This implementation updates the CorrectionTab with current data.
+
+        Args:
+            data: Optional data to use for update (unused in this implementation)
+        """
         if hasattr(self._correction_tab, "_update_view"):
             self._correction_tab._update_view()
+
+        logger.debug("CorrectionViewAdapter: View content updated")
+
+    def _refresh_view_content(self) -> None:
+        """
+        Refresh the view content without changing the underlying data.
+        """
+        if hasattr(self._correction_tab, "_update_view"):
+            self._correction_tab._update_view()
+
+        logger.debug("CorrectionViewAdapter: View content refreshed")
+
+    def _populate_view_content(self, data=None) -> None:
+        """
+        Populate the view content from scratch.
+
+        This implementation calls the update_view method to fully populate correction options.
+
+        Args:
+            data: Optional data to use for population (unused in this implementation)
+        """
+        if hasattr(self._correction_tab, "_update_view"):
+            self._correction_tab._update_view()
+
+            # If we have a controller and the tab has a method to load correction rules,
+            # we should make sure they're loaded
+            if self._controller and hasattr(self._correction_tab, "_load_correction_rules"):
+                self._correction_tab._load_correction_rules()
+
+        logger.debug("CorrectionViewAdapter: View content populated")
+
+    def _reset_view_content(self) -> None:
+        """
+        Reset the view content to its initial state.
+        """
+        # Reset any selected correction options if possible
+        if hasattr(self._correction_tab, "_reset_form"):
+            self._correction_tab._reset_form()
+
+        logger.debug("CorrectionViewAdapter: View content reset")
 
     @Slot(str)
     def _on_action_clicked(self, action_id: str) -> None:
@@ -127,6 +194,13 @@ class CorrectionViewAdapter(BaseView):
 
     def _on_apply_clicked(self) -> None:
         """Handle apply correction button click."""
+        # Emit signal for tracking
+        strategy_name = "default"
+        if hasattr(self._correction_tab, "_get_selected_strategy"):
+            strategy_name = self._correction_tab._get_selected_strategy() or "default"
+
+        self.correction_requested.emit(strategy_name)
+
         if self._controller:
             # Since we need parameters from the CorrectionTab, we have to call its method
             # This is less than ideal, but necessary given the current structure
@@ -139,6 +213,9 @@ class CorrectionViewAdapter(BaseView):
 
     def _on_history_clicked(self) -> None:
         """Handle view history button click."""
+        # Emit signal for tracking
+        self.history_requested.emit()
+
         # Get correction history from the controller if available
         if self._controller:
             history = self._controller.get_correction_history()
@@ -200,3 +277,17 @@ class CorrectionViewAdapter(BaseView):
         """
         if hasattr(self, "_set_header_status"):
             self._set_header_status(f"Error: {error_msg}")
+
+    def enable_auto_update(self) -> None:
+        """Enable automatic updates when data model changes."""
+        if hasattr(self._data_model, "data_changed") and hasattr(self, "request_update"):
+            self._signal_manager.connect(self._data_model, "data_changed", self, "request_update")
+            logger.debug("Auto-update enabled for CorrectionViewAdapter")
+
+    def disable_auto_update(self) -> None:
+        """Disable automatic updates when data model changes."""
+        if hasattr(self._data_model, "data_changed") and hasattr(self, "request_update"):
+            self._signal_manager.disconnect(
+                self._data_model, "data_changed", self, "request_update"
+            )
+            logger.debug("Auto-update disabled for CorrectionViewAdapter")

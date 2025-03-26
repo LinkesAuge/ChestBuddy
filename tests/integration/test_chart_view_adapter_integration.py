@@ -14,10 +14,22 @@ from chestbuddy.core.models import ChestDataModel
 from chestbuddy.core.services.chart_service import ChartService
 from chestbuddy.core.controllers.data_view_controller import DataViewController
 from chestbuddy.ui.views.chart_view_adapter import ChartViewAdapter
+from chestbuddy.utils.signal_manager import SignalManager
 
 
 class TestChartViewAdapterIntegration:
     """Integration tests for the ChartViewAdapter with DataViewController."""
+
+    @pytest.fixture
+    def app(self, qtbot):
+        """Create a QApplication for testing."""
+        # qtbot fixture will ensure QApplication exists
+        return QApplication.instance()
+
+    @pytest.fixture
+    def signal_manager(self):
+        """Create a SignalManager instance for testing."""
+        return SignalManager(debug_mode=True)
 
     @pytest.fixture
     def data_model(self):
@@ -32,7 +44,7 @@ class TestChartViewAdapterIntegration:
                 "CLAN": ["Alpha", "Beta", "Gamma"],
             }
         )
-        model.set_data(data)
+        model.update_data(data)
         return model
 
     @pytest.fixture
@@ -46,15 +58,15 @@ class TestChartViewAdapterIntegration:
         return service
 
     @pytest.fixture
-    def data_view_controller(self, data_model):
+    def data_view_controller(self, data_model, signal_manager):
         """Create a DataViewController instance."""
-        controller = DataViewController(data_model)
+        controller = DataViewController(data_model, signal_manager)
         return controller
 
     @pytest.fixture
-    def chart_view_adapter(self, data_model, chart_service, data_view_controller):
+    def chart_view_adapter(self, app, data_model, chart_service, data_view_controller):
         """Create a ChartViewAdapter instance with controller."""
-        adapter = ChartViewAdapter(data_model, chart_service)
+        adapter = ChartViewAdapter(data_model, chart_service, None, parent=None, debug_mode=True)
         adapter.set_data_view_controller(data_view_controller)
 
         # Mock chart tab's chart view to avoid QWidget issues in tests
@@ -63,7 +75,7 @@ class TestChartViewAdapterIntegration:
         return adapter
 
     def test_end_to_end_chart_creation(
-        self, chart_view_adapter, data_view_controller, chart_service, qtbot
+        self, app, chart_view_adapter, data_view_controller, chart_service, qtbot
     ):
         """Test end-to-end chart creation flow with controller."""
         # Create signal catchers
@@ -101,14 +113,10 @@ class TestChartViewAdapterIntegration:
         data_view_controller.create_chart = MagicMock(side_effect=mock_create_chart)
 
         # Trigger chart creation
-        with qtbot.waitSignals(
-            [
-                chart_view_adapter.chart_creation_started,
-                chart_view_adapter.chart_creation_completed,
-            ],
-            timeout=1000,
-        ):
-            chart_view_adapter._on_create_chart()
+        chart_view_adapter._on_create_chart()
+
+        # Process events
+        qtbot.wait(100)
 
         # Verify signals were emitted
         assert creation_started is True
@@ -123,7 +131,7 @@ class TestChartViewAdapterIntegration:
         assert call_args["y_column"] == "SCORE"
         assert call_args["title"] == "Test Chart"
 
-    def test_end_to_end_chart_export(self, chart_view_adapter, data_view_controller, qtbot):
+    def test_end_to_end_chart_export(self, app, chart_view_adapter, data_view_controller, qtbot):
         """Test end-to-end chart export flow with controller."""
         # Create signal catchers
         export_started = False
@@ -152,11 +160,10 @@ class TestChartViewAdapterIntegration:
         data_view_controller.export_chart = MagicMock(side_effect=mock_export_chart)
 
         # Trigger chart export
-        with qtbot.waitSignals(
-            [chart_view_adapter.chart_export_started, chart_view_adapter.chart_export_completed],
-            timeout=1000,
-        ):
-            chart_view_adapter._on_export_chart()
+        chart_view_adapter._on_export_chart()
+
+        # Process events
+        qtbot.wait(100)
 
         # Verify signals were emitted
         assert export_started is True
@@ -166,7 +173,9 @@ class TestChartViewAdapterIntegration:
         # Verify controller method was called
         data_view_controller.export_chart.assert_called_once()
 
-    def test_integration_with_error_handling(self, chart_view_adapter, data_view_controller, qtbot):
+    def test_integration_with_error_handling(
+        self, app, chart_view_adapter, data_view_controller, qtbot
+    ):
         """Test integration with error handling."""
         # Create signal catchers
         error_received = False
@@ -189,17 +198,16 @@ class TestChartViewAdapterIntegration:
         data_view_controller.create_chart = MagicMock(side_effect=mock_create_chart_error)
 
         # Trigger chart creation
-        with qtbot.waitSignals(
-            [chart_view_adapter.chart_creation_started, chart_view_adapter.chart_creation_error],
-            timeout=1000,
-        ):
-            chart_view_adapter._on_create_chart()
+        chart_view_adapter._on_create_chart()
+
+        # Process events
+        qtbot.wait(100)
 
         # Verify error signal was emitted
         assert error_received is True
         assert error_message == "Error creating chart: Invalid column"
 
-    def test_header_actions_integration(self, chart_view_adapter, data_view_controller, qtbot):
+    def test_header_actions_integration(self, app, chart_view_adapter, data_view_controller, qtbot):
         """Test header actions integration with controller."""
         # Mock methods
         data_view_controller.create_chart = MagicMock(return_value=True)

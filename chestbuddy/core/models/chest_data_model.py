@@ -17,6 +17,7 @@ from PySide6.QtCore import Signal, QObject
 
 from chestbuddy.core.models.base_model import BaseModel
 from chestbuddy.utils.config import ConfigManager
+from chestbuddy.core.state.data_state import DataState
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -31,19 +32,20 @@ class ChestDataModel(QObject):
     Follows the Observer pattern by emitting signals when the data changes.
 
     Attributes:
-        data_changed (Signal): Signal emitted when the data is changed.
+        data_changed (Signal): Signal emitted when the data is changed, with the current DataState.
         validation_changed (Signal): Signal emitted when validation status changes.
         correction_applied (Signal): Signal emitted when corrections are applied.
         data_cleared (Signal): Signal emitted when data is cleared.
 
     Implementation Notes:
         - Uses pandas DataFrame as the primary data structure
+        - Tracks data state changes using DataState for efficient UI updates
         - Emits signals to notify observers of changes
         - Provides methods for filtering and manipulating data
     """
 
     # Define signals
-    data_changed = Signal()
+    data_changed = Signal(object)  # Will emit the current DataState
     validation_changed = Signal()
     correction_applied = Signal()
     data_cleared = Signal()
@@ -70,6 +72,9 @@ class ChestDataModel(QObject):
         # Track the data state via hash for meaningful change detection
         self._current_data_hash = None
         self._update_data_hash()
+
+        # Initialize DataState for efficient change tracking
+        self._data_state = DataState(self._data)
 
         # Track whether signals are already blocked
         self._signals_already_blocked = False
@@ -155,6 +160,10 @@ class ChestDataModel(QObject):
         self._data = pd.DataFrame(columns=self.EXPECTED_COLUMNS)
         self._validation_status = pd.DataFrame()
         self._correction_status = pd.DataFrame()
+
+        # Reset the DataState
+        self._data_state = DataState(self._data)
+
         # Emit data_cleared signal
         self.data_cleared.emit()
         self._notify_change()
@@ -183,21 +192,23 @@ class ChestDataModel(QObject):
             # Calculate a new hash to detect actual changes
             new_hash = self._calculate_data_hash()
 
-            # Only emit if the data has actually changed
-            if new_hash == self._current_data_hash:
+            # If we had a blank current hash or the hash has changed, emit
+            if self._current_data_hash is None or new_hash != self._current_data_hash:
+                # Update the data hash and time tracking
+                self._current_data_hash = new_hash
+                self._last_emission_time = current_time
+
+                # Update the DataState from the current data
+                self._data_state.update_from_data(self._data)
+
+                # Emit the signal with the DataState
+                print("EMITTING data_changed signal with DataState!!!")
+                logger.debug("Emitting data_changed signal with DataState.")
+                self.data_changed.emit(self._data_state)
+                print("data_changed signal emitted.")
+            else:
                 print("Skipping emission, no actual data change detected.")
                 logger.debug("Skipping emission, no actual data change detected.")
-                return
-
-            # Update the data hash and time tracking
-            self._current_data_hash = new_hash
-            self._last_emission_time = current_time
-
-            # Emit the signal
-            print("EMITTING data_changed signal!!!")
-            logger.debug("Emitting data_changed signal.")
-            self.data_changed.emit()
-            print("data_changed signal emitted.")
 
         except Exception as e:
             print(f"Error emitting data_changed signal: {e}")
@@ -353,24 +364,6 @@ class ChestDataModel(QObject):
             self._updating = True
             print("Set _updating to True")
 
-            # Check if this is an actual data change
-            if not self._data.empty and new_data is not None and not new_data.empty:
-                print("Checking if data has changed with hash")
-                temp_current_hash = self._calculate_data_hash()
-
-                # Calculate what the hash would be with the new data
-                orig_data = self._data
-                self._data = new_data
-                temp_new_hash = self._calculate_data_hash()
-                self._data = orig_data
-
-                # If the hashes match, this is a no-op update - skip it
-                if temp_current_hash == temp_new_hash:
-                    print("Skipping update as data is identical")
-                    logger.debug("Skipping update as data is identical")
-                    self._updating = False
-                    return
-
             # Track if signals were already blocked
             self._signals_already_blocked = self.signalsBlocked()
             print(f"Signals already blocked: {self._signals_already_blocked}")
@@ -403,23 +396,10 @@ class ChestDataModel(QObject):
                 print("Unblocking signals before notifying")
                 self.blockSignals(False)
 
-            # Important change: Clear the current hash before notifying
+            # Important change: Always clear the current hash to force notification
             # This ensures that _notify_change will detect a change and emit the signal
-            was_empty = self._current_data_hash == self._calculate_hash_for_empty()
-            is_now_populated = not self._data.empty
-
-            # Force hash refresh for significant changes (empty → populated or populated → empty)
-            if (was_empty and is_now_populated) or (not was_empty and self._data.empty):
-                print(
-                    "Clearing current hash to force signal emission for empty/populated transition"
-                )
-                logger.debug(
-                    "Clearing current hash to force signal emission for empty/populated transition"
-                )
-                self._current_data_hash = None
-            else:
-                # Update the current hash before notifying
-                self._update_data_hash()
+            print("Clearing current hash to force signal emission after update_data")
+            self._current_data_hash = None
 
             print("Calling _notify_change to emit signals")
         except Exception as e:
@@ -1082,3 +1062,13 @@ class ChestDataModel(QObject):
         if self._current_data_hash is None:
             self._update_data_hash()
         return self._current_data_hash
+
+    @property
+    def data_state(self) -> DataState:
+        """
+        Get the current data state.
+
+        Returns:
+            The current DataState object
+        """
+        return self._data_state

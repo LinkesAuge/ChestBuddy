@@ -403,3 +403,125 @@ self._validation_view.validate_clicked.connect(self._data_controller.validate_da
 ```
 
 This signal-based communication ensures loose coupling between UI and business logic components. 
+
+## Signal Management and Debugging Architecture
+
+ChestBuddy implements a sophisticated signal management and debugging architecture that provides centralized control and visibility into signal connections throughout the application.
+
+```mermaid
+graph TD
+    SigSender[Signal Sender] --- SignalMgr[SignalManager]
+    SignalMgr --- SigRcvr[Signal Receiver]
+    
+    SignalMgr --- ThrottledConn[Throttled Connections]
+    SignalMgr --- TypeChecking[Type Safety Checking]
+    SignalMgr --- PriorityConn[Priority Connections]
+    
+    SignalMgr --- SigTracer[SignalTracer]
+    SigTracer --- EmissionLogs[Emission Logs]
+    SigTracer --- SlowHandlers[Slow Handler Detection]
+    SigTracer --- SignalPaths[Signal Path Visualization]
+    
+    style SignalMgr fill:#2C5282,color:#fff
+    style SigTracer fill:#2C5282,color:#fff
+    style ThrottledConn fill:#3182CE,color:#fff
+    style TypeChecking fill:#3182CE,color:#fff
+    style PriorityConn fill:#3182CE,color:#fff
+    style EmissionLogs fill:#3182CE,color:#fff
+    style SlowHandlers fill:#3182CE,color:#fff
+    style SignalPaths fill:#3182CE,color:#fff
+```
+
+### Key Components
+
+1. **SignalManager**: Centralizes signal connection tracking and management
+   - Prevents duplicate connections
+   - Enforces type safety
+   - Provides connection prioritization
+   - Implements signal throttling
+   - Manages automatic disconnection
+
+2. **SignalTracer**: Provides real-time visibility into signal flow
+   - Tracks signal emissions across the application
+   - Records signal paths and emission chains
+   - Measures timing of signal handling
+   - Detects slow handlers for performance optimization
+   - Visualizes nested signal chains
+
+### Signal Connection Patterns
+
+The application follows standardized patterns for signal connections:
+
+1. **Standard Connection**: Basic signal connection with tracking
+   ```python
+   signal_manager.connect(sender, "signal_name", receiver, "slot_name")
+   ```
+
+2. **Throttled Connection**: Rate-limited signal processing
+   ```python
+   signal_manager.connect_throttled(sender, "signal_name", receiver, "slot_name", 
+                                   throttle_ms=100)
+   ```
+
+3. **Prioritized Connection**: Controlled execution order
+   ```python
+   signal_manager.connect(sender, "signal_name", receiver, "slot_name", 
+                         priority=SignalPriority.HIGH)
+   ```
+
+4. **Safe Connection**: Automatic disconnection on object deletion
+   ```python
+   signal_manager.safe_connect(sender, "signal_name", receiver, "slot_name")
+   ```
+
+### Signal Debugging Patterns
+
+The SignalTracer provides comprehensive signal flow debugging:
+
+1. **Tracing Session**: Capture and analyze signal flow
+   ```python
+   # Start tracing
+   signal_tracer.start_tracing()
+   
+   # Run code that emits signals
+   # ...
+   
+   # Generate report
+   signal_tracer.stop_tracing()
+   report = signal_tracer.generate_report()
+   ```
+
+2. **Slow Handler Detection**: Identify performance bottlenecks
+   ```python
+   # Set threshold for slow handler detection
+   signal_tracer.set_slow_threshold("MyClass.data_changed", 50.0)  # ms
+   
+   # Get slow handlers after tracing
+   slow_handlers = signal_tracer.find_slow_handlers()
+   ```
+
+3. **Signal Registration**: Focus on specific signals of interest
+   ```python
+   # Register specific signals for detailed tracking
+   signal_tracer.register_signal(data_model, "data_changed", view, "update_view")
+   ```
+
+4. **Signal Path Analysis**: Visualize signal flow paths
+   ```python
+   # Get formatted signal paths
+   paths = signal_tracer._build_signal_paths()
+   for path in paths:
+       print(path)
+   ```
+
+### Benefits
+
+This architecture provides several key benefits:
+
+1. **Maintainability**: Centralized signal management improves code organization
+2. **Reliability**: Type checking prevents many common runtime errors
+3. **Performance**: Throttling prevents UI freezing during rapid updates
+4. **Debuggability**: Comprehensive tracing improves visibility into signal flow
+5. **Safety**: Automatic disconnection prevents memory leaks
+
+The signal management and debugging architecture is fundamental to the application's maintainability and helps developers understand the complex interactions between components. 

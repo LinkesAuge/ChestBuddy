@@ -17,6 +17,7 @@ from PySide6.QtWidgets import QStackedWidget, QWidget, QMessageBox
 from chestbuddy.core.models import ChestDataModel
 from chestbuddy.ui.widgets.sidebar_navigation import SidebarNavigation
 from chestbuddy.core.controllers.base_controller import BaseController
+from chestbuddy.ui.interfaces import IUpdatable
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -167,6 +168,11 @@ class ViewStateController(BaseController):
                 self,
                 "_on_data_dependent_view_clicked",
             )
+
+            # Check if sidebar implements IUpdatable interface and populate it
+            if isinstance(self._sidebar, IUpdatable):
+                logger.info("Sidebar implements IUpdatable, populating it")
+                self._sidebar.populate()
 
         # Initialize view availability
         for view_name in self._views:
@@ -509,7 +515,14 @@ class ViewStateController(BaseController):
 
         # Update sidebar
         if self._sidebar:
-            self._sidebar.set_active_item(view_name)
+            # Use IUpdatable interface if available
+            if isinstance(self._sidebar, IUpdatable) and self._sidebar.needs_update():
+                logger.debug(f"Updating sidebar via IUpdatable interface")
+                self._sidebar.set_active_item(view_name)
+                self._sidebar.update()
+            else:
+                # Fall back to direct method call
+                self._sidebar.set_active_item(view_name)
 
         # Set widget in stack
         self._content_stack.setCurrentWidget(target_widget)
@@ -724,6 +737,19 @@ class ViewStateController(BaseController):
             logger.warning("No active widget found to refresh")
             return
 
+        # Check if widget implements IUpdatable interface
+        if isinstance(active_widget, IUpdatable):
+            logger.info(f"Refreshing active view '{self._active_view}' via IUpdatable interface")
+            try:
+                if active_widget.needs_update():
+                    active_widget.refresh()
+                else:
+                    logger.debug(f"View '{self._active_view}' doesn't need refreshing")
+            except Exception as e:
+                logger.error(f"Error refreshing view via IUpdatable: {e}")
+            return
+
+        # Legacy refresh for widgets that don't implement IUpdatable
         # Check if widget has needs_refresh method to avoid unnecessary refreshes
         needs_refresh = True
         if hasattr(active_widget, "needs_refresh") and callable(
@@ -868,9 +894,14 @@ class ViewStateController(BaseController):
 
         # Could integrate with ErrorHandlingController here if available
 
-    @Slot()
-    def _on_data_changed(self) -> None:
-        """Handle data changed event from the data model."""
+    @Slot(object)
+    def _on_data_changed(self, data_state=None) -> None:
+        """
+        Handle data changed event from the data model.
+
+        Args:
+            data_state: The current DataState (optional)
+        """
         has_data = not self._data_model.is_empty
 
         logger.info(f"Data changed event: has_data={has_data}")

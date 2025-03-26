@@ -9,15 +9,20 @@ Usage:
 
 from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtWidgets import QWidget, QVBoxLayout
+import logging
 
 from chestbuddy.core.models import ChestDataModel
 from chestbuddy.core.services import ValidationService
 from chestbuddy.core.controllers.data_view_controller import DataViewController
 from chestbuddy.ui.validation_tab import ValidationTab
-from chestbuddy.ui.views.base_view import BaseView
+from chestbuddy.ui.views.updatable_view import UpdatableView
+from chestbuddy.ui.utils import get_update_manager
+
+# Set up logger
+logger = logging.getLogger(__name__)
 
 
-class ValidationViewAdapter(BaseView):
+class ValidationViewAdapter(UpdatableView):
     """
     Adapter that wraps the existing ValidationTab component to integrate with the new UI structure.
 
@@ -28,10 +33,11 @@ class ValidationViewAdapter(BaseView):
         _controller (DataViewController): The controller for validation operations
 
     Implementation Notes:
-        - Inherits from BaseView to maintain UI consistency
+        - Inherits from UpdatableView to maintain UI consistency and implement IUpdatable
         - Wraps the existing ValidationTab component
         - Provides the same functionality as ValidationTab but with the new UI styling
         - Uses DataViewController for validation operations
+        - Uses UpdateManager for scheduling updates
     """
 
     # Define signals
@@ -43,6 +49,7 @@ class ValidationViewAdapter(BaseView):
         data_model: ChestDataModel,
         validation_service: ValidationService,
         parent: QWidget = None,
+        debug_mode: bool = False,
     ):
         """
         Initialize the ValidationViewAdapter.
@@ -51,6 +58,7 @@ class ValidationViewAdapter(BaseView):
             data_model (ChestDataModel): The data model to validate
             validation_service (ValidationService): The validation service to use
             parent (QWidget, optional): The parent widget. Defaults to None.
+            debug_mode (bool, optional): Enable debug mode for signal connections. Defaults to False.
         """
         # Store references
         self._data_model = data_model
@@ -61,7 +69,7 @@ class ValidationViewAdapter(BaseView):
         self._validation_tab = ValidationTab(data_model, validation_service)
 
         # Initialize the base view
-        super().__init__("Data Validation", parent)
+        super().__init__("Data Validation", parent, debug_mode=debug_mode)
         self.setObjectName("ValidationViewAdapter")
 
     def set_controller(self, controller: DataViewController) -> None:
@@ -80,7 +88,7 @@ class ValidationViewAdapter(BaseView):
             self._controller.validation_error.connect(self._on_validation_error)
             self._controller.operation_error.connect(self._on_operation_error)
 
-            print("ValidationViewAdapter: Controller set and signals connected")
+            logger.info("ValidationViewAdapter: Controller set and signals connected")
 
     def _setup_ui(self):
         """Set up the UI components."""
@@ -98,6 +106,18 @@ class ValidationViewAdapter(BaseView):
         # Connect header action buttons
         self.header_action_clicked.connect(self._on_action_clicked)
 
+        # Connect to data model if available
+        if hasattr(self._data_model, "data_changed") and hasattr(self, "request_update"):
+            try:
+                self._signal_manager.connect(
+                    self._data_model, "data_changed", self, "request_update"
+                )
+                logger.debug(
+                    "Connected data_model.data_changed to ValidationViewAdapter.request_update"
+                )
+            except Exception as e:
+                logger.error(f"Error connecting data model signals: {e}")
+
     def _add_action_buttons(self):
         """Add action buttons to the header."""
         # Add action buttons for common validation operations
@@ -105,10 +125,56 @@ class ValidationViewAdapter(BaseView):
         self.add_header_action("clear", "Clear Validation")
         self.add_header_action("refresh", "Refresh")
 
-    def refresh(self) -> None:
-        """Refresh the validation view."""
+    def _update_view_content(self, data=None) -> None:
+        """
+        Update the view content with current data.
+
+        This implementation updates the ValidationTab with current validation results.
+
+        Args:
+            data: Optional data to use for update (unused in this implementation)
+        """
+        # Use the ValidationTab's own refresh method if available
         if hasattr(self._validation_tab, "refresh"):
             self._validation_tab.refresh()
+
+        logger.debug("ValidationViewAdapter: View content updated")
+
+    def _refresh_view_content(self) -> None:
+        """
+        Refresh the view content without changing the underlying data.
+        """
+        if hasattr(self._validation_tab, "refresh"):
+            self._validation_tab.refresh()
+
+        logger.debug("ValidationViewAdapter: View content refreshed")
+
+    def _populate_view_content(self, data=None) -> None:
+        """
+        Populate the view content from scratch.
+
+        This implementation calls the validate method to fully populate validation results.
+
+        Args:
+            data: Optional data to use for population (unused in this implementation)
+        """
+        # If controller exists, use it to validate data
+        if self._controller:
+            self._controller.validate_data()
+        # Fallback to direct validation if controller not set
+        elif hasattr(self._validation_tab, "validate"):
+            self._validation_tab.validate()
+
+        logger.debug("ValidationViewAdapter: View content populated")
+
+    def _reset_view_content(self) -> None:
+        """
+        Reset the view content to its initial state.
+        """
+        if hasattr(self._validation_tab, "clear_validation"):
+            self._validation_tab.clear_validation()
+
+        logger.debug("ValidationViewAdapter: View content reset")
 
     @Slot(str)
     def _on_action_clicked(self, action_id: str) -> None:
@@ -127,17 +193,15 @@ class ValidationViewAdapter(BaseView):
 
     def _on_validate_clicked(self) -> None:
         """Handle validate button click using controller."""
-        if self._controller:
-            self._controller.validate_data()
-        else:
-            # Fallback to direct validation if controller not set
-            if hasattr(self._validation_tab, "validate"):
-                self._validation_tab.validate()
+        # Schedule update through UI update system
+        self.populate()
+        self.validation_requested.emit()
 
     def _on_clear_clicked(self) -> None:
         """Handle clear validation button click."""
-        if hasattr(self._validation_tab, "clear_validation"):
-            self._validation_tab.clear_validation()
+        # Reset the component
+        self.reset()
+        self.validation_cleared.emit()
 
     @Slot()
     def _on_validation_started(self) -> None:
@@ -183,3 +247,17 @@ class ValidationViewAdapter(BaseView):
         """
         if hasattr(self, "_set_header_status"):
             self._set_header_status(f"Error: {error_msg}")
+
+    def enable_auto_update(self) -> None:
+        """Enable automatic updates when data model changes."""
+        if hasattr(self._data_model, "data_changed") and hasattr(self, "request_update"):
+            self._signal_manager.connect(self._data_model, "data_changed", self, "request_update")
+            logger.debug("Auto-update enabled for ValidationViewAdapter")
+
+    def disable_auto_update(self) -> None:
+        """Disable automatic updates when data model changes."""
+        if hasattr(self._data_model, "data_changed") and hasattr(self, "request_update"):
+            self._signal_manager.disconnect(
+                self._data_model, "data_changed", self, "request_update"
+            )
+            logger.debug("Auto-update disabled for ValidationViewAdapter")

@@ -452,9 +452,14 @@ class ChestBuddyApp(QObject):
         """Handler for data loaded signal."""
         logger.info("App: Data loaded signal received")
 
-    @Slot()
-    def _on_data_changed(self) -> None:
-        """Handler for data changed signal."""
+    @Slot(object)
+    def _on_data_changed(self, data_state=None) -> None:
+        """
+        Handler for data changed signal.
+
+        Args:
+            data_state: The current DataState object (optional)
+        """
         logger.info("App: Data model changed signal received")
 
     @Slot()

@@ -143,6 +143,43 @@ ChestBuddy implements a robust background processing framework:
 - **ProgressBar**: State-based progress indicator (normal, success, error)
 - **Throttled Updates**: Prevent UI flooding during frequent updates
 
+## Signal Debugging and Visualization
+
+ChestBuddy includes advanced tools for debugging Qt signal flow:
+
+### SignalTracer
+- **Signal Path Tracing**: Track signal emissions through the application
+- **Timing Analysis**: Measure signal handling performance
+- **Nested Signal Detection**: Identify signal chains and dependencies
+- **Slow Handler Detection**: Find performance bottlenecks in signal handlers
+
+### Implementation
+- **SignalEmission class**: Represents individual signal emission events
+- **Global signal_tracer instance**: Provides app-wide access to tracing functionality
+- **Text-based Reporting**: Generate detailed signal flow reports
+- **Integration with SignalManager**: Automatic tracking of registered signals
+
+### Usage
+```python
+# Start tracing
+signal_tracer.start_tracing()
+
+# Run code that emits signals
+# ...
+
+# Stop tracing and get report
+signal_tracer.stop_tracing()
+report = signal_tracer.generate_report()
+print(report)
+```
+
+### Features
+- **Connection to SignalManager**: Works with existing signal management system
+- **Customizable Thresholds**: Configure slow handler detection thresholds
+- **Signal Registration**: Explicitly register signals for detailed tracking
+- **Signal Path Visualization**: Format nested signal calls as tree structures
+- **Performance Analysis**: List slow signal handlers by duration
+
 ## Testing Infrastructure
 
 A comprehensive testing framework ensures reliability:

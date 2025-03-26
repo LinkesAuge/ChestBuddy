@@ -36,6 +36,7 @@ class DataManager(QObject):
         _config: Configuration manager instance
         _worker: Background worker for async operations
         _current_file_path: Track the current file path
+        _result_processed: Flag to prevent processing task results multiple times
 
     Implementation Notes:
         - Manages file loading and saving
@@ -75,6 +76,7 @@ class DataManager(QObject):
         self._csv_service = csv_service
         self._current_file_path = None  # Track the current file path
         self._current_task = None  # Track the current task for potential cancellation
+        self._result_processed = False  # Track whether we've processed a result
 
         # Initialize config and background worker
         self._config = ConfigManager()
@@ -99,6 +101,9 @@ class DataManager(QObject):
         logger.info(
             f"DataManager.load_csv called with {file_paths if isinstance(file_paths, str) else len(file_paths)} file(s)"
         )
+
+        # Reset result processing flag to prevent duplicate processing
+        self._result_processed = False
 
         # Convert single string path to list
         if isinstance(file_paths, str):
@@ -176,6 +181,9 @@ class DataManager(QObject):
         # Set the cancellation flag
         self._cancel_requested = True
         logger.debug("Set cancellation flag to True")
+
+        # Reset result processing flag
+        self._result_processed = False
 
         # If there's an active task, try to cancel it
         if self._current_task:
@@ -602,8 +610,16 @@ class DataManager(QObject):
         """
         logger.debug(f"Background task {task_id} completed with result: {type(result)}")
 
+        # Skip if we've already processed a result for this task
+        if self._result_processed:
+            logger.debug("Skipping duplicate result processing for this task")
+            return
+
         # Clear current task reference
         self._current_task = None
+
+        # Mark as processed to prevent duplicate processing
+        self._result_processed = True
 
         # Process the result based on task type
         # If it's a MultiCSVLoadTask, the result will be from the CSV load operation
@@ -671,9 +687,10 @@ class DataManager(QObject):
                 logger.error(f"Error connecting worker.progress signal: {e}")
 
             try:
-                # Connect the worker.finished signal - this is different from task_completed
-                # which is connected in __init__
-                self._worker.finished.connect(self._adapt_task_result)
+                # Remove the duplicate connection to worker.finished - we already connect to
+                # task_completed in __init__ which is more specific and eliminates duplicate processing
+                # self._worker.finished.connect(self._adapt_task_result)
+                pass
             except Exception as e:
                 logger.error(f"Error connecting worker.finished signal: {e}")
 

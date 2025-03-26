@@ -190,9 +190,14 @@ class DataViewController(BaseController):
         """Handle the clear filter button clicked in the view."""
         self.clear_filter()
 
-    @Slot()
-    def _on_data_changed(self):
-        """Handle data model changes."""
+    @Slot(object)
+    def _on_data_changed(self, data_state=None):
+        """
+        Handle data model changes.
+
+        Args:
+            data_state: The current DataState (optional)
+        """
         # Update our state tracking
         self._update_data_state()
 

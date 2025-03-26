@@ -353,12 +353,15 @@ class UpdatableView(BaseView):
             # Fall back to direct update if UpdateManager is not available
             self.update()
 
-    def request_update(self) -> None:
+    def request_update(self, data_state=None) -> None:
         """
         Request an update for this view.
 
         This is a convenience method that makes the view's update state as needing
         an update and schedules it with the UpdateManager.
+
+        Args:
+            data_state: Optional DataState object from data change event
         """
         self._update_state["needs_update"] = True
         self.schedule_update()

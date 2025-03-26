@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
     QStackedWidget,
 )
 
-from chestbuddy.ui.views.base_view import BaseView
+from chestbuddy.ui.views.updatable_view import UpdatableView
 from chestbuddy.ui.resources.style import Colors
 from chestbuddy.ui.resources.icons import Icons
 from chestbuddy.ui.widgets.empty_state_widget import EmptyStateWidget
@@ -359,7 +359,7 @@ class RecentFilesWidget(QFrame):
             self._file_items.append(button)
 
 
-class DashboardView(BaseView):
+class DashboardView(UpdatableView):
     """
     Dashboard view showing summary information and quick actions.
 
@@ -393,6 +393,10 @@ class DashboardView(BaseView):
 
         # Set initial state
         self.set_data_loaded(False)
+
+        # Initial population if we have a data model
+        if self._data_model is not None:
+            self.populate(self._data_model)
 
     def _setup_dashboard(self):
         """Set up the dashboard with content and empty state views."""
@@ -541,14 +545,71 @@ class DashboardView(BaseView):
         self._stacked_widget.setCurrentIndex(1 if loaded else 0)
 
     def refresh(self):
-        """Refresh the dashboard view with the latest data."""
-        # No need to refresh if we're not visible
+        """Refresh the dashboard view using the UpdatableView pattern."""
+        super().refresh()
+
+    def _do_update(self, data=None):
+        """
+        Update the dashboard with the latest data.
+
+        Args:
+            data: Optional data to update with (not used currently)
+        """
+        # Only update if visible
         if not self.isVisible():
             return
 
         # Update dashboard components
         self._update_recent_file_list()
         self._update_dashboard_stats()
+
+    def _do_refresh(self):
+        """Refresh the dashboard view (lighter weight than full update)."""
+        # Reuse update logic for now
+        self._update_recent_file_list()
+        self._update_dashboard_stats()
+
+    def _do_populate(self, data=None):
+        """
+        Initial population of the dashboard.
+
+        Args:
+            data: Optional data model to populate from
+        """
+        # Store data model if provided
+        if data is not None and self._data_model is None:
+            self._data_model = data
+
+        # Perform initial update
+        self._update_recent_file_list()
+        self._update_dashboard_stats()
+
+        # Set initial state based on data model
+        if self._data_model is not None:
+            has_data = not self._data_model.is_empty
+            self.set_data_loaded(has_data)
+        else:
+            self.set_data_loaded(False)
+
+    def _do_reset(self):
+        """Reset the dashboard to its initial state."""
+        # Reset stats cards
+        self.update_stats(0, "N/A", 0, "Never")
+
+        # Clear recent files
+        self.set_recent_files([])
+
+        # Set to empty state
+        self.set_data_loaded(False)
+
+    def schedule_dashboard_update(self, debounce_ms=100):
+        """
+        Schedule a dashboard update with debouncing.
+
+        Args:
+            debounce_ms: Debounce time in milliseconds
+        """
+        self.schedule_update(debounce_ms)
 
     def _update_recent_file_list(self):
         """Update the recent file list in the dashboard."""

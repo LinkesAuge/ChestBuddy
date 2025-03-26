@@ -10,12 +10,16 @@ Usage:
 import inspect
 import logging
 from contextlib import contextmanager
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union, cast
+import weakref
 
 from PySide6.QtCore import QObject, QTimer, Signal
 
 # Set up logger
 logger = logging.getLogger(__name__)
+
+# Add import for the signal tracer
+from chestbuddy.utils.signal_tracer import signal_tracer
 
 
 class SignalManager:
@@ -40,6 +44,15 @@ class SignalManager:
     PRIORITY_LOW = 25
     PRIORITY_LOWEST = 0
 
+    _instance = None
+
+    @classmethod
+    def instance(cls) -> "SignalManager":
+        """Get or create the singleton instance."""
+        if cls._instance is None:
+            cls._instance = SignalManager()
+        return cls._instance
+
     def __init__(self, debug_mode: bool = False, type_checking: bool = True):
         """
         Initialize the signal manager with an empty connections dictionary.
@@ -60,6 +73,29 @@ class SignalManager:
         ] = {}
         self._debug_mode = debug_mode
         self._type_checking = type_checking
+
+        # Track connections by (emitter, signal, receiver, slot)
+        self._connections: Dict[
+            Tuple[int, str, int, str], Tuple[QObject, str, QObject, Callable, bool]
+        ] = {}
+
+        # Maps to quickly locate connections
+        # signal_emitter_id -> [(signal_name, connection_id), ...]
+        self._emitter_map: Dict[int, List[Tuple[str, Tuple[int, str, int, str]]]] = {}
+
+        # receiver_id -> [(slot_name, connection_id), ...]
+        self._receiver_map: Dict[int, List[Tuple[str, Tuple[int, str, int, str]]]] = {}
+
+        # slot_name -> [(receiver, connection_id), ...]
+        self._slot_map: Dict[str, List[Tuple[QObject, Tuple[int, str, int, str]]]] = {}
+
+        # Track emitters and receivers as weak references to avoid memory leaks
+        # This also helps with cleanup when objects are destroyed
+        self._weak_emitters: Dict[int, "weakref.ReferenceType[QObject]"] = {}
+        self._weak_receivers: Dict[int, "weakref.ReferenceType[QObject]"] = {}
+
+        # Set of connections to be checked for memory leaks
+        self._leaked_connection_check: Set[Tuple[int, str, int, str]] = set()
 
     def _check_signal_slot_compatibility(
         self, sender: QObject, signal_name: str, receiver: QObject, slot_name: str
@@ -1212,3 +1248,102 @@ class SignalManager:
             yield
         finally:
             sender.blockSignals(original_state)
+
+    def connect_signal(
+        self,
+        emitter: QObject,
+        signal_name: str,
+        receiver: QObject,
+        slot: Union[Callable, str],
+        track_only: bool = False,
+    ) -> bool:
+        """
+        Connect a signal to a slot and register it with the manager.
+
+        Args:
+            emitter: The object emitting the signal
+            signal_name: The name of the signal (without the signature)
+            receiver: The object receiving the signal
+            slot: Either a callable or the name of the method to connect to
+            track_only: If True, don't make the actual connection, just track it
+                        (useful when connections are made elsewhere)
+
+        Returns:
+            bool: True if the connection was successfully made or tracked
+        """
+        # Get signal object by name
+        signal_obj = getattr(emitter, signal_name, None)
+        if not isinstance(signal_obj, Signal):
+            logger.error(f"Signal '{signal_name}' not found on {emitter}")
+            return False
+
+        # Resolve slot if it's a string
+        if isinstance(slot, str):
+            slot_name = slot
+            slot_method = getattr(receiver, slot, None)
+            if not callable(slot_method):
+                logger.error(f"Slot '{slot}' not found on {receiver}")
+                return False
+        else:
+            # Try to get the method name for a callable
+            slot_method = slot
+            try:
+                slot_name = slot_method.__name__
+            except AttributeError:
+                # For lambdas and other callables without __name__
+                slot_name = f"lambda_{id(slot)}"
+
+        # Create unique IDs for connection tracking
+        emitter_id = id(emitter)
+        receiver_id = id(receiver)
+
+        # Create a unique connection ID
+        connection_id = (emitter_id, signal_name, receiver_id, slot_name)
+
+        # Check if this connection already exists
+        if connection_id in self._connections:
+            logger.debug(
+                f"Connection already exists: {emitter}.{signal_name} -> {receiver}.{slot_name}"
+            )
+            return True
+
+        # Add weak references to track object lifecycle
+        self._weak_emitters[emitter_id] = weakref.ref(
+            emitter, lambda ref: self._cleanup_emitter(emitter_id)
+        )
+
+        self._weak_receivers[receiver_id] = weakref.ref(
+            receiver, lambda ref: self._cleanup_receiver(receiver_id)
+        )
+
+        # Make the actual connection if not track_only
+        if not track_only:
+            signal_obj.connect(slot_method)
+
+        # Store the connection details for tracking
+        self._connections[connection_id] = (emitter, signal_name, receiver, slot_method, track_only)
+
+        # Update the quick lookup maps
+        # Emitter map
+        if emitter_id not in self._emitter_map:
+            self._emitter_map[emitter_id] = []
+        self._emitter_map[emitter_id].append((signal_name, connection_id))
+
+        # Receiver map
+        if receiver_id not in self._receiver_map:
+            self._receiver_map[receiver_id] = []
+        self._receiver_map[receiver_id].append((slot_name, connection_id))
+
+        # Slot map
+        if slot_name not in self._slot_map:
+            self._slot_map[slot_name] = []
+        self._slot_map[slot_name].append((receiver, connection_id))
+
+        # Register with the signal tracer if it's active
+        if signal_tracer.is_active():
+            signal_tracer.register_signal(emitter, signal_name, receiver, slot_name)
+
+        logger.debug(
+            f"Connected: {emitter.__class__.__name__}.{signal_name} -> {receiver.__class__.__name__}.{slot_name}"
+        )
+        return True

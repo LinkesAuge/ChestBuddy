@@ -8,7 +8,8 @@ Usage:
 """
 
 import logging
-from typing import Optional, Set, List
+import time
+from typing import Optional, Set, List, Any, Dict
 
 from PySide6.QtCore import Qt, QSize, Signal, Slot
 from PySide6.QtWidgets import (
@@ -22,6 +23,8 @@ from PySide6.QtGui import QColor, QFont, QBrush
 
 from chestbuddy.ui.resources.style import Colors
 from chestbuddy.ui.resources.icons import Icons
+from chestbuddy.ui.interfaces import IUpdatable
+from chestbuddy.ui.utils import get_update_manager
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -182,7 +185,8 @@ class SidebarNavigation(QFrame):
     """
     Sidebar navigation widget for the ChestBuddy application.
 
-    This widget provides navigation between different sections of the application.
+    This widget provides navigation between different sections of the application
+    and implements the IUpdatable interface for standardized updates.
 
     Signals:
         navigation_changed (str, str): Emitted when navigation changes.
@@ -205,6 +209,16 @@ class SidebarNavigation(QFrame):
         self._data_loaded = False
         self._active_item = ""
         self._view_availability = {}
+
+        # Initialize update state tracking
+        self._update_state = {
+            "last_update_time": 0.0,
+            "needs_update": True,
+            "update_pending": False,
+            "data_hash": None,
+            "initial_population": False,
+        }
+
         self._setup_ui()
         self._connect_signals()
 
@@ -313,6 +327,9 @@ class SidebarNavigation(QFrame):
         self._active_item = section_name
         self._sections[section_name].set_active(True)
 
+        # Mark as needing update
+        self._update_state["needs_update"] = True
+
     @Slot(bool)
     def set_data_loaded(self, has_data: bool):
         """
@@ -331,6 +348,10 @@ class SidebarNavigation(QFrame):
             if section:
                 section.set_enabled(has_data)
 
+        # Request update via UpdateManager
+        self._update_state["needs_update"] = True
+        self.schedule_update()
+
     @Slot(dict)
     def update_view_availability(self, availability: dict):
         """
@@ -345,3 +366,191 @@ class SidebarNavigation(QFrame):
         for section_name, section in self._sections.items():
             if section_name in availability:
                 section.set_enabled(availability[section_name])
+
+        # Request update via UpdateManager
+        self._update_state["needs_update"] = True
+        self.schedule_update()
+
+    # IUpdatable interface implementation
+
+    def refresh(self) -> None:
+        """
+        Refresh the sidebar display with current data.
+        """
+        self._update_state["needs_update"] = True
+        self._refresh_view_content()
+        self._update_state["last_update_time"] = time.time()
+        logger.debug(f"SidebarNavigation refreshed")
+
+    def update(self, data: Optional[Any] = None) -> None:
+        """
+        Update the sidebar with new data.
+
+        Args:
+            data: Optional new data (unused in this implementation)
+        """
+        if not self.needs_update():
+            logger.debug(f"SidebarNavigation skipping update (no change detected)")
+            return
+
+        self._update_state["needs_update"] = True
+        self._update_state["update_pending"] = True
+
+        try:
+            self._update_view_content(data)
+            self._update_state["needs_update"] = False
+            self._update_state["update_pending"] = False
+            self._update_state["last_update_time"] = time.time()
+            logger.debug(f"SidebarNavigation updated")
+        except Exception as e:
+            self._update_state["update_pending"] = False
+            logger.error(f"Error updating SidebarNavigation: {str(e)}")
+            raise
+
+    def populate(self, data: Optional[Any] = None) -> None:
+        """
+        Completely populate the sidebar from scratch.
+
+        Args:
+            data: Optional data to populate with (unused in this implementation)
+        """
+        self._update_state["needs_update"] = True
+        self._update_state["update_pending"] = True
+
+        try:
+            self._populate_view_content(data)
+            self._update_state["needs_update"] = False
+            self._update_state["update_pending"] = False
+            self._update_state["initial_population"] = True
+            self._update_state["last_update_time"] = time.time()
+            logger.debug(f"SidebarNavigation populated")
+        except Exception as e:
+            self._update_state["update_pending"] = False
+            logger.error(f"Error populating SidebarNavigation: {str(e)}")
+            raise
+
+    def needs_update(self) -> bool:
+        """
+        Check if the sidebar needs an update.
+
+        Returns:
+            bool: True if the sidebar needs to be updated, False otherwise
+        """
+        return self._update_state["needs_update"]
+
+    def reset(self) -> None:
+        """
+        Reset the sidebar to its initial state.
+        """
+        self._update_state["needs_update"] = True
+        self._update_state["update_pending"] = True
+
+        try:
+            self._reset_view_content()
+            self._update_state["needs_update"] = False
+            self._update_state["update_pending"] = False
+            self._update_state["initial_population"] = False
+            self._update_state["last_update_time"] = time.time()
+            logger.debug(f"SidebarNavigation reset")
+        except Exception as e:
+            self._update_state["update_pending"] = False
+            logger.error(f"Error resetting SidebarNavigation: {str(e)}")
+            raise
+
+    def last_update_time(self) -> float:
+        """
+        Get the timestamp of the last update.
+
+        Returns:
+            float: Timestamp of the last update (seconds since epoch)
+        """
+        return self._update_state["last_update_time"]
+
+    def schedule_update(self, debounce_ms: int = 50) -> None:
+        """
+        Schedule an update using the UpdateManager.
+
+        Args:
+            debounce_ms: Debounce interval in milliseconds
+        """
+        try:
+            update_manager = get_update_manager()
+            update_manager.schedule_update(self, debounce_ms)
+            logger.debug(f"SidebarNavigation scheduled for update")
+        except Exception as e:
+            logger.error(f"Error scheduling update for SidebarNavigation: {e}")
+            # Fall back to direct update if UpdateManager is not available
+            self.update()
+
+    # Internal implementation methods for IUpdatable
+
+    def _update_view_content(self, data: Optional[Any] = None) -> None:
+        """
+        Update the sidebar content based on provided data.
+
+        Args:
+            data: Optional data to update with (unused in this implementation)
+        """
+        # In sidebar, update is primarily about reflecting availability
+        if hasattr(self, "_view_availability"):
+            # Apply view availability without triggering a new update
+            for section_name, section in self._sections.items():
+                if section_name in self._view_availability:
+                    section.set_enabled(self._view_availability[section_name])
+
+    def _refresh_view_content(self) -> None:
+        """
+        Refresh the sidebar content without changing underlying data.
+        """
+        # For sidebar, refresh just updates the current active item
+        if hasattr(self, "_active_item") and self._active_item:
+            # Refresh active state without triggering a new update
+            for section_name, section in self._sections.items():
+                section.set_active(section_name == self._active_item)
+
+    def _populate_view_content(self, data: Optional[Any] = None) -> None:
+        """
+        Populate the sidebar content from scratch.
+
+        Args:
+            data: Optional data to populate with (unused in this implementation)
+        """
+        # For the sidebar, population happens during initialization,
+        # so this is primarily about refreshing the entire state
+
+        # Apply all current state without triggering new updates
+
+        # Apply data loaded state
+        for section_name in self._data_dependent_sections:
+            section = self._sections.get(section_name)
+            if section:
+                section.set_enabled(self._data_loaded)
+
+        # Apply view availability
+        for section_name, section in self._sections.items():
+            if section_name in self._view_availability:
+                section.set_enabled(self._view_availability[section_name])
+
+        # Apply active item
+        if self._active_item:
+            for section_name, section in self._sections.items():
+                section.set_active(section_name == self._active_item)
+
+    def _reset_view_content(self) -> None:
+        """
+        Reset the sidebar content to its initial state.
+        """
+        # Reset to initial state (no data, dashboard active)
+        self._data_loaded = False
+        self._active_item = "Dashboard"
+        self._view_availability = {}
+
+        # Update UI to reflect reset state
+        for section_name in self._data_dependent_sections:
+            section = self._sections.get(section_name)
+            if section:
+                section.set_enabled(False)
+
+        # Set Dashboard as active
+        for section_name, section in self._sections.items():
+            section.set_active(section_name == "Dashboard")
