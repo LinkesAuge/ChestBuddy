@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
     QStatusBar,
     QLineEdit,
     QGridLayout,
+    QCheckBox,
 )
 from PySide6.QtCore import Qt, Signal, QSize
 from PySide6.QtGui import QAction
@@ -158,13 +159,47 @@ class ValidationTabView(QWidget):
         toolbar.setAutoFillBackground(True)  # Ensure toolbar has correct background
         toolbar.setProperty("lightContentView", True)  # Enable light theme styling
 
-        # Add toolbar actions - only keep the validate button
+        # Create a widget for toolbar options section
+        options_widget = QWidget()
+        options_layout = QHBoxLayout(options_widget)
+        options_layout.setContentsMargins(10, 0, 10, 0)
+        options_layout.setSpacing(20)
+
+        # Add validation preferences checkboxes
+        options_label = QLabel("Options:")
+        options_label.setStyleSheet(f"color: {Colors.TEXT_LIGHT}; font-weight: bold;")
+
+        self._case_sensitive_checkbox = QCheckBox("Case-sensitive")
+        self._case_sensitive_checkbox.setStyleSheet(f"color: {Colors.TEXT_LIGHT};")
+        self._case_sensitive_checkbox.setToolTip("When enabled, validation will be case-sensitive")
+
+        self._validate_on_import_checkbox = QCheckBox("Validate on import")
+        self._validate_on_import_checkbox.setStyleSheet(f"color: {Colors.TEXT_LIGHT};")
+        self._validate_on_import_checkbox.setToolTip(
+            "When enabled, validation will be performed automatically when importing data"
+        )
+
+        # Load initial settings from validation service
+        prefs = self._validation_service.get_validation_preferences()
+        self._case_sensitive_checkbox.setChecked(prefs.get("case_sensitive", False))
+        self._validate_on_import_checkbox.setChecked(prefs.get("validate_on_import", True))
+
+        # Add widgets to options layout
+        options_layout.addWidget(options_label)
+        options_layout.addWidget(self._case_sensitive_checkbox)
+        options_layout.addWidget(self._validate_on_import_checkbox)
+        options_layout.addStretch(1)  # Add stretch to push everything to the left
+
+        # Add validate button on the right side
         self._validate_action = QAction(
             IconProvider.get_icon("check"),
             "Validate",
             self,
         )
 
+        # Add widgets to toolbar
+        toolbar.addWidget(options_widget)
+        toolbar.addSeparator()
         toolbar.addAction(self._validate_action)
 
         main_layout.addWidget(toolbar)
@@ -382,6 +417,10 @@ class ValidationTabView(QWidget):
         # Connect toolbar actions
         self._validate_action.triggered.connect(self._on_validate_clicked)
 
+        # Connect preferences checkboxes
+        self._case_sensitive_checkbox.toggled.connect(self._on_case_sensitive_toggled)
+        self._validate_on_import_checkbox.toggled.connect(self._on_validate_on_import_toggled)
+
         # Define section names with normalized format (underscores instead of spaces)
         sections = ["players", "chest_types", "sources"]
 
@@ -540,3 +579,29 @@ class ValidationTabView(QWidget):
         for section in ["players", "chest_types", "sources"]:
             list_view = getattr(self, f"_{section}_list")
             list_view.clear_validation()
+
+    def _on_case_sensitive_toggled(self, checked: bool) -> None:
+        """
+        Handle case sensitive checkbox toggle.
+
+        Args:
+            checked (bool): Whether the checkbox is checked
+        """
+        # Update validation service preferences
+        prefs = self._validation_service.get_validation_preferences()
+        prefs["case_sensitive"] = checked
+        self._validation_service.set_validation_preferences(prefs)
+        logger.info(f"Case sensitive validation set to: {checked}")
+
+    def _on_validate_on_import_toggled(self, checked: bool) -> None:
+        """
+        Handle validate on import checkbox toggle.
+
+        Args:
+            checked (bool): Whether the checkbox is checked
+        """
+        # Update validation service preferences
+        prefs = self._validation_service.get_validation_preferences()
+        prefs["validate_on_import"] = checked
+        self._validation_service.set_validation_preferences(prefs)
+        logger.info(f"Validate on import set to: {checked}")
