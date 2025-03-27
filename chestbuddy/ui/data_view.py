@@ -1805,16 +1805,24 @@ class DataView(QWidget):
                                 f"Error processing validation status for row {row_idx}: {e}"
                             )
 
-                    # Clear all previous validation status for this row
+                    # First pass: Set row-level validation for ALL non-status columns
+                    # This gives the row-level highlighting for all cells in the invalid row
                     for col in range(self._table_model.columnCount()):
                         if col != status_col:  # Skip status column
                             item = self._table_model.item(filtered_idx, col)
                             if item:
-                                item.setData(
-                                    None, Qt.UserRole + 1
-                                )  # Clear any existing validation status
+                                column_name = self._table_model.headerData(col, Qt.Horizontal)
+                                # Don't change specifically invalid cells at this stage
+                                if column_name not in invalid_columns:
+                                    current_validation = item.data(Qt.UserRole + 1)
+                                    if current_validation != ValidationStatus.INVALID:
+                                        item.setData(ValidationStatus.INVALID_ROW, Qt.UserRole + 1)
+                                        value = item.data(Qt.DisplayRole)
+                                        logger.debug(
+                                            f"Setting ValidationStatus.INVALID_ROW for cell [{filtered_idx},{col}] ({column_name}={value})"
+                                        )
 
-                    # Mark specifically invalid cells with INVALID status
+                    # Second pass: Mark specifically invalid cells
                     if invalid_columns:
                         logger.debug(
                             f"Setting ValidationStatus.INVALID for specific cells in row {filtered_idx}: {invalid_columns}"
@@ -1825,24 +1833,12 @@ class DataView(QWidget):
                                 if self._table_model.headerData(col, Qt.Horizontal) == col_name:
                                     item = self._table_model.item(filtered_idx, col)
                                     if item:
+                                        value = item.data(Qt.DisplayRole)
                                         logger.debug(
-                                            f"Setting ValidationStatus.INVALID for specific cell [{filtered_idx},{col}] ({col_name})"
+                                            f"Setting ValidationStatus.INVALID for specific cell [{filtered_idx},{col}] ({col_name}={value})"
                                         )
                                         item.setData(ValidationStatus.INVALID, Qt.UserRole + 1)
                                     break
-                    else:
-                        # No specific invalid columns identified, mark validatable cells in the row
-                        logger.debug(
-                            f"No specific invalid columns identified for row {filtered_idx}, marking all validatable cells"
-                        )
-                        for col_name, col_idx in validatable_col_indices.items():
-                            if col_idx >= 0:
-                                item = self._table_model.item(filtered_idx, col_idx)
-                                if item:
-                                    logger.debug(
-                                        f"Setting ValidationStatus.INVALID for cell [{filtered_idx},{col_idx}] ({col_name})"
-                                    )
-                                    item.setData(ValidationStatus.INVALID, Qt.UserRole + 1)
 
             # Force redraw of the view
             self._table_view.viewport().update()

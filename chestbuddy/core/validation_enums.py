@@ -20,8 +20,12 @@ class ValidationStatus(Enum):
         VALID: The entry is valid
         WARNING: The entry has potential issues but is not invalid
         INVALID: The entry is invalid or missing from validation lists
+        INVALID_ROW: Row has an invalid entry, but this cell itself is not invalid
+        NOT_VALIDATED: Entry has not been validated
     """
 
-    VALID = 0
-    WARNING = 1
-    INVALID = 2
+    VALID = auto()
+    WARNING = auto()
+    INVALID = auto()
+    INVALID_ROW = auto()
+    NOT_VALIDATED = auto()

@@ -93,54 +93,21 @@ class ValidationStatusDelegate(QStyledItemDelegate):
         # Check if this is a validatable column
         is_validatable_column = column_name in self.VALIDATABLE_COLUMNS
 
-        # First, check if the row has an invalid status - this affects all cells in the row
-        row_has_invalid_status = False
-        status_col_idx = -1
-        status_text = None
-
-        # Find the STATUS column index
-        for col in range(model.columnCount()):
-            col_header = model.headerData(col, Qt.Horizontal)
-            if col_header == self.STATUS_COLUMN:
-                status_col_idx = col
-                break
-
-        # Check the status column value if found
-        if status_col_idx >= 0:
-            status_idx = model.index(index.row(), status_col_idx)
-            status_text = status_idx.data(Qt.DisplayRole)
-            if status_text == "Invalid":
-                row_has_invalid_status = True
-
         # Get cell-specific validation status from model data (Qt.UserRole + 1)
         validation_status = index.data(Qt.ItemDataRole.UserRole + 1)
 
-        # More verbose logging to diagnose the issue
-        self.logger.debug(
-            f"Cell [{index.row()},{index.column()}]: column={column_name}, "
-            f"validation_status={validation_status}, "
-            f"validation_status_type={type(validation_status)}, "
-            f"row_invalid={row_has_invalid_status}, status_text={status_text}, "
-            f"is_enum={isinstance(validation_status, ValidationStatus)}, "
-            f"is_dict={isinstance(validation_status, dict)}, "
-            f"is_validatable={is_validatable_column}"
-        )
-
-        # Paint order is important:
-        # 1. First paint row background for invalid rows
-        # 2. Then override with cell-specific styling for invalid cells
-
-        # If this is NOT the status column AND the row has invalid status, paint with row color first
-        if not is_status_column and row_has_invalid_status:
-            painter.fillRect(option.rect, self.INVALID_ROW_COLOR)
-
-        # Now check for cell-specific styling which will override the row styling
+        # More verbose logging to diagnose the issue (only when debug logging is enabled)
+        if logger.isEnabledFor(logging.DEBUG):
+            self.logger.debug(
+                f"Cell [{index.row()},{index.column()}]: column={column_name}, "
+                f"validation_status={validation_status}, "
+                f"is_validatable={is_validatable_column}"
+            )
 
         # If this is the status column, paint based on the text value
         if is_status_column:
             # Get the display text
             text = index.data(Qt.DisplayRole)
-            self.logger.debug(f"Status column text: {text}")
 
             if text == "Valid":
                 # Use light green for valid status
@@ -152,28 +119,10 @@ class ValidationStatusDelegate(QStyledItemDelegate):
                 # Light gray for not validated
                 painter.fillRect(option.rect, self.NOT_VALIDATED_COLOR)
         else:
-            # Check cell-specific validation status with more lenient checks
-            is_invalid = False
-
-            # Only consider validation status for validatable columns
-            if is_validatable_column:
-                # Check different ways the validation status might be represented
-                if validation_status == ValidationStatus.INVALID:
-                    is_invalid = True
-                elif isinstance(validation_status, dict):
-                    # If it's a dict, check for any keys ending with _valid with False values
-                    for key, value in validation_status.items():
-                        if key.endswith("_valid") and value is False:
-                            is_invalid = True
-                            break
-                elif validation_status is False:  # Direct boolean check
-                    is_invalid = True
-
-            if is_invalid and is_validatable_column:
-                # Draw with error highlighting (bright crimson)
+            # Apply styling based on validation status
+            if validation_status == ValidationStatus.INVALID:
+                # This is a cell with a specific validation error (highlight prominently)
                 self.logger.debug(f"Painting cell [{index.row()},{index.column()}] as INVALID")
-
-                # Use a much more distinctive style for invalid cells
 
                 # Draw with bold red background
                 painter.fillRect(option.rect, self.INVALID_COLOR)
@@ -188,15 +137,24 @@ class ValidationStatusDelegate(QStyledItemDelegate):
                 border_rect = option.rect.adjusted(1, 1, -1, -1)
                 painter.drawRect(border_rect)
 
-                # Optional: Add a diagonal cross pattern over the cell
+                # Add a diagonal cross pattern over the cell
                 pen.setStyle(Qt.DashLine)
                 painter.setPen(pen)
                 painter.drawLine(option.rect.topLeft(), option.rect.bottomRight())
                 painter.drawLine(option.rect.topRight(), option.rect.bottomLeft())
+            elif validation_status == ValidationStatus.INVALID_ROW:
+                # This is just a cell in an invalid row (but not the specific invalid cell)
+                # Use a subtle background to indicate this is in an invalid row
+                painter.fillRect(option.rect, self.INVALID_ROW_COLOR)
             elif validation_status == ValidationStatus.WARNING:
                 # Draw with warning highlighting
-                self.logger.debug(f"Painting cell [{index.row()},{index.column()}] as WARNING")
                 painter.fillRect(option.rect, self.WARNING_COLOR)
+            elif validation_status == ValidationStatus.VALID:
+                # Use light green for valid status
+                painter.fillRect(option.rect, self.VALID_COLOR)
+            elif validation_status == ValidationStatus.NOT_VALIDATED:
+                # Light gray for not validated
+                painter.fillRect(option.rect, self.NOT_VALIDATED_COLOR)
 
         # Restore painter state before calling the parent paint method
         painter.restore()
