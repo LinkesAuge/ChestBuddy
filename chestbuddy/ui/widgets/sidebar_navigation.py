@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QFrame,
     QSizePolicy,
     QLabel,
+    QHBoxLayout,
 )
 from PySide6.QtGui import QColor, QFont, QBrush
 
@@ -49,136 +50,251 @@ class NavigationSection:
 
 
 class NavigationButton(QFrame):
-    """A navigation button in the sidebar."""
+    """
+    A button for the navigation sidebar.
 
-    clicked = Signal(str)  # section name
+    This button contains an icon and a text label and can be in an active,
+    disabled or normal state with appropriate visual styling.
+    """
 
-    def __init__(self, name: str, icon_path: str, parent=None):
-        """
-        Initialize the navigation button.
+    clicked = Signal()
 
-        Args:
-            name: Button name
-            icon_path: Path to icon
-            parent: Parent widget
-        """
+    def __init__(
+        self, text: str, icon_path: Optional[str] = None, parent: Optional[QWidget] = None
+    ):
+        """Initialize a new navigation button."""
         super().__init__(parent)
-        self._name = name
+        self._text = text
         self._icon_path = icon_path
-        self._active = False
-        self._enabled = True
+        self._is_active = False
+        self._is_enabled = True
+        self._is_hovered = False
+
+        # Create widgets and layout
         self._setup_ui()
 
     def _setup_ui(self):
         """Set up the UI components."""
         # Set frame properties
-        self.setFrameShape(QFrame.StyledPanel)
-        self.setMinimumHeight(40)
-        self.setMaximumHeight(40)
+        self.setFrameShape(QFrame.NoFrame)
+        self.setFrameShadow(QFrame.Plain)
         self.setCursor(Qt.PointingHandCursor)
 
-        # Create layout
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 5, 10, 5)
+        # Create the main horizontal layout
+        self._main_layout = QHBoxLayout(self)
+        self._main_layout.setContentsMargins(0, 0, 0, 0)
+        self._main_layout.setSpacing(0)
 
-        # Create label
-        self._label = QLabel(self._name)
-        self._label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        icon = Icons.get_icon(self._icon_path, Colors.TEXT_LIGHT)
-        self._label.setPixmap(icon.pixmap(16, 16))
-        self._label.setText(f"  {self._name}")
+        # Indicator widget at left edge (vertical colored bar)
+        self._indicator = QFrame(self)
+        self._indicator.setFrameShape(QFrame.NoFrame)
+        self._indicator.setFixedWidth(4)  # Increase indicator width for better visibility
+        self._main_layout.addWidget(self._indicator)
 
-        layout.addWidget(self._label)
+        # Content widget containing icon and text
+        self._content = QFrame(self)
+        self._content.setFrameShape(QFrame.NoFrame)
+        content_layout = QHBoxLayout(self._content)
+        content_layout.setContentsMargins(12, 10, 12, 10)  # Increase vertical padding
+        content_layout.setSpacing(10)  # Increase spacing between icon and text
 
-        # Set initial style
+        # Icon and label
+        self._icon = None  # Initialize as None to check later
+        if self._icon_path:
+            try:
+                self._icon = QLabel(self)
+                self._icon.setFixedSize(22, 22)  # Slightly larger icons
+                self._update_icon()
+                content_layout.addWidget(self._icon)
+            except Exception as e:
+                # If icon loading fails, log it and continue without the icon
+                logger.warning(f"Failed to load icon {self._icon_path}: {str(e)}")
+                self._icon = None
+
+        self._label = QLabel(self._text, self)
+        content_layout.addWidget(self._label)
+        content_layout.addStretch()
+
+        self._main_layout.addWidget(self._content, 1)
+
+        # Initial styling
         self._update_style()
 
+    def _update_icon(self):
+        """Update the icon based on the current state."""
+        if not self._icon or not self._icon_path:
+            return
+
+        try:
+            # Use appropriate color based on state
+            if not self._is_enabled:
+                color = Colors.TEXT_DISABLED
+            elif self._is_active:
+                color = Colors.SECONDARY  # Use accent gold color for active icons
+            else:
+                color = Colors.TEXT_LIGHT  # Use light color for better visibility
+
+            icon = Icons.get_icon(self._icon_path, color)
+            if not icon.isNull():
+                self._icon.setPixmap(icon.pixmap(22, 22))  # Match the size with _setup_ui
+            else:
+                # Hide the icon if it couldn't be loaded
+                self._icon.hide()
+        except Exception as e:
+            # If icon update fails, hide the icon
+            logger.warning(f"Failed to update icon {self._icon_path}: {str(e)}")
+            self._icon.hide()
+
     def _update_style(self):
-        """Update the widget style based on state."""
-        base_style = f"""
-            QFrame {{
-                border-radius: 4px;
-                border: none;
-                color: {Colors.TEXT_LIGHT};
-                padding-left: 10px;
-            }}
+        """Update the styling based on the current state."""
+        # First reset all styling to avoid inheritance issues
+        self.setStyleSheet("")
+        self._indicator.setStyleSheet("")
+        self._content.setStyleSheet("")
+        self._label.setStyleSheet("")
+
+        if self._icon:
+            self._icon.setStyleSheet("")
+
+        # Base style for all states (with explicit border clearing)
+        self.setStyleSheet("""
+            border: none;
+            background-color: transparent;
+        """)
+
+        # Base content style with more padding to make items more distinct
+        # Use padding to ensure the background extends to the full width
+        content_style = f"""
+            background-color: transparent;
+            border: none;
+            border-left: none;
+            border-right: none;
+            border-bottom: 1px solid {Colors.PRIMARY_LIGHT};
+            padding: 6px 0px; /* Vertical padding only, let layout handle horizontal */
+            margin: 0px;
         """
 
-        if not self._enabled:
-            style = (
-                base_style
-                + f"""
-                QFrame {{
-                    background-color: transparent;
-                    color: {Colors.TEXT_DISABLED};
-                }}
-            """
-            )
-            self.setCursor(Qt.ForbiddenCursor)
-        elif self._active:
-            style = (
-                base_style
-                + f"""
-                QFrame {{
-                    background-color: {Colors.PRIMARY_LIGHT};
-                    border-left: 3px solid {Colors.ACCENT};
-                }}
-            """
-            )
-        else:
-            style = (
-                base_style
-                + f"""
-                QFrame {{
-                    background-color: transparent;
-                }}
-                QFrame:hover {{
-                    background-color: {Colors.PRIMARY};
-                }}
-            """
-            )
-            self.setCursor(Qt.PointingHandCursor)
+        # Use light text color for better visibility on dark background
+        label_style = f"""
+            color: {Colors.TEXT_LIGHT};
+            font-size: 15px;
+            border: none;
+            background-color: transparent;
+        """
 
-        self.setStyleSheet(style)
+        # Ensure the indicator has no background initially
+        indicator_style = """
+            background-color: transparent;
+            border: none;
+        """
 
-        # Update font
-        font = self._label.font()
-        font.setItalic(not self._enabled)
-        self._label.setFont(font)
+        # Apply specific styling based on state
+        if not self._is_enabled:
+            # Disabled state
+            label_style = f"""
+                color: {Colors.TEXT_DISABLED};
+                font-size: 15px;
+                border: none;
+                background-color: transparent;
+            """
+
+        elif self._is_active:
+            # Active state - highlighted with gold color and bolder font
+            # Always use the hover background color for active items
+            content_style = f"""
+                background-color: {Colors.PRIMARY_HOVER};
+                border: none;
+                border-left: none;
+                border-right: none;
+                border-bottom: 1px solid {Colors.PRIMARY_LIGHT};
+                padding: 6px 0px; /* Vertical padding only, let layout handle horizontal */
+                margin: 0px;
+            """
+
+            indicator_style = f"""
+                background-color: {Colors.SECONDARY};
+                border: none;
+            """
+
+            # Make active label bold and slightly larger
+            label_style = f"""
+                color: {Colors.SECONDARY};
+                font-size: 16px;
+                font-weight: bold;
+                border: none;
+                background-color: transparent;
+            """
+
+        elif self._is_hovered:
+            # Hover state
+            content_style = f"""
+                background-color: {Colors.PRIMARY_HOVER};
+                border: none; 
+                border-left: none;
+                border-right: none;
+                border-bottom: 1px solid {Colors.PRIMARY_LIGHT};
+                padding: 6px 0px; /* Vertical padding only, let layout handle horizontal */
+                margin: 0px;
+            """
+
+            indicator_style = f"""
+                background-color: {Colors.PRIMARY_LIGHT};
+                border: none;
+            """
+
+        # Apply the styles explicitly
+        self._indicator.setStyleSheet(indicator_style)
+        self._content.setStyleSheet(content_style)
+        self._label.setStyleSheet(label_style)
+
+        # Update icon color if needed
+        self._update_icon()
+
+    def text(self) -> str:
+        """Get the button text."""
+        return self._text
+
+    def set_active(self, active: bool):
+        """Set whether this button is active."""
+        if self._is_active != active:
+            self._is_active = active
+            self._update_style()
+
+    def is_active(self) -> bool:
+        """Check if this button is active."""
+        return self._is_active
+
+    def set_enabled(self, enabled: bool):
+        """Set whether this button is enabled."""
+        if self._is_enabled != enabled:
+            self._is_enabled = enabled
+            self.setEnabled(enabled)
+            self.setCursor(Qt.PointingHandCursor if enabled else Qt.ArrowCursor)
+            self._update_style()
+
+    def is_enabled(self) -> bool:
+        """Check if this button is enabled."""
+        return self._is_enabled
+
+    # Event handling methods
+    def enterEvent(self, event):
+        """Handle mouse enter events."""
+        if self._is_enabled:
+            self._is_hovered = True
+            self._update_style()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        """Handle mouse leave events."""
+        self._is_hovered = False
+        self._update_style()
+        super().leaveEvent(event)
 
     def mousePressEvent(self, event):
         """Handle mouse press events."""
-        if self._enabled and event.button() == Qt.LeftButton:
-            self.clicked.emit(self._name)
+        if event.button() == Qt.LeftButton and self._is_enabled:
+            self.clicked.emit()
         super().mousePressEvent(event)
-
-    def set_active(self, active: bool):
-        """
-        Set whether this button is active.
-
-        Args:
-            active: Whether the button is active
-        """
-        if self._active != active:
-            self._active = active
-            self._update_style()
-
-    def set_enabled(self, enabled: bool):
-        """
-        Set whether this button is enabled.
-
-        Args:
-            enabled: Whether the button is enabled
-        """
-        if self._enabled != enabled:
-            self._enabled = enabled
-            self._update_style()
-
-            # Update text
-            if not enabled:
-                self._label.setText(f"  {self._name} ⊗")
-            else:
-                self._label.setText(f"  {self._name}")
 
 
 class SidebarNavigation(QFrame):
@@ -232,7 +348,9 @@ class SidebarNavigation(QFrame):
         # Create layout
         self._layout = QVBoxLayout(self)
         self._layout.setContentsMargins(0, 0, 0, 0)
-        self._layout.setSpacing(2)
+        self._layout.setSpacing(
+            0
+        )  # No spacing between items - separation handled by items themselves
 
         # Create logo/header
         logo_label = QLabel("ChestBuddy")
@@ -268,7 +386,9 @@ class SidebarNavigation(QFrame):
         """Connect signals to slots."""
         # Connect section button signals
         for section_name, section in self._sections.items():
-            section.clicked.connect(self._on_section_clicked)
+            section.clicked.connect(
+                lambda checked=False, name=section_name: self._on_section_clicked(name)
+            )
 
     def _add_section(self, name: str, icon_path: str):
         """
@@ -279,7 +399,7 @@ class SidebarNavigation(QFrame):
             icon_path: Path to icon
         """
         section = NavigationButton(name, icon_path, self)
-        section.clicked.connect(self._on_section_clicked)
+        # Connection happens in _connect_signals
 
         self._layout.addWidget(section)
         self._sections[name] = section

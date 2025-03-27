@@ -21,7 +21,9 @@ class Icons:
     _ICON_PATH = ":/icons"
 
     # Application icons
-    APP_ICON = ":/icons/app_icon.png"
+    APP_ICON = (
+        "chestbuddy/ui/resources/icons/logo_buddy_v1_icon.png"  # Direct path to the logo file
+    )
 
     # Action icons
     OPEN = ":/icons/open.png"
