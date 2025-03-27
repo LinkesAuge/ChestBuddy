@@ -37,8 +37,12 @@ class ValidationStatusDelegate(QStyledItemDelegate):
     # Define colors for different validation states
     VALID_COLOR = QColor(0, 255, 0, 40)  # Light green transparent
     WARNING_COLOR = QColor(255, 240, 0, 80)  # Light yellow
-    INVALID_COLOR = QColor(255, 0, 0, 200)  # Bright red with higher opacity for better visibility
-    INVALID_ROW_COLOR = QColor(255, 200, 200, 120)  # Light red for row highlighting
+    INVALID_COLOR = QColor(
+        255, 0, 0, 240
+    )  # Bright red with very high opacity for maximum visibility
+    INVALID_ROW_COLOR = QColor(
+        255, 200, 200, 140
+    )  # Light red for row highlighting with increased opacity
     NOT_VALIDATED_COLOR = QColor(200, 200, 200, 40)  # Light gray for not validated
 
     # Column name constants

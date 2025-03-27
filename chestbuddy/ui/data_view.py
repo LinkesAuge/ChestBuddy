@@ -1016,8 +1016,12 @@ class DataView(QWidget):
             }
             QTableView::item {
                 color: white;
-                /* Remove background-color to allow delegate painting to show through */
+                /* No background color to allow delegate painting to show through */
                 padding: 12px;
+            }
+            QTableView::item:alternate {
+                /* Very subtle alternating row color that won't interfere with validation highlighting */
+                background-color: rgba(45, 55, 72, 40);
             }
             QTableView::item:selected {
                 color: #1A2C42;
@@ -1025,8 +1029,8 @@ class DataView(QWidget):
             }
         """)
 
-        # Disable alternating row colors which conflict with validation highlight
-        self._table_view.setAlternatingRowColors(False)
+        # Re-enable alternating row colors with subtle effect
+        self._table_view.setAlternatingRowColors(True)
 
         # Make sure the model has appropriate default foreground color
         self._table_model.setItemPrototype(QStandardItem())
