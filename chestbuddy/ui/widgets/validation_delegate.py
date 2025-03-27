@@ -98,10 +98,12 @@ class ValidationStatusDelegate(QStyledItemDelegate):
 
         # More verbose logging to diagnose the issue (only when debug logging is enabled)
         if logger.isEnabledFor(logging.DEBUG):
+            value = index.data(Qt.DisplayRole)
             self.logger.debug(
                 f"Cell [{index.row()},{index.column()}]: column={column_name}, "
                 f"validation_status={validation_status}, "
-                f"is_validatable={is_validatable_column}"
+                f"is_validatable={is_validatable_column}, "
+                f"value='{value}'"
             )
 
         # If this is the status column, paint based on the text value
@@ -121,20 +123,32 @@ class ValidationStatusDelegate(QStyledItemDelegate):
         else:
             # Apply styling based on validation status
             if validation_status == ValidationStatus.INVALID:
-                # This is a cell with a specific validation error (highlight prominently)
-                self.logger.debug(f"Painting cell [{index.row()},{index.column()}] as INVALID")
+                # Only apply INVALID styling to validatable columns
+                if is_validatable_column:
+                    # This is a specifically invalid cell (in a validatable column)
+                    value = index.data(Qt.DisplayRole)
+                    self.logger.debug(
+                        f"Painting invalid cell [{index.row()},{index.column()}], col={column_name}, value='{value}'"
+                    )
 
-                # Draw with dark red background
-                painter.fillRect(option.rect, self.INVALID_COLOR)
+                    # Draw with dark red background
+                    painter.fillRect(option.rect, self.INVALID_COLOR)
 
-                # Draw a simple border
-                pen = painter.pen()
-                pen.setColor(self.INVALID_BORDER_COLOR)
-                pen.setWidth(1)  # Thinner border
-                painter.setPen(pen)
+                    # Draw a simple border
+                    pen = painter.pen()
+                    pen.setColor(self.INVALID_BORDER_COLOR)
+                    pen.setWidth(1)  # Thinner border
+                    painter.setPen(pen)
 
-                # Draw the border
-                painter.drawRect(option.rect)
+                    # Draw the border
+                    painter.drawRect(option.rect)
+                else:
+                    # Non-validatable columns should never get INVALID status
+                    # They should only get INVALID_ROW status
+                    self.logger.debug(
+                        f"Non-validatable column {column_name} has INVALID status, treating as INVALID_ROW"
+                    )
+                    painter.fillRect(option.rect, self.INVALID_ROW_COLOR)
             elif validation_status == ValidationStatus.INVALID_ROW:
                 # This is just a cell in an invalid row (but not the specific invalid cell)
                 # Use a subtle background to indicate this is in an invalid row
