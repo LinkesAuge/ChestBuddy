@@ -37,12 +37,10 @@ class ValidationStatusDelegate(QStyledItemDelegate):
     # Define colors for different validation states
     VALID_COLOR = QColor(0, 255, 0, 40)  # Light green transparent
     WARNING_COLOR = QColor(255, 240, 0, 80)  # Light yellow
-    INVALID_COLOR = QColor(
-        255, 0, 0, 240
-    )  # Bright red with very high opacity for maximum visibility
+    INVALID_COLOR = QColor(255, 0, 0, 255)  # Fully opaque bright red for maximum visibility
     INVALID_ROW_COLOR = QColor(
-        255, 200, 200, 140
-    )  # Light red for row highlighting with increased opacity
+        255, 200, 200, 170
+    )  # Light red for row highlighting with even higher opacity
     NOT_VALIDATED_COLOR = QColor(200, 200, 200, 40)  # Light gray for not validated
 
     # Column name constants
@@ -109,9 +107,14 @@ class ValidationStatusDelegate(QStyledItemDelegate):
         # Get cell-specific validation status from model data (Qt.UserRole + 1)
         validation_status = index.data(Qt.ItemDataRole.UserRole + 1)
 
-        # Add debug logging
+        # More verbose logging to diagnose the issue
         self.logger.debug(
-            f"Cell [{index.row()},{index.column()}]: column={column_name}, row_invalid={row_has_invalid_status}, validation_status={validation_status}, status_text={status_text}"
+            f"Cell [{index.row()},{index.column()}]: column={column_name}, "
+            f"validation_status={validation_status}, "
+            f"validation_status_type={type(validation_status)}, "
+            f"row_invalid={row_has_invalid_status}, status_text={status_text}, "
+            f"is_enum={isinstance(validation_status, ValidationStatus)}, "
+            f"is_dict={isinstance(validation_status, dict)}"
         )
 
         # If this is the status column, paint based on the text value
@@ -130,8 +133,22 @@ class ValidationStatusDelegate(QStyledItemDelegate):
                 # Light gray for not validated
                 painter.fillRect(option.rect, self.NOT_VALIDATED_COLOR)
         else:
-            # Check cell-specific validation status first (highest priority)
+            # Check cell-specific validation status with more lenient checks
+            is_invalid = False
+
+            # Check different ways the validation status might be represented
             if validation_status == ValidationStatus.INVALID:
+                is_invalid = True
+            elif isinstance(validation_status, dict):
+                # If it's a dict, check for any keys ending with _valid with False values
+                for key, value in validation_status.items():
+                    if key.endswith("_valid") and value is False:
+                        is_invalid = True
+                        break
+            elif validation_status is False:  # Direct boolean check
+                is_invalid = True
+
+            if is_invalid:
                 # Draw with error highlighting (bright red)
                 self.logger.debug(f"Painting cell [{index.row()},{index.column()}] as INVALID")
                 painter.fillRect(option.rect, self.INVALID_COLOR)
