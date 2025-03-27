@@ -352,15 +352,15 @@ def apply_application_style(app):
             background-color: {Colors.PRIMARY_LIGHT};
             color: {Colors.TEXT_LIGHT};
             border: 1px solid {Colors.DARK_BORDER};
-            gridline-color: {Colors.DARK_BORDER};
+            gridline-color: transparent;
             selection-background-color: {Colors.PRIMARY};
             selection-color: {Colors.SECONDARY};
             alternate-background-color: {Colors.PRIMARY_DARK};
         }}
         
         QTableView::item, QTreeView::item, QListView::item {{
-            padding: 4px;
-            border-bottom: 1px solid {Colors.DARK_BORDER};
+            padding: 12px;
+            border-bottom: none;
         }}
         
         QTableView::item:selected, QTreeView::item:selected, QListView::item:selected {{

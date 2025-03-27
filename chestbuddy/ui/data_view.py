@@ -1079,13 +1079,14 @@ class DataView(QWidget):
             QTableView {
                 color: white;
                 background-color: #1A2C42;
-                gridline-color: #4A5568;
+                gridline-color: transparent;
                 selection-background-color: #D4AF37;
                 selection-color: #1A2C42;
             }
             QTableView::item {
                 color: white;
                 background-color: #1A2C42;
+                padding: 12px;
             }
             QTableView::item:alternate {
                 background-color: #2D3748;
