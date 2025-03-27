@@ -70,28 +70,6 @@ class ValidationListView(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)
 
-        # Search input
-        self._search_input = QLineEdit()
-        self._search_input.setPlaceholderText("Search...")
-        self._search_input.setStyleSheet(f"""
-            QLineEdit {{
-                background-color: {Colors.PRIMARY};
-                border: 1px solid {Colors.DARK_BORDER};
-                border-radius: 4px;
-                padding: 4px 8px;
-                color: {Colors.TEXT_LIGHT};
-            }}
-            QLineEdit:focus {{
-                border-color: {Colors.SECONDARY};
-                background-color: {Colors.PRIMARY_LIGHT};
-            }}
-            QLineEdit::placeholder {{
-                color: {Colors.TEXT_MUTED};
-            }}
-        """)
-        self._search_input.setAutoFillBackground(True)  # Ensure search input has proper background
-        layout.addWidget(self._search_input)
-
         # List widget with improved styling for consistent colors and better item spacing
         self._list_widget = QListWidget()
         self._list_widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -144,6 +122,28 @@ class ValidationListView(QWidget):
         self._list_widget.viewport().setAutoFillBackground(True)
 
         layout.addWidget(self._list_widget)
+
+        # Search input - moved to be after the list widget
+        self._search_input = QLineEdit()
+        self._search_input.setPlaceholderText("Search...")
+        self._search_input.setStyleSheet(f"""
+            QLineEdit {{
+                background-color: {Colors.PRIMARY};
+                border: 1px solid {Colors.DARK_BORDER};
+                border-radius: 4px;
+                padding: 4px 8px;
+                color: {Colors.TEXT_LIGHT};
+            }}
+            QLineEdit:focus {{
+                border-color: {Colors.SECONDARY};
+                background-color: {Colors.PRIMARY_LIGHT};
+            }}
+            QLineEdit::placeholder {{
+                color: {Colors.TEXT_MUTED};
+            }}
+        """)
+        self._search_input.setAutoFillBackground(True)  # Ensure search input has proper background
+        layout.addWidget(self._search_input)
 
     def _connect_signals(self) -> None:
         """Connect widget signals to slots."""

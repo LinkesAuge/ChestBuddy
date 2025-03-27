@@ -282,9 +282,24 @@ class ValidationTabView(QWidget):
         header_layout.addStretch()
         layout.addLayout(header_layout)
 
-        # Create buttons layout (horizontal instead of grid)
+        # Create and add list view with the model first (moved up)
+        list_view = ValidationListView(model)
+        list_view.setStyleSheet(f"""
+            ValidationListView {{
+                background-color: {Colors.BACKGROUND_PRIMARY};
+            }}
+            QListView {{
+                background-color: {Colors.BACKGROUND_INPUT};
+                border: 1px solid {Colors.BORDER_LIGHT};
+                border-radius: 4px;
+            }}
+        """)
+        list_view.setAutoFillBackground(True)  # Ensure list view has correct background
+        layout.addWidget(list_view)
+
+        # Create buttons layout (moved below the list view)
         buttons_layout = QHBoxLayout()
-        buttons_layout.setContentsMargins(0, 4, 0, 8)
+        buttons_layout.setContentsMargins(0, 8, 0, 0)  # Adjusted top margin
         buttons_layout.setSpacing(6)  # Proper spacing between buttons
 
         # Create styled buttons with smaller size for single row
@@ -347,21 +362,6 @@ class ValidationTabView(QWidget):
 
         # Add buttons layout to main layout
         layout.addLayout(buttons_layout)
-
-        # Create and add list view with the model
-        list_view = ValidationListView(model)
-        list_view.setStyleSheet(f"""
-            ValidationListView {{
-                background-color: {Colors.BACKGROUND_PRIMARY};
-            }}
-            QListView {{
-                background-color: {Colors.BACKGROUND_INPUT};
-                border: 1px solid {Colors.BORDER_LIGHT};
-                border-radius: 4px;
-            }}
-        """)
-        list_view.setAutoFillBackground(True)  # Ensure list view has correct background
-        layout.addWidget(list_view)
 
         # Update count label with actual count
         if model:
