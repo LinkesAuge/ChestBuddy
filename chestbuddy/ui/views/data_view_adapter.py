@@ -125,12 +125,22 @@ class DataViewAdapter(UpdatableView):
         Args:
             data: Optional data to use for update (unused in this implementation)
         """
-        if hasattr(self._data_view, "_update_view"):
-            self._data_view._update_view()
+        try:
+            # Check if we need full population
+            if self._needs_population and hasattr(self._data_view, "populate_table"):
+                logger.debug("DataViewAdapter: View needs population, calling populate_table")
+                self._data_view.populate_table()
+                self._needs_population = False
+            # Otherwise just update the view
+            elif hasattr(self._data_view, "_update_view"):
+                logger.debug("DataViewAdapter: Updating view")
+                self._data_view._update_view()
 
-        # Update our state tracking
-        self._update_data_state()
-        logger.debug(f"DataViewAdapter: View content updated")
+            # Update our state tracking
+            self._update_data_state()
+            logger.debug("DataViewAdapter: View content updated")
+        except Exception as e:
+            logger.error(f"Error updating view content: {e}")
 
     def _refresh_view_content(self) -> None:
         """
@@ -150,8 +160,36 @@ class DataViewAdapter(UpdatableView):
         Args:
             data: Optional data to use for population (unused in this implementation)
         """
-        self.populate_table()
-        logger.debug(f"DataViewAdapter: View content populated")
+        try:
+            # Check if population is already in progress in the underlying DataView
+            if (
+                hasattr(self._data_view, "_population_in_progress")
+                and self._data_view._population_in_progress
+            ):
+                logger.debug(
+                    "DataViewAdapter: Skipping population (already in progress in DataView)"
+                )
+                return
+
+            # First try using the controller
+            if self._controller and not self._data_model.is_empty:
+                logger.debug("DataViewAdapter: Populating table via controller")
+                self._controller.populate_table()
+            # If controller didn't work, call directly on the DataView
+            elif hasattr(self._data_view, "populate_table") and not self._data_model.is_empty:
+                logger.debug("DataViewAdapter: Directly calling populate_table on DataView")
+                self._data_view.populate_table()
+            else:
+                logger.debug("DataViewAdapter: Skipping population (no controller or empty data)")
+
+            # Update our state tracking
+            self._update_data_state()
+            self._needs_population = False
+            logger.debug("DataViewAdapter: View content populated")
+        except Exception as e:
+            logger.error(f"Error populating view content: {e}")
+            # Reset the needs_population flag even on error to avoid getting stuck
+            self._needs_population = False
 
     def _reset_view_content(self) -> None:
         """
@@ -269,6 +307,13 @@ class DataViewAdapter(UpdatableView):
                 self._signal_manager.safe_connect(
                     self._data_model, "data_changed", self, "_on_data_changed", True
                 )
+
+            # Connect to validation_changed signal for validation updates
+            if hasattr(self._data_model, "validation_changed"):
+                self._signal_manager.safe_connect(
+                    self._data_model, "validation_changed", self, "_on_validation_changed"
+                )
+                logger.debug("Connected to validation_changed signal")
         except Exception as e:
             logger.error(f"Error connecting model signals in DataViewAdapter: {e}")
 
@@ -451,9 +496,14 @@ class DataViewAdapter(UpdatableView):
                 self._needs_population = False
                 return
 
+            # First try using the controller
             if self._controller and not self._data_model.is_empty:
                 logger.debug("DataViewAdapter: Populating table via controller")
                 self._controller.populate_table()
+            # If controller didn't work or isn't available, call directly on the DataView
+            elif hasattr(self._data_view, "populate_table") and not self._data_model.is_empty:
+                logger.debug("DataViewAdapter: Directly calling populate_table on DataView")
+                self._data_view.populate_table()
             else:
                 logger.debug("DataViewAdapter: Skipping population (no controller or empty data)")
 
@@ -480,3 +530,13 @@ class DataViewAdapter(UpdatableView):
             self._signal_manager.disconnect(
                 self._data_model, "data_changed", self, "request_update"
             )
+
+    def _on_validation_changed(self):
+        """Handle validation status changes in the data model."""
+        # Make sure to update the underlying DataView with validation changes
+        if hasattr(self._data_view, "_on_validation_changed"):
+            self._data_view._on_validation_changed()
+
+        # Request update from the UpdateManager
+        self.request_update()
+        logger.debug("Handled validation changed signal")

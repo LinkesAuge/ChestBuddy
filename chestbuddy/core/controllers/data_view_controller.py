@@ -176,6 +176,27 @@ class DataViewController(BaseController):
 
         logger.info("Validation and correction services updated")
 
+    def _connect_signals(self):
+        """
+        Connect signals between the controller and services.
+
+        Establishes signal connections between:
+        - ValidationService and this controller
+        - CorrectionService and this controller
+        """
+        # Connect ValidationService signals if available
+        if hasattr(self, "_validation_service") and self._validation_service:
+            # Connect validation_preferences_changed to validate_data
+            self._signal_manager.connect(
+                self._validation_service, "validation_preferences_changed", self, "validate_data"
+            )
+            logger.debug("Connected ValidationService signals to DataViewController")
+
+        # Note: CorrectionService doesn't emit signals directly that the controller needs to listen to
+        # But we can log that services are connected
+        if hasattr(self, "_correction_service") and self._correction_service:
+            logger.debug("CorrectionService connected to DataViewController")
+
     @Slot()
     def _handle_filter_button_clicked(self):
         """Handle the filter button clicked in the view."""

@@ -743,9 +743,50 @@ class ValidationService(QObject):
         Args:
             validation_results (Dict[str, Dict[int, str]]): Validation results
         """
-        # TODO: Implement method to update validation status in data model
-        # This method should be implemented based on how validation status is tracked
-        pass
+        if not validation_results:
+            logger.debug("No validation results to update")
+            return
+
+        # Get the current data from the model
+        df = self._data_model.data
+
+        # Create a DataFrame to store validation status
+        # Initialize with default valid status (empty DataFrame)
+        status_df = pd.DataFrame(index=df.index)
+
+        # Process each validation rule's results
+        for rule_name, rule_results in validation_results.items():
+            # For each row with validation issues
+            for row_idx, message in rule_results.items():
+                # Skip any invalid indices
+                if row_idx < 0 or row_idx >= len(df):
+                    continue
+
+                # Add the rule and message to the status DataFrame
+                status_df.loc[row_idx, rule_name] = message
+
+                # Mark columns as invalid based on rule type
+                if rule_name == "player_validation":
+                    status_df.loc[row_idx, f"{self.PLAYER_COLUMN}_valid"] = False
+                elif rule_name == "chest_type_validation":
+                    status_df.loc[row_idx, f"{self.CHEST_COLUMN}_valid"] = False
+                elif rule_name == "source_validation":
+                    status_df.loc[row_idx, f"{self.SOURCE_COLUMN}_valid"] = False
+                elif rule_name == "missing_values":
+                    # For missing values, check which columns are mentioned in the message
+                    for col in df.columns:
+                        if col in message:
+                            status_df.loc[row_idx, f"{col}_valid"] = False
+
+        # Set default values for columns not explicitly set
+        for col in df.columns:
+            col_status = f"{col}_valid"
+            if col_status not in status_df.columns:
+                status_df[col_status] = True
+
+        # Update the validation status in the data model
+        self._data_model.set_validation_status(status_df)
+        logger.info(f"Updated validation status for {len(validation_results)} rules")
 
     def get_validation_statistics(self) -> Dict[str, int]:
         """

@@ -456,9 +456,33 @@ class ValidationTabView(QWidget):
 
     def _on_validate_clicked(self) -> None:
         """Handle validate button click."""
-        # TODO: Implement validation triggering
-        self.validation_changed.emit()
-        logger.info("Validate clicked")
+        try:
+            # Change status to show validation is in progress
+            self._set_status_message("Validating data...")
+
+            # Trigger validation in the validation service
+            results = self._validation_service.validate_data()
+
+            # Update status bar with validation results summary
+            if results:
+                total_issues = sum(len(rule_results) for rule_results in results.values())
+                if total_issues > 0:
+                    self._set_status_message(f"Validation complete: Found {total_issues} issues")
+                else:
+                    self._set_status_message("Validation complete: No issues found")
+            else:
+                self._set_status_message("Validation complete: No issues found")
+
+            # Emit signal to notify about validation change
+            self.validation_changed.emit()
+            logger.info("Validation completed")
+
+        except Exception as e:
+            self._set_status_message(f"Validation error: {str(e)}")
+            logger.error(f"Error during validation: {e}")
+
+        # Update statistics after validation
+        self._update_validation_stats()
 
     def _on_add_clicked(self, section: str) -> None:
         """

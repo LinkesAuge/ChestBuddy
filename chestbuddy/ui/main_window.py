@@ -570,6 +570,12 @@ class MainWindow(QMainWindow):
         self._content_stack.addWidget(chart_view)
         self._views["Charts"] = chart_view
 
+        # Set services in the data view controller
+        self._data_view_controller.set_services(
+            validation_service=self._validation_service, correction_service=self._correction_service
+        )
+        logger.info("Services set in data view controller")
+
         # TODO: Add placeholder views for other sections
         # For Reports, Settings, Help if needed
 

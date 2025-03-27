@@ -298,205 +298,39 @@ class DataView(QWidget):
             self._data_model.correction_applied.connect(self._on_correction_applied)
 
     def _update_view(self) -> None:
-        """Update the view with current data."""
-        # Guard against recursive calls
+        """
+        Update the view with the current data model content.
+        Handles data display, filtering, and highlighting.
+        """
         if self._is_updating:
-            print("Skipping recursive _update_view call")
-            logger.debug("Skipping recursive _update_view call")
+            logger.debug("Already updating, skipping _update_view call")
             return
 
-        # Skip if population is already in progress
-        if self._population_in_progress:
-            print("Skipping _update_view call - population already in progress")
-            logger.debug("Skipping _update_view call - population already in progress")
-            return
+        # Process before starting update
+        QApplication.processEvents()
 
         try:
             self._is_updating = True
-            self._population_in_progress = True  # Set flag that population is starting
-            print("Starting _update_view method")
-            logger.info("Starting _update_view method")
+            print("DataView._update_view: Starting update")
 
-            # Clear the table model
-            self._table_model.clear()
-            print("Cleared table model")
-
-            # Check if data is empty
+            # Check if the model is empty
             if self._data_model.is_empty:
-                print("Data model is empty, no data to display")
-                logger.info("Data model is empty, no data to display")
-                self._status_label.setText("No data loaded")
-                self._filtered_rows = []  # Initialize to empty list when no data
-                self._is_updating = False
-                self._population_in_progress = False  # Clear flag when aborting early
-                print("_update_view aborted: No data in model")
+                self._table_model.clear()
+                self._update_status("No data loaded")
                 return
 
-            # Temporarily disable sorting and selection during population
-            self._table_view.setSortingEnabled(False)
-            self._table_view.setEnabled(False)
+            # Use the populate_table method to fully populate the table
+            self.populate_table()
 
-            try:
-                # Get data from model - get a shallow copy to avoid modifying original
-                data = self._data_model.data
-                print(f"Got data from model: {len(data)} rows, columns: {list(data.columns)}")
-                logger.info(f"Got data from model: {len(data)} rows, columns: {list(data.columns)}")
-
-                # Get column names
-                column_names = list(data.columns)
-
-                # Set table dimensions
-                self._table_model.setColumnCount(len(column_names))
-                self._table_model.setRowCount(len(data))
-                print(f"Set table model dimensions: {len(data)} rows, {len(column_names)} columns")
-                logger.info(
-                    f"Set table model dimensions: {len(data)} rows, {len(column_names)} columns"
-                )
-
-                # Set headers
-                self._table_model.setHorizontalHeaderLabels(column_names)
-                print(f"Set horizontal headers: {column_names}")
-
-                # Update status to show we're populating the table
-                self._status_label.setText(f"Populating table with {len(data)} records...")
-                QApplication.processEvents()  # Process events to update status
-
-                # Define chunk size for table population
-                CHUNK_SIZE = 500  # Number of rows to process before yielding to UI
-                UPDATE_FREQUENCY = 50  # Update progress display every N rows
-
-                # Populate table with data in chunks
-                total_rows = len(data)
-                processed_rows = 0
-
-                print(
-                    f"Starting to populate table with {total_rows} rows in chunks of {CHUNK_SIZE}"
-                )
-                logger.info(
-                    f"Starting to populate table with {total_rows} rows in chunks of {CHUNK_SIZE}"
-                )
-
-                # Process data in chunks to maintain UI responsiveness
-                try:
-                    # Check visibility once at the beginning and store it
-                    should_continue = True
-                    print(
-                        f"Initial widget visibility check: Widget exists={bool(self)}, isVisible={self.isVisible() if self else False}"
-                    )
-
-                    # Track if application is shutting down
-                    app = QApplication.instance()
-
-                    for chunk_start in range(0, total_rows, CHUNK_SIZE):
-                        # Check if application is shutting down
-                        if not app or app.closingDown():
-                            print("Application is shutting down, stopping table population")
-                            should_continue = False
-                            break
-
-                        # Calculate end of chunk (bounded by total rows)
-                        chunk_end = min(chunk_start + CHUNK_SIZE, total_rows)
-
-                        print(f"Processing chunk from {chunk_start} to {chunk_end}")
-
-                        # Process this chunk of rows
-                        for row_idx in range(chunk_start, chunk_end):
-                            # Only do emergency visibility checks every 100 rows to avoid overhead
-                            if row_idx % 100 == 0:
-                                # Check if application is shutting down
-                                if not app or app.closingDown():
-                                    print("Application is shutting down, stopping table population")
-                                    should_continue = False
-                                    break
-
-                                # Use a much more conservative check - only abort for complete widget destruction
-                                if not self:
-                                    print("Widget completely destroyed, stopping population")
-                                    should_continue = False
-                                    break
-
-                            try:
-                                for col_idx, col_name in enumerate(column_names):
-                                    value = data.iloc[row_idx, col_idx]
-                                    text = "" if pd.isna(value) else str(value)
-                                    self._table_model.setItem(row_idx, col_idx, QStandardItem(text))
-
-                                # Update processed count
-                                processed_rows += 1
-
-                                # Update progress display at regular intervals
-                                if (
-                                    processed_rows % UPDATE_FREQUENCY == 0
-                                    or processed_rows == total_rows
-                                ):
-                                    progress_pct = int((processed_rows / total_rows) * 100)
-                                    self._status_label.setText(
-                                        f"Populating table: {progress_pct}% ({processed_rows}/{total_rows})"
-                                    )
-                                    # Let the UI update more frequently for progress display
-                                    QApplication.processEvents()
-                            except Exception as row_error:
-                                print(f"Error processing row {row_idx}: {row_error}")
-                                # Continue with next row
-                                continue
-
-                        # Check if we should continue after this chunk
-                        if not should_continue:
-                            break
-
-                        # Let the UI update between chunks
-                        QApplication.processEvents()
-                        print(f"Finished chunk, processed {processed_rows}/{total_rows} rows")
-
-                except Exception as chunk_error:
-                    print(f"Error during chunk processing: {chunk_error}")
-                    import traceback
-
-                    traceback.print_exc()
-                    # Continue with what we have
-
-                print(f"Table population complete. Processed {processed_rows}/{total_rows} rows")
-
-                # Store filtered rows
-                self._filtered_rows = list(range(len(data)))
-
-                # Update filter column combo
-                self._filter_column.clear()
-                self._filter_column.addItems(column_names)
-
-                # Update status
-                if processed_rows < total_rows:
-                    self._status_label.setText(
-                        f"Loaded {processed_rows} of {total_rows} records (incomplete)"
-                    )
-                else:
-                    self._status_label.setText(f"Loaded {processed_rows} records")
-
-            except Exception as e:
-                print(f"Error getting/displaying data: {e}")
-                self._status_label.setText("Error loading data")
-                import traceback
-
-                traceback.print_exc()
-            finally:
-                # ALWAYS re-enable the table view when done, even if there was an error
-                if self:  # Just check if the widget still exists
-                    try:
-                        self._table_view.setEnabled(True)
-                        self._table_view.setSortingEnabled(True)
-                        print("Table view re-enabled")
-                    except Exception as enable_error:
-                        print(f"Error re-enabling table: {enable_error}")
-                        traceback.print_exc()
+            print("DataView._update_view: Update complete")
 
         except Exception as e:
-            logger.error(f"Error in _update_view: {e}")
-            print(f"Error in _update_view: {e}")
+            msg = f"Error updating view: {str(e)}"
+            logger.error(msg)
+            self._update_status(msg, True)
+
         finally:
             self._is_updating = False
-            self._population_in_progress = False  # Clear flag when population is done
-            print("_update_view completed")
-            logger.info("_update_view completed")
 
     def _apply_filter(self) -> None:
         """Apply the current filter to the data."""
@@ -703,6 +537,8 @@ class DataView(QWidget):
                 sample_item = self._table_model.item(0, 0)
                 sample_text = sample_item.text() if sample_item else "None"
                 logger.info(f"Sample cell [0,0] content: '{sample_text}'")
+            else:
+                logger.warning("No data in table - cannot verify content")
         finally:
             self._is_updating = False
 
@@ -981,20 +817,23 @@ class DataView(QWidget):
                         actual_row, column_name
                     )
 
-                    if validation_info and "status" in validation_info:
-                        # Set validation status as user role data
-                        status_value = (
-                            ValidationStatus.INVALID
-                            if validation_info["status"] == "invalid"
-                            else (
-                                ValidationStatus.WARNING
-                                if validation_info["status"] == "warning"
-                                else ValidationStatus.VALID
+                    # Check the 'valid' key from the validation_info dictionary
+                    index = self._table_model.index(row, col)
+                    if validation_info and "valid" in validation_info:
+                        # Set validation status based on the 'valid' value
+                        if validation_info["valid"]:
+                            self._table_model.setData(
+                                index, ValidationStatus.VALID, Qt.ItemDataRole.UserRole + 1
                             )
+                        else:
+                            self._table_model.setData(
+                                index, ValidationStatus.INVALID, Qt.ItemDataRole.UserRole + 1
+                            )
+                    else:
+                        # Default to VALID if no validation info
+                        self._table_model.setData(
+                            index, ValidationStatus.VALID, Qt.ItemDataRole.UserRole + 1
                         )
-
-                        index = self._table_model.index(row, col)
-                        self._table_model.setData(index, status_value, Qt.ItemDataRole.UserRole + 1)
         except Exception as e:
             logger.error(f"Error updating validation status in view: {e}")
 
@@ -1241,3 +1080,164 @@ class DataView(QWidget):
         """Disable automatic table updates on data changes."""
         logger.info("DataView auto-update disabled")
         self._auto_update_enabled = False
+
+    def _add_status_column(self) -> None:
+        """Add a status column to the table to display validation status."""
+        # Get the number of columns and rows in the table model
+        cols = self._table_model.columnCount()
+        rows = self._table_model.rowCount()
+
+        # Add the status column
+        self._table_model.setColumnCount(cols + 1)
+        self._table_model.setHeaderData(cols, Qt.Horizontal, "STATUS")
+
+        # Populate the status column
+        for row in range(rows):
+            # Default status is "Not validated"
+            status_text = "Not validated"
+
+            # Get the actual row index if filtered
+            actual_row = row
+            if self._filtered_rows and row < len(self._filtered_rows):
+                actual_row = self._filtered_rows[row]
+
+            # Check any column's validation status
+            if not self._data_model.is_empty and cols > 0:
+                first_col_name = self._data_model.column_names[0]
+                validation_info = self._data_model.get_cell_validation_status(
+                    actual_row, first_col_name
+                )
+
+                # Determine status based on validation info
+                if validation_info and "valid" in validation_info:
+                    if validation_info["valid"]:
+                        status_text = "Valid"
+                    else:
+                        status_text = "Invalid"
+
+            # Create and set status item
+            status_item = QStandardItem(status_text)
+            status_item.setTextAlignment(Qt.AlignCenter)
+
+            # Set item background color based on status
+            if status_text == "Valid":
+                status_item.setBackground(QColor(0, 180, 0, 50))  # Light green
+            elif status_text == "Invalid":
+                status_item.setBackground(QColor(180, 0, 0, 50))  # Light red
+
+            self._table_model.setItem(row, cols, status_item)
+
+    def populate_table(self) -> None:
+        """Populate the table with data from the model."""
+        # Skip if already updating
+        if self._is_updating or self._population_in_progress:
+            return
+
+        try:
+            # Set flag to prevent recursive calls
+            self._is_updating = True
+            self._population_in_progress = True
+
+            # Clear the table
+            self._table_model.clear()
+
+            # Check if model is empty
+            if self._data_model.is_empty:
+                self._update_status("No data loaded")
+                return
+
+            # Get data from the model
+            data = self._data_model.data
+
+            # Check if filtering should be applied
+            if self._current_filter and "column" in self._current_filter:
+                filtered_data = self._filter_data(
+                    data,
+                    self._current_filter["column"],
+                    self._current_filter["text"],
+                    self._current_filter["mode"],
+                    self._current_filter["case_sensitive"],
+                )
+                # Store filtered row indices for later reference
+                self._filtered_rows = filtered_data.index.tolist()
+                data = filtered_data
+            else:
+                # No filtering, use all rows
+                self._filtered_rows = list(range(len(data)))
+
+            # Get column names from model
+            columns = self._data_model.column_names
+
+            # Set up the model with correct dimensions
+            self._table_model.setColumnCount(len(columns))
+            self._table_model.setRowCount(len(data))
+
+            # Set header labels
+            for col, name in enumerate(columns):
+                self._table_model.setHeaderData(col, Qt.Horizontal, name)
+
+            # Set row header labels (row numbers)
+            for row in range(len(data)):
+                original_idx = self._filtered_rows[row] if row < len(self._filtered_rows) else row
+                self._table_model.setHeaderData(row, Qt.Vertical, str(original_idx))
+
+            # Populate the table with data
+            for row in range(len(data)):
+                for col, column_name in enumerate(columns):
+                    # Get value from DataFrame
+                    value = data.iloc[row][column_name]
+
+                    # Create item from value
+                    item = QStandardItem(str(value))
+
+                    # Set the item in the model
+                    self._table_model.setItem(row, col, item)
+
+            # Add the status column
+            self._add_status_column()
+
+            # Update status message
+            total_rows = len(self._data_model.data)
+            filtered_rows = len(data)
+            if total_rows == filtered_rows:
+                self._update_status(f"Showing all {total_rows} rows")
+            else:
+                self._update_status(f"Showing {filtered_rows} of {total_rows} rows")
+
+            # Apply validation highlighting
+            self._on_validation_changed()
+
+        except Exception as e:
+            logger.error(f"Error populating table: {e}")
+            self._update_status(f"Error: {str(e)}", True)
+
+        finally:
+            # Reset flags
+            self._is_updating = False
+            self._population_in_progress = False
+
+    def _update_status(self, message: str, is_error: bool = False) -> None:
+        """
+        Update the status message displayed in the view.
+
+        Args:
+            message: Status message to display
+            is_error: Whether this is an error message (adds styling)
+        """
+        if not hasattr(self, "_status_label"):
+            logger.warning("Status label not available, cannot update status")
+            return
+
+        try:
+            # Set the text
+            self._status_label.setText(message)
+
+            # Apply error styling if needed
+            if is_error:
+                self._status_label.setStyleSheet("color: #FF5555; font-weight: bold;")
+            else:
+                self._status_label.setStyleSheet("")
+
+            logger.debug(f"Status updated: {message}")
+        except Exception as e:
+            logger.error(f"Error updating status: {e}")
