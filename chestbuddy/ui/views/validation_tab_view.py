@@ -158,19 +158,13 @@ class ValidationTabView(QWidget):
         toolbar.setAutoFillBackground(True)  # Ensure toolbar has correct background
         toolbar.setProperty("lightContentView", True)  # Enable light theme styling
 
-        # Add toolbar actions
-        self._preferences_action = QAction(
-            IconProvider.get_icon("settings"),
-            "Preferences",
-            self,
-        )
+        # Add toolbar actions - only keep the validate button
         self._validate_action = QAction(
             IconProvider.get_icon("check"),
             "Validate",
             self,
         )
 
-        toolbar.addAction(self._preferences_action)
         toolbar.addAction(self._validate_action)
 
         main_layout.addWidget(toolbar)
@@ -386,7 +380,6 @@ class ValidationTabView(QWidget):
     def _connect_signals(self) -> None:
         """Connect signals and slots."""
         # Connect toolbar actions
-        self._preferences_action.triggered.connect(self._on_preferences_clicked)
         self._validate_action.triggered.connect(self._on_validate_clicked)
 
         # Define section names with normalized format (underscores instead of spaces)
@@ -421,11 +414,6 @@ class ValidationTabView(QWidget):
             # Connect status signal if available
             if hasattr(list_view, "status_changed"):
                 list_view.status_changed.connect(self._on_status_changed)
-
-    def _on_preferences_clicked(self) -> None:
-        """Handle preferences button click."""
-        # TODO: Show validation preferences dialog
-        logger.info("Preferences clicked")
 
     def _on_validate_clicked(self) -> None:
         """Handle validate button click."""

@@ -135,10 +135,8 @@ class ValidationViewAdapter(BaseView):
 
     def _add_action_buttons(self):
         """Add action buttons to the header."""
-        # Add action buttons for common validation operations
-        self.add_header_action("validate", "Validate")
-        self.add_header_action("clear", "Clear Validation")
-        self.add_header_action("refresh", "Refresh")
+        # Remove all header action buttons as requested
+        pass
 
     @Slot()
     def _on_validation_changed(self):
