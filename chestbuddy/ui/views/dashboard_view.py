@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
 )
 
 from chestbuddy.ui.views.updatable_view import UpdatableView
-from chestbuddy.ui.resources.style import Colors
+from chestbuddy.ui.resources.style import Colors, get_card_style
 from chestbuddy.ui.resources.icons import Icons
 from chestbuddy.ui.widgets.empty_state_widget import EmptyStateWidget
 
@@ -48,9 +48,7 @@ class StatsCard(QFrame):
         self.setFrameShape(QFrame.StyledPanel)
         self.setStyleSheet(f"""
             StatsCard {{
-                background-color: {Colors.PRIMARY};
-                border-radius: 6px;
-                border: 1px solid {Colors.SECONDARY};
+                {get_card_style("stats")}
             }}
         """)
 
@@ -108,9 +106,7 @@ class ChartWidget(QFrame):
         self.setFrameShape(QFrame.StyledPanel)
         self.setStyleSheet(f"""
             ChartWidget {{
-                background-color: {Colors.PRIMARY};
-                border-radius: 6px;
-                border: 1px solid {Colors.SECONDARY};
+                {get_card_style("chart")}
             }}
         """)
 
@@ -192,9 +188,7 @@ class QuickActionsWidget(QFrame):
         self.setFrameShape(QFrame.StyledPanel)
         self.setStyleSheet(f"""
             QuickActionsWidget {{
-                background-color: {Colors.PRIMARY};
-                border-radius: 6px;
-                border: 1px solid {Colors.BORDER};
+                {get_card_style("action")}
             }}
         """)
 
@@ -275,9 +269,7 @@ class RecentFilesWidget(QFrame):
         self.setFrameShape(QFrame.StyledPanel)
         self.setStyleSheet(f"""
             RecentFilesWidget {{
-                background-color: {Colors.PRIMARY};
-                border-radius: 6px;
-                border: 1px solid {Colors.BORDER};
+                {get_card_style("list")}
             }}
             
             QPushButton {{
@@ -306,7 +298,7 @@ class RecentFilesWidget(QFrame):
             font-size: 16px;
             font-weight: 500;
             padding-bottom: 8px;
-            border-bottom: 1px solid {Colors.BORDER};
+            border-bottom: 1px solid {Colors.SECONDARY};
         """)
         self._layout.addWidget(self._title_label)
 

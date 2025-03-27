@@ -104,6 +104,56 @@ def get_sidebar_style():
     """
 
 
+def get_card_style(card_type="standard", custom_styling="", background_color=None, border_radius=6):
+    """
+    Get standardized card styling with consistent borders and appearance.
+
+    Args:
+        card_type (str): Type of card ('standard', 'stats', 'chart', 'action', 'list')
+        custom_styling (str): Additional custom CSS to append
+        background_color (str, optional): Override the background color. Defaults to Colors.PRIMARY.
+        border_radius (int, optional): Border radius in pixels. Defaults to 6.
+
+    Returns:
+        str: CSS stylesheet for the card
+    """
+    # Use provided background color or default to PRIMARY
+    bg_color = background_color if background_color else Colors.PRIMARY
+
+    # Base style common to all cards
+    base_style = f"""
+        background-color: {bg_color};
+        border-radius: {border_radius}px;
+        border: 1px solid {Colors.SECONDARY};
+    """
+
+    # Add type-specific styling
+    if card_type == "stats":
+        # Stats card specific styling
+        additional_style = ""
+    elif card_type == "chart":
+        # Chart card specific styling with title border
+        additional_style = """
+            padding: 16px;
+        """
+    elif card_type == "action":
+        # Action card specific styling
+        additional_style = """
+            padding: 16px;
+        """
+    elif card_type == "list":
+        # List card specific styling
+        additional_style = """
+            padding: 16px;
+        """
+    else:
+        # Standard card
+        additional_style = ""
+
+    # Combine all styles
+    return base_style + additional_style + custom_styling
+
+
 def apply_application_style(app):
     """
     Apply the application style to the given QApplication instance.
