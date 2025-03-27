@@ -126,6 +126,16 @@ class ValidationStatusDelegate(QStyledItemDelegate):
             f"is_validatable={is_validatable_column}"
         )
 
+        # Paint order is important:
+        # 1. First paint row background for invalid rows
+        # 2. Then override with cell-specific styling for invalid cells
+
+        # If this is NOT the status column AND the row has invalid status, paint with row color first
+        if not is_status_column and row_has_invalid_status:
+            painter.fillRect(option.rect, self.INVALID_ROW_COLOR)
+
+        # Now check for cell-specific styling which will override the row styling
+
         # If this is the status column, paint based on the text value
         if is_status_column:
             # Get the display text
@@ -162,19 +172,31 @@ class ValidationStatusDelegate(QStyledItemDelegate):
             if is_invalid and is_validatable_column:
                 # Draw with error highlighting (bright crimson)
                 self.logger.debug(f"Painting cell [{index.row()},{index.column()}] as INVALID")
+
+                # Use a much more distinctive style for invalid cells
+
+                # Draw with bold red background
                 painter.fillRect(option.rect, self.INVALID_COLOR)
 
-                # Draw a border around the invalid cell to make it really stand out
-                painter.setPen(self.INVALID_BORDER_COLOR)
-                painter.drawRect(option.rect)
+                # Draw a stronger border with a thicker width
+                pen = painter.pen()
+                pen.setColor(self.INVALID_BORDER_COLOR)
+                pen.setWidth(2)  # Make the border thicker
+                painter.setPen(pen)
+
+                # Draw the actual border - inset slightly for visual clarity
+                border_rect = option.rect.adjusted(1, 1, -1, -1)
+                painter.drawRect(border_rect)
+
+                # Optional: Add a diagonal cross pattern over the cell
+                pen.setStyle(Qt.DashLine)
+                painter.setPen(pen)
+                painter.drawLine(option.rect.topLeft(), option.rect.bottomRight())
+                painter.drawLine(option.rect.topRight(), option.rect.bottomLeft())
             elif validation_status == ValidationStatus.WARNING:
                 # Draw with warning highlighting
                 self.logger.debug(f"Painting cell [{index.row()},{index.column()}] as WARNING")
                 painter.fillRect(option.rect, self.WARNING_COLOR)
-            # If no cell-specific status but row is invalid, use row highlighting
-            elif row_has_invalid_status:
-                self.logger.debug(f"Painting cell [{index.row()},{index.column()}] as invalid row")
-                painter.fillRect(option.rect, self.INVALID_ROW_COLOR)
 
         # Restore painter state before calling the parent paint method
         painter.restore()
