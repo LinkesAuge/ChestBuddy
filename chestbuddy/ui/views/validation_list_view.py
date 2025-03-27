@@ -1,461 +1,354 @@
 """
 validation_list_view.py
 
-Description: View for displaying and editing validation lists
+Description: View for displaying and managing a single validation list
 """
 
 import logging
-from typing import Optional, List, Callable
+from typing import Optional, List
+from pathlib import Path
 
-from PySide6.QtCore import Qt, Slot, Signal, QSize
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
-    QHBoxLayout,
-    QLabel,
     QLineEdit,
-    QPushButton,
     QListWidget,
     QListWidgetItem,
-    QFrame,
     QMenu,
     QMessageBox,
-    QToolBar,
-    QSizePolicy,
+    QInputDialog,
+    QFileDialog,
 )
-from PySide6.QtGui import QIcon, QAction, QColor, QBrush
+from PySide6.QtCore import Qt, Signal, QTimer
 
 from chestbuddy.core.models.validation_list_model import ValidationListModel
 from chestbuddy.ui.resources.style import Colors
-from chestbuddy.ui.resources.icons import Icons
 
 logger = logging.getLogger(__name__)
 
 
 class ValidationListView(QWidget):
     """
-    View for displaying and editing validation lists.
-
-    This widget allows viewing, searching, and modifying validation lists
-    for players, chest types, and sources.
+    View for displaying and managing a single validation list.
 
     Attributes:
-        status_changed (Signal): Signal emitted when the validation list status changes
+        status_changed (Signal): Signal emitted when list status changes
     """
 
-    status_changed = Signal(str, int)  # category, count
+    status_changed = Signal(str)
 
-    def __init__(
-        self, title: str, validation_model: ValidationListModel, parent: Optional[QWidget] = None
-    ) -> None:
+    def __init__(self, model: ValidationListModel, parent: Optional[QWidget] = None):
         """
-        Initialize the ValidationListView.
+        Initialize the validation list view.
 
         Args:
-            title (str): Title for the validation list
-            validation_model (ValidationListModel): Model containing validation entries
-            parent (QWidget, optional): Parent widget
+            model (ValidationListModel): Model containing validation list data
+            parent (Optional[QWidget]): Parent widget
         """
         super().__init__(parent)
-        self.title = title
-        self.validation_model = validation_model
-        self.filter_active = False
+        self._model = model
+        self._search_timer = QTimer()
+        self._search_timer.setSingleShot(True)
+        self._search_timer.setInterval(300)  # 300ms debounce
 
-        # Set minimum width for the widget
-        self.setMinimumWidth(200)
+        # Set properties for proper styling
+        self.setProperty("lightContentView", True)
+        self.setProperty("container", True)
 
-        # Connect to model signals
-        self.validation_model.entries_changed.connect(self._on_entries_changed)
-
-        # Setup UI
         self._setup_ui()
-
-        # Load initial data
-        self._load_entries()
+        self._connect_signals()
+        self._populate_list()
+        logger.info(f"Initialized ValidationListView with {self._model.count()} entries")
 
     def _setup_ui(self) -> None:
-        """Set up the UI components."""
+        """Set up the user interface."""
+        # Set background color for the entire widget
+        self.setStyleSheet(f"background-color: {Colors.DARK_CONTENT_BG};")
+        self.setAutoFillBackground(True)  # Ensure widget has proper background
+
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(10)
-
-        # Title and count layout
-        title_layout = QHBoxLayout()
-
-        # Title label
-        self.title_label = QLabel(f"{self.title}")
-        self.title_label.setStyleSheet("font-weight: bold; font-size: 14px;")
-        title_layout.addWidget(self.title_label)
-
-        # Count label
-        self.count_label = QLabel(f"(0)")
-        self.count_label.setStyleSheet(f"color: {Colors.TEXT_MUTED}; font-size: 14px;")
-        title_layout.addWidget(self.count_label)
-
-        # Add stretch to push count to the right
-        title_layout.addStretch(1)
-
-        layout.addLayout(title_layout)
-
-        # Search bar
-        search_layout = QHBoxLayout()
-
-        # Search icon - use search icon from resources if available
-        search_icon_label = QLabel()
-        search_icon_label.setPixmap(
-            Icons.get_pixmap(Icons.DASHBOARD).scaled(
-                16, 16, Qt.KeepAspectRatio, Qt.SmoothTransformation
-            )
-        )
-        search_layout.addWidget(search_icon_label)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(8)
 
         # Search input
-        self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Search...")
-        self.search_input.textChanged.connect(self._on_search_text_changed)
-        search_layout.addWidget(self.search_input)
-
-        # Clear search button
-        self.clear_search_button = QPushButton("✕")
-        self.clear_search_button.setFixedSize(20, 20)
-        self.clear_search_button.setStyleSheet("QPushButton { border: none; }")
-        self.clear_search_button.clicked.connect(self._clear_search)
-        self.clear_search_button.setVisible(False)
-        search_layout.addWidget(self.clear_search_button)
-
-        layout.addLayout(search_layout)
-
-        # List widget for entries
-        self.list_widget = QListWidget()
-        self.list_widget.setAlternatingRowColors(True)
-        self.list_widget.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
-        self.list_widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.list_widget.customContextMenuRequested.connect(self._show_context_menu)
-
-        # Set list widget styling
-        self.list_widget.setStyleSheet(f"""
-            QListWidget {{
-                border: 1px solid {Colors.BORDER};
-                border-radius: 4px;
+        self._search_input = QLineEdit()
+        self._search_input.setPlaceholderText("Search...")
+        self._search_input.setStyleSheet(f"""
+            QLineEdit {{
                 background-color: {Colors.PRIMARY};
-            }}
-            QListWidget::item {{
-                padding: 6px;
-                border-bottom: 1px solid {Colors.BORDER_DARK};
-            }}
-            QListWidget::item:selected {{
-                background-color: {Colors.ACCENT};
+                border: 1px solid {Colors.DARK_BORDER};
+                border-radius: 4px;
+                padding: 4px 8px;
                 color: {Colors.TEXT_LIGHT};
-                border-left: 3px solid {Colors.SECONDARY};
             }}
-            QListWidget::item:hover:!selected {{
+            QLineEdit:focus {{
+                border-color: {Colors.SECONDARY};
                 background-color: {Colors.PRIMARY_LIGHT};
             }}
+            QLineEdit::placeholder {{
+                color: {Colors.TEXT_MUTED};
+            }}
         """)
+        self._search_input.setAutoFillBackground(True)  # Ensure search input has proper background
+        layout.addWidget(self._search_input)
 
-        layout.addWidget(self.list_widget, 1)  # Add stretch factor to expand list
+        # List widget with improved styling for consistent colors and better item spacing
+        self._list_widget = QListWidget()
+        self._list_widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self._list_widget.setStyleSheet(f"""
+            QListWidget {{
+                background-color: {Colors.PRIMARY};
+                border: 1px solid {Colors.DARK_BORDER};
+                border-radius: 4px;
+                padding: 4px;
+                color: {Colors.TEXT_LIGHT};
+            }}
+            QListWidget::item {{
+                padding: 6px 8px;
+                border-bottom: 1px solid {Colors.DARK_BORDER};
+                margin-bottom: 2px;
+            }}
+            QListWidget::item:selected {{
+                background-color: {Colors.PRIMARY_LIGHT};
+                border-left: 3px solid {Colors.SECONDARY};
+                color: {Colors.TEXT_LIGHT};
+            }}
+            QListWidget::item:hover {{
+                background-color: {Colors.PRIMARY_LIGHT};
+            }}
+            QScrollBar:vertical {{
+                background: {Colors.PRIMARY_DARK};
+                width: 14px;
+                margin: 0px;
+            }}
+            QScrollBar::handle:vertical {{
+                background: {Colors.BG_MEDIUM};
+                min-height: 30px;
+                border-radius: 7px;
+            }}
+            QScrollBar::handle:vertical:hover {{
+                background: {Colors.SECONDARY};
+            }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+                border: none;
+                background: none;
+                height: 0px;
+            }}
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{
+                background: {Colors.PRIMARY_DARK};
+            }}
+        """)
+        self._list_widget.setAutoFillBackground(True)  # Ensure list widget has proper background
 
-        # Bottom toolbar
-        self.toolbar = QToolBar()
-        self.toolbar.setMovable(False)
-        self.toolbar.setIconSize(QSize(16, 16))
+        # Ensure all QListWidgetItems will render with proper background
+        self._list_widget.viewport().setAutoFillBackground(True)
 
-        # Add/Remove/Filter buttons
-        self.add_button = QPushButton("Add")
-        self.add_button.setIcon(QIcon.fromTheme("list-add"))
-        self.add_button.clicked.connect(self._on_add_clicked)
-        self.toolbar.addWidget(self.add_button)
+        layout.addWidget(self._list_widget)
 
-        self.remove_button = QPushButton("Remove")
-        self.remove_button.setIcon(QIcon.fromTheme("list-remove"))
-        self.remove_button.clicked.connect(self._on_remove_clicked)
-        self.remove_button.setEnabled(False)
-        self.toolbar.addWidget(self.remove_button)
+    def _connect_signals(self) -> None:
+        """Connect widget signals to slots."""
+        # Model signals
+        self._model.entries_changed.connect(self._on_entries_changed)
 
-        self.toolbar.addSeparator()
+        # Search input signals
+        self._search_input.textChanged.connect(self._on_search_text_changed)
+        self._search_timer.timeout.connect(self._perform_search)
 
-        self.filter_button = QPushButton("Filter")
-        self.filter_button.setCheckable(True)
-        self.filter_button.setIcon(QIcon.fromTheme("view-filter"))
-        self.filter_button.clicked.connect(self._on_filter_toggled)
-        self.toolbar.addWidget(self.filter_button)
+        # List widget signals
+        self._list_widget.customContextMenuRequested.connect(self._show_context_menu)
+        self._list_widget.itemDoubleClicked.connect(self._edit_entry)
 
-        layout.addWidget(self.toolbar)
-
-        # Status label
-        self.status_label = QLabel("0 entries")
-        self.status_label.setStyleSheet(f"color: {Colors.TEXT_MUTED}; font-size: 11px;")
-        layout.addWidget(self.status_label)
-
-        # Connect list selection to enable/disable remove button
-        self.list_widget.itemSelectionChanged.connect(self._on_selection_changed)
-
-    def _load_entries(self) -> None:
-        """Load entries from the validation model."""
-        self.list_widget.clear()
-
-        entries = self.validation_model.get_entries()
-        for entry in entries:
-            self._add_item_to_list(entry)
-
-        # Update status
-        self._update_status()
-
-    def _add_item_to_list(self, entry: str) -> None:
+    def _populate_list(self, filter_text: str = "") -> None:
         """
-        Add an entry to the list widget with proper formatting.
+        Populate the list widget with entries.
 
         Args:
-            entry (str): The entry text to add
+            filter_text (str, optional): Text to filter entries by. Defaults to "".
         """
-        item = QListWidgetItem(entry)
+        self._list_widget.clear()
 
-        # Set background color based on validation status (if applicable)
-        # This would be extended with actual validation logic in a real implementation
-        # For now, we're just demonstrating the visual appearance
-        if self.title == "Players" and len(entry) < 3:
-            # Example of invalid entry (too short)
-            item.setBackground(QBrush(QColor("#FFCCCC")))  # Light red for invalid
-            item.setToolTip("Invalid: Name too short")
-        elif self.title == "Chest Types" and "?" in entry:
-            # Example of missing entry (contains question mark)
-            item.setBackground(QBrush(QColor("#FFFFCC")))  # Light yellow for missing
-            item.setToolTip("Warning: Uncertain chest type")
-
-        self.list_widget.addItem(item)
-
-    def _filter_entries(self, query: str) -> None:
-        """
-        Filter the list entries based on search text.
-
-        Args:
-            query (str): Search query text
-        """
-        # Show/hide clear button based on query
-        self.clear_search_button.setVisible(bool(query))
-
-        self.list_widget.clear()
-
-        entries = self.validation_model.find_matching_entries(query)
-        for entry in entries:
-            self._add_item_to_list(entry)
-
-        # Update status to show filtered count
-        filtered_text = f" (filtered from {self.validation_model.count()})" if query else ""
-        self.status_label.setText(f"{len(entries)} entries{filtered_text}")
-
-        # Update the count label
-        if query:
-            self.count_label.setText(f"({len(entries)}/{self.validation_model.count()})")
-        else:
-            self.count_label.setText(f"({self.validation_model.count()})")
-
-    @Slot()
-    def _clear_search(self) -> None:
-        """Clear the search input and reset the list."""
-        self.search_input.clear()
-        self._filter_entries("")
-
-    @Slot()
-    def _on_add_clicked(self) -> None:
-        """Handle add button click."""
-        # Use the search text as the new entry if it's not empty
-        text = self.search_input.text().strip()
-
-        if not text:
-            # If search is empty, show input dialog
-            from PySide6.QtWidgets import QInputDialog
-
-            text, ok = QInputDialog.getText(
-                self, f"Add {self.title} Entry", f"Enter a new {self.title.lower()} entry:"
-            )
-
-            if not ok or not text.strip():
-                return
-
-        # Add the entry
-        success = self.validation_model.add_entry(text)
-
-        if success:
-            # Clear search to show updated list
-            self.search_input.clear()
-            logger.info(f"Added entry '{text}' to {self.title}")
-            # Force a full reload of entries rather than filtering
-            self._load_entries()
-        else:
-            QMessageBox.information(
-                self,
-                "Duplicate Entry",
-                f"The entry '{text}' already exists in the {self.title} list.",
-            )
-            # Make sure we still show all entries
-            current_query = self.search_input.text()
-            if current_query:
-                self._filter_entries(current_query)
-            else:
-                self._load_entries()
-
-    @Slot()
-    def _on_remove_clicked(self) -> None:
-        """Handle remove button click."""
-        selected_items = self.list_widget.selectedItems()
-        if not selected_items:
-            return
-
-        # Confirm deletion
-        if len(selected_items) == 1:
-            message = f"Are you sure you want to remove '{selected_items[0].text()}'?"
-        else:
-            message = f"Are you sure you want to remove {len(selected_items)} entries?"
-
-        confirm = QMessageBox.question(
-            self,
-            "Confirm Removal",
-            message,
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        # Get entries (filtered if search text is provided)
+        entries = (
+            self._model.find_matching_entries(filter_text)
+            if filter_text
+            else self._model.get_entries()
         )
 
-        if confirm == QMessageBox.StandardButton.Yes:
-            for item in selected_items:
-                self.validation_model.remove_entry(item.text())
+        # Add entries to list widget
+        for entry in entries:
+            item = QListWidgetItem(entry)
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
+            self._list_widget.addItem(item)
 
-            # Clear selection
-            self.list_widget.clearSelection()
+        # Update status
+        self.status_changed.emit("List populated")
+        logger.debug(f"Populated list with {len(entries)} entries")
 
-            # Update the filter if search is active
-            if self.search_input.text():
-                self._on_search_text_changed(self.search_input.text())
+    def _on_entries_changed(self) -> None:
+        """Handle changes to the model's entries."""
+        self._populate_list(self._search_input.text())
 
-    @Slot(str)
     def _on_search_text_changed(self, text: str) -> None:
         """
-        Handle search text changes.
+        Handle changes to the search input text.
 
         Args:
-            text (str): Current search text
+            text (str): New search text
         """
-        self._filter_entries(text)
+        # Reset and start the timer
+        self._search_timer.stop()
+        self._search_timer.start()
 
-    @Slot()
-    def _on_selection_changed(self) -> None:
-        """Handle list selection changes."""
-        self.remove_button.setEnabled(len(self.list_widget.selectedItems()) > 0)
+    def _perform_search(self) -> None:
+        """Perform the search operation."""
+        search_text = self._search_input.text()
+        self._populate_list(search_text)
 
-    @Slot()
-    def _on_entries_changed(self) -> None:
-        """Handle changes in the validation model."""
-        # Always start with a full reload to ensure all entries are available
-        current_query = self.search_input.text()
-
-        # First reload all entries to ensure model and view are in sync
-        self._load_entries()
-
-        # Then apply any filter if search is active
-        if current_query:
-            self._filter_entries(current_query)
-
-    @Slot(bool)
-    def _on_filter_toggled(self, checked: bool) -> None:
-        """
-        Handle filter button toggle.
-
-        Args:
-            checked (bool): Whether the button is checked
-        """
-        self.filter_active = checked
-
-        if checked:
-            self.filter_button.setText("Filtering...")
-            # In a real implementation, this would apply additional filtering logic
-            # For now, just change the button text as a visual indicator
-        else:
-            self.filter_button.setText("Filter")
-            # Remove any additional filtering beyond the search text
-
-        # Refresh the display
-        self._on_search_text_changed(self.search_input.text())
-
-    def _update_status(self) -> None:
-        """Update the status label and emit status changed signal."""
-        count = self.validation_model.count()
-        self.status_label.setText(f"{count} entries")
-        self.count_label.setText(f"({count})")
-
-        # Emit signal with category and count
-        self.status_changed.emit(self.title, count)
-
-    @Slot(object)
     def _show_context_menu(self, position) -> None:
         """
-        Show context menu for list items.
+        Show the context menu for list items.
 
         Args:
             position: Position where to show the menu
         """
-        menu = QMenu()
-
-        # Style the context menu
+        menu = QMenu(self)
         menu.setStyleSheet(f"""
             QMenu {{
                 background-color: {Colors.PRIMARY};
-                border: 1px solid {Colors.BORDER};
+                border: 1px solid {Colors.DARK_BORDER};
+                border-radius: 4px;
+                padding: 4px;
             }}
             QMenu::item {{
-                padding: 6px 20px;
+                padding: 6px 24px 6px 8px;
+                color: {Colors.TEXT_LIGHT};
             }}
             QMenu::item:selected {{
-                background-color: {Colors.ACCENT};
+                background-color: {Colors.PRIMARY_LIGHT};
+                color: {Colors.SECONDARY};
+            }}
+            QMenu::separator {{
+                height: 1px;
+                background-color: {Colors.DARK_BORDER};
+                margin: 4px 8px;
             }}
         """)
 
-        add_action = QAction("Add Entry", self)
-        add_action.triggered.connect(self._on_add_clicked)
-        menu.addAction(add_action)
-
-        # Only enable actions that require selection if items are selected
-        if self.list_widget.selectedItems():
-            remove_action = QAction("Remove Selected", self)
-            remove_action.triggered.connect(self._on_remove_clicked)
-            menu.addAction(remove_action)
-
-            menu.addSeparator()
-
-            # Add export selection action
-            export_action = QAction("Export Selected", self)
-            export_action.triggered.connect(self._on_export_selected)
-            menu.addAction(export_action)
-
-        menu.exec(self.list_widget.mapToGlobal(position))
-
-    @Slot()
-    def _on_export_selected(self) -> None:
-        """Handle export selected action."""
-        selected_items = self.list_widget.selectedItems()
+        # Get selected items
+        selected_items = self._list_widget.selectedItems()
         if not selected_items:
             return
 
-        from PySide6.QtWidgets import QFileDialog
+        # Add actions
+        edit_action = menu.addAction("Edit")
+        menu.addSeparator()
+        remove_action = menu.addAction("Remove")
 
-        # Get file path for export
-        file_path, _ = QFileDialog.getSaveFileName(
-            self, "Export Selected Entries", "", "Text Files (*.txt)"
-        )
+        # Show menu and handle action
+        action = menu.exec(self._list_widget.mapToGlobal(position))
+        if action == edit_action:
+            self._edit_entry(selected_items[0])
+        elif action == remove_action:
+            self._remove_entries(selected_items)
 
-        if not file_path:
+    def _edit_entry(self, item: QListWidgetItem) -> None:
+        """
+        Edit a list entry.
+
+        Args:
+            item (QListWidgetItem): Item to edit
+        """
+        old_text = item.text()
+        new_text, ok = QInputDialog.getText(self, "Edit Entry", "Enter new value:", text=old_text)
+
+        if ok and new_text and new_text != old_text:
+            # Remove old entry
+            self._model.remove_entry(old_text)
+
+            # Try to add new entry
+            if not self._model.add_entry(new_text):
+                # If add fails (e.g., duplicate), restore old entry
+                self._model.add_entry(old_text)
+                QMessageBox.warning(
+                    self, "Edit Failed", f"The entry '{new_text}' already exists in the list."
+                )
+
+    def _remove_entries(self, items: List[QListWidgetItem]) -> None:
+        """
+        Remove entries from the list.
+
+        Args:
+            items (List[QListWidgetItem]): Items to remove
+        """
+        if not items:
             return
 
-        try:
-            with open(file_path, "w") as f:
-                for item in selected_items:
-                    f.write(f"{item.text()}\n")
+        # Confirm deletion
+        msg = "Remove selected entries?" if len(items) > 1 else "Remove selected entry?"
+        if QMessageBox.question(self, "Confirm Remove", msg) == QMessageBox.StandardButton.Yes:
+            for item in items:
+                self._model.remove_entry(item.text())
 
-            self.status_label.setText(f"Exported {len(selected_items)} entries")
-            logger.info(f"Exported {len(selected_items)} entries to {file_path}")
-        except Exception as e:
-            logger.error(f"Failed to export entries: {e}")
-            QMessageBox.critical(self, "Export Error", f"Failed to export entries: {str(e)}")
+    def model(self) -> ValidationListModel:
+        """
+        Get the validation list model.
+
+        Returns:
+            ValidationListModel: The model managing the validation list
+        """
+        return self._model
+
+    def add_entry(self) -> None:
+        """Add a new entry to the list."""
+        text, ok = QInputDialog.getText(self, "Add Entry", "Enter new entry:")
+        if ok and text:
+            if self._model.add_entry(text):
+                self.status_changed.emit("Entry added successfully")
+            else:
+                QMessageBox.warning(
+                    self, "Add Failed", f"The entry '{text}' already exists in the list."
+                )
+
+    def remove_selected_entries(self) -> None:
+        """Remove selected entries from the list."""
+        selected_items = self._list_widget.selectedItems()
+        if selected_items:
+            self._remove_entries(selected_items)
+        else:
+            QMessageBox.information(self, "Remove", "No items selected")
+
+    def import_entries(self) -> None:
+        """Import entries from a file, replacing all existing entries."""
+        file_path, _ = QFileDialog.getOpenFileName(self, "Import Entries", "", "Text Files (*.txt)")
+        if file_path:
+            # Ask for confirmation since this will replace all existing entries
+            result = QMessageBox.question(
+                self,
+                "Confirm Import",
+                "This will replace ALL existing entries with the imported ones. Continue?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+
+            if result == QMessageBox.StandardButton.Yes:
+                success, _ = self._model.import_from_file(Path(file_path))
+                if success:
+                    self.status_changed.emit(
+                        f"Imported entries successfully, replacing all existing entries"
+                    )
+                else:
+                    QMessageBox.critical(self, "Import Failed", "Failed to import entries")
+
+    def export_entries(self) -> None:
+        """Export entries to a file."""
+        file_path, _ = QFileDialog.getSaveFileName(self, "Export Entries", "", "Text Files (*.txt)")
+        if file_path:
+            if self._model.export_to_file(Path(file_path)):
+                self.status_changed.emit(f"Exported entries successfully")
+            else:
+                QMessageBox.critical(self, "Export Failed", "Failed to export entries")
 
     def refresh(self) -> None:
-        """Refresh the validation list view."""
-        self.validation_model.refresh()
-        self._load_entries()
+        """Refresh the list view."""
+        self._model.refresh()
+        self._populate_list(self._search_input.text())

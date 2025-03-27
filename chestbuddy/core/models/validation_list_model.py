@@ -6,7 +6,7 @@ Description: Model for managing validation lists
 
 import logging
 from pathlib import Path
-from typing import List, Set, Optional
+from typing import List, Set, Optional, Tuple
 
 from PySide6.QtCore import QObject, Signal
 
@@ -93,6 +93,28 @@ class ValidationListModel(QObject):
             logger.error(f"Error saving entries to {self.file_path}: {str(e)}")
             return False
 
+    def _is_duplicate_entry(self, entry: str) -> bool:
+        """
+        Check if an entry already exists in the list.
+
+        Args:
+            entry (str): Entry to check
+
+        Returns:
+            bool: True if entry exists, False otherwise
+        """
+        if not entry:
+            return False
+
+        entry = entry.strip()
+        if not entry:
+            return False
+
+        if self._case_sensitive:
+            return entry in self.entries
+        else:
+            return any(e.lower() == entry.lower() for e in self.entries)
+
     def add_entry(self, entry: str) -> bool:
         """
         Add a new entry to the list.
@@ -101,7 +123,7 @@ class ValidationListModel(QObject):
             entry (str): Entry to add
 
         Returns:
-            bool: True if added, False if already exists
+            bool: True if added, False if already exists or invalid
         """
         entry = entry.strip()
         if not entry:
@@ -109,7 +131,7 @@ class ValidationListModel(QObject):
             return False
 
         # Check if entry already exists
-        if self.contains(entry):
+        if self._is_duplicate_entry(entry):
             logger.debug(f"Entry '{entry}' already exists, not adding")
             return False
 
@@ -135,7 +157,7 @@ class ValidationListModel(QObject):
             bool: True if removed, False if not found
         """
         # Check if entry exists
-        if not self.contains(entry):
+        if not self._is_duplicate_entry(entry):
             logger.debug(f"Entry '{entry}' not found, cannot remove")
             return False
 
@@ -157,6 +179,65 @@ class ValidationListModel(QObject):
 
         return result
 
+    def import_from_file(self, file_path: Path) -> Tuple[bool, List[str]]:
+        """
+        Import entries from a file, replacing all existing entries.
+
+        Args:
+            file_path (Path): Path to the file to import
+
+        Returns:
+            Tuple[bool, List[str]]: (Success, empty list - duplicates no longer checked)
+        """
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                entries = [line.strip() for line in f.readlines() if line.strip()]
+
+            # Replace current entries with imported entries, regardless of duplicates
+            self.entries = set(entries)
+            if self.save_entries():
+                self.entries_changed.emit()
+                logger.info(
+                    f"Successfully imported {len(entries)} entries from {file_path}, replacing all existing entries"
+                )
+                return True, []
+            else:
+                logger.error("Failed to save entries after import")
+                return False, []
+
+        except Exception as e:
+            logger.error(f"Error importing entries from {file_path}: {e}")
+            return False, []
+
+    def export_to_file(self, file_path: Path) -> bool:
+        """
+        Export entries to a file.
+
+        Args:
+            file_path (Path): Path to save the entries to
+
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            # Create parent directory if it doesn't exist
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # Sort entries alphabetically
+            sorted_entries = sorted(self.entries)
+
+            # Write entries to file
+            with open(file_path, "w", encoding="utf-8") as f:
+                for entry in sorted_entries:
+                    f.write(f"{entry}\n")
+
+            logger.info(f"Successfully exported {len(self.entries)} entries to {file_path}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error exporting entries to {file_path}: {e}")
+            return False
+
     def contains(self, entry: str) -> bool:
         """
         Check if an entry exists in the list.
@@ -167,10 +248,7 @@ class ValidationListModel(QObject):
         Returns:
             bool: True if entry exists, False otherwise
         """
-        if self._case_sensitive:
-            return entry in self.entries
-        else:
-            return any(e.lower() == entry.lower() for e in self.entries)
+        return self._is_duplicate_entry(entry)
 
     def get_entries(self) -> List[str]:
         """

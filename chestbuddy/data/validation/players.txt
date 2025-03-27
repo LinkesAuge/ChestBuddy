@@ -20,6 +20,7 @@ Corda 1004
 Cordaginn
 Court Jester Herzi
 D4rkBlizZ4rD
+DR STRANGE
 Dacage
 Dacage2
 Dagdarim
@@ -31,7 +32,6 @@ DerBremer SK
 DerBremer2
 Dexter
 Django
-DR STRANGE
 Drachen 2
 Engelchen
 Enneen
@@ -40,10 +40,10 @@ Feldjäger
 Fluxs
 Fluxsfire
 Frau Blume
-GoldRush
+GUARDIENofTHUNDER
 GoT
 GoT SiSu
-GUARDIENofTHUNDER
+GoldRush
 Gärtnerei
 Hammerschlag1
 Hammerschlag2
@@ -64,21 +64,17 @@ Lord Öre
 Mahoni
 Mahoni2
 Metaur
-mimin
 Montrius
 Moony
 Moraron
 Mork vom Ork
 Muggeseggele
 Name,Default Player List
-nobby
-nobe
 Noch ein Cenn
 OsmanlıTorunu
 Pink Rektalforscher
 Ragnar Ansgar
 RagnarAnsgar3
-rainstream
 Reckless
 Rocky
 Roin
@@ -99,3 +95,7 @@ Tyroler Bua
 Volkspark
 Weinkeller
 Zeus
+mimin
+nobby
+nobe
+rainstream

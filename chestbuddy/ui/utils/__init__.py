@@ -1,24 +1,25 @@
 """
 UI utilities package initialization.
 
-This module imports and re-exports UI utility functions and classes.
+This package contains utility classes and functions for UI components.
 """
 
+from chestbuddy.ui.utils.icon_provider import IconProvider
 from chestbuddy.ui.utils.update_manager import UpdateManager
-from chestbuddy.utils.service_locator import ServiceLocator
+from chestbuddy.core.service_locator import ServiceLocator
 
 
 def get_update_manager() -> UpdateManager:
     """
-    Get the application-wide UpdateManager instance.
+    Get the global UpdateManager instance from the ServiceLocator.
 
     Returns:
-        UpdateManager: The application's UpdateManager instance
+        UpdateManager: The global UpdateManager instance
 
     Raises:
-        KeyError: If the UpdateManager has not been registered
+        KeyError: If UpdateManager is not registered with ServiceLocator
     """
-    return ServiceLocator.get_typed("update_manager", UpdateManager)
+    return ServiceLocator.get("update_manager")
 
 
-__all__ = ["UpdateManager", "get_update_manager"]
+__all__ = ["IconProvider", "UpdateManager", "get_update_manager"]

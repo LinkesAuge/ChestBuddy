@@ -488,3 +488,59 @@ This mockup achieves an "A" rating on all UX criteria:
 6. **Spacing & Alignment**: Maintains consistent spacing variables and clean alignment throughout
 
 The design implements the requested three-column layout with validation lists for Players, Chest Types, and Sources. Each column includes a header with count, search functionality, scrollable list, and action buttons. Visual cues are provided for invalid and missing values, and a context menu shows relevant options for adding items to validation lists. 
+
+## Duplicate Entry Handling
+
+### Add/Edit Entry
+When adding or editing an entry:
+```
+┌─────────────────────────────────┐
+│ Add Entry                       │
+├─────────────────────────────────┤
+│ Entry: [___________________]    │
+│                                 │
+│ [Add] [Cancel]                  │
+└─────────────────────────────────┘
+
+Error Dialog (if duplicate):
+┌─────────────────────────────────┐
+│ ⚠️ Duplicate Entry              │
+├─────────────────────────────────┤
+│ The entry "Example" already     │
+│ exists in the list.            │
+│                                 │
+│ [OK]                           │
+└─────────────────────────────────┘
+```
+
+### Import Validation
+When importing a file:
+```
+┌─────────────────────────────────┐
+│ Import Validation              │
+├─────────────────────────────────┤
+│ Found 3 duplicate entries:      │
+│ - Entry 1                      │
+│ - Entry 2                      │
+│ - Entry 3                      │
+│                                │
+│ [Skip Duplicates] [Cancel]     │
+└─────────────────────────────────┘
+```
+
+### Validation Rules
+1. Duplicate Check:
+   - Case-sensitive or case-insensitive based on preferences
+   - Performed before any add/edit operation
+   - Performed during file import
+   - Whitespace is trimmed before comparison
+
+2. Error Handling:
+   - Add/Edit: Show error dialog and prevent save
+   - Import: Show dialog with duplicate entries and option to skip
+   - Paste: Check each entry and skip duplicates with notification
+
+3. User Feedback:
+   - Clear error messages explaining the duplicate
+   - Visual indication of duplicate entries in import preview
+   - Status bar updates with operation result 

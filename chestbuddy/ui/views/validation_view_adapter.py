@@ -10,6 +10,7 @@ Usage:
 from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtWidgets import QWidget, QVBoxLayout
 import logging
+from typing import Any, Dict, Optional
 
 from chestbuddy.core.models import ChestDataModel
 from chestbuddy.core.services import ValidationService
@@ -17,12 +18,13 @@ from chestbuddy.core.controllers.data_view_controller import DataViewController
 from chestbuddy.ui.views.validation_tab_view import ValidationTabView
 from chestbuddy.ui.views.updatable_view import UpdatableView
 from chestbuddy.ui.utils import get_update_manager
+from chestbuddy.ui.views.base_view import BaseView
 
 # Set up logger
 logger = logging.getLogger(__name__)
 
 
-class ValidationViewAdapter(UpdatableView):
+class ValidationViewAdapter(BaseView):
     """
     Adapter that wraps the ValidationTabView component to integrate with the new UI structure.
 
@@ -34,7 +36,7 @@ class ValidationViewAdapter(UpdatableView):
         _is_updating (bool): Flag to prevent recursive updates
 
     Implementation Notes:
-        - Inherits from UpdatableView to maintain UI consistency and implement IUpdatable
+        - Inherits from BaseView to maintain UI consistency and implement IUpdatable
         - Wraps the ValidationTabView component
         - Provides improved UI with three-column layout, search functionality, and visual indicators
         - Uses DataViewController for validation operations
@@ -44,12 +46,13 @@ class ValidationViewAdapter(UpdatableView):
     # Define signals
     validation_requested = Signal()
     validation_cleared = Signal()
+    validation_changed = Signal()
 
     def __init__(
         self,
         data_model: ChestDataModel,
         validation_service: ValidationService,
-        parent: QWidget = None,
+        parent: Optional[QWidget] = None,
         debug_mode: bool = False,
     ):
         """
@@ -58,7 +61,7 @@ class ValidationViewAdapter(UpdatableView):
         Args:
             data_model (ChestDataModel): The data model to validate
             validation_service (ValidationService): The validation service to use
-            parent (QWidget, optional): The parent widget. Defaults to None.
+            parent (Optional[QWidget], optional): The parent widget. Defaults to None.
             debug_mode (bool, optional): Enable debug mode for signal connections. Defaults to False.
         """
         # Store references
@@ -71,8 +74,15 @@ class ValidationViewAdapter(UpdatableView):
         self._validation_tab = ValidationTabView(validation_service)
 
         # Initialize the base view
-        super().__init__("Data Validation", parent, debug_mode=debug_mode)
+        super().__init__(
+            title="Validation",
+            parent=parent,
+            debug_mode=debug_mode,
+        )
         self.setObjectName("ValidationViewAdapter")
+
+        # Set the lightContentView property to true for proper theme inheritance
+        self._validation_tab.setProperty("lightContentView", True)
 
     def set_controller(self, controller: DataViewController) -> None:
         """
@@ -109,7 +119,7 @@ class ValidationViewAdapter(UpdatableView):
         self.header_action_clicked.connect(self._on_action_clicked)
 
         # Connect validation tab signals
-        self._validation_tab.validation_updated.connect(self._on_validation_updated)
+        self._validation_tab.validation_changed.connect(self._on_validation_changed)
 
         # Connect to data model if available
         if hasattr(self._data_model, "data_changed") and hasattr(self, "request_update"):
@@ -131,26 +141,10 @@ class ValidationViewAdapter(UpdatableView):
         self.add_header_action("refresh", "Refresh")
 
     @Slot()
-    def _on_validation_updated(self):
-        """
-        Handle validation updated event from the ValidationTabView.
-
-        This method is called when the ValidationTabView signals that validation
-        has been updated. To prevent infinite recursion from immediate updates,
-        this method schedules a debounced update through the UpdateManager.
-        """
-        logger.debug("ValidationViewAdapter: Validation updated")
-
-        # Prevent recursive updates
-        if self._is_updating:
-            logger.debug("ValidationViewAdapter: Update already in progress, skipping")
-            return
-
-        # Don't call refresh directly as it causes recursion with the validation tab view
-        # Instead, use a debounced update request to avoid infinite recursive calls
-        self.schedule_update(
-            debounce_ms=100
-        )  # Use schedule_update with debounce to prevent recursion
+    def _on_validation_changed(self):
+        """Handle validation status changes."""
+        logger.debug("Validation status changed")
+        self.validation_changed.emit()
 
     def _update_view_content(self, data=None) -> None:
         """
@@ -317,3 +311,13 @@ class ValidationViewAdapter(UpdatableView):
                 self._data_model, "data_changed", self, "request_update"
             )
             logger.debug("Auto-update disabled for ValidationViewAdapter")
+
+    def update_status(self, status: Dict[str, Any]):
+        """
+        Update the view status.
+
+        Args:
+            status (Dict[str, Any]): Status information
+        """
+        # Update view based on status data
+        logger.debug(f"Updating validation view with status: {status}")

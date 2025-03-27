@@ -263,6 +263,41 @@ class ValidationListModel(QObject):
     def set_case_sensitive(self, case_sensitive):
         """Set whether validation should be case-sensitive."""
         # Implementation details...
+
+    def _is_duplicate_entry(self, entry: str, ignore_case: bool = False) -> bool:
+        """Check if an entry already exists in the list."""
+        if ignore_case:
+            entry = entry.lower()
+            return entry in [e.lower() for e in self._entries]
+        return entry in self._entries
+
+    def import_from_file(self, file_path: Path) -> tuple[bool, list[str]]:
+        """Import entries from a file, returns success and list of duplicates."""
+        try:
+            with open(file_path, 'r') as f:
+                entries = [line.strip() for line in f.readlines()]
+            duplicates = []
+            for entry in entries:
+                if self._is_duplicate_entry(entry):
+                    duplicates.append(entry)
+            if not duplicates:
+                self._entries = entries
+                self._save_entries()
+                return True, []
+            return False, duplicates
+        except Exception as e:
+            logger.error(f"Error importing entries: {e}")
+            return False, []
+
+    def export_to_file(self, file_path: Path) -> bool:
+        """Export entries to a file."""
+        try:
+            with open(file_path, 'w') as f:
+                f.write('\n'.join(self._entries))
+            return True
+        except Exception as e:
+            logger.error(f"Error exporting entries: {e}")
+            return False
 ```
 
 ### 3.2 ValidationListView
@@ -393,7 +428,33 @@ class ValidationTabView(QWidget):
         
     def _setup_ui(self):
         """Set up the UI components."""
-        # Implementation details...
+        layout = QHBoxLayout()
+        
+        # Players section
+        players_group = self._create_list_section(
+            "Players", 
+            self._on_player_import,
+            self._on_player_export
+        )
+        layout.addWidget(players_group)
+        
+        # Chest Types section
+        chest_types_group = self._create_list_section(
+            "Chest Types",
+            self._on_chest_type_import,
+            self._on_chest_type_export
+        )
+        layout.addWidget(chest_types_group)
+        
+        # Sources section
+        sources_group = self._create_list_section(
+            "Sources",
+            self._on_source_import,
+            self._on_source_export
+        )
+        layout.addWidget(sources_group)
+        
+        self.setLayout(layout)
         
     def _connect_signals(self):
         """Connect signals and slots."""
@@ -422,6 +483,26 @@ class ValidationTabView(QWidget):
     def get_preferences(self):
         """Get the current validation preferences."""
         # Implementation details...
+
+    def _show_import_dialog(self, list_type: str) -> Optional[Path]:
+        """Show file dialog for importing."""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            f"Import {list_type}",
+            str(self._get_last_directory()),
+            "Text Files (*.txt)"
+        )
+        return Path(file_path) if file_path else None
+
+    def _show_export_dialog(self, list_type: str) -> Optional[Path]:
+        """Show file dialog for exporting."""
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            f"Export {list_type}",
+            str(self._get_last_directory()),
+            "Text Files (*.txt)"
+        )
+        return Path(file_path) if file_path else None
 ```
 
 ### 3.4 ValidationService Enhancements
@@ -542,6 +623,22 @@ class ValidationService:
             dict: Dictionary with validation statistics
         """
         # Implementation details...
+
+    def validate_entry(self, entry: str, list_type: str) -> tuple[bool, str]:
+        """Validate an entry for a specific list type."""
+        if self._is_duplicate_entry(entry, list_type):
+            return False, f"Entry '{entry}' already exists in {list_type}"
+        # ... existing validation logic ...
+
+    def handle_import(self, file_path: Path, list_type: str) -> tuple[bool, list[str]]:
+        """Handle import for a specific list type."""
+        model = self._get_model(list_type)
+        return model.import_from_file(file_path)
+
+    def handle_export(self, file_path: Path, list_type: str) -> bool:
+        """Handle export for a specific list type."""
+        model = self._get_model(list_type)
+        return model.export_to_file(file_path)
 ```
 
 ### 3.5 DataViewController Enhancements

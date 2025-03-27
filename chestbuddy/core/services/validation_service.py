@@ -275,15 +275,20 @@ class ValidationService(QObject):
     def _initialize_validation_lists(self) -> None:
         """Initialize the validation list models."""
         try:
-            # Use the resolver method instead of direct path construction
+            # Resolve paths for validation lists
             player_file = self._resolve_validation_path("player")
             chest_file = self._resolve_validation_path("chest_type")
             source_file = self._resolve_validation_path("source")
 
+            # Ensure parent directories exist
+            player_file.parent.mkdir(parents=True, exist_ok=True)
+            chest_file.parent.mkdir(parents=True, exist_ok=True)
+            source_file.parent.mkdir(parents=True, exist_ok=True)
+
             # Create validation list models
-            self._player_list_model = ValidationListModel(player_file, self._case_sensitive)
-            self._chest_type_list_model = ValidationListModel(chest_file, self._case_sensitive)
-            self._source_list_model = ValidationListModel(source_file, self._case_sensitive)
+            self._player_list_model = ValidationListModel(str(player_file), self._case_sensitive)
+            self._chest_type_list_model = ValidationListModel(str(chest_file), self._case_sensitive)
+            self._source_list_model = ValidationListModel(str(source_file), self._case_sensitive)
 
             logger.info(
                 f"Initialized validation lists: Players ({len(self._player_list_model.get_entries())} entries), "
@@ -292,9 +297,25 @@ class ValidationService(QObject):
             )
         except Exception as e:
             logger.error(f"Error initializing validation lists: {e}")
-            self._player_list_model = None
-            self._chest_type_list_model = None
-            self._source_list_model = None
+            # Create empty validation list models instead of setting to None
+            try:
+                fallback_dir = Path(__file__).parents[2] / "data" / "validation"
+                fallback_dir.mkdir(parents=True, exist_ok=True)
+
+                self._player_list_model = ValidationListModel(
+                    str(fallback_dir / "players.txt"), self._case_sensitive
+                )
+                self._chest_type_list_model = ValidationListModel(
+                    str(fallback_dir / "chest_types.txt"), self._case_sensitive
+                )
+                self._source_list_model = ValidationListModel(
+                    str(fallback_dir / "sources.txt"), self._case_sensitive
+                )
+
+                logger.warning("Created empty validation list models with fallback paths")
+            except Exception as inner_e:
+                logger.critical(f"Failed to create fallback validation list models: {inner_e}")
+                raise RuntimeError("Could not initialize validation system") from inner_e
 
     def _resolve_validation_path(self, list_type: str) -> Path:
         """
@@ -306,16 +327,46 @@ class ValidationService(QObject):
         Returns:
             Path: The path to the validation list file
         """
-        data_dir = Path(__file__).parents[3] / "data" / "validation"
+        try:
+            # Try to get path from config first
+            if self._config_manager:
+                validation_dir = self._config_manager.get("Validation", "validation_lists_dir")
+                if validation_dir:
+                    validation_path = Path(validation_dir)
+                else:
+                    # Fall back to default path if not configured
+                    validation_path = Path(__file__).parents[2] / "data" / "validation"
+                    logger.warning(
+                        f"No validation_lists_dir configured, using default: {validation_path}"
+                    )
+            else:
+                # Use default path if no config manager
+                validation_path = Path(__file__).parents[2] / "data" / "validation"
+                logger.warning(
+                    f"No config manager available, using default path: {validation_path}"
+                )
 
-        if list_type == "player":
-            return data_dir / "players.txt"
-        elif list_type == "chest_type":
-            return data_dir / "chest_types.txt"
-        elif list_type == "source":
-            return data_dir / "sources.txt"
+            # Create directory if it doesn't exist
+            validation_path.mkdir(parents=True, exist_ok=True)
 
-        return None
+            # Return appropriate file path based on list type
+            if list_type == "player":
+                return validation_path / "players.txt"
+            elif list_type == "chest_type":
+                return validation_path / "chest_types.txt"
+            elif list_type == "source":
+                return validation_path / "sources.txt"
+
+            logger.error(f"Unknown validation list type: {list_type}")
+            # Return a default path even for unknown types to prevent None
+            return validation_path / f"{list_type}.txt"
+
+        except Exception as e:
+            logger.error(f"Error resolving validation path for {list_type}: {e}")
+            # Return a fallback path in case of errors
+            fallback_path = Path(__file__).parents[2] / "data" / "validation" / f"{list_type}.txt"
+            logger.warning(f"Using fallback path: {fallback_path}")
+            return fallback_path
 
     def add_validation_rule(self, rule_name: str, rule_function: callable) -> None:
         """
@@ -843,3 +894,23 @@ class ValidationService(QObject):
         # Clear any cached validation results
         if hasattr(self, "_validation_results"):
             self._validation_results = {}
+
+    def get_validation_list_path(self, filename: str) -> Path:
+        """
+        Get the path to a validation list file.
+
+        Args:
+            filename (str): Name of the validation list file
+
+        Returns:
+            Path: Path to the validation list file
+        """
+        if self._config_manager:
+            validation_dir = self._config_manager.get("Validation", "validation_lists_dir")
+            if validation_dir:
+                return Path(validation_dir) / filename
+
+        # Fall back to default path if no config manager or no path configured
+        default_path = Path(__file__).parents[2] / "data" / "validation" / filename
+        logger.warning(f"Using default validation list path: {default_path}")
+        return default_path

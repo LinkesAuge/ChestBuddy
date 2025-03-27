@@ -1,6 +1,6 @@
 Abandoned Chest
-Ancient Warrior's Chest
 Ancient Bastion Chest
+Ancient Warrior's Chest
 Ancients' Chest
 Arachne Chest
 Barbarian Chest
@@ -70,4 +70,3 @@ White Wood Chest
 Wooden Chest
 Yao Chest
 Yogwei Chest
-
