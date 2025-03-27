@@ -37,9 +37,9 @@ class ValidationStatusDelegate(QStyledItemDelegate):
     # Define colors for different validation states
     VALID_COLOR = QColor(0, 255, 0, 40)  # Light green transparent
     WARNING_COLOR = QColor(255, 240, 0, 80)  # Light yellow
-    INVALID_COLOR = QColor(220, 20, 60, 255)  # Crimson red, fully opaque
+    INVALID_COLOR = QColor(180, 0, 0, 255)  # Darker red, fully opaque
     INVALID_BORDER_COLOR = QColor(0, 0, 0, 255)  # Black border
-    INVALID_ROW_COLOR = QColor(255, 200, 200, 100)  # Light red with lower opacity
+    INVALID_ROW_COLOR = QColor(255, 230, 230, 100)  # Light pink with low opacity
     NOT_VALIDATED_COLOR = QColor(200, 200, 200, 40)  # Light gray for not validated
 
     # Column name constants
@@ -124,24 +124,17 @@ class ValidationStatusDelegate(QStyledItemDelegate):
                 # This is a cell with a specific validation error (highlight prominently)
                 self.logger.debug(f"Painting cell [{index.row()},{index.column()}] as INVALID")
 
-                # Draw with bold red background
+                # Draw with dark red background
                 painter.fillRect(option.rect, self.INVALID_COLOR)
 
-                # Draw a stronger border with a thicker width
+                # Draw a simple border
                 pen = painter.pen()
                 pen.setColor(self.INVALID_BORDER_COLOR)
-                pen.setWidth(2)  # Make the border thicker
+                pen.setWidth(1)  # Thinner border
                 painter.setPen(pen)
 
-                # Draw the actual border - inset slightly for visual clarity
-                border_rect = option.rect.adjusted(1, 1, -1, -1)
-                painter.drawRect(border_rect)
-
-                # Add a diagonal cross pattern over the cell
-                pen.setStyle(Qt.DashLine)
-                painter.setPen(pen)
-                painter.drawLine(option.rect.topLeft(), option.rect.bottomRight())
-                painter.drawLine(option.rect.topRight(), option.rect.bottomLeft())
+                # Draw the border
+                painter.drawRect(option.rect)
             elif validation_status == ValidationStatus.INVALID_ROW:
                 # This is just a cell in an invalid row (but not the specific invalid cell)
                 # Use a subtle background to indicate this is in an invalid row
