@@ -28,6 +28,20 @@ We are currently working on three main areas:
    - Implement background processing for other intensive operations
    - Optimize memory usage for large datasets
 
+### Table Sorting Performance Optimization
+
+1. **Simplified Column Sorting Implementation**:
+   - Removed complex manual sorting logic that was causing performance issues
+   - Leveraged built-in QTableView sorting capabilities instead of reimplementing sorting
+   - Eliminated the need to repopulate the entire table when sorting columns
+   - Improved user experience with responsive column sorting
+
+2. **Table Population Process Optimization**:
+   - Improved chunking mechanism for loading large datasets
+   - Implemented a more efficient dictionary-based approach for data iteration
+   - Streamlined item creation process to reduce overhead
+   - Added batch operations for better performance
+
 ### Dark Theme Standardization
 
 1. **Theme System Update**:
@@ -74,6 +88,8 @@ We are currently working on three main areas:
 
 ## Recent Changes
 
+- Optimized table sorting performance by leveraging built-in Qt capabilities and removing redundant update mechanisms
+- Improved table population process with more efficient data iteration and reduced overhead
 - Standardized the dark theme throughout the application by updating the color definitions in style.py and ensuring all UI components use consistent dark theme colors.
 - Resolved the naming conflict with the `lightContentView` property by ensuring its implementation consistently applies dark theme styling across all views.
 - Updated the validation_list_view.py file to replace light theme colors with dark theme equivalents for search inputs, list widgets, scrollbars, and context menus.

@@ -9,7 +9,7 @@ from typing import Dict, List, Optional, Any
 import time
 
 import pandas as pd
-from PySide6.QtCore import Qt, Signal, Slot, QModelIndex, QTimer
+from PySide6.QtCore import Qt, Signal, Slot, QModelIndex, QTimer, QSortFilterProxyModel
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -102,6 +102,8 @@ class DataView(QWidget):
         self._is_updating = False  # Guard against recursive updates
         self._auto_update_enabled = True  # Enable auto-update by default
         self._population_in_progress = False  # Track if table population is in progress
+        self._initial_load = True  # Track if this is the initial data load
+        self._user_initiated_sort = False  # Flag to track if sorting was initiated by user
 
         # Initialize columns list with default columns
         self._columns = [
@@ -237,6 +239,10 @@ class DataView(QWidget):
         self._table_view.verticalHeader().setDefaultSectionSize(24)  # Compact rows
         self._table_view.verticalHeader().setVisible(True)
 
+        # Enable sorting on the table view
+        self._table_view.setSortingEnabled(True)
+        self._table_view.horizontalHeader().setSortIndicatorShown(True)
+
         # Disable text wrapping in the view
         self._table_view.setWordWrap(False)
         self._table_view.setTextElideMode(Qt.ElideRight)  # Show ellipsis for cut-off text
@@ -316,6 +322,11 @@ class DataView(QWidget):
         # Connect table model for data editing
         if isinstance(self._table_model, QStandardItemModel):
             self._table_model.itemChanged.connect(self._on_item_changed)
+
+        # Connect table view for sorting
+        self._table_view.horizontalHeader().sortIndicatorChanged.connect(
+            self._on_sort_indicator_changed
+        )
 
         # Connect to model signals for updates
         if hasattr(self._data_model, "data_changed"):
@@ -727,6 +738,7 @@ class DataView(QWidget):
                 try:
                     row = sel_index.row()
                     col = sel_index.column()
+
                     if (
                         0 <= row < self._table_model.rowCount()
                         and 0 <= col < self._table_model.columnCount()
@@ -750,6 +762,7 @@ class DataView(QWidget):
             try:
                 row = index.row()
                 col = index.column()
+
                 if (
                     0 <= row < self._table_model.rowCount()
                     and 0 <= col < self._table_model.columnCount()
@@ -815,164 +828,41 @@ class DataView(QWidget):
         print("_update_view completed from _on_data_changed")
         logger.debug("_update_view completed from _on_data_changed")
 
-    @Slot(object)
-    def _on_validation_changed(self, validation_status=None) -> None:
+    @Slot(int, Qt.SortOrder)
+    def _on_sort_indicator_changed(self, logical_index: int, order: Qt.SortOrder) -> None:
         """
-        Handle validation changed signal.
+        Handle changes in the sort indicator using the built-in QTableView sorting capability.
 
         Args:
-            validation_status: The validation status.
+            logical_index: The column index being sorted
+            order: The sort order (ascending or descending)
         """
+        # Skip sorting during initial load or if population is in progress
+        if self._initial_load or self._population_in_progress:
+            logger.debug("Skipping sort during initial load or population")
+            return
+
+        # Set flag to indicate this is a user-initiated sort
+        self._user_initiated_sort = True
+
         try:
-            # Check if we have valid models
-            if not self._has_valid_models():
-                logger.warning("Cannot update validation status: Invalid models")
+            # Get the column name for the logical index
+            column_name = self._table_model.headerData(logical_index, Qt.Horizontal)
+            if not column_name:
+                logger.warning(f"Cannot sort: No column name for index {logical_index}")
                 return
 
-            logger.debug("Handling validation changed in DataView")
+            logger.debug(
+                f"User requested sorting by column {column_name} (index {logical_index}), order: {order}"
+            )
 
-            # Get the model's validation status if not provided
-            if validation_status is None and hasattr(self._data_model, "get_validation_status"):
-                try:
-                    validation_status = self._data_model.get_validation_status()
-                    logger.debug(f"Got validation status: {type(validation_status)}")
-                except Exception as e:
-                    logger.error(f"Error getting validation status: {e}")
-                    return
-
-            # Ensure status column exists
-            self._ensure_status_column()
-
-            # Get status column index
-            status_col = self._get_column_index(self.STATUS_COLUMN)
-            if status_col < 0:
-                logger.error("Status column not found in table model")
-                return
-
-            # Handle different validation_status data types
-            if validation_status is None:
-                # If validation_status is None, set all to "Not validated"
-                logger.debug("Validation status is None, setting all to 'Not validated'")
-                for row in range(self._table_model.rowCount()):
-                    self._table_model.setData(
-                        self._table_model.index(row, status_col), "Not validated"
-                    )
-            elif isinstance(validation_status, pd.DataFrame):
-                # Handle DataFrame case
-                logger.debug(
-                    f"Handling DataFrame validation status with columns: {validation_status.columns.tolist()}"
-                )
-
-                # Get all columns that indicate validation status (end with _valid)
-                validation_columns = [
-                    col for col in validation_status.columns if col.endswith("_valid")
-                ]
-
-                # Update status for each row
-                for row in range(self._table_model.rowCount()):
-                    if row >= len(validation_status):
-                        # Row outside of validation range
-                        self._table_model.setData(
-                            self._table_model.index(row, status_col), "Not validated"
-                        )
-                        continue
-
-                    # Check if this row has any validation columns set
-                    if not validation_columns:
-                        # No validation columns, set to "Not validated"
-                        self._table_model.setData(
-                            self._table_model.index(row, status_col), "Not validated"
-                        )
-                        continue
-
-                    # Check row's validation status
-                    row_has_validation = False
-                    row_is_valid = True
-
-                    for col in validation_columns:
-                        # Skip if the column doesn't exist in the row or the value is NaN
-                        if col not in validation_status.columns or pd.isna(
-                            validation_status.iloc[row].get(col, None)
-                        ):
-                            continue
-
-                        # If the column exists and has a value, we've validated this row
-                        row_has_validation = True
-
-                        # If any column is invalid (False), the row is invalid
-                        if not validation_status.iloc[row][col]:
-                            row_is_valid = False
-
-                    # Set the cell's status based on validation results
-                    if row_has_validation:
-                        status_text = "Valid" if row_is_valid else "Invalid"
-                    else:
-                        status_text = "Not validated"
-
-                    self._table_model.setData(self._table_model.index(row, status_col), status_text)
-
-            elif isinstance(validation_status, dict):
-                # Handle dictionary case
-                logger.debug("Handling dictionary validation status")
-
-                # Set all rows to "Not validated" initially
-                for row in range(self._table_model.rowCount()):
-                    self._table_model.setData(
-                        self._table_model.index(row, status_col), "Not validated"
-                    )
-
-                # Process dictionary entries
-                for row_idx, row_status in validation_status.items():
-                    # Skip if row_idx is not a valid row number
-                    if (
-                        not isinstance(row_idx, int)
-                        or row_idx < 0
-                        or row_idx >= self._table_model.rowCount()
-                    ):
-                        continue
-
-                    # Skip if row_status is not a dictionary
-                    if not isinstance(row_status, dict):
-                        continue
-
-                    # Check for validation columns (ending with _valid)
-                    validation_results = []
-                    for col, val in row_status.items():
-                        if col.endswith("_valid") and isinstance(val, bool):
-                            validation_results.append(val)
-
-                    # If we have validation results, update the status
-                    if validation_results:
-                        status_text = "Valid" if all(validation_results) else "Invalid"
-                        self._table_model.setData(
-                            self._table_model.index(row_idx, status_col), status_text
-                        )
-            else:
-                # Unknown validation_status type, log error
-                logger.error(f"Unknown validation_status type: {type(validation_status)}")
-                # Set all to "Not validated"
-                for row in range(self._table_model.rowCount()):
-                    self._table_model.setData(
-                        self._table_model.index(row, status_col), "Not validated"
-                    )
-
-            # Make the view update
-            self._table_view.viewport().update()
-            logger.debug("Validation status update complete")
+            # Let the built-in sorting handle the display
+            # The table is already in sortable state because setSortingEnabled(True) was called in _init_ui
 
         except Exception as e:
-            logger.error(f"Error updating validation status in data view: {e}", exc_info=True)
-
-    @Slot(object)
-    def _on_correction_applied(self, correction_status) -> None:
-        """
-        Handle correction applied signal.
-
-        Args:
-            correction_status: The correction status.
-        """
-        # Update the view to reflect correction changes
-        self._on_data_changed()
+            logger.error(f"Error during sort indicator change: {e}")
+        finally:
+            self._user_initiated_sort = False  # Reset the user-initiated sort flag
 
     @Slot(QStandardItem)
     def _on_item_changed(self, item: QStandardItem) -> None:
@@ -1002,7 +892,11 @@ class DataView(QWidget):
 
                 # Get the current value from the model first
                 try:
-                    current_value = self._data_model.get_cell_value(row, column_name)
+                    actual_row = row
+                    if self._filtered_rows and row < len(self._filtered_rows):
+                        actual_row = self._filtered_rows[row]
+
+                    current_value = self._data_model.get_cell_value(actual_row, column_name)
                 except Exception as e:
                     logger.error(f"Error getting current cell value: {str(e)}")
                     return
@@ -1019,7 +913,11 @@ class DataView(QWidget):
                 )
 
                 # Use a more efficient update method that doesn't recreate the DataFrame
-                success = self._data_model.update_cell(row, column_name, new_value)
+                actual_row = row
+                if self._filtered_rows and row < len(self._filtered_rows):
+                    actual_row = self._filtered_rows[row]
+
+                success = self._data_model.update_cell(actual_row, column_name, new_value)
 
                 if not success:
                     logger.error(f"Failed to update cell at [{row}, {column_name}]")
@@ -1185,111 +1083,113 @@ class DataView(QWidget):
         self.export_clicked.emit()
 
     def populate_table(self) -> None:
-        """Populate the table with data from the model using chunked approach for responsiveness."""
-        # Skip if already updating
+        """Populate the table with data from the data model, using chunking for performance."""
         if self._is_updating or self._population_in_progress:
+            logger.debug("Skipping population since update or population is in progress")
             return
 
         try:
-            # Set flags to prevent recursive calls
             self._is_updating = True
             self._population_in_progress = True
+            self._initial_load = True  # Set initial load flag to true
 
-            # Clear the table
-            self._table_model.clear()
+            # Get the data and columns to use
+            data = self._data_model.data
+            columns = self._data_model.column_names
 
-            # Check if model is empty
-            if self._data_model.is_empty:
-                self._update_status("No data loaded")
+            if data is None or data.empty or not columns:
+                logger.warning("No data or columns available to populate table")
+                self._update_status("No data available")
                 self._is_updating = False
                 self._population_in_progress = False
                 return
 
-            # Get data from the model
-            self._population_data = self._data_model.data
+            # Clear the model and reset it with correct dimensions
+            self._table_model.clear()
+            self._table_model.setHorizontalHeaderLabels(columns)
 
-            # Check if filtering should be applied
-            if self._current_filter and "column" in self._current_filter:
-                filtered_data = self._filter_data(
-                    self._population_data,
-                    self._current_filter["column"],
-                    self._current_filter["text"],
-                    self._current_filter["mode"],
-                    self._current_filter["case_sensitive"],
-                )
-                # Store filtered row indices for later reference
-                self._filtered_rows = filtered_data.index.tolist()
-                self._population_data = filtered_data
-            else:
-                # No filtering, use all rows
-                self._filtered_rows = list(range(len(self._population_data)))
+            # Set dimensions for the table model
+            row_count = len(data)
+            col_count = len(columns)
+            self._table_model.setRowCount(row_count)
+            self._table_model.setColumnCount(col_count)
 
-            # Get column names from model
-            columns = self._data_model.column_names
+            # Prepare for chunked population
+            self._chunk_columns = columns
+            self._chunk_data = data
+            self._chunk_row_count = row_count
+            self._chunk_col_count = col_count
+            self._chunk_size = min(500, row_count)  # Process 500 rows at a time
+            self._chunk_start = 0
 
-            # Set up the model with correct dimensions
-            self._table_model.setColumnCount(len(columns))
-            self._table_model.setRowCount(len(self._population_data))
-
-            # Set header labels
-            for col, name in enumerate(columns):
-                self._table_model.setHeaderData(col, Qt.Horizontal, name)
-
-            # Set row header labels (row numbers)
-            for row in range(len(self._population_data)):
-                original_idx = self._filtered_rows[row] if row < len(self._filtered_rows) else row
-                self._table_model.setHeaderData(row, Qt.Vertical, str(original_idx))
-
-            # Update status to show we're populating
-            self._update_status(f"Populating {len(self._population_data)} rows...")
-
-            # Set up chunked population parameters
-            self._rows_per_chunk = 200  # Configure this based on performance testing
-            self._current_chunk_start = 0
-            self._total_rows = len(self._population_data)
-            self._columns = columns
-
-            # Start the chunked population
-            QTimer.singleShot(0, self._populate_chunk)
+            # Start the chunked population process - use immediate processing for the first chunk
+            self._populate_chunk()
 
         except Exception as e:
-            logger.error(f"Error setting up table population: {e}")
+            logger.error(f"Error populating table: {e}")
             self._update_status(f"Error: {str(e)}", True)
             self._is_updating = False
             self._population_in_progress = False
 
-    def _populate_chunk(self) -> None:
-        """Populate a chunk of rows in the table."""
+    def _populate_chunk(self):
+        """Populate one chunk of data to the table."""
         try:
-            # Check if we should stop
-            if not self._population_in_progress or self._current_chunk_start >= self._total_rows:
-                # We're done, finalize the population
+            if not hasattr(self, "_chunk_start"):
+                logger.error("Error in _populate_chunk: _chunk_start attribute not found")
+                self._is_updating = False
+                self._population_in_progress = False
+                return
+
+            # Get current chunk boundaries
+            chunk_start = self._chunk_start
+            chunk_end = min(chunk_start + self._chunk_size, self._chunk_row_count)
+
+            logger.debug(
+                f"Populating chunk from {chunk_start} to {chunk_end} of {self._chunk_row_count} rows"
+            )
+
+            # Get the data for the current chunk
+            column_names = self._chunk_columns
+
+            # Process only the current chunk of data
+            if hasattr(self, "_chunk_data") and self._chunk_data is not None:
+                data_subset = self._chunk_data.iloc[chunk_start:chunk_end]
+
+                # Convert to a format that's faster to iterate
+                values = data_subset.to_dict("records")
+
+                # Batch creation of items for better performance
+                for i, row_data in enumerate(values):
+                    row_idx = chunk_start + i
+                    for col_idx, col_name in enumerate(column_names):
+                        # Get value with proper None/NaN handling
+                        cell_value = row_data.get(col_name, "")
+                        str_value = (
+                            ""
+                            if cell_value is None
+                            or (isinstance(cell_value, float) and pd.isna(cell_value))
+                            else str(cell_value)
+                        )
+
+                        # Create the item and add it to the model
+                        item = QStandardItem(str_value)
+                        self._table_model.setItem(row_idx, col_idx, item)
+            else:
+                logger.error("_chunk_data attribute is missing or None")
+                self._is_updating = False
+                self._population_in_progress = False
+                return
+
+            # Check if we've processed all rows
+            if chunk_end >= self._chunk_row_count:
+                logger.debug(f"Chunk population complete: {self._chunk_row_count} rows processed")
+                self._is_updating = False
+                self._population_in_progress = False
                 self._finalize_population()
                 return
 
-            # Calculate end of this chunk
-            chunk_end = min(self._current_chunk_start + self._rows_per_chunk, self._total_rows)
-
-            # Update status to show progress
-            progress_pct = int((self._current_chunk_start / self._total_rows) * 100)
-            self._update_status(
-                f"Populating table: {progress_pct}% ({self._current_chunk_start}/{self._total_rows} rows)"
-            )
-
-            # Populate this chunk of rows
-            for row in range(self._current_chunk_start, chunk_end):
-                for col, column_name in enumerate(self._columns):
-                    # Get value from DataFrame
-                    value = self._population_data.iloc[row][column_name]
-
-                    # Create item from value
-                    item = QStandardItem(str(value))
-
-                    # Set the item in the model
-                    self._table_model.setItem(row, col, item)
-
-            # Update progress
-            self._current_chunk_start = chunk_end
+            # Update for next chunk
+            self._chunk_start = chunk_end
 
             # Schedule the next chunk with a small delay to keep UI responsive
             QTimer.singleShot(5, self._populate_chunk)
@@ -1305,6 +1205,7 @@ class DataView(QWidget):
         self._ensure_no_text_wrapping()
         self._customize_column_widths()
         self._update_status_from_row_count()
+        self._initial_load = False  # Reset initial load flag
 
     def _ensure_no_text_wrapping(self):
         """Ensure that text does not wrap in table cells."""
@@ -1493,3 +1394,162 @@ class DataView(QWidget):
             and hasattr(self, "_table_model")
             and self._table_model is not None
         )
+
+    @Slot(object)
+    def _on_validation_changed(self, validation_status=None) -> None:
+        """
+        Handle validation changed signal.
+
+        Args:
+            validation_status: The validation status.
+        """
+        try:
+            # Check if we have valid models
+            if not self._has_valid_models():
+                logger.warning("Cannot update validation status: Invalid models")
+                return
+
+            logger.debug("Handling validation changed in DataView")
+
+            # Get the model's validation status if not provided
+            if validation_status is None and hasattr(self._data_model, "get_validation_status"):
+                try:
+                    validation_status = self._data_model.get_validation_status()
+                    logger.debug(f"Got validation status: {type(validation_status)}")
+                except Exception as e:
+                    logger.error(f"Error getting validation status: {e}")
+                    return
+
+            # Ensure status column exists
+            self._ensure_status_column()
+
+            # Get status column index
+            status_col = self._get_column_index(self.STATUS_COLUMN)
+            if status_col < 0:
+                logger.error("Status column not found in table model")
+                return
+
+            # Handle different validation_status data types
+            if validation_status is None:
+                # If validation_status is None, set all to "Not validated"
+                logger.debug("Validation status is None, setting all to 'Not validated'")
+                for row in range(self._table_model.rowCount()):
+                    self._table_model.setData(
+                        self._table_model.index(row, status_col), "Not validated"
+                    )
+            elif isinstance(validation_status, pd.DataFrame):
+                # Handle DataFrame case
+                logger.debug(
+                    f"Handling DataFrame validation status with columns: {validation_status.columns.tolist()}"
+                )
+
+                # Get all columns that indicate validation status (end with _valid)
+                validation_columns = [
+                    col for col in validation_status.columns if col.endswith("_valid")
+                ]
+
+                # Update status for each row in the source model
+                for row in range(self._table_model.rowCount()):
+                    if row >= len(validation_status):
+                        # Row outside of validation range
+                        self._table_model.setData(
+                            self._table_model.index(row, status_col), "Not validated"
+                        )
+                        continue
+
+                    # Check if this row has any validation columns set
+                    if not validation_columns:
+                        # No validation columns, set to "Not validated"
+                        self._table_model.setData(
+                            self._table_model.index(row, status_col), "Not validated"
+                        )
+                        continue
+
+                    # Check row's validation status
+                    row_has_validation = False
+                    row_is_valid = True
+
+                    for col in validation_columns:
+                        # Skip if the column doesn't exist in the row or the value is NaN
+                        if col not in validation_status.columns or pd.isna(
+                            validation_status.iloc[row].get(col, None)
+                        ):
+                            continue
+
+                        # If the column exists and has a value, we've validated this row
+                        row_has_validation = True
+
+                        # If any column is invalid (False), the row is invalid
+                        if not validation_status.iloc[row][col]:
+                            row_is_valid = False
+
+                    # Set the cell's status based on validation results
+                    if row_has_validation:
+                        status_text = "Valid" if row_is_valid else "Invalid"
+                    else:
+                        status_text = "Not validated"
+
+                    self._table_model.setData(self._table_model.index(row, status_col), status_text)
+
+            elif isinstance(validation_status, dict):
+                # Handle dictionary case
+                logger.debug("Handling dictionary validation status")
+
+                # Set all rows to "Not validated" initially
+                for row in range(self._table_model.rowCount()):
+                    self._table_model.setData(
+                        self._table_model.index(row, status_col), "Not validated"
+                    )
+
+                # Process dictionary entries
+                for row_idx, row_status in validation_status.items():
+                    # Skip if row_idx is not a valid row number
+                    if (
+                        not isinstance(row_idx, int)
+                        or row_idx < 0
+                        or row_idx >= self._table_model.rowCount()
+                    ):
+                        continue
+
+                    # Skip if row_status is not a dictionary
+                    if not isinstance(row_status, dict):
+                        continue
+
+                    # Check for validation columns (ending with _valid)
+                    validation_results = []
+                    for col, val in row_status.items():
+                        if col.endswith("_valid") and isinstance(val, bool):
+                            validation_results.append(val)
+
+                    # If we have validation results, update the status
+                    if validation_results:
+                        status_text = "Valid" if all(validation_results) else "Invalid"
+                        self._table_model.setData(
+                            self._table_model.index(row_idx, status_col), status_text
+                        )
+            else:
+                # Unknown validation_status type, log error
+                logger.error(f"Unknown validation_status type: {type(validation_status)}")
+                # Set all to "Not validated"
+                for row in range(self._table_model.rowCount()):
+                    self._table_model.setData(
+                        self._table_model.index(row, status_col), "Not validated"
+                    )
+
+            # Make the view update
+            self._table_view.viewport().update()
+            logger.debug("Validation status update complete")
+
+        except Exception as e:
+            logger.error(f"Error updating validation status in data view: {e}", exc_info=True)
+
+    @Slot(object)
+    def _on_correction_applied(self, correction_status) -> None:
+        """
+        Handle correction applied signal.
+
+        Args:
+            correction_status: The correction status.
+        """
+        # Update the view to reflect correction changes
+        self._on_data_changed()

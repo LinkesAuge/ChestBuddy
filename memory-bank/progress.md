@@ -23,6 +23,13 @@ This phase focuses on improving the application's performance and responsiveness
    - Used QTimer to keep UI responsive between chunks
    - Provided better user feedback during the population process
 
+3. Optimized table sorting performance
+   - Simplified sorting implementation by utilizing built-in QTableView capabilities
+   - Removed redundant `_update_table_with_sorted_data` method that was causing performance issues
+   - Optimized table population process with efficient dictionary-based iteration
+   - Eliminated excessive validation status checking during sorting
+   - Verified significant performance improvement when sorting large datasets
+
 ### In Progress
 
 1. Investigating additional performance improvements
