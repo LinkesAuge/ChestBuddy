@@ -50,7 +50,7 @@ class StatsCard(QFrame):
             StatsCard {{
                 background-color: {Colors.PRIMARY};
                 border-radius: 6px;
-                border: 1px solid {Colors.BORDER};
+                border: 1px solid {Colors.SECONDARY};
             }}
         """)
 
@@ -110,7 +110,7 @@ class ChartWidget(QFrame):
             ChartWidget {{
                 background-color: {Colors.PRIMARY};
                 border-radius: 6px;
-                border: 1px solid {Colors.BORDER};
+                border: 1px solid {Colors.SECONDARY};
             }}
         """)
 
@@ -126,7 +126,7 @@ class ChartWidget(QFrame):
             font-size: 16px;
             font-weight: 500;
             padding-bottom: 8px;
-            border-bottom: 1px solid {Colors.BORDER};
+            border-bottom: 1px solid {Colors.SECONDARY};
         """)
         self._layout.addWidget(self._title_label)
 

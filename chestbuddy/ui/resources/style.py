@@ -331,7 +331,7 @@ def apply_application_style(app):
         }}
         
         QSplitter::handle {{
-            background-color: {Colors.DARK_BORDER};
+            background-color: {Colors.SECONDARY};
         }}
         
         /* Status Bar */

@@ -41,7 +41,7 @@ class ViewHeader(QFrame):
         self.setStyleSheet(f"""
             ViewHeader {{
                 background-color: {Colors.PRIMARY};
-                border-bottom: 1px solid {Colors.BORDER};
+                border-bottom: 1px solid {Colors.SECONDARY};
             }}
         """)
         self.setFixedHeight(60)

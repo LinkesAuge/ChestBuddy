@@ -80,7 +80,7 @@ class ValidationTabView(QWidget):
                 background-color: {Colors.DARK_CONTENT_BG};
             }}
             QSplitter::handle {{
-                background-color: {Colors.DARK_BORDER};
+                background-color: {Colors.SECONDARY};
                 width: 2px;
             }}
         """)
@@ -280,12 +280,12 @@ class ValidationTabView(QWidget):
         search_container.setStyleSheet(f"""
             QWidget {{
                 background-color: {Colors.BACKGROUND_PRIMARY};
-                border: 1px solid {Colors.BORDER};
+                border: 1px solid {Colors.SECONDARY};
                 border-radius: 4px;
                 padding: 2px;
             }}
             QWidget:focus-within {{
-                border: 1px solid {Colors.PRIMARY};
+                border: 1px solid {Colors.SECONDARY};
                 background-color: {Colors.PRIMARY_LIGHT};
             }}
         """)
