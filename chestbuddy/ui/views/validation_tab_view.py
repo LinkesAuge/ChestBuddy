@@ -74,14 +74,18 @@ class ValidationTabView(QWidget):
 
         # Create splitter for resizable panels
         self._splitter = QSplitter(Qt.Horizontal)
-        self._splitter.setChildrenCollapsible(False)
+        # Allow collapsing but set a minimum size
+        self._splitter.setHandleWidth(8)  # Wider handle for easier grabbing
         self._splitter.setStyleSheet(f"""
             QSplitter {{
                 background-color: {Colors.DARK_CONTENT_BG};
             }}
             QSplitter::handle {{
                 background-color: {Colors.DARK_CONTENT_BG};
-                width: 4px;
+                width: 8px;
+            }}
+            QSplitter::handle:hover {{
+                background-color: {Colors.BG_MEDIUM};
             }}
         """)
         # Ensure the splitter has correct background
@@ -264,7 +268,7 @@ class ValidationTabView(QWidget):
 
         header = QLabel(title)
         header.setStyleSheet(
-            f"font-weight: bold; font-size: 16px; color: {Colors.TEXT_LIGHT}; background-color: {Colors.PRIMARY_DARK}; padding: 4px 8px; border-radius: 4px;"
+            f"font-weight: bold; font-size: 16px; color: {Colors.TEXT_LIGHT}; border-bottom: 2px solid {Colors.SECONDARY}; padding-bottom: 4px; margin-bottom: 4px;"
         )
         header_layout.addWidget(header)
 
