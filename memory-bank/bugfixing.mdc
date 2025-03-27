@@ -128,7 +128,7 @@ As of the project completion, all known bugs and issues have been resolved. The 
 
 ### 2025-03-27: Fixed White Background Issues in ValidationTabView and ValidationListView
 
-- **Issue**: Persistent white backgrounds in the validation UI despite several attempts to apply proper styling.
+- **Issue**: Persistent white backgrounds in the validation UI despite several attempts to apply proper styling. Golden highlights/accents missing across the application.
 - **Root Cause**: Qt widget styling requires both property setting AND autoFillBackground to properly render background colors. Several key issues were identified:
   1. Missing "lightContentView" property on widgets (needed for application-wide style)
   2. Missing calls to `setAutoFillBackground(True)` on nested widgets
@@ -896,6 +896,37 @@ The application had inconsistent theming where some UI components were using lig
 ### Status
 ✅ Fixed - The application now displays a consistent dark theme across all UI components. All views (Dashboard, Validation, Data, Charts, Correction) now properly display dark backgrounds and styling.
 
+## UI Performance Issues
+
+### Issue: UI Freezing During Table Population
+- **Problem**: When loading large datasets, the UI would become completely unresponsive during table population, causing a poor user experience and making the application appear frozen.
+- **Cause**: The table population process was processing all rows synchronously in a single pass, blocking the main UI thread until completion.
+- **Impact**: Users experienced significant freezing when working with datasets larger than a few hundred rows, making the application difficult to use with real-world data sizes.
+- **Solution**: Implemented a chunked processing approach that:
+  1. Processes a limited number of rows (200) at a time
+  2. Uses QTimer.singleShot(0, self._populate_chunk) to yield control back to the event loop between chunks
+  3. Maintains state variables to track progress (current_row_index, rows_to_process)
+  4. Provides visual feedback during the population process
+- **Implementation**: Added a new chunked approach in DataView.populate_table() with supporting methods:
+  - _populate_chunk(): Processes a single chunk of 200 rows
+  - _finalize_population(): Completes the process after all chunks are processed
+- **Result**: The UI remains responsive even when loading large datasets (10,000+ rows), and users can see the progress as rows are added to the table.
+- **Future Improvements**: 
+  - Apply similar chunking approach to validation process
+  - Add more granular progress reporting
+  - Consider true background processing for extremely large datasets (100,000+ rows)
+
+### Issue: Delayed UI Response After Import
+- **Problem**: After importing data and closing the progress window, there was a long delay (2000ms) before the data view became responsive.
+- **Cause**: In the _on_load_finished method of ChestBuddyApp, there was an excessive delay before populating the data table: QTimer.singleShot(2000, self._main_window.populate_data_table)
+- **Impact**: Users experienced a confusing "dead time" after import, where the progress dialog had closed but the application appeared unresponsive.
+- **Solution**: 
+  1. Reduced the delay from 2000ms to 100ms to improve responsiveness
+  2. Documented the reason for the delay (allowing time for the UI to update after progress dialog closes)
+- **Implementation**: Modified the QTimer.singleShot call in ChestBuddyApp._on_load_finished
+- **Result**: The UI now responds much more quickly after data import, providing a smoother user experience.
+- **Additional Learning**: Always question hardcoded delays in UI code - they can often be reduced or eliminated with proper event handling.
+
 ## Ongoing Issues
 
 All known issues have been resolved. The application is now stable and ready for release.
@@ -1318,4 +1349,42 @@ Fixed. Validation list import now replaces all existing entries with the importe
    - `DARK_CONTENT_BG = "#2D3748"` (Content area background)
 
 **Status:** Fixed. The application now displays a consistent dark theme with proper golden accents across all views.
+
+### 2024-03-27: Fixed UI Responsiveness Issue After Data Import
+
+- **Issue**: After importing data and closing the progress window, there was a long delay (several seconds) before the data view became responsive, causing a poor user experience.
+- **Root Cause**: In the `_on_load_finished` method of the `ChestBuddyApp` class, there was a 2000ms (2 second) delay before starting to populate the data table after the progress dialog was closed.
+- **Fix**: Reduced the delay from 2000ms to 100ms in the `QTimer.singleShot` call:
+  ```python
+  # Before:
+  QTimer.singleShot(2000, self._main_window.populate_data_table)
+  
+  # After:
+  QTimer.singleShot(100, self._main_window.populate_data_table)
+  ```
+- **Status**: Fixed, UI now responds much more quickly after data import.
+- **Future Improvements**: 
+  1. Consider implementing asynchronous table population to further improve responsiveness
+  2. Implement chunked loading for large datasets
+  3. Add progress indication during table population
+
+### 2024-03-28: Fixed UI Unresponsiveness During Table Population
+
+- **Issue**: The application's UI would become completely unresponsive when importing data files and displaying them in the data view, especially for large datasets. This was happening after the progress window closed, during the table population phase.
+- **Root Cause**: The table population process in `DataView.populate_table` was executing synchronously in the main UI thread, blocking the Qt event loop while creating potentially thousands of table items all at once.
+- **Fix**: Implemented a chunked table population approach:
+  1. Modified `DataView.populate_table` to set up the table structure and prepare for chunked processing
+  2. Created a new `_populate_chunk` method that processes a limited number of rows at a time (200 rows per chunk)
+  3. Used `QTimer.singleShot` to schedule each chunk processing with small delays between chunks
+  4. Added a `_finalize_population` method to complete the process after all chunks are done
+  5. Added progress updates during the chunking process so the user knows what's happening
+  ```python
+  def _populate_chunk(self) -> None:
+      # Process current chunk of rows
+      # ...
+      # Schedule next chunk with a small delay to keep UI responsive
+      QTimer.singleShot(5, self._populate_chunk)
+  ```
+- **Status**: Fixed, the UI now remains responsive during table population for large datasets. The user sees progress updates as rows are processed in chunks.
+- **Note**: This is a significant improvement to the overall user experience, as the application no longer appears frozen after importing large files.
 

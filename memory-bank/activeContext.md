@@ -1,13 +1,32 @@
 ---
 title: Active Context - ChestBuddy Application
-date: 2024-03-27
+date: 2024-03-28
 ---
 
 # Active Context: ChestBuddy Application
 
-## Current Focus: UI Theming Standardization and Validation Enhancement
+## Current Focus: UI Responsiveness and Performance Optimization
 
-We are currently working on two main areas:
+We are currently working on three main areas:
+
+### UI Performance Improvement
+
+1. **Import Process Optimization**:
+   - Fixed UI responsiveness issue during file import
+   - Reduced delay between progress window close and table population from 2000ms to 100ms
+   - Improved user experience by making the UI more responsive after data import
+
+2. **Table Population Optimization**:
+   - Implemented chunked table population to prevent UI freezing with large datasets
+   - Added progress indicators during table population process
+   - Used Qt's timer system (QTimer.singleShot) to keep UI responsive
+   - Limited each processing chunk to 200 rows to maintain responsiveness
+   - Created a better user experience with visual feedback during long operations
+
+3. **Planned Performance Improvements**:
+   - Apply similar chunking approach to validation process
+   - Implement background processing for other intensive operations
+   - Optimize memory usage for large datasets
 
 ### Dark Theme Standardization
 

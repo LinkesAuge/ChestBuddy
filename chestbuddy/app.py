@@ -362,9 +362,9 @@ class ChestBuddyApp(QObject):
         # Wait a brief moment for UI to update before closing
         QTimer.singleShot(1500, self._progress_controller.close_progress)
 
-        # If it was successful, schedule the data table to be populated
+        # If it was successful, schedule the data table to be populated with minimal delay
         if not is_error and self._main_window:
-            QTimer.singleShot(2000, self._main_window.populate_data_table)
+            QTimer.singleShot(100, self._main_window.populate_data_table)
 
     @Slot(str)
     def _on_load_error(self, error_message: str) -> None:

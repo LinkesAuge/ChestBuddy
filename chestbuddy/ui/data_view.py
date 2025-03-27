@@ -9,7 +9,7 @@ from typing import Dict, List, Optional, Any
 import time
 
 import pandas as pd
-from PySide6.QtCore import Qt, Signal, Slot, QModelIndex
+from PySide6.QtCore import Qt, Signal, Slot, QModelIndex, QTimer
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -76,6 +76,14 @@ class DataView(QWidget):
     data_removed = Signal(list)  # List of row indices removed
     status_updated = Signal(str, bool)  # Status message, is_error
 
+    # Column names used across the application
+    PLAYER_COLUMN = "PLAYER"
+    SOURCE_COLUMN = "SOURCE"
+    CHEST_COLUMN = "CHEST"
+    SCORE_COLUMN = "SCORE"
+    CLAN_COLUMN = "CLAN"
+    STATUS_COLUMN = "STATUS"
+
     def __init__(self, data_model: ChestDataModel, parent: Optional[QWidget] = None) -> None:
         """
         Initialize the DataView.
@@ -95,6 +103,16 @@ class DataView(QWidget):
         self._auto_update_enabled = True  # Enable auto-update by default
         self._population_in_progress = False  # Track if table population is in progress
 
+        # Initialize columns list with default columns
+        self._columns = [
+            self.PLAYER_COLUMN,
+            self.SOURCE_COLUMN,
+            self.CHEST_COLUMN,
+            self.SCORE_COLUMN,
+            self.CLAN_COLUMN,
+            self.STATUS_COLUMN,
+        ]
+
         # Set up UI
         self._init_ui()
 
@@ -103,6 +121,10 @@ class DataView(QWidget):
 
         # Initial update
         self._update_view()
+
+        # Ensure status column and proper column widths
+        self._ensure_status_column()
+        self._customize_column_widths()
 
     def _init_ui(self) -> None:
         """Initialize the user interface."""
@@ -208,10 +230,16 @@ class DataView(QWidget):
         self._table_view.setModel(self._table_model)
         self._table_view.setAlternatingRowColors(True)
         self._table_view.setContextMenuPolicy(Qt.CustomContextMenu)
-        self._table_view.horizontalHeader().setStretchLastSection(True)
+        self._table_view.horizontalHeader().setStretchLastSection(
+            False
+        )  # Change to False to allow manual sizing
         self._table_view.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
         self._table_view.verticalHeader().setDefaultSectionSize(24)  # Compact rows
         self._table_view.verticalHeader().setVisible(True)
+
+        # Disable text wrapping in the view
+        self._table_view.setWordWrap(False)
+        self._table_view.setTextElideMode(Qt.ElideRight)  # Show ellipsis for cut-off text
 
         # Set up custom delegate for validation visualization
         self._validation_delegate = ValidationStatusDelegate(self)
@@ -795,78 +823,145 @@ class DataView(QWidget):
         Args:
             validation_status: The validation status.
         """
-        logger.debug("Handling validation changed in DataView")
-
-        # Update the view with validation status
-        if self._data_model.is_empty:
-            return
-
         try:
-            # Get validation status for each cell
-            for row in range(self._table_model.rowCount()):
-                # Determine if this row has valid data for all columns
-                row_valid = True
+            # Check if we have valid models
+            if not self._has_valid_models():
+                logger.warning("Cannot update validation status: Invalid models")
+                return
 
-                for col in range(
-                    min(self._table_model.columnCount(), len(self._data_model.column_names))
-                ):
-                    # Get the actual row index if filtered
-                    actual_row = row
-                    if self._filtered_rows and row < len(self._filtered_rows):
-                        actual_row = self._filtered_rows[row]
+            logger.debug("Handling validation changed in DataView")
 
-                    try:
-                        column_name = self._data_model.column_names[col]
+            # Get the model's validation status if not provided
+            if validation_status is None and hasattr(self._data_model, "get_validation_status"):
+                try:
+                    validation_status = self._data_model.get_validation_status()
+                    logger.debug(f"Got validation status: {type(validation_status)}")
+                except Exception as e:
+                    logger.error(f"Error getting validation status: {e}")
+                    return
 
-                        # Get cell validation status
-                        validation_info = self._data_model.get_cell_validation_status(
-                            actual_row, column_name
+            # Ensure status column exists
+            self._ensure_status_column()
+
+            # Get status column index
+            status_col = self._get_column_index(self.STATUS_COLUMN)
+            if status_col < 0:
+                logger.error("Status column not found in table model")
+                return
+
+            # Handle different validation_status data types
+            if validation_status is None:
+                # If validation_status is None, set all to "Not validated"
+                logger.debug("Validation status is None, setting all to 'Not validated'")
+                for row in range(self._table_model.rowCount()):
+                    self._table_model.setData(
+                        self._table_model.index(row, status_col), "Not validated"
+                    )
+            elif isinstance(validation_status, pd.DataFrame):
+                # Handle DataFrame case
+                logger.debug(
+                    f"Handling DataFrame validation status with columns: {validation_status.columns.tolist()}"
+                )
+
+                # Get all columns that indicate validation status (end with _valid)
+                validation_columns = [
+                    col for col in validation_status.columns if col.endswith("_valid")
+                ]
+
+                # Update status for each row
+                for row in range(self._table_model.rowCount()):
+                    if row >= len(validation_status):
+                        # Row outside of validation range
+                        self._table_model.setData(
+                            self._table_model.index(row, status_col), "Not validated"
                         )
-
-                        # Check the 'valid' key from the validation_info dictionary
-                        index = self._table_model.index(row, col)
-                        is_valid = True
-
-                        if validation_info and "valid" in validation_info:
-                            is_valid = validation_info["valid"]
-
-                        # Set validation status based on validity
-                        if is_valid:
-                            self._table_model.setData(
-                                index, ValidationStatus.VALID, Qt.ItemDataRole.UserRole + 1
-                            )
-                        else:
-                            self._table_model.setData(
-                                index, ValidationStatus.INVALID, Qt.ItemDataRole.UserRole + 1
-                            )
-                            row_valid = False
-
-                    except IndexError:
-                        # Handle case where model column count doesn't match data column count
-                        logger.debug(f"Column index {col} out of range for data model columns")
                         continue
-                    except Exception as e:
-                        logger.debug(
-                            f"Error getting validation status for cell [{actual_row}, {col}]: {e}"
+
+                    # Check if this row has any validation columns set
+                    if not validation_columns:
+                        # No validation columns, set to "Not validated"
+                        self._table_model.setData(
+                            self._table_model.index(row, status_col), "Not validated"
                         )
                         continue
 
-                # Update status column if it exists
-                status_col = self._table_model.columnCount() - 1
-                if status_col >= len(self._data_model.column_names):
-                    status_item = self._table_model.item(row, status_col)
-                    if status_item:
-                        if row_valid:
-                            status_item.setText("Valid")
-                            status_item.setBackground(QColor(0, 180, 0, 50))  # Light green
-                        else:
-                            status_item.setText("Invalid")
-                            status_item.setBackground(QColor(180, 0, 0, 50))  # Light red
+                    # Check row's validation status
+                    row_has_validation = False
+                    row_is_valid = True
+
+                    for col in validation_columns:
+                        # Skip if the column doesn't exist in the row or the value is NaN
+                        if col not in validation_status.columns or pd.isna(
+                            validation_status.iloc[row].get(col, None)
+                        ):
+                            continue
+
+                        # If the column exists and has a value, we've validated this row
+                        row_has_validation = True
+
+                        # If any column is invalid (False), the row is invalid
+                        if not validation_status.iloc[row][col]:
+                            row_is_valid = False
+
+                    # Set the cell's status based on validation results
+                    if row_has_validation:
+                        status_text = "Valid" if row_is_valid else "Invalid"
+                    else:
+                        status_text = "Not validated"
+
+                    self._table_model.setData(self._table_model.index(row, status_col), status_text)
+
+            elif isinstance(validation_status, dict):
+                # Handle dictionary case
+                logger.debug("Handling dictionary validation status")
+
+                # Set all rows to "Not validated" initially
+                for row in range(self._table_model.rowCount()):
+                    self._table_model.setData(
+                        self._table_model.index(row, status_col), "Not validated"
+                    )
+
+                # Process dictionary entries
+                for row_idx, row_status in validation_status.items():
+                    # Skip if row_idx is not a valid row number
+                    if (
+                        not isinstance(row_idx, int)
+                        or row_idx < 0
+                        or row_idx >= self._table_model.rowCount()
+                    ):
+                        continue
+
+                    # Skip if row_status is not a dictionary
+                    if not isinstance(row_status, dict):
+                        continue
+
+                    # Check for validation columns (ending with _valid)
+                    validation_results = []
+                    for col, val in row_status.items():
+                        if col.endswith("_valid") and isinstance(val, bool):
+                            validation_results.append(val)
+
+                    # If we have validation results, update the status
+                    if validation_results:
+                        status_text = "Valid" if all(validation_results) else "Invalid"
+                        self._table_model.setData(
+                            self._table_model.index(row_idx, status_col), status_text
+                        )
+            else:
+                # Unknown validation_status type, log error
+                logger.error(f"Unknown validation_status type: {type(validation_status)}")
+                # Set all to "Not validated"
+                for row in range(self._table_model.rowCount()):
+                    self._table_model.setData(
+                        self._table_model.index(row, status_col), "Not validated"
+                    )
+
+            # Make the view update
+            self._table_view.viewport().update()
+            logger.debug("Validation status update complete")
+
         except Exception as e:
-            logger.error(f"Error updating validation status in view: {e}")
-
-        # Refresh the view
-        self._table_view.viewport().update()
+            logger.error(f"Error updating validation status in data view: {e}", exc_info=True)
 
     @Slot(object)
     def _on_correction_applied(self, correction_status) -> None:
@@ -1090,87 +1185,13 @@ class DataView(QWidget):
         self.export_clicked.emit()
 
     def populate_table(self) -> None:
-        """Populate the table with data from the data model."""
-        # Check if population is already in progress
-        if self._population_in_progress:
-            logger.debug("Table population already in progress, skipping duplicate call")
-            return
-
-        # Use the existing _update_view method to do the actual population
-        self._update_view()
-
-    def enable_auto_update(self) -> None:
-        """Enable automatic table updates on data changes."""
-        logger.info("DataView auto-update enabled")
-        self._auto_update_enabled = True
-
-    def disable_auto_update(self) -> None:
-        """Disable automatic table updates on data changes."""
-        logger.info("DataView auto-update disabled")
-        self._auto_update_enabled = False
-
-    def _add_status_column(self) -> None:
-        """Add a status column to the table to display validation status."""
-        # Get the number of columns and rows in the table model
-        cols = self._table_model.columnCount()
-        rows = self._table_model.rowCount()
-
-        # Add the status column
-        self._table_model.setColumnCount(cols + 1)
-        self._table_model.setHeaderData(cols, Qt.Horizontal, "STATUS")
-
-        # Populate the status column
-        for row in range(rows):
-            # Default status is "Not validated"
-            status_text = "Not validated"
-
-            # Get the actual row index if filtered
-            actual_row = row
-            if self._filtered_rows and row < len(self._filtered_rows):
-                actual_row = self._filtered_rows[row]
-
-            # Check all columns' validation status
-            if not self._data_model.is_empty and len(self._data_model.column_names) > 0:
-                # Default to valid until we find an invalid column
-                row_is_valid = True
-                has_validation = False
-
-                # Check each column for validation status
-                for col_name in self._data_model.column_names:
-                    validation_info = self._data_model.get_cell_validation_status(
-                        actual_row, col_name
-                    )
-
-                    if validation_info:
-                        has_validation = True
-                        if "valid" in validation_info and not validation_info["valid"]:
-                            row_is_valid = False
-                            break
-
-                # Determine status text based on validation
-                if has_validation:
-                    status_text = "Valid" if row_is_valid else "Invalid"
-
-            # Create and set status item
-            status_item = QStandardItem(status_text)
-            status_item.setTextAlignment(Qt.AlignCenter)
-
-            # Set item background color based on status
-            if status_text == "Valid":
-                status_item.setBackground(QColor(0, 180, 0, 50))  # Light green
-            elif status_text == "Invalid":
-                status_item.setBackground(QColor(180, 0, 0, 50))  # Light red
-
-            self._table_model.setItem(row, cols, status_item)
-
-    def populate_table(self) -> None:
-        """Populate the table with data from the model."""
+        """Populate the table with data from the model using chunked approach for responsiveness."""
         # Skip if already updating
         if self._is_updating or self._population_in_progress:
             return
 
         try:
-            # Set flag to prevent recursive calls
+            # Set flags to prevent recursive calls
             self._is_updating = True
             self._population_in_progress = True
 
@@ -1180,15 +1201,17 @@ class DataView(QWidget):
             # Check if model is empty
             if self._data_model.is_empty:
                 self._update_status("No data loaded")
+                self._is_updating = False
+                self._population_in_progress = False
                 return
 
             # Get data from the model
-            data = self._data_model.data
+            self._population_data = self._data_model.data
 
             # Check if filtering should be applied
             if self._current_filter and "column" in self._current_filter:
                 filtered_data = self._filter_data(
-                    data,
+                    self._population_data,
                     self._current_filter["column"],
                     self._current_filter["text"],
                     self._current_filter["mode"],
@@ -1196,32 +1219,68 @@ class DataView(QWidget):
                 )
                 # Store filtered row indices for later reference
                 self._filtered_rows = filtered_data.index.tolist()
-                data = filtered_data
+                self._population_data = filtered_data
             else:
                 # No filtering, use all rows
-                self._filtered_rows = list(range(len(data)))
+                self._filtered_rows = list(range(len(self._population_data)))
 
             # Get column names from model
             columns = self._data_model.column_names
 
             # Set up the model with correct dimensions
             self._table_model.setColumnCount(len(columns))
-            self._table_model.setRowCount(len(data))
+            self._table_model.setRowCount(len(self._population_data))
 
             # Set header labels
             for col, name in enumerate(columns):
                 self._table_model.setHeaderData(col, Qt.Horizontal, name)
 
             # Set row header labels (row numbers)
-            for row in range(len(data)):
+            for row in range(len(self._population_data)):
                 original_idx = self._filtered_rows[row] if row < len(self._filtered_rows) else row
                 self._table_model.setHeaderData(row, Qt.Vertical, str(original_idx))
 
-            # Populate the table with data
-            for row in range(len(data)):
-                for col, column_name in enumerate(columns):
+            # Update status to show we're populating
+            self._update_status(f"Populating {len(self._population_data)} rows...")
+
+            # Set up chunked population parameters
+            self._rows_per_chunk = 200  # Configure this based on performance testing
+            self._current_chunk_start = 0
+            self._total_rows = len(self._population_data)
+            self._columns = columns
+
+            # Start the chunked population
+            QTimer.singleShot(0, self._populate_chunk)
+
+        except Exception as e:
+            logger.error(f"Error setting up table population: {e}")
+            self._update_status(f"Error: {str(e)}", True)
+            self._is_updating = False
+            self._population_in_progress = False
+
+    def _populate_chunk(self) -> None:
+        """Populate a chunk of rows in the table."""
+        try:
+            # Check if we should stop
+            if not self._population_in_progress or self._current_chunk_start >= self._total_rows:
+                # We're done, finalize the population
+                self._finalize_population()
+                return
+
+            # Calculate end of this chunk
+            chunk_end = min(self._current_chunk_start + self._rows_per_chunk, self._total_rows)
+
+            # Update status to show progress
+            progress_pct = int((self._current_chunk_start / self._total_rows) * 100)
+            self._update_status(
+                f"Populating table: {progress_pct}% ({self._current_chunk_start}/{self._total_rows} rows)"
+            )
+
+            # Populate this chunk of rows
+            for row in range(self._current_chunk_start, chunk_end):
+                for col, column_name in enumerate(self._columns):
                     # Get value from DataFrame
-                    value = data.iloc[row][column_name]
+                    value = self._population_data.iloc[row][column_name]
 
                     # Create item from value
                     item = QStandardItem(str(value))
@@ -1229,28 +1288,115 @@ class DataView(QWidget):
                     # Set the item in the model
                     self._table_model.setItem(row, col, item)
 
-            # Add the status column
-            self._add_status_column()
+            # Update progress
+            self._current_chunk_start = chunk_end
 
-            # Update status message
-            total_rows = len(self._data_model.data)
-            filtered_rows = len(data)
-            if total_rows == filtered_rows:
-                self._update_status(f"Showing all {total_rows} rows")
-            else:
-                self._update_status(f"Showing {filtered_rows} of {total_rows} rows")
-
-            # Apply validation highlighting
-            self._on_validation_changed()
+            # Schedule the next chunk with a small delay to keep UI responsive
+            QTimer.singleShot(5, self._populate_chunk)
 
         except Exception as e:
-            logger.error(f"Error populating table: {e}")
+            logger.error(f"Error in chunk population: {e}")
             self._update_status(f"Error: {str(e)}", True)
-
-        finally:
-            # Reset flags
             self._is_updating = False
             self._population_in_progress = False
+
+    def _finalize_population(self):
+        """Finalize the population process."""
+        self._ensure_no_text_wrapping()
+        self._customize_column_widths()
+        self._update_status_from_row_count()
+
+    def _ensure_no_text_wrapping(self):
+        """Ensure that text does not wrap in table cells."""
+        # Disable word wrap at the view level
+        if hasattr(self, "_table_view") and self._table_view is not None:
+            # Set the text elide mode for the header to ensure no wrapping
+            header = self._table_view.horizontalHeader()
+            if header is not None:
+                # Set a reasonable default section size to reduce need for wrapping
+                header.setDefaultSectionSize(120)
+                # Ensure header text does not wrap
+                header.setTextElideMode(Qt.ElideRight)
+
+            # Set word wrap to false for the table view
+            self._table_view.setWordWrap(False)
+            # Set text elide mode to ensure text is ellipsized
+            self._table_view.setTextElideMode(Qt.ElideRight)
+
+    def _customize_column_widths(self):
+        """
+        Customize column widths based on content type.
+
+        Sets appropriate widths for each column type:
+        - Fixed width for player, source, and chest columns
+        - Smaller width for status, score and clan columns
+        - Default width for other columns
+        """
+        if not hasattr(self, "_table_view") or self._table_view is None:
+            logger.warning("Cannot customize column widths: TableView not available")
+            return
+
+        # Get the header view
+        header = self._table_view.horizontalHeader()
+        if not header:
+            logger.warning("Cannot customize column widths: Header view not available")
+            return
+
+        # Make sure the header sections can be resized by the user
+        header.setSectionResizeMode(QHeaderView.Interactive)
+
+        # Define default widths
+        default_column_widths = {
+            self.PLAYER_COLUMN: 200,
+            self.SOURCE_COLUMN: 200,
+            self.CHEST_COLUMN: 200,
+            self.STATUS_COLUMN: 60,
+            self.SCORE_COLUMN: 80,
+            self.CLAN_COLUMN: 80,
+        }
+
+        # First, try to set column widths by indices from the model
+        for col in range(self._table_model.columnCount()):
+            column_name = self._table_model.headerData(col, Qt.Horizontal)
+            if column_name in default_column_widths:
+                width = default_column_widths[column_name]
+                self._table_view.setColumnWidth(col, width)
+                logger.debug(f"Set {column_name} column (index {col}) width to {width}px")
+
+        # If we have the PLAYER column in our list but it's not in the model,
+        # make sure the STATUS column is still properly sized if it exists
+        status_col = self._get_column_index(self.STATUS_COLUMN)
+        if status_col >= 0:
+            self._table_view.setColumnWidth(status_col, default_column_widths[self.STATUS_COLUMN])
+            logger.debug(
+                f"Set STATUS column (index {status_col}) width to {default_column_widths[self.STATUS_COLUMN]}px"
+            )
+
+    def _get_column_index(self, column_name: str, default: int = -1) -> int:
+        """
+        Get the index of a column by name.
+
+        Args:
+            column_name: Name of the column to find
+            default: Default value to return if column not found
+
+        Returns:
+            Index of the column or default value if not found
+        """
+        if not hasattr(self, "_table_model") or self._table_model is None:
+            return default
+
+        # Search for column in the model
+        for col in range(self._table_model.columnCount()):
+            header_data = self._table_model.headerData(col, Qt.Horizontal)
+            if header_data == column_name:
+                return col
+
+        # If column not found in model but exists in columns list
+        if column_name in self._columns:
+            return self._columns.index(column_name)
+
+        return default
 
     def _update_status(self, message: str, is_error: bool = False) -> None:
         """
@@ -1277,3 +1423,73 @@ class DataView(QWidget):
             logger.debug(f"Status updated: {message}")
         except Exception as e:
             logger.error(f"Error updating status: {e}")
+
+    def enable_auto_update(self) -> None:
+        """Enable automatic table updates on data changes."""
+        logger.info("DataView auto-update enabled")
+        self._auto_update_enabled = True
+
+    def disable_auto_update(self) -> None:
+        """Disable automatic table updates on data changes."""
+        logger.info("DataView auto-update disabled")
+        self._auto_update_enabled = False
+
+    def _update_status_from_row_count(self):
+        """Update the status display based on the current row count."""
+        if hasattr(self, "_table_model") and self._table_model is not None:
+            row_count = self._table_model.rowCount()
+            if row_count > 0:
+                self._update_status(f"Showing all {row_count} rows")
+            else:
+                self._update_status("No data loaded")
+
+    def _ensure_status_column(self) -> None:
+        """Ensure the status column exists in the table model."""
+        if not hasattr(self, "_table_model") or self._table_model is None:
+            return
+
+        # Check if STATUS_COLUMN exists in columns
+        if self.STATUS_COLUMN not in self._columns:
+            self._columns.append(self.STATUS_COLUMN)
+
+        # Get the current column count
+        col_idx = self._table_model.columnCount()
+
+        # If there are no columns yet, add a header with just the STATUS_COLUMN
+        # This ensures STATUS_COLUMN exists even when no data is loaded
+        if col_idx == 0:
+            logger.debug("No columns in table model, adding STATUS_COLUMN header")
+            self._table_model.setColumnCount(1)
+            self._table_model.setHeaderData(0, Qt.Horizontal, self.STATUS_COLUMN)
+            return
+
+        # Check if the STATUS_COLUMN already exists
+        has_status_column = False
+        for i in range(col_idx):
+            if self._table_model.headerData(i, Qt.Horizontal) == self.STATUS_COLUMN:
+                has_status_column = True
+                break
+
+        # If STATUS_COLUMN doesn't exist, add it
+        if not has_status_column:
+            logger.debug(f"Adding STATUS_COLUMN at column index {col_idx}")
+            self._table_model.insertColumn(col_idx)
+            self._table_model.setHeaderData(col_idx, Qt.Horizontal, self.STATUS_COLUMN)
+
+            # Populate with "Not validated" values
+            for row in range(self._table_model.rowCount()):
+                index = self._table_model.index(row, col_idx)
+                self._table_model.setData(index, "Not validated")
+
+    def _has_valid_models(self) -> bool:
+        """Check if both data model and table model are valid.
+
+        Returns:
+            bool: True if both models are valid, False otherwise.
+        """
+        return (
+            hasattr(self, "_data_model")
+            and self._data_model is not None
+            and hasattr(self, "_table_model")
+            and self._table_model is not None
+        )

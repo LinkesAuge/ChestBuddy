@@ -842,26 +842,41 @@ class ChestDataModel(QObject):
         Get the validation status for a specific cell.
 
         Args:
-            row_idx: The index of the row.
-            column_name: The name of the column.
+            row_idx: Row index
+            column_name: Column name
 
         Returns:
-            Dictionary with validation status for the cell.
+            Dictionary with validation information:
+                - valid: True if validation passed, False otherwise
+                - reason: Reason for validation failure (if any)
+                - validated: True if this cell has been validated, False if not yet validated
         """
-        if self._validation_status.empty or row_idx >= len(self._validation_status):
-            return {"valid": True}
+        try:
+            # First check if the row index is valid
+            if row_idx < 0 or row_idx >= len(self._data):
+                logger.warning(f"Invalid row index: {row_idx}")
+                return {}
 
-        status_col = f"{column_name}_valid"
-        if status_col in self._validation_status.columns:
-            # Access the value directly without DataFrame operations
-            try:
-                is_valid = self._validation_status.iloc[row_idx][status_col]
-                return {"valid": bool(is_valid)}
-            except Exception as e:
-                logger.error(f"Error getting cell validation status: {e}")
-                return {"valid": True}
+            # Second check if the column name is valid
+            if column_name not in self._data.columns:
+                logger.warning(f"Invalid column name: {column_name}")
+                return {}
 
-        return {"valid": True}
+            # Check if validation status exists
+            if self._validation_status.empty:
+                return {"validated": False}
+
+            # Extract validation status for this cell
+            validation_info = self._validation_status.iloc[row_idx].get(column_name, {})
+
+            # If we have validation info, add the validated flag
+            if validation_info:
+                validation_info["validated"] = True
+
+            return validation_info or {"validated": False}
+        except Exception as e:
+            logger.error(f"Error getting cell validation status: {str(e)}")
+            return {"validated": False}
 
     def get_cell_correction_status(self, row_idx: int, column_name: str) -> Dict[str, Any]:
         """

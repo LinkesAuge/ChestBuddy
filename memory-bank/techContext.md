@@ -108,6 +108,8 @@ The project follows a clear, modular structure with these key directories:
 
 10. **Testing Approach**: Adopted a comprehensive testing strategy with unit, integration, and end-to-end tests.
 
+11. **Chunked Processing**: Implemented a chunked processing approach for UI-intensive operations to maintain responsiveness. This technique breaks large operations (like table population) into smaller chunks of work (200 rows at a time) and yields control back to the Qt event loop between processing chunks using QTimer.singleShot(). This prevents UI freezing during heavy operations while providing opportunities for progress feedback.
+
 ## Technical Implementation Challenges and Solutions
 
 ### Challenge 1: Signal Connection Management

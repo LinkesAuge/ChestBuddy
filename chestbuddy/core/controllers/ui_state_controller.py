@@ -15,6 +15,7 @@ import time
 from PySide6.QtCore import QObject, Signal, Slot
 
 from chestbuddy.core.controllers.base_controller import BaseController
+from chestbuddy.utils.config import ConfigManager
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -57,9 +58,27 @@ class UIStateController(BaseController):
         """
         super().__init__(signal_manager)
 
+        # Get config manager instance
+        self._config_manager = ConfigManager()
+
         # Initialize state
         self._status_message = "Ready"
-        self._action_states = {}
+        self._action_states = {
+            "save": False,
+            "save_as": False,
+            "export": False,
+            "validate": False,
+            "correct": False,
+            "chart": False,
+            "filter": False,
+            "sort": False,
+            "add_to_validation": False,
+            "clear_validation": False,
+            "refresh_validation": False,
+            "auto_validate": self._config_manager.get_bool(
+                "Validation", "auto_validate", True
+            ),  # Load from config
+        }
         self._ui_theme = "default"
         self._validation_state = {
             "has_issues": False,
@@ -105,6 +124,14 @@ class UIStateController(BaseController):
             if action_name not in self._action_states or self._action_states[action_name] != state:
                 self._action_states[action_name] = state
                 changed = True
+
+                # Save auto_validate setting to config if it changed
+                if action_name == "auto_validate":
+                    try:
+                        self._config_manager.set("Validation", "auto_validate", str(state))
+                        logger.debug(f"Saved auto_validate setting to config: {state}")
+                    except Exception as e:
+                        logger.error(f"Error saving auto_validate setting to config: {e}")
 
         if changed:
             self.actions_state_changed.emit(self._action_states.copy())
@@ -163,6 +190,9 @@ class UIStateController(BaseController):
         Args:
             has_data: Whether data is currently loaded
         """
+        # Store current auto_validate state
+        auto_validate = self._action_states.get("auto_validate", True)
+
         # Update action states based on data availability
         self.update_action_states(
             save=has_data,
@@ -176,6 +206,7 @@ class UIStateController(BaseController):
             add_to_validation=has_data,
             clear_validation=has_data,
             refresh_validation=has_data,
+            auto_validate=auto_validate,  # Preserve auto_validate setting
         )
 
         # Update status message based on data state
@@ -311,3 +342,54 @@ class UIStateController(BaseController):
         )
 
         logger.debug(f"Handled validation results: {issue_count} issues found")
+
+    def toggle_auto_validate(self) -> bool:
+        """
+        Toggle the auto-validate state.
+
+        Returns:
+            bool: The new auto-validate state
+        """
+        current_state = self._action_states.get("auto_validate", True)
+        new_state = not current_state
+
+        # Update state and emit signal
+        self.update_action_states(auto_validate=new_state)
+
+        # Save to config
+        try:
+            self._config_manager.set("Validation", "auto_validate", str(new_state))
+            logger.info(f"Saved auto_validate toggle to config: {new_state}")
+        except Exception as e:
+            logger.error(f"Error saving auto_validate toggle to config: {e}")
+
+        logger.info(f"Auto-validate toggled from {current_state} to {new_state}")
+        return new_state
+
+    def set_auto_validate(self, enabled: bool) -> None:
+        """
+        Set the auto-validate state.
+
+        Args:
+            enabled: Whether auto-validation should be enabled
+        """
+        if self._action_states.get("auto_validate") != enabled:
+            self.update_action_states(auto_validate=enabled)
+
+            # Save to config
+            try:
+                self._config_manager.set("Validation", "auto_validate", str(enabled))
+                logger.info(f"Saved auto_validate setting to config: {enabled}")
+            except Exception as e:
+                logger.error(f"Error saving auto_validate setting to config: {e}")
+
+            logger.info(f"Auto-validate set to {enabled}")
+
+    def get_auto_validate(self) -> bool:
+        """
+        Get the current auto-validate state.
+
+        Returns:
+            bool: Whether auto-validation is enabled
+        """
+        return self._action_states.get("auto_validate", True)

@@ -264,6 +264,81 @@ class ValidationListProxy:
         return self._list
 ```
 
+### 11. Chunked Processing Pattern
+
+**Implementation**: Breaking large operations into smaller chunks processed sequentially
+
+**Examples**:
+- Table population in DataView for large datasets
+- Validation processing for large datasets
+- File loading operations with progress reporting
+
+**Benefits**:
+- Maintains UI responsiveness during heavy operations
+- Provides opportunity for progress feedback
+- Prevents blocking the main UI thread
+- Reduces perceived processing time for users
+
+**DataView Chunked Population Example**:
+```python
+def populate_table(self) -> None:
+    """Populate the table with data from the data model.
+    
+    Uses a chunked approach to prevent UI freezing with large datasets.
+    Each chunk processes a limited number of rows (200) and then yields
+    back to the event loop before continuing.
+    """
+    if not self._data_model or self._data_model.is_empty():
+        return
+
+    # Reset population state
+    self._rows_to_process = len(self._data_model)
+    self._current_row_index = 0
+    self._population_in_progress = True
+    
+    # Clear existing table and prepare model
+    self._table_model.clear()
+    self._setup_horizontal_headers()
+    
+    # Start the chunked population process
+    self._populate_chunk()
+
+def _populate_chunk(self) -> None:
+    """Process a chunk of rows (200 max) and schedule the next chunk."""
+    if not self._population_in_progress:
+        return
+        
+    chunk_size = 200  # Process 200 rows at a time
+    end_row = min(self._current_row_index + chunk_size, self._rows_to_process)
+    
+    # Process this chunk
+    for row_idx in range(self._current_row_index, end_row):
+        # Add row to the table model
+        # ... row processing code ...
+    
+    # Update progress
+    self._current_row_index = end_row
+    progress = (self._current_row_index / self._rows_to_process) * 100
+    
+    # If more rows to process, schedule next chunk
+    if self._current_row_index < self._rows_to_process:
+        QTimer.singleShot(0, self._populate_chunk)
+    else:
+        # Finalize population
+        self._population_in_progress = False
+        self._finalize_population()
+```
+
+This pattern is essential for operations that would otherwise block the UI thread for an extended period. By breaking the work into manageable chunks and yielding control back to the event loop between chunks (via `QTimer.singleShot(0, ...)`), the UI remains responsive and can update progress indicators, respond to user input, and provide a better overall user experience.
+
+For the ChestBuddy application, this pattern is used in:
+1. Table population when displaying large datasets
+2. Data validation processing for extensive rule checks
+3. CSV import operations with multiple files
+4. Chart generation with complex datasets
+
+The implementation uses Qt's timer system (specifically `QTimer.singleShot()`) to schedule each chunk of work while ensuring the UI event loop can process pending events between chunks.
+
 ## Utility Patterns
 
 ### 1. SignalManager

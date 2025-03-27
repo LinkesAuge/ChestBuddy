@@ -275,3 +275,97 @@ UX Rubric to rate the quality of your UI/UX design:
 | **Hierarchy & Navigation** | Weight: 1x  | Flawless content hierarchy with intuitive navigation that effortlessly guides users to core features and information.          | Content levels are well-defined, and primary navigation is accessible; minor tweaks could enhance usability further.           | A straightforward hierarchy is established, though key actions or navigation items could be more prominently displayed.    | Some attempt at prioritizing content is visible, yet users may struggle to locate important features easily.         | Information is scattered without clear importance levels; navigation elements are unrecognizable or absent.             |
 | **Accessibility**          | Weight: 1x  | Fully meets or exceeds accessibility best practices, ensuring all users can easily interact with and understand the dashboard. | The design largely complies with accessibility standards; minor improvements could include more robust testing or refinements. | Basic accessibility measures are present, though certain features like keyboard navigation or ARIA tags may be incomplete. | Some attempts to address accessibility are made, yet many crucial guidelines (e.g., color contrast) remain unmet.    | Design disregards accessibility guidelines altogether, using low contrast, illegible fonts, and no accessible patterns. |
 | **Spacing & Alignment**    | Weight: 1x  | A perfectly balanced layout with deliberate spacing; every element is precisely aligned for maximum readability.               | Thoughtful use of white space and alignment creates a clean layout with only minor areas needing adjustment.                   | Spacing and alignment are mostly consistent, though certain sections need refinement to enhance clarity.                   | Some uniformity in spacing is emerging, but inconsistent alignment detracts from legibility and overall visual flow. | Visual clutter dominates due to no consistent margins, padding, or alignment, making the interface look unfinished.     |
+
+## 5. Performance Patterns
+
+### 5.1 Chunked Processing for UI Responsiveness
+
+To maintain UI responsiveness during intensive operations like table population, data validation, or file loading, the application implements a chunked processing pattern:
+
+#### Pattern Implementation
+- **Concept**: Break large operations into smaller chunks processed sequentially with UI updates between chunks
+- **Mechanism**: Use Qt's timer system (QTimer.singleShot) to yield to the event loop
+- **Chunk Size**: Typically 200 items per chunk for table operations
+- **Progress Indication**: Update progress indicators between chunks
+
+#### Applied Examples
+
+**Table Population**:
+- Main implementation in DataView.populate_table() method
+- Processes 200 rows per chunk
+- Provides visual feedback on progress during population
+- Maintains UI responsiveness even with datasets of 10,000+ rows
+
+**Data Import**:
+- Implementation in MultiCSVLoadTask
+- Processes files in chunks with progress reporting
+- Allows cancellation during the operation
+
+#### Best Practices
+
+1. **Appropriate Chunk Size**:
+   - Balance between performance and responsiveness
+   - 100-200 items works well for most operations
+   - Adjust based on operation complexity
+
+2. **Progress Feedback**:
+   - Always provide visual indication of progress
+   - Update status bar or progress dialog between chunks
+   - Consider percent-complete indicators for longer operations
+
+3. **Cancelable Operations**:
+   - Include cancellation capability for long operations
+   - Check for cancellation between chunks
+   - Clean up resources properly if canceled
+
+4. **Implementation Pattern**:
+   ```python
+   def process_operation(self):
+       # Initialize
+       self._items_to_process = len(items)
+       self._current_index = 0
+       self._in_progress = True
+       
+       # Start chunked processing
+       self._process_chunk()
+   
+   def _process_chunk(self):
+       if not self._in_progress:
+           return
+           
+       chunk_size = 200
+       end_index = min(self._current_index + chunk_size, self._items_to_process)
+       
+       # Process this chunk
+       for idx in range(self._current_index, end_index):
+           # Process item
+           
+       # Update progress and schedule next chunk
+       self._current_index = end_index
+       if self._current_index < self._items_to_process:
+           QTimer.singleShot(0, self._process_chunk)
+       else:
+           self._finalize_operation()
+   ```
+
+5. **UI Thread Considerations**:
+   - For very complex operations, consider true background processing
+   - For simpler operations, chunked processing often provides a good balance
+   - Always update UI elements in the main thread
+
+### 5.2 Debouncing and Throttling
+
+For UI events that can fire rapidly (like resize, scrolling, or text input), implement debouncing or throttling:
+
+- **Debouncing**: Wait until a pause in the event stream before processing
+- **Throttling**: Process at most once per specified time interval
+
+The application uses the SignalManager's throttling capabilities to improve UI performance for frequent events.
+
+### 5.3 Lazy Loading
+
+For components or data that might not be immediately needed:
+
+- Load only when needed/visible
+- Implement placeholder states for unloaded content
+- Load in background when idle time is available
