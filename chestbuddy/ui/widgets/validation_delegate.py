@@ -37,10 +37,8 @@ class ValidationStatusDelegate(QStyledItemDelegate):
     # Define colors for different validation states
     VALID_COLOR = QColor(0, 255, 0, 40)  # Light green transparent
     WARNING_COLOR = QColor(255, 240, 0, 80)  # Light yellow
-    INVALID_COLOR = QColor(255, 0, 0, 170)  # Bright red with high opacity
-    INVALID_ROW_COLOR = QColor(
-        255, 200, 200, 120
-    )  # Light red for row highlighting with increased opacity
+    INVALID_COLOR = QColor(255, 0, 0, 200)  # Bright red with higher opacity for better visibility
+    INVALID_ROW_COLOR = QColor(255, 200, 200, 120)  # Light red for row highlighting
     NOT_VALIDATED_COLOR = QColor(200, 200, 200, 40)  # Light gray for not validated
 
     # Column name constants
@@ -128,18 +126,19 @@ class ValidationStatusDelegate(QStyledItemDelegate):
                 # Light gray for not validated
                 painter.fillRect(option.rect, self.NOT_VALIDATED_COLOR)
         else:
-            # Apply row highlighting if the row has invalid status
-            if row_has_invalid_status:
-                painter.fillRect(option.rect, self.INVALID_ROW_COLOR)
-
-            # If this specific cell has invalid status, highlight it with a stronger color
-            # This takes precedence over the row highlighting
+            # Check cell-specific validation status first (highest priority)
             if validation_status == ValidationStatus.INVALID:
-                # Draw with error highlighting (darker red)
+                # Draw with error highlighting (bright red)
+                self.logger.debug(f"Painting cell [{index.row()},{index.column()}] as INVALID")
                 painter.fillRect(option.rect, self.INVALID_COLOR)
             elif validation_status == ValidationStatus.WARNING:
                 # Draw with warning highlighting
+                self.logger.debug(f"Painting cell [{index.row()},{index.column()}] as WARNING")
                 painter.fillRect(option.rect, self.WARNING_COLOR)
+            # If no cell-specific status but row is invalid, use row highlighting
+            elif row_has_invalid_status:
+                self.logger.debug(f"Painting cell [{index.row()},{index.column()}] as invalid row")
+                painter.fillRect(option.rect, self.INVALID_ROW_COLOR)
 
         # Restore painter state before calling the parent paint method
         painter.restore()

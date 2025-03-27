@@ -230,7 +230,6 @@ class DataView(QWidget):
         # Table view with minimal spacing
         self._table_view = QTableView()
         self._table_view.setModel(self._table_model)
-        self._table_view.setAlternatingRowColors(True)
         self._table_view.setContextMenuPolicy(Qt.CustomContextMenu)
         self._table_view.horizontalHeader().setStretchLastSection(
             False
@@ -1020,14 +1019,14 @@ class DataView(QWidget):
                 /* Remove background-color to allow delegate painting to show through */
                 padding: 12px;
             }
-            QTableView::item:alternate {
-                background-color: #2D3748;
-            }
             QTableView::item:selected {
                 color: #1A2C42;
                 background-color: #D4AF37;
             }
         """)
+
+        # Disable alternating row colors which conflict with validation highlight
+        self._table_view.setAlternatingRowColors(False)
 
         # Make sure the model has appropriate default foreground color
         self._table_model.setItemPrototype(QStandardItem())
