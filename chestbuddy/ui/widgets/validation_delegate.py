@@ -37,14 +37,19 @@ class ValidationStatusDelegate(QStyledItemDelegate):
     # Define colors for different validation states
     VALID_COLOR = QColor(0, 255, 0, 40)  # Light green transparent
     WARNING_COLOR = QColor(255, 240, 0, 80)  # Light yellow
-    INVALID_COLOR = QColor(255, 0, 0, 255)  # Fully opaque bright red for maximum visibility
-    INVALID_ROW_COLOR = QColor(
-        255, 200, 200, 170
-    )  # Light red for row highlighting with even higher opacity
+    INVALID_COLOR = QColor(220, 20, 60, 255)  # Crimson red, fully opaque
+    INVALID_BORDER_COLOR = QColor(0, 0, 0, 255)  # Black border
+    INVALID_ROW_COLOR = QColor(255, 200, 200, 100)  # Light red with lower opacity
     NOT_VALIDATED_COLOR = QColor(200, 200, 200, 40)  # Light gray for not validated
 
     # Column name constants
     STATUS_COLUMN = "STATUS"
+    PLAYER_COLUMN = "PLAYER"
+    SOURCE_COLUMN = "SOURCE"
+    CHEST_COLUMN = "CHEST"
+
+    # List of columns that can be validated
+    VALIDATABLE_COLUMNS = [PLAYER_COLUMN, SOURCE_COLUMN, CHEST_COLUMN]
 
     def __init__(self, parent=None):
         """
@@ -85,6 +90,9 @@ class ValidationStatusDelegate(QStyledItemDelegate):
         # Check if this is the status column
         is_status_column = column_name == self.STATUS_COLUMN
 
+        # Check if this is a validatable column
+        is_validatable_column = column_name in self.VALIDATABLE_COLUMNS
+
         # First, check if the row has an invalid status - this affects all cells in the row
         row_has_invalid_status = False
         status_col_idx = -1
@@ -114,7 +122,8 @@ class ValidationStatusDelegate(QStyledItemDelegate):
             f"validation_status_type={type(validation_status)}, "
             f"row_invalid={row_has_invalid_status}, status_text={status_text}, "
             f"is_enum={isinstance(validation_status, ValidationStatus)}, "
-            f"is_dict={isinstance(validation_status, dict)}"
+            f"is_dict={isinstance(validation_status, dict)}, "
+            f"is_validatable={is_validatable_column}"
         )
 
         # If this is the status column, paint based on the text value
@@ -136,22 +145,28 @@ class ValidationStatusDelegate(QStyledItemDelegate):
             # Check cell-specific validation status with more lenient checks
             is_invalid = False
 
-            # Check different ways the validation status might be represented
-            if validation_status == ValidationStatus.INVALID:
-                is_invalid = True
-            elif isinstance(validation_status, dict):
-                # If it's a dict, check for any keys ending with _valid with False values
-                for key, value in validation_status.items():
-                    if key.endswith("_valid") and value is False:
-                        is_invalid = True
-                        break
-            elif validation_status is False:  # Direct boolean check
-                is_invalid = True
+            # Only consider validation status for validatable columns
+            if is_validatable_column:
+                # Check different ways the validation status might be represented
+                if validation_status == ValidationStatus.INVALID:
+                    is_invalid = True
+                elif isinstance(validation_status, dict):
+                    # If it's a dict, check for any keys ending with _valid with False values
+                    for key, value in validation_status.items():
+                        if key.endswith("_valid") and value is False:
+                            is_invalid = True
+                            break
+                elif validation_status is False:  # Direct boolean check
+                    is_invalid = True
 
-            if is_invalid:
-                # Draw with error highlighting (bright red)
+            if is_invalid and is_validatable_column:
+                # Draw with error highlighting (bright crimson)
                 self.logger.debug(f"Painting cell [{index.row()},{index.column()}] as INVALID")
                 painter.fillRect(option.rect, self.INVALID_COLOR)
+
+                # Draw a border around the invalid cell to make it really stand out
+                painter.setPen(self.INVALID_BORDER_COLOR)
+                painter.drawRect(option.rect)
             elif validation_status == ValidationStatus.WARNING:
                 # Draw with warning highlighting
                 self.logger.debug(f"Painting cell [{index.row()},{index.column()}] as WARNING")

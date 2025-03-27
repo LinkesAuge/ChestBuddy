@@ -1722,6 +1722,16 @@ class DataView(QWidget):
             # Get status column index
             status_col = self._get_column_index(self.STATUS_COLUMN)
 
+            # Define validatable columns
+            validatable_columns = ["PLAYER", "SOURCE", "CHEST"]
+
+            # Get column indices for validatable columns
+            validatable_col_indices = {}
+            for col_name in validatable_columns:
+                col_idx = self._get_column_index(col_name)
+                if col_idx >= 0:
+                    validatable_col_indices[col_name] = col_idx
+
             # Get validation status dataframe if available
             validation_status_df = None
             validation_columns = []
@@ -1784,14 +1794,25 @@ class DataView(QWidget):
                                     if not validation_status_df.iloc[row_idx][val_col]:
                                         # Get the original column name by removing _valid suffix
                                         orig_column = val_col.replace("_valid", "")
-                                        invalid_columns.append(orig_column)
-                                        logger.debug(
-                                            f"Row {row_idx} has invalid column: {orig_column}"
-                                        )
+                                        # Only add if it's a validatable column
+                                        if orig_column in validatable_columns:
+                                            invalid_columns.append(orig_column)
+                                            logger.debug(
+                                                f"Row {row_idx} has invalid column: {orig_column}"
+                                            )
                         except Exception as e:
                             logger.error(
                                 f"Error processing validation status for row {row_idx}: {e}"
                             )
+
+                    # Clear all previous validation status for this row
+                    for col in range(self._table_model.columnCount()):
+                        if col != status_col:  # Skip status column
+                            item = self._table_model.item(filtered_idx, col)
+                            if item:
+                                item.setData(
+                                    None, Qt.UserRole + 1
+                                )  # Clear any existing validation status
 
                     # Mark specifically invalid cells with INVALID status
                     if invalid_columns:
@@ -1810,18 +1831,18 @@ class DataView(QWidget):
                                         item.setData(ValidationStatus.INVALID, Qt.UserRole + 1)
                                     break
                     else:
-                        # No specific invalid columns identified, mark all cells in the row
+                        # No specific invalid columns identified, mark validatable cells in the row
                         logger.debug(
-                            f"Setting ValidationStatus.INVALID for all cells in row {filtered_idx} (no specific invalid columns identified)"
+                            f"No specific invalid columns identified for row {filtered_idx}, marking all validatable cells"
                         )
-                        for col in range(self._table_model.columnCount()):
-                            if col != status_col:  # Skip the status column
-                                item = self._table_model.item(filtered_idx, col)
+                        for col_name, col_idx in validatable_col_indices.items():
+                            if col_idx >= 0:
+                                item = self._table_model.item(filtered_idx, col_idx)
                                 if item:
-                                    item.setData(ValidationStatus.INVALID, Qt.UserRole + 1)
                                     logger.debug(
-                                        f"Set ValidationStatus.INVALID for cell [{filtered_idx},{col}]"
+                                        f"Setting ValidationStatus.INVALID for cell [{filtered_idx},{col_idx}] ({col_name})"
                                     )
+                                    item.setData(ValidationStatus.INVALID, Qt.UserRole + 1)
 
             # Force redraw of the view
             self._table_view.viewport().update()
