@@ -642,6 +642,9 @@ class DataViewController(BaseController):
             if self._view and hasattr(self._view, "refresh"):
                 self._view.refresh()
 
+            # Highlight invalid rows in the view
+            self.highlight_invalid_rows()
+
             logger.info(f"Handled validation completion with {len(results)} rule results")
 
         except Exception as e:

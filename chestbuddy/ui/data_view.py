@@ -525,7 +525,33 @@ class DataView(QWidget):
                                     column_name,  # Use actual_row_idx here
                                 )
                                 if val_status:
-                                    item.setData(val_status, Qt.UserRole + 1)
+                                    # Get validation columns from validation_status DataFrame if available
+                                    validation_columns = []
+                                    if hasattr(self._data_model, "get_validation_status"):
+                                        validation_status = self._data_model.get_validation_status()
+                                        if isinstance(validation_status, pd.DataFrame) and not validation_status.empty:
+                                            validation_columns = [
+                                                col for col in validation_status.columns 
+                                                if col.endswith("_valid")
+                                            ]
+                                    
+                                    # Convert the validation status dictionary to a ValidationStatus enum value
+                                    # Check if there's a validation column for this column
+                                    val_column = f"{column_name}_valid"
+                                    if val_column in validation_columns:
+                                        # Check if we have validation data for this cell
+                                        if val_column in validation_status.columns and not pd.isna(validation_status.iloc[actual_row_idx].get(val_column, None)):
+                                            # If the validation status is False, set as INVALID
+                                            if validation_status.iloc[actual_row_idx][val_column] == False:
+                                                item.setData(ValidationStatus.INVALID, Qt.UserRole + 1)
+                                            else:
+                                                item.setData(ValidationStatus.VALID, Qt.UserRole + 1)
+                                        else:
+                                            # No validation status available
+                                            item.setData(None, Qt.UserRole + 1)
+                                    else:
+                                        # Just store the original validation status dictionary
+                                        item.setData(val_status, Qt.UserRole + 1)
                             except Exception as vs_error:
                                 # Don't let validation status errors block the display
                                 logger.debug(f"Validation status access error: {vs_error}")

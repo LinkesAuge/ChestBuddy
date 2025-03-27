@@ -35,10 +35,10 @@ class ValidationStatusDelegate(QStyledItemDelegate):
     """
 
     # Define colors for different validation states
-    VALID_COLOR = QColor(0, 255, 0, 30)  # Light green transparent
+    VALID_COLOR = QColor(0, 255, 0, 40)  # Light green transparent
     WARNING_COLOR = QColor(255, 240, 0, 80)  # Light yellow
-    INVALID_COLOR = QColor(200, 0, 0, 150)  # Darker red with more opacity
-    INVALID_ROW_COLOR = QColor(255, 200, 200, 70)  # Light red for row highlighting
+    INVALID_COLOR = QColor(255, 0, 0, 170)  # Bright red with high opacity
+    INVALID_ROW_COLOR = QColor(255, 200, 200, 100)  # Light red for row highlighting
     NOT_VALIDATED_COLOR = QColor(200, 200, 200, 40)  # Light gray for not validated
 
     # Column name constants
@@ -83,6 +83,25 @@ class ValidationStatusDelegate(QStyledItemDelegate):
         # Check if this is the status column
         is_status_column = column_name == self.STATUS_COLUMN
 
+        # First, check if the row has an invalid status - this affects all cells in the row
+        row_has_invalid_status = False
+        status_col_idx = -1
+        status_text = None
+
+        # Find the STATUS column index
+        for col in range(model.columnCount()):
+            col_header = model.headerData(col, Qt.Horizontal)
+            if col_header == self.STATUS_COLUMN:
+                status_col_idx = col
+                break
+
+        # Check the status column value if found
+        if status_col_idx >= 0:
+            status_idx = model.index(index.row(), status_col_idx)
+            status_text = status_idx.data(Qt.DisplayRole)
+            if status_text == "Invalid":
+                row_has_invalid_status = True
+
         # If this is the status column, paint based on the text value
         if is_status_column:
             # Get the display text
@@ -99,30 +118,17 @@ class ValidationStatusDelegate(QStyledItemDelegate):
                 # Light gray for not validated
                 painter.fillRect(option.rect, self.NOT_VALIDATED_COLOR)
         else:
-            # Get validation status from model data (Qt.UserRole + 1)
+            # Get cell-specific validation status from model data (Qt.UserRole + 1)
             validation_status = index.data(Qt.ItemDataRole.UserRole + 1)
 
-            # Check if any cell in this row is invalid - look for the STATUS column
-            status_col_idx = -1
-            for col in range(model.columnCount()):
-                col_header = model.headerData(col, Qt.Horizontal)
-                if col_header == self.STATUS_COLUMN:
-                    status_col_idx = col
-                    break
+            # Apply row highlighting if the row has invalid status
+            if row_has_invalid_status:
+                painter.fillRect(option.rect, self.INVALID_ROW_COLOR)
 
-            # If status column found, check its value
-            if status_col_idx >= 0:
-                status_idx = model.index(index.row(), status_col_idx)
-                status_text = status_idx.data(Qt.DisplayRole)
-
-                # If the status is "Invalid" and this isn't the status column itself,
-                # highlight with row invalid color
-                if status_text == "Invalid" and not is_status_column:
-                    painter.fillRect(option.rect, self.INVALID_ROW_COLOR)
-
-            # Additionally, check cell-specific validation status
+            # If this specific cell has invalid status, highlight it with a stronger color
+            # This takes precedence over the row highlighting
             if validation_status == ValidationStatus.INVALID:
-                # Draw with error highlighting
+                # Draw with error highlighting (darker red)
                 painter.fillRect(option.rect, self.INVALID_COLOR)
             elif validation_status == ValidationStatus.WARNING:
                 # Draw with warning highlighting

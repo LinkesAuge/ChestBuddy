@@ -5460,3 +5460,385 @@
 2025-03-27 22:47:28,137 - chestbuddy.ui.views.base_view - ERROR - Error disconnecting signals for CorrectionViewAdapter: Internal C++ object (ChestDataModel) already deleted.
 2025-03-27 22:47:28,137 - chestbuddy.ui.views.base_view - ERROR - Error disconnecting signals for ChartViewAdapter: Internal C++ object (ChestDataModel) already deleted.
 2025-03-27 22:53:15,577 - root - INFO - Logging initialized to D:\Projekte\ChestBuddy\chestbuddy\logs\chestbuddy.log
+2025-03-27 22:54:24,855 - root - INFO - Logging initialized to D:\Projekte\ChestBuddy\chestbuddy\logs\chestbuddy.log
+2025-03-27 22:54:25,001 - __main__ - INFO - Logging initialized
+2025-03-27 22:54:25,004 - chestbuddy.core.models.chest_data_model - DEBUG - Updated data hash to: 1d4f9f63b040166415e97d034fc84c19
+2025-03-27 22:54:25,004 - chestbuddy.core.state.data_state - DEBUG - DataState updated: 0 rows, 6 columns
+2025-03-27 22:54:25,005 - chestbuddy.core.controllers.base_controller - DEBUG - Initialized ErrorHandlingController with SignalManager
+2025-03-27 22:54:25,005 - chestbuddy.core.services.validation_service - WARNING - No config manager available, using default path: D:\Projekte\ChestBuddy\chestbuddy\data\validation
+2025-03-27 22:54:25,005 - chestbuddy.core.services.validation_service - WARNING - No config manager available, using default path: D:\Projekte\ChestBuddy\chestbuddy\data\validation
+2025-03-27 22:54:25,005 - chestbuddy.core.services.validation_service - WARNING - No config manager available, using default path: D:\Projekte\ChestBuddy\chestbuddy\data\validation
+2025-03-27 22:54:25,006 - chestbuddy.core.models.validation_list_model - DEBUG - Loaded 101 entries from D:\Projekte\ChestBuddy\chestbuddy\data\validation\players.txt
+2025-03-27 22:54:25,006 - chestbuddy.core.models.validation_list_model - INFO - Initialized ValidationListModel with 101 entries from D:\Projekte\ChestBuddy\chestbuddy\data\validation\players.txt
+2025-03-27 22:54:25,007 - chestbuddy.core.models.validation_list_model - DEBUG - Loaded 72 entries from D:\Projekte\ChestBuddy\chestbuddy\data\validation\chest_types.txt
+2025-03-27 22:54:25,007 - chestbuddy.core.models.validation_list_model - INFO - Initialized ValidationListModel with 72 entries from D:\Projekte\ChestBuddy\chestbuddy\data\validation\chest_types.txt
+2025-03-27 22:54:25,007 - chestbuddy.core.models.validation_list_model - DEBUG - Loaded 82 entries from D:\Projekte\ChestBuddy\chestbuddy\data\validation\sources.txt
+2025-03-27 22:54:25,007 - chestbuddy.core.models.validation_list_model - INFO - Initialized ValidationListModel with 82 entries from D:\Projekte\ChestBuddy\chestbuddy\data\validation\sources.txt
+2025-03-27 22:54:25,007 - chestbuddy.core.services.validation_service - INFO - Initialized validation lists: Players (101 entries), Chest Types (72 entries), Sources (82 entries)
+2025-03-27 22:54:25,008 - chestbuddy.core.controllers.base_controller - DEBUG - Initialized FileOperationsController with SignalManager
+2025-03-27 22:54:25,008 - chestbuddy.core.controllers.base_controller - DEBUG - FileOperationsController connected to model: DataManager
+2025-03-27 22:54:25,008 - chestbuddy.core.controllers.file_operations_controller - DEBUG - FileOperationsController connected to model: DataManager
+2025-03-27 22:54:25,008 - chestbuddy.core.controllers.file_operations_controller - DEBUG - Loaded 3 recent files from config
+2025-03-27 22:54:25,009 - chestbuddy.core.controllers.base_controller - DEBUG - Initialized ProgressController with SignalManager
+2025-03-27 22:54:25,009 - chestbuddy.core.controllers.base_controller - DEBUG - Initialized ViewStateController with SignalManager
+2025-03-27 22:54:25,009 - chestbuddy.core.controllers.base_controller - DEBUG - ViewStateController connected to model: ChestDataModel
+2025-03-27 22:54:25,009 - chestbuddy.core.controllers.view_state_controller - DEBUG - ViewStateController connected to model: ChestDataModel
+2025-03-27 22:54:25,009 - chestbuddy.core.controllers.base_controller - DEBUG - Initialized UIStateController with SignalManager
+2025-03-27 22:54:25,010 - chestbuddy.core.controllers.ui_state_controller - INFO - UIStateController initialized
+2025-03-27 22:54:25,010 - chestbuddy.core.controllers.base_controller - DEBUG - Initialized DataViewController with SignalManager
+2025-03-27 22:54:25,010 - chestbuddy.core.controllers.base_controller - DEBUG - DataViewController connected to model: ChestDataModel
+2025-03-27 22:54:25,010 - chestbuddy.core.controllers.data_view_controller - DEBUG - DataViewController connected to model: ChestDataModel
+2025-03-27 22:54:25,010 - chestbuddy.core.controllers.data_view_controller - DEBUG - DataViewController connected to UIStateController
+2025-03-27 22:54:25,010 - chestbuddy.core.controllers.data_view_controller - DEBUG - DataViewController initialized
+2025-03-27 22:54:25,011 - chestbuddy.utils.service_locator - DEBUG - Service 'update_manager' registered: UpdateManager
+2025-03-27 22:54:25,011 - __main__ - INFO - UpdateManager initialized and registered with ServiceLocator
+2025-03-27 22:54:25,012 - chestbuddy.core.controllers.view_state_controller - INFO - Data view controller set and signals connected
+2025-03-27 22:54:25,012 - chestbuddy.ui.main_window - DEBUG - MainWindow initialized with data_manager
+2025-03-27 22:54:25,033 - chestbuddy.ui.views.updatable_view - DEBUG - DashboardView populated
+2025-03-27 22:54:25,038 - chestbuddy.ui.data_view - INFO - Installed event filter on table view
+2025-03-27 22:54:25,038 - chestbuddy.ui.data_view - INFO - Registered Ctrl+C shortcut for copying (table-specific)
+2025-03-27 22:54:25,038 - chestbuddy.ui.data_view - INFO - Registered widget-level Ctrl+V shortcut for pasting (widget hierarchy)
+2025-03-27 22:54:25,040 - chestbuddy.ui.data_view - DEBUG - Connecting import button clicked signal to _on_import_clicked handler
+2025-03-27 22:54:25,040 - chestbuddy.ui.data_view - DEBUG - Connecting export button clicked signal to _on_export_clicked handler
+2025-03-27 22:54:25,041 - chestbuddy.ui.data_view - INFO - Installed event filter on table view
+2025-03-27 22:54:25,041 - chestbuddy.ui.data_view - INFO - Registered Ctrl+C shortcut for copying (table-specific)
+2025-03-27 22:54:25,041 - chestbuddy.ui.data_view - INFO - Registered widget-level Ctrl+V shortcut for pasting (widget hierarchy)
+2025-03-27 22:54:25,043 - chestbuddy.ui.data_view - DEBUG - Status updated: No data loaded
+2025-03-27 22:54:25,043 - chestbuddy.ui.data_view - DEBUG - No columns in table model, adding STATUS_COLUMN header
+2025-03-27 22:54:25,044 - chestbuddy.ui.data_view - DEBUG - Set STATUS column (index 0) width to 60px
+2025-03-27 22:54:25,044 - chestbuddy.ui.data_view - DEBUG - Set STATUS column (index 0) width to 60px
+2025-03-27 22:54:25,044 - chestbuddy.ui.data_view - INFO - DataView auto-update disabled
+2025-03-27 22:54:25,045 - chestbuddy.utils.signal_manager - ERROR - Error in safe_connect: SignalManager.connect() got an unexpected keyword argument 'disconnect_first'
+2025-03-27 22:54:25,045 - chestbuddy.utils.signal_manager - ERROR - Error in safe_connect: SignalManager.connect() got an unexpected keyword argument 'disconnect_first'
+2025-03-27 22:54:25,045 - chestbuddy.utils.signal_manager - ERROR - Error in safe_connect: SignalManager.connect() got an unexpected keyword argument 'disconnect_first'
+2025-03-27 22:54:25,045 - chestbuddy.ui.views.data_view_adapter - DEBUG - Connected to validation_changed signal
+2025-03-27 22:54:25,046 - chestbuddy.ui.views.data_view_adapter - DEBUG - DataViewAdapter: Auto-update enabled
+2025-03-27 22:54:25,046 - chestbuddy.core.services.validation_service - WARNING - Using default validation list path: D:\Projekte\ChestBuddy\chestbuddy\data\validation\players.txt
+2025-03-27 22:54:25,052 - chestbuddy.ui.views.validation_list_view - DEBUG - Populated list with 101 entries
+2025-03-27 22:54:25,052 - chestbuddy.ui.views.validation_list_view - INFO - Initialized ValidationListView with 101 entries
+2025-03-27 22:54:25,056 - chestbuddy.core.services.validation_service - WARNING - Using default validation list path: D:\Projekte\ChestBuddy\chestbuddy\data\validation\chest_types.txt
+2025-03-27 22:54:25,058 - chestbuddy.ui.views.validation_list_view - DEBUG - Populated list with 72 entries
+2025-03-27 22:54:25,058 - chestbuddy.ui.views.validation_list_view - INFO - Initialized ValidationListView with 72 entries
+2025-03-27 22:54:25,061 - chestbuddy.core.services.validation_service - WARNING - Using default validation list path: D:\Projekte\ChestBuddy\chestbuddy\data\validation\sources.txt
+2025-03-27 22:54:25,063 - chestbuddy.ui.views.validation_list_view - DEBUG - Populated list with 82 entries
+2025-03-27 22:54:25,063 - chestbuddy.ui.views.validation_list_view - INFO - Initialized ValidationListView with 82 entries
+2025-03-27 22:54:25,083 - chestbuddy.ui.views.validation_tab_view - DEBUG - Status updated: Ready
+2025-03-27 22:54:25,084 - chestbuddy.ui.views.validation_tab_view - INFO - Initialized ValidationTabView
+2025-03-27 22:54:25,091 - chestbuddy.ui.views.validation_view_adapter - INFO - ValidationViewAdapter: Controller set and signals connected
+2025-03-27 22:54:25,093 - chestbuddy.ui.correction_tab - DEBUG - Skipping CorrectionTab._update_view call - recursive or uninitialized UI
+2025-03-27 22:54:25,093 - chestbuddy.ui.views.correction_view_adapter - DEBUG - Connected data_model.data_changed to CorrectionViewAdapter.request_update
+2025-03-27 22:54:25,094 - chestbuddy.utils.signal_manager - ERROR - Error in safe_connect: slot_name_or_callable must be provided
+2025-03-27 22:54:25,094 - chestbuddy.utils.signal_manager - ERROR - Error in safe_connect: slot_name_or_callable must be provided
+2025-03-27 22:54:25,094 - chestbuddy.utils.signal_manager - ERROR - Error in safe_connect: slot_name_or_callable must be provided
+2025-03-27 22:54:25,094 - chestbuddy.ui.views.correction_view_adapter - INFO - CorrectionViewAdapter: Controller set and signals connected
+2025-03-27 22:54:25,097 - chestbuddy.utils.signal_manager - ERROR - Error in safe_connect: slot_name_or_callable must be provided
+2025-03-27 22:54:25,097 - chestbuddy.utils.signal_manager - ERROR - Error in safe_connect: slot_name_or_callable must be provided
+2025-03-27 22:54:25,097 - chestbuddy.utils.signal_manager - ERROR - Error in safe_connect: slot_name_or_callable must be provided
+2025-03-27 22:54:25,098 - chestbuddy.core.controllers.data_view_controller - DEBUG - Connected ValidationService signals to DataViewController
+2025-03-27 22:54:25,098 - chestbuddy.core.controllers.data_view_controller - DEBUG - CorrectionService connected to DataViewController
+2025-03-27 22:54:25,098 - chestbuddy.core.controllers.data_view_controller - INFO - Validation and correction services updated
+2025-03-27 22:54:25,098 - chestbuddy.ui.main_window - INFO - Services set in data view controller
+2025-03-27 22:54:25,098 - chestbuddy.core.controllers.base_controller - DEBUG - ViewStateController connected to view: SidebarNavigation
+2025-03-27 22:54:25,099 - chestbuddy.core.controllers.view_state_controller - INFO - Sidebar implements IUpdatable, populating it
+2025-03-27 22:54:25,099 - chestbuddy.ui.widgets.sidebar_navigation - DEBUG - SidebarNavigation populated
+2025-03-27 22:54:25,099 - chestbuddy.core.controllers.view_state_controller - INFO - Registering dependencies for view 'Validation': {'Data'}
+2025-03-27 22:54:25,101 - chestbuddy.ui.widgets.sidebar_navigation - ERROR - Error scheduling update for SidebarNavigation: "Service 'update_manager' not found"
+2025-03-27 22:54:25,101 - chestbuddy.ui.widgets.sidebar_navigation - DEBUG - SidebarNavigation updated
+2025-03-27 22:54:25,101 - chestbuddy.core.controllers.view_state_controller - INFO - View availability changed: {'Validation': True, 'Correction': True, 'Charts': True}
+2025-03-27 22:54:25,102 - chestbuddy.core.controllers.view_state_controller - INFO - Registering dependencies for view 'Correction': {'Validation'}
+2025-03-27 22:54:25,102 - chestbuddy.core.controllers.view_state_controller - DEBUG - Skipping view availability update (throttled)
+2025-03-27 22:54:25,102 - chestbuddy.core.controllers.view_state_controller - INFO - Registering dependencies for view 'Charts': {'Data'}
+2025-03-27 22:54:25,102 - chestbuddy.core.controllers.view_state_controller - DEBUG - Skipping view availability update (throttled)
+2025-03-27 22:54:25,102 - chestbuddy.core.controllers.view_state_controller - INFO - Registered prerequisite check for view 'Validation'
+2025-03-27 22:54:25,102 - chestbuddy.core.controllers.view_state_controller - DEBUG - Skipping view availability update (throttled)
+2025-03-27 22:54:25,103 - chestbuddy.core.controllers.view_state_controller - INFO - Registered prerequisite check for view 'Correction'
+2025-03-27 22:54:25,103 - chestbuddy.core.controllers.view_state_controller - DEBUG - Skipping view availability update (throttled)
+2025-03-27 22:54:25,103 - chestbuddy.core.controllers.view_state_controller - INFO - Registered prerequisite check for view 'Charts'
+2025-03-27 22:54:25,103 - chestbuddy.core.controllers.view_state_controller - DEBUG - Skipping view availability update (throttled)
+2025-03-27 22:54:25,104 - chestbuddy.core.controllers.view_state_controller - INFO - View changed from '' to 'Dashboard'
+2025-03-27 22:54:25,105 - chestbuddy.core.controllers.ui_state_controller - DEBUG - Status message updated: No data loaded
+2025-03-27 22:54:25,105 - chestbuddy.core.controllers.ui_state_controller - DEBUG - Updated data-dependent UI state: has_data=False
+2025-03-27 22:54:25,106 - chestbuddy.ui.main_window - DEBUG - Connecting Dashboard.import_requested to _on_import_requested handler
+2025-03-27 22:54:25,106 - chestbuddy.ui.main_window - DEBUG - Connecting Data.import_requested to _on_import_requested handler
+2025-03-27 22:54:25,163 - __main__ - INFO - UI created and shown
+2025-03-27 22:54:25,164 - __main__ - INFO - Application signals connected
+2025-03-27 22:54:25,275 - __main__ - INFO - Application initialized successfully
+2025-03-27 22:54:25,287 - chestbuddy.core.controllers.view_state_controller - DEBUG - View transition to 'Dashboard' completed
+2025-03-27 22:54:36,172 - chestbuddy.ui.main_window - DEBUG - _on_import_requested called with flags: _is_handling_import=False, _is_loading_files=False
+2025-03-27 22:54:36,172 - chestbuddy.ui.main_window - DEBUG - Handling import request via FileOperationsController - set flag: _is_handling_import=True
+2025-03-27 22:54:36,172 - chestbuddy.core.controllers.file_operations_controller - DEBUG - FileOperationsController.open_file called with parent=<chestbuddy.ui.main_window.MainWindow(0x1ee8526f470) at 0x000001EE87B50700>
+2025-03-27 22:54:36,172 - chestbuddy.core.controllers.file_operations_controller - DEBUG - About to show file open dialog
+2025-03-27 22:54:36,173 - chestbuddy.core.controllers.file_operations_controller - DEBUG - Retrieved last directory: D:/Projekte/ChestBuddy/chestbuddy/data/input
+2025-03-27 22:54:41,685 - chestbuddy.core.controllers.file_operations_controller - DEBUG - User selected 1 files
+2025-03-27 22:54:41,685 - chestbuddy.core.controllers.file_operations_controller - DEBUG - Saving last directory: D:/Projekte/ChestBuddy/chestbuddy/data/input
+2025-03-27 22:54:41,686 - chestbuddy.core.services.data_manager - INFO - DataManager.load_csv called with 1 file(s)
+2025-03-27 22:54:41,686 - chestbuddy.core.services.data_manager - DEBUG - Set files_to_load with 1 files
+2025-03-27 22:54:41,686 - chestbuddy.core.services.data_manager - DEBUG - Set current_file_path to: D:/Projekte/ChestBuddy/chestbuddy/data/input/Chests_input_test.csv
+2025-03-27 22:54:41,686 - chestbuddy.core.services.data_manager - DEBUG - Emitting load_started signal
+2025-03-27 22:54:41,686 - chestbuddy.ui.main_window - DEBUG - MainWindow._on_load_started called
+2025-03-27 22:54:41,703 - chestbuddy.core.controllers.ui_state_controller - DEBUG - Updated data-dependent UI state: has_data=False
+2025-03-27 22:54:41,703 - chestbuddy.core.services.data_manager - INFO - DataManager.cancel_loading called
+2025-03-27 22:54:41,703 - chestbuddy.core.services.data_manager - DEBUG - Set cancellation flag to True
+2025-03-27 22:54:41,704 - chestbuddy.core.services.data_manager - DEBUG - No active task to cancel
+2025-03-27 22:54:41,704 - chestbuddy.core.services.data_manager - DEBUG - Loading operation cancelled successfully
+2025-03-27 22:54:41,704 - chestbuddy.core.services.data_manager - DEBUG - Blocking data model signals during load
+2025-03-27 22:54:41,704 - chestbuddy.core.services.data_manager - DEBUG - Creating MultiCSVLoadTask for 1 files
+2025-03-27 22:54:41,704 - chestbuddy.core.services.data_manager - DEBUG - Stored task reference: <chestbuddy.utils.background_processing.MultiCSVLoadTask(0x1ee8a5cd2f0) at 0x000001EE87BFA5C0>
+2025-03-27 22:54:41,704 - chestbuddy.core.services.data_manager - DEBUG - Reset cancellation flag to False
+2025-03-27 22:54:41,705 - chestbuddy.core.services.data_manager - DEBUG - Executing MultiCSVLoadTask
+2025-03-27 22:54:41,705 - chestbuddy.ui.main_window - INFO - File opened: D:/Projekte/ChestBuddy/chestbuddy/data/input/Chests_input_test.csv
+2025-03-27 22:54:41,705 - chestbuddy.core.controllers.file_operations_controller - DEBUG - Saved 3 recent files to config
+2025-03-27 22:54:41,706 - chestbuddy.ui.main_window - DEBUG - Recent files updated: 3 files
+2025-03-27 22:54:41,706 - chestbuddy.core.services.csv_service - DEBUG - read_csv_chunked called for D:/Projekte/ChestBuddy/chestbuddy/data/input/Chests_input_test.csv
+2025-03-27 22:54:41,707 - chestbuddy.ui.main_window - DEBUG - _on_import_requested called with flags: _is_handling_import=True, _is_loading_files=True
+2025-03-27 22:54:41,707 - chestbuddy.ui.main_window - DEBUG - Already handling an import request, ignoring duplicate
+2025-03-27 22:54:41,714 - charset_normalizer - DEBUG - Encoding detection: utf_8 is most likely the one.
+2025-03-27 22:54:41,714 - chestbuddy.core.services.csv_service - DEBUG - charset_normalizer detected encoding: utf-8 with confidence: 0.9936
+2025-03-27 22:54:41,714 - chestbuddy.core.services.csv_service - INFO - Detected encoding: utf-8 with confidence 0.99
+2025-03-27 22:54:41,714 - chestbuddy.ui.main_window - DEBUG - MainWindow._on_load_started called
+2025-03-27 22:54:41,715 - chestbuddy.core.controllers.progress_controller - DEBUG - Progress dialog already exists, updating instead of creating new one
+2025-03-27 22:54:41,733 - chestbuddy.core.controllers.ui_state_controller - DEBUG - Updated data-dependent UI state: has_data=False
+2025-03-27 22:54:41,999 - chestbuddy.core.services.data_manager - DEBUG - CSV loading progress: 0% (0/100)
+2025-03-27 22:54:42,035 - chestbuddy.core.services.data_manager - DEBUG - CSV loading progress: 0% (0/100)
+2025-03-27 22:54:42,072 - chestbuddy.core.services.data_manager - DEBUG - Task status: Loading CSV data: 0 rows (File 1/1)
+2025-03-27 22:54:42,116 - chestbuddy.core.services.data_manager - DEBUG - CSV loading progress: 0% (0/100)
+2025-03-27 22:54:42,144 - chestbuddy.core.services.data_manager - DEBUG - CSV loading progress: 0% (0/100)
+2025-03-27 22:54:42,188 - chestbuddy.core.services.data_manager - DEBUG - Task status: Loading CSV data: 0 rows (File 1/1)
+2025-03-27 22:54:42,225 - chestbuddy.core.services.data_manager - DEBUG - CSV loading progress: 0% (0/100)
+2025-03-27 22:54:42,265 - chestbuddy.core.services.data_manager - DEBUG - CSV loading progress: 0% (0/100)
+2025-03-27 22:54:42,303 - chestbuddy.core.services.data_manager - DEBUG - Task status: Loading CSV data: 0 rows (File 1/1)
+2025-03-27 22:54:42,350 - chestbuddy.core.services.data_manager - DEBUG - CSV loading progress: 0% (0/100)
+2025-03-27 22:54:42,395 - chestbuddy.core.services.data_manager - DEBUG - CSV loading progress: 0% (0/100)
+2025-03-27 22:54:42,425 - chestbuddy.core.services.data_manager - DEBUG - Task status: Loading CSV data: 0 rows (File 1/1)
+2025-03-27 22:54:42,448 - chestbuddy.core.services.data_manager - DEBUG - CSV loading progress: 0% (0/100)
+2025-03-27 22:54:42,464 - chestbuddy.core.services.data_manager - DEBUG - CSV loading progress: 0% (0/100)
+2025-03-27 22:54:42,480 - chestbuddy.core.services.data_manager - DEBUG - Task status: Loading CSV data: 0 rows (File 1/1)
+2025-03-27 22:54:42,513 - chestbuddy.core.services.data_manager - DEBUG - CSV loading progress: 0% (0/100)
+2025-03-27 22:54:42,527 - chestbuddy.core.services.data_manager - DEBUG - CSV loading progress: 0% (0/100)
+2025-03-27 22:54:42,550 - chestbuddy.core.services.data_manager - DEBUG - Task status: Loading CSV data: 0 rows (File 1/1)
+2025-03-27 22:54:42,599 - chestbuddy.core.services.data_manager - DEBUG - CSV loading progress: 0% (0/100)
+2025-03-27 22:54:42,629 - chestbuddy.core.services.data_manager - DEBUG - CSV loading progress: 0% (0/100)
+2025-03-27 22:54:42,645 - chestbuddy.core.services.data_manager - DEBUG - Task status: Loading CSV data: 0 rows (File 1/1)
+2025-03-27 22:54:42,653 - chestbuddy.core.services.data_manager - DEBUG - CSV loading progress: 0% (0/100)
+2025-03-27 22:54:42,653 - chestbuddy.core.services.data_manager - DEBUG - CSV loading progress: 0% (0/100)
+2025-03-27 22:54:42,656 - chestbuddy.utils.background_processing - INFO - Successfully loaded 12387 rows from 1 files
+2025-03-27 22:54:42,657 - chestbuddy.core.services.data_manager - DEBUG - Task status: Loading CSV data: 0 rows (File 1/1)
+2025-03-27 22:54:42,657 - chestbuddy.core.services.data_manager - DEBUG - CSV loading progress: 0% (0/100)
+2025-03-27 22:54:42,657 - chestbuddy.utils.background_processing - DEBUG - Task completed: load_multi_csv_1_files
+2025-03-27 22:54:42,657 - chestbuddy.core.services.data_manager - DEBUG - CSV loading progress: 0% (0/100)
+2025-03-27 22:54:42,657 - chestbuddy.utils.background_processing - DEBUG - Thread finished and task cleanup completed
+2025-03-27 22:54:42,657 - chestbuddy.core.services.data_manager - DEBUG - Task status: Loading CSV data: 0 rows (File 1/1)
+2025-03-27 22:54:42,658 - chestbuddy.core.services.data_manager - DEBUG - CSV loading progress: 100% (100/100)
+2025-03-27 22:54:42,658 - chestbuddy.core.services.data_manager - DEBUG - CSV loading progress: 100% (100/100)
+2025-03-27 22:54:42,658 - chestbuddy.core.services.data_manager - DEBUG - Task status: Loading CSV data: 0 rows (File 1/1)
+2025-03-27 22:54:42,659 - chestbuddy.core.services.data_manager - DEBUG - CSV loading progress: 100% (100/100)
+2025-03-27 22:54:42,659 - chestbuddy.core.services.data_manager - DEBUG - CSV loading progress: 100% (100/100)
+2025-03-27 22:54:42,659 - chestbuddy.core.services.data_manager - DEBUG - Task status: Loading CSV data: 12,387 rows (File 1/1)
+2025-03-27 22:54:42,659 - chestbuddy.core.services.data_manager - DEBUG - Background task load_multi_csv_1_files completed with result: <class 'tuple'>
+2025-03-27 22:54:42,659 - chestbuddy.core.services.data_manager - INFO - DataManager._on_csv_load_success called
+2025-03-27 22:54:42,659 - chestbuddy.core.services.data_manager - DEBUG - CSV load result message: None
+2025-03-27 22:54:42,660 - chestbuddy.core.services.data_manager - INFO - CSV loaded successfully with 12387 rows
+2025-03-27 22:54:42,660 - chestbuddy.ui.main_window - DEBUG - Load finished signal received: Successfully loaded 12,387 rows of data
+2025-03-27 22:54:42,660 - chestbuddy.ui.widgets.progress_dialog - DEBUG - Progress dialog close called
+2025-03-27 22:54:42,660 - chestbuddy.ui.widgets.progress_dialog - DEBUG - Dialog closed via window close button, emitting canceled signal
+2025-03-27 22:54:42,660 - chestbuddy.core.controllers.progress_controller - DEBUG - Progress dialog cancel button clicked
+2025-03-27 22:54:42,660 - chestbuddy.ui.widgets.progress_dialog - DEBUG - Cancel button clicked in progress dialog
+2025-03-27 22:54:42,661 - chestbuddy.core.controllers.progress_controller - DEBUG - Progress dialog cancel button clicked
+2025-03-27 22:54:42,661 - chestbuddy.ui.widgets.progress_dialog - DEBUG - Directly closing dialog after cancel button clicked
+2025-03-27 22:54:42,667 - chestbuddy.ui.widgets.progress_dialog - DEBUG - Progress dialog successfully closed
+2025-03-27 22:54:42,667 - chestbuddy.core.controllers.ui_state_controller - DEBUG - Updated data-dependent UI state: has_data=False
+2025-03-27 22:54:42,667 - chestbuddy.core.services.data_manager - DEBUG - Mapping columns...
+2025-03-27 22:54:42,669 - chestbuddy.core.services.data_manager - DEBUG - Mapped columns successfully, DataFrame shape: (12387, 6)
+2025-03-27 22:54:42,670 - chestbuddy.core.services.data_manager - DEBUG - Unblocking data model signals before update
+2025-03-27 22:54:42,670 - chestbuddy.core.services.data_manager - DEBUG - Updating data model with new data
+2025-03-27 22:54:42,680 - chestbuddy.core.state.data_state - DEBUG - DataState updated: 12387 rows, 6 columns
+2025-03-27 22:54:42,680 - chestbuddy.core.models.chest_data_model - DEBUG - Emitting data_changed signal with DataState.
+2025-03-27 22:54:42,680 - chestbuddy.core.controllers.view_state_controller - INFO - Data changed event: has_data=True
+2025-03-27 22:54:42,682 - chestbuddy.core.controllers.view_state_controller - INFO - Data loaded state changed: True
+2025-03-27 22:54:42,683 - chestbuddy.ui.widgets.sidebar_navigation - ERROR - Error scheduling update for SidebarNavigation: "Service 'update_manager' not found"
+2025-03-27 22:54:42,684 - chestbuddy.ui.widgets.sidebar_navigation - DEBUG - SidebarNavigation updated
+2025-03-27 22:54:42,685 - chestbuddy.core.controllers.view_state_controller - INFO - Marking Data view for population (not current)
+2025-03-27 22:54:42,685 - chestbuddy.core.controllers.view_state_controller - INFO - Refreshing active view 'Dashboard' via IUpdatable interface
+2025-03-27 22:54:42,685 - chestbuddy.core.controllers.view_state_controller - DEBUG - View 'Dashboard' doesn't need refreshing
+2025-03-27 22:54:42,686 - chestbuddy.ui.data_view - DEBUG - DataView._on_data_changed called
+2025-03-27 22:54:42,686 - chestbuddy.ui.data_view - DEBUG - Auto-update disabled, skipping table update
+2025-03-27 22:54:42,686 - chestbuddy.ui.views.updatable_view - ERROR - Error scheduling update for DataViewAdapter: "Service 'update_manager' not found"
+2025-03-27 22:54:42,686 - chestbuddy.ui.views.updatable_view - DEBUG - DataViewAdapter updating with data: NoneType
+2025-03-27 22:54:42,687 - chestbuddy.ui.views.data_view_adapter - DEBUG - DataViewAdapter: View needs population, calling populate_table
+2025-03-27 22:54:42,687 - chestbuddy.ui.data_view - DEBUG - Populating chunk from 0 to 500 of 12387 rows
+2025-03-27 22:54:42,739 - chestbuddy.ui.views.data_view_adapter - DEBUG - DataViewAdapter: View content updated
+2025-03-27 22:54:42,740 - chestbuddy.ui.views.updatable_view - DEBUG - DataViewAdapter updated
+2025-03-27 22:54:42,740 - chestbuddy.ui.correction_tab - DEBUG - Skipping CorrectionTab._update_view call - recursive or uninitialized UI
+2025-03-27 22:54:42,740 - chestbuddy.ui.views.updatable_view - ERROR - Error scheduling update for CorrectionViewAdapter: "Service 'update_manager' not found"
+2025-03-27 22:54:42,740 - chestbuddy.ui.views.updatable_view - DEBUG - CorrectionViewAdapter updating with data: NoneType
+2025-03-27 22:54:42,740 - chestbuddy.ui.correction_tab - DEBUG - Skipping CorrectionTab._update_view call - recursive or uninitialized UI
+2025-03-27 22:54:42,740 - chestbuddy.ui.views.correction_view_adapter - DEBUG - CorrectionViewAdapter: View content updated
+2025-03-27 22:54:42,741 - chestbuddy.ui.views.updatable_view - DEBUG - CorrectionViewAdapter updated
+2025-03-27 22:54:42,741 - chestbuddy.ui.views.updatable_view - ERROR - Error scheduling update for ChartViewAdapter: "Service 'update_manager' not found"
+2025-03-27 22:54:42,741 - chestbuddy.ui.views.updatable_view - DEBUG - ChartViewAdapter updating with data: NoneType
+2025-03-27 22:54:42,742 - chestbuddy.ui.views.chart_view_adapter - DEBUG - ChartViewAdapter: View content updated
+2025-03-27 22:54:42,742 - chestbuddy.ui.views.updatable_view - DEBUG - ChartViewAdapter updated
+2025-03-27 22:54:42,742 - chestbuddy.core.controllers.data_view_controller - DEBUG - Auto-validate action state changed to: True
+2025-03-27 22:54:42,742 - chestbuddy.core.controllers.data_view_controller - INFO - Updated validation service auto-validate setting to: True
+2025-03-27 22:54:42,743 - chestbuddy.core.controllers.ui_state_controller - DEBUG - Action states updated: {'save': True, 'save_as': True, 'export': True, 'validate': True, 'correct': True, 'chart': True, 'filter': True, 'sort': True, 'add_to_validation': True, 'clear_validation': True, 'refresh_validation': True, 'auto_validate': True}
+2025-03-27 22:54:42,743 - chestbuddy.core.controllers.ui_state_controller - DEBUG - Status message updated: Data loaded and ready
+2025-03-27 22:54:42,743 - chestbuddy.core.controllers.ui_state_controller - DEBUG - Updated data-dependent UI state: has_data=True
+2025-03-27 22:54:43,011 - chestbuddy.core.controllers.ui_state_controller - DEBUG - Status message updated: Data loaded: 12,387 rows
+2025-03-27 22:54:43,011 - chestbuddy.core.controllers.ui_state_controller - DEBUG - Status message updated: Data loaded and ready
+2025-03-27 22:54:43,011 - chestbuddy.core.controllers.ui_state_controller - DEBUG - Updated data-dependent UI state: has_data=True
+2025-03-27 22:54:43,012 - chestbuddy.core.services.data_manager - INFO - Emitting data_loaded signal
+2025-03-27 22:54:43,012 - chestbuddy.ui.main_window - INFO - Data loaded signal received, ensuring data table is populated
+2025-03-27 22:54:43,013 - chestbuddy.ui.main_window - INFO - Data view doesn't need refresh, skipping table population
+2025-03-27 22:54:43,013 - chestbuddy.ui.main_window - ERROR - Error in fallback table population: 'ViewStateController' object has no attribute 'get_view'
+2025-03-27 22:54:43,013 - chestbuddy.core.controllers.view_state_controller - INFO - Refreshing active view 'Dashboard' via IUpdatable interface
+2025-03-27 22:54:43,013 - chestbuddy.core.controllers.view_state_controller - DEBUG - View 'Dashboard' doesn't need refreshing
+2025-03-27 22:54:43,014 - chestbuddy.core.controllers.ui_state_controller - DEBUG - Status message updated: Data loaded: 12,387 rows
+2025-03-27 22:54:43,014 - chestbuddy.core.services.data_manager - INFO - Emitted load_success signal
+2025-03-27 22:54:43,016 - chestbuddy.ui.data_view - DEBUG - Populating chunk from 500 to 1000 of 12387 rows
+2025-03-27 22:54:43,064 - chestbuddy.ui.data_view - DEBUG - Populating chunk from 1000 to 1500 of 12387 rows
+2025-03-27 22:54:43,111 - chestbuddy.ui.data_view - DEBUG - Populating chunk from 1500 to 2000 of 12387 rows
+2025-03-27 22:54:43,157 - chestbuddy.ui.data_view - DEBUG - Populating chunk from 2000 to 2500 of 12387 rows
+2025-03-27 22:54:43,204 - chestbuddy.ui.data_view - DEBUG - Populating chunk from 2500 to 3000 of 12387 rows
+2025-03-27 22:54:43,252 - chestbuddy.ui.data_view - DEBUG - Populating chunk from 3000 to 3500 of 12387 rows
+2025-03-27 22:54:43,300 - chestbuddy.ui.data_view - DEBUG - Populating chunk from 3500 to 4000 of 12387 rows
+2025-03-27 22:54:43,347 - chestbuddy.ui.data_view - DEBUG - Populating chunk from 4000 to 4500 of 12387 rows
+2025-03-27 22:54:43,393 - chestbuddy.ui.data_view - DEBUG - Populating chunk from 4500 to 5000 of 12387 rows
+2025-03-27 22:54:43,441 - chestbuddy.ui.data_view - DEBUG - Populating chunk from 5000 to 5500 of 12387 rows
+2025-03-27 22:54:43,505 - chestbuddy.ui.data_view - DEBUG - Populating chunk from 5500 to 6000 of 12387 rows
+2025-03-27 22:54:43,552 - chestbuddy.ui.data_view - DEBUG - Populating chunk from 6000 to 6500 of 12387 rows
+2025-03-27 22:54:43,600 - chestbuddy.ui.data_view - DEBUG - Populating chunk from 6500 to 7000 of 12387 rows
+2025-03-27 22:54:43,647 - chestbuddy.ui.data_view - DEBUG - Populating chunk from 7000 to 7500 of 12387 rows
+2025-03-27 22:54:43,694 - chestbuddy.ui.data_view - DEBUG - Populating chunk from 7500 to 8000 of 12387 rows
+2025-03-27 22:54:43,740 - chestbuddy.ui.data_view - DEBUG - Populating chunk from 8000 to 8500 of 12387 rows
+2025-03-27 22:54:43,787 - chestbuddy.ui.data_view - DEBUG - Populating chunk from 8500 to 9000 of 12387 rows
+2025-03-27 22:54:43,836 - chestbuddy.ui.data_view - DEBUG - Populating chunk from 9000 to 9500 of 12387 rows
+2025-03-27 22:54:43,887 - chestbuddy.ui.data_view - DEBUG - Populating chunk from 9500 to 10000 of 12387 rows
+2025-03-27 22:54:43,934 - chestbuddy.ui.data_view - DEBUG - Populating chunk from 10000 to 10500 of 12387 rows
+2025-03-27 22:54:43,982 - chestbuddy.ui.data_view - DEBUG - Populating chunk from 10500 to 11000 of 12387 rows
+2025-03-27 22:54:44,034 - chestbuddy.ui.data_view - DEBUG - Populating chunk from 11000 to 11500 of 12387 rows
+2025-03-27 22:54:44,080 - chestbuddy.ui.data_view - DEBUG - Populating chunk from 11500 to 12000 of 12387 rows
+2025-03-27 22:54:44,128 - chestbuddy.ui.data_view - DEBUG - Populating chunk from 12000 to 12387 of 12387 rows
+2025-03-27 22:54:44,161 - chestbuddy.ui.data_view - DEBUG - Chunk population complete: 12387 rows processed
+2025-03-27 22:54:44,161 - chestbuddy.ui.data_view - DEBUG - Set PLAYER column (index 1) width to 200px
+2025-03-27 22:54:44,162 - chestbuddy.ui.data_view - DEBUG - Set SOURCE column (index 2) width to 200px
+2025-03-27 22:54:44,162 - chestbuddy.ui.data_view - DEBUG - Set CHEST column (index 3) width to 200px
+2025-03-27 22:54:44,162 - chestbuddy.ui.data_view - DEBUG - Set SCORE column (index 4) width to 80px
+2025-03-27 22:54:44,162 - chestbuddy.ui.data_view - DEBUG - Set CLAN column (index 5) width to 80px
+2025-03-27 22:54:44,162 - chestbuddy.ui.data_view - DEBUG - Set STATUS column (index 5) width to 60px
+2025-03-27 22:54:44,162 - chestbuddy.ui.data_view - DEBUG - Status updated: Showing all 12387 rows
+2025-03-27 22:54:45,788 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Validation - 
+2025-03-27 22:54:45,789 - chestbuddy.core.controllers.view_state_controller - DEBUG - Updating sidebar via IUpdatable interface
+2025-03-27 22:54:45,791 - chestbuddy.ui.widgets.sidebar_navigation - DEBUG - SidebarNavigation updated
+2025-03-27 22:54:45,792 - chestbuddy.core.controllers.view_state_controller - DEBUG - Navigation history updated: position=1, history=['Dashboard', 'Validation']
+2025-03-27 22:54:45,792 - chestbuddy.core.controllers.view_state_controller - INFO - View changed from 'Dashboard' to 'Validation'
+2025-03-27 22:54:45,793 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Validation - 
+2025-03-27 22:54:45,849 - chestbuddy.core.controllers.view_state_controller - DEBUG - View transition to 'Validation' completed
+2025-03-27 22:54:46,444 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Data - 
+2025-03-27 22:54:46,445 - chestbuddy.core.controllers.view_state_controller - DEBUG - Updating sidebar via IUpdatable interface
+2025-03-27 22:54:46,447 - chestbuddy.ui.widgets.sidebar_navigation - DEBUG - SidebarNavigation updated
+2025-03-27 22:54:46,450 - chestbuddy.core.controllers.view_state_controller - DEBUG - Navigation history updated: position=2, history=['Dashboard', 'Validation', 'Data']
+2025-03-27 22:54:46,450 - chestbuddy.core.controllers.view_state_controller - INFO - View changed from 'Validation' to 'Data'
+2025-03-27 22:54:46,450 - chestbuddy.core.controllers.view_state_controller - INFO - View transition already in progress, queuing change to 'Data'
+2025-03-27 22:54:46,450 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Data - 
+2025-03-27 22:54:46,451 - chestbuddy.core.controllers.view_state_controller - INFO - View transition already in progress, queuing change to 'Data'
+2025-03-27 22:54:46,506 - chestbuddy.core.controllers.view_state_controller - DEBUG - View transition to 'Data' completed
+2025-03-27 22:54:46,506 - chestbuddy.core.controllers.view_state_controller - INFO - Processing pending view change to 'Data' with subsection 'None'
+2025-03-27 22:54:48,067 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Validation - 
+2025-03-27 22:54:48,067 - chestbuddy.core.controllers.view_state_controller - DEBUG - Updating sidebar via IUpdatable interface
+2025-03-27 22:54:48,069 - chestbuddy.ui.widgets.sidebar_navigation - DEBUG - SidebarNavigation updated
+2025-03-27 22:54:48,070 - chestbuddy.core.controllers.view_state_controller - DEBUG - Navigation history updated: position=3, history=['Dashboard', 'Validation', 'Data', 'Validation']
+2025-03-27 22:54:48,071 - chestbuddy.core.controllers.view_state_controller - INFO - View changed from 'Data' to 'Validation'
+2025-03-27 22:54:48,071 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Validation - 
+2025-03-27 22:54:48,123 - chestbuddy.core.controllers.view_state_controller - DEBUG - View transition to 'Validation' completed
+2025-03-27 22:54:48,948 - chestbuddy.ui.views.validation_tab_view - DEBUG - Status updated: Validating data...
+2025-03-27 22:54:51,666 - chestbuddy.ui.data_view - DEBUG - Handling validation changed in DataView
+2025-03-27 22:54:51,679 - chestbuddy.ui.data_view - DEBUG - Got validation status: <class 'pandas.core.frame.DataFrame'>
+2025-03-27 22:54:51,679 - chestbuddy.ui.data_view - DEBUG - Adding STATUS_COLUMN at column index 6
+2025-03-27 22:54:51,779 - chestbuddy.ui.data_view - DEBUG - Handling DataFrame validation status with columns: ['duplicates', 'player_validation', 'PLAYER_valid', 'chest_type_validation', 'CHEST_valid', 'source_validation', 'SOURCE_valid', 'DATE_valid', 'SCORE_valid', 'CLAN_valid']
+2025-03-27 22:54:53,713 - chestbuddy.ui.data_view - DEBUG - Validation status update complete
+2025-03-27 22:54:53,713 - chestbuddy.core.services.validation_service - INFO - Updated validation status for 4 rules
+2025-03-27 22:54:53,714 - chestbuddy.ui.views.validation_tab_view - DEBUG - Status updated: Validation complete: Found 12331 issues
+2025-03-27 22:54:53,714 - chestbuddy.ui.views.validation_view_adapter - DEBUG - Validation status changed
+2025-03-27 22:54:53,714 - chestbuddy.ui.views.validation_tab_view - INFO - Validation completed
+2025-03-27 22:57:06,704 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Data - 
+2025-03-27 22:57:06,705 - chestbuddy.core.controllers.view_state_controller - DEBUG - Updating sidebar via IUpdatable interface
+2025-03-27 22:57:06,707 - chestbuddy.ui.widgets.sidebar_navigation - DEBUG - SidebarNavigation updated
+2025-03-27 22:57:06,709 - chestbuddy.core.controllers.view_state_controller - DEBUG - Navigation history updated: position=4, history=['Dashboard', 'Validation', 'Data', 'Validation', 'Data']
+2025-03-27 22:57:06,710 - chestbuddy.core.controllers.view_state_controller - INFO - View changed from 'Validation' to 'Data'
+2025-03-27 22:57:06,710 - chestbuddy.core.controllers.view_state_controller - INFO - View transition already in progress, queuing change to 'Data'
+2025-03-27 22:57:06,710 - chestbuddy.ui.main_window - DEBUG - Navigation changed: Data - 
+2025-03-27 22:57:06,710 - chestbuddy.core.controllers.view_state_controller - INFO - View transition already in progress, queuing change to 'Data'
+2025-03-27 22:57:06,713 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Invalid
+2025-03-27 22:57:06,715 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Invalid
+2025-03-27 22:57:06,716 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Invalid
+2025-03-27 22:57:06,717 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Invalid
+2025-03-27 22:57:06,718 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Invalid
+2025-03-27 22:57:06,718 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:06,719 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:06,720 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:06,721 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:06,722 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:06,722 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:06,723 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:06,723 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:06,724 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:06,725 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:06,725 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:06,726 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:06,726 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:06,727 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:06,728 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:06,728 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:06,729 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:06,729 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:06,730 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:06,767 - chestbuddy.core.controllers.view_state_controller - DEBUG - View transition to 'Data' completed
+2025-03-27 22:57:06,767 - chestbuddy.core.controllers.view_state_controller - INFO - Processing pending view change to 'Data' with subsection 'None'
+2025-03-27 22:57:09,052 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Invalid
+2025-03-27 22:57:09,053 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Invalid
+2025-03-27 22:57:09,054 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Invalid
+2025-03-27 22:57:09,055 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Invalid
+2025-03-27 22:57:09,056 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Invalid
+2025-03-27 22:57:09,056 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:09,057 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:09,058 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:09,058 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:09,059 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:09,060 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:09,060 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:09,061 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:09,062 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:09,062 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:09,063 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:09,064 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:09,065 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:09,065 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:09,066 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:09,066 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:09,067 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:09,067 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:09,068 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:09,073 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Invalid
+2025-03-27 22:57:09,073 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Invalid
+2025-03-27 22:57:09,074 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Invalid
+2025-03-27 22:57:09,075 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Invalid
+2025-03-27 22:57:09,075 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Invalid
+2025-03-27 22:57:09,076 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:09,077 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:09,077 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:09,078 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:09,078 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:09,079 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:09,079 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:09,080 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:09,080 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:09,081 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:09,081 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:09,082 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:09,083 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:09,083 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:09,083 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:09,085 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:09,085 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:09,086 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
+2025-03-27 22:57:09,087 - chestbuddy.ui.widgets.validation_delegate - DEBUG - Status column text: Valid
