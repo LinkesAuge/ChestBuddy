@@ -100,7 +100,7 @@ class ValidationStatusDelegate(QStyledItemDelegate):
         if logger.isEnabledFor(logging.DEBUG):
             value = index.data(Qt.DisplayRole)
             # Use repr() to safely handle potentially problematic Unicode characters
-            safe_value = repr(value) if value else "None"
+            safe_value = repr(value) if value is not None else "None"
             self.logger.debug(
                 f"Cell [{index.row()},{index.column()}]: column={column_name}, "
                 f"validation_status={validation_status}, "
@@ -129,8 +129,8 @@ class ValidationStatusDelegate(QStyledItemDelegate):
                 if is_validatable_column:
                     # This is a specifically invalid cell (in a validatable column)
                     value = index.data(Qt.DisplayRole)
-                    # Use repr() for safe logging of Unicode characters
-                    safe_value = repr(value) if value else "None"
+                    # Use repr() for safe Unicode handling
+                    safe_value = repr(value) if value is not None else "None"
                     self.logger.debug(
                         f"Painting invalid cell [{index.row()},{index.column()}], col={column_name}, value={safe_value}"
                     )

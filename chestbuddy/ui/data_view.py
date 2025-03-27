@@ -574,13 +574,8 @@ class DataView(QWidget):
                                             if not cell_is_valid:
                                                 # Only mark validatable columns as INVALID
                                                 if column_name in ["PLAYER", "SOURCE", "CHEST"]:
-                                                    # Use repr() for safe logging of Unicode characters
-                                                    value = self._data_model.data.iloc[
-                                                        actual_row_idx
-                                                    ].get(column_name, "N/A")
-                                                    safe_value = repr(value) if value else "None"
                                                     logger.debug(
-                                                        f"Setting cell [{actual_row_idx},{column_name}] to INVALID, value={safe_value}"
+                                                        f"Setting cell [{actual_row_idx},{column_name}] to INVALID"
                                                     )
                                                     item.setData(
                                                         ValidationStatus.INVALID, Qt.UserRole + 1
@@ -871,6 +866,268 @@ class DataView(QWidget):
         else:
             logger.warning("Paste operation failed: No valid cell selected")
             return
+
+    @Slot()
+    def _on_data_changed(self) -> None:
+        """Handle data model changes."""
+        logger.debug("DataView._on_data_changed called")
+        print("DataView._on_data_changed called!")
+
+        # Skip if auto-update is disabled
+        if not self._auto_update_enabled:
+            logger.debug("Auto-update disabled, skipping table update")
+            print("Auto-update disabled, skipping table update")
+            return
+
+        # Add debug logging to verify data model state
+        has_data = not self._data_model.is_empty
+        data_shape = (
+            "empty"
+            if self._data_model.is_empty
+            else f"{len(self._data_model.data)} rows x {len(self._data_model.column_names)} columns"
+        )
+        print(f"Data model state in _on_data_changed: has_data={has_data}, shape={data_shape}")
+        logger.debug(
+            f"Data model state in _on_data_changed: has_data={has_data}, shape={data_shape}"
+        )
+
+        # Rate-limit updates to prevent UI freezing
+        current_time = time.time() * 1000
+        time_since_last_update = current_time - self._last_update_time
+
+        if time_since_last_update < self._update_debounce_ms:
+            logger.debug(
+                f"Skipping update due to rate limiting: {time_since_last_update}ms < {self._update_debounce_ms}ms"
+            )
+            print(
+                f"Skipping update due to rate limiting: {time_since_last_update}ms < {self._update_debounce_ms}ms"
+            )
+            return
+
+        print("Forcing _update_view call from _on_data_changed")
+        # Force update the view
+        self._update_view()
+        self._last_update_time = current_time
+        print("_update_view completed from _on_data_changed")
+        logger.debug("_update_view completed from _on_data_changed")
+
+    @Slot(int, Qt.SortOrder)
+    def _on_sort_indicator_changed(self, logical_index: int, order: Qt.SortOrder) -> None:
+        """
+        Handle changes in the sort indicator using the built-in QTableView sorting capability.
+
+        Args:
+            logical_index: The column index being sorted
+            order: The sort order (ascending or descending)
+        """
+        # Skip sorting during initial load or if population is in progress
+        if self._initial_load or self._population_in_progress:
+            logger.debug("Skipping sort during initial load or population")
+            return
+
+        # Set flag to indicate this is a user-initiated sort
+        self._user_initiated_sort = True
+
+        try:
+            # Get the column name for the logical index
+            column_name = self._table_model.headerData(logical_index, Qt.Horizontal)
+            if not column_name:
+                logger.warning(f"Cannot sort: No column name for index {logical_index}")
+                return
+
+            logger.debug(
+                f"User requested sorting by column {column_name} (index {logical_index}), order: {order}"
+            )
+
+            # Let the built-in sorting handle the display
+            # The table is already in sortable state because setSortingEnabled(True) was called in _init_ui
+
+        except Exception as e:
+            logger.error(f"Error during sort indicator change: {e}")
+        finally:
+            self._user_initiated_sort = False  # Reset the user-initiated sort flag
+
+    @Slot(QStandardItem)
+    def _on_item_changed(self, item: QStandardItem) -> None:
+        """
+        Update the data model when an item in the view changes.
+
+        Args:
+            item: The item that changed.
+        """
+        try:
+            # Ignore item changes if we're currently updating
+            if self._is_updating:
+                return
+
+            # Get the row and column of the changed item
+            row = item.row()
+            column = item.column()
+
+            # If we have a valid row and column
+            if row >= 0 and column >= 0 and column < len(self._data_model.column_names):
+                # Get the new value from the item - use item.text() instead of item.data()
+                # This avoids the Qt.EditRole vs int role issue
+                new_value = item.text()
+
+                # Get the column name for this column index
+                column_name = self._data_model.column_names[column]
+
+                # Get the current value from the model first
+                try:
+                    actual_row = row
+                    if self._filtered_rows and row < len(self._filtered_rows):
+                        actual_row = self._filtered_rows[row]
+
+                    current_value = self._data_model.get_cell_value(actual_row, column_name)
+                except Exception as e:
+                    logger.error(f"Error getting current cell value: {str(e)}")
+                    return
+
+                # Check if the value has actually changed
+                if str(current_value) == str(new_value):
+                    logger.debug(
+                        f"Skipping cell update at [{row}, {column_name}] - value unchanged"
+                    )
+                    return
+
+                logger.debug(
+                    f"Updating cell at [{row}, {column_name}] from '{current_value}' to '{new_value}'"
+                )
+
+                # Use a more efficient update method that doesn't recreate the DataFrame
+                actual_row = row
+                if self._filtered_rows and row < len(self._filtered_rows):
+                    actual_row = self._filtered_rows[row]
+
+                success = self._data_model.update_cell(actual_row, column_name, new_value)
+
+                if not success:
+                    logger.error(f"Failed to update cell at [{row}, {column_name}]")
+                    # Reload the item to show the original value
+                    self._is_updating = True
+                    try:
+                        # Use setText instead of setData to avoid the role issue
+                        item.setText(str(current_value))
+                    finally:
+                        self._is_updating = False
+
+        except Exception as e:
+            logger.error(f"Error handling item change: {str(e)}")
+
+    def _apply_table_styling(self) -> None:
+        """Apply additional styling to ensure table content is visible."""
+        # Set text color explicitly via stylesheet
+        self._table_view.setStyleSheet("""
+            QTableView {
+                color: white;
+                background-color: #1A2C42;
+                gridline-color: transparent;
+                selection-background-color: #D4AF37;
+                selection-color: #1A2C42;
+            }
+            QTableView::item {
+                color: white;
+                /* No background color to allow delegate painting to show through */
+                padding: 12px;
+            }
+            QTableView::item:alternate {
+                /* Very subtle alternating row color that won't interfere with validation highlighting */
+                background-color: rgba(45, 55, 72, 40);
+            }
+            QTableView::item:selected {
+                color: #1A2C42;
+                background-color: #D4AF37;
+            }
+        """)
+
+        # Re-enable alternating row colors with subtle effect
+        self._table_view.setAlternatingRowColors(True)
+
+        # Make sure the model has appropriate default foreground color
+        self._table_model.setItemPrototype(QStandardItem())
+        prototype = self._table_model.itemPrototype()
+        if prototype:
+            prototype.setForeground(QColor("white"))
+
+    def _copy_selected_cells(self) -> None:
+        """Copy the currently selected cell(s) to clipboard."""
+        selected_indexes = self._table_view.selectedIndexes()
+        if not selected_indexes:
+            return
+
+        # If only one cell is selected, use the existing copy function
+        if len(selected_indexes) == 1:
+            self._copy_cell(selected_indexes[0])
+            return
+
+        # For multiple cells, we could implement more advanced copying in the future
+        # For now, just copy the first selected cell
+        self._copy_cell(selected_indexes[0])
+        logger.info(f"Copied first of {len(selected_indexes)} selected cells")
+
+    def _paste_to_selected_cells(self) -> None:
+        """Paste clipboard content to the currently selected cell(s)."""
+        logger.info("Paste shortcut activated")
+
+        # First check if we have data in the table
+        if self._data_model.is_empty or self._table_model.rowCount() == 0:
+            logger.warning("Paste operation failed: No data in table")
+            self._status_label.setText("Cannot paste: No data in table")
+            return
+
+        # Ensure table has focus for proper visual feedback
+        self._table_view.setFocus()
+
+        # Get currently selected cells
+        selected_indexes = self._table_view.selectedIndexes()
+
+        # Get the clipboard text
+        clipboard_text = QApplication.clipboard().text().strip()
+        if not clipboard_text:
+            logger.warning("Paste operation failed: Clipboard is empty")
+            self._status_label.setText("Cannot paste: Clipboard is empty")
+            return
+
+        # If no cells are selected, try to use the current cell or select the first cell
+        if not selected_indexes:
+            logger.warning("No cells explicitly selected for paste operation")
+
+            current_index = self._table_view.currentIndex()
+            if current_index.isValid():
+                logger.info(
+                    f"Using current cell at [{current_index.row()}, {current_index.column()}]"
+                )
+                self._paste_cell(current_index)
+                self._status_label.setText("Pasted to current cell")
+            else:
+                # If no current cell, select the first cell if data exists
+                if self._table_model.rowCount() > 0 and self._table_model.columnCount() > 0:
+                    logger.info("Selecting first cell for paste operation")
+                    first_index = self._table_model.index(0, 0)
+                    self._table_view.setCurrentIndex(first_index)
+                    self._table_view.selectionModel().select(
+                        first_index, self._table_view.selectionModel().SelectCurrent
+                    )
+                    self._paste_cell(first_index)
+                    self._status_label.setText("Pasted to first cell")
+                else:
+                    logger.warning("No data in table - cannot paste")
+                    self._status_label.setText("Cannot paste: No valid target cells")
+            return
+
+        # Log number of cells that will receive the pasted value
+        logger.info(f"Pasting to {len(selected_indexes)} selected cells")
+
+        # Use an empty QModelIndex for the first parameter because we're not
+        # responding to a context menu click but to a keyboard shortcut
+        self._paste_cell(QModelIndex())
+
+        # Update status label with paste confirmation
+        if len(selected_indexes) == 1:
+            self._status_label.setText("Pasted to selected cell")
+        else:
+            self._status_label.setText(f"Pasted to {len(selected_indexes)} selected cells")
 
     def eventFilter(self, watched, event):
         """
@@ -1347,13 +1604,12 @@ class DataView(QWidget):
                                                     ValidationStatus.INVALID, Qt.UserRole + 1
                                                 )
                                             else:
-                                                # Non-validatable columns should never be INVALID
+                                                # Non-validatable columns should be marked as INVALID_ROW
                                                 logger.debug(
-                                                    f"Setting non-validatable cell [{row},{col_idx}] to INVALID_ROW instead of INVALID"
+                                                    f"Setting ValidationStatus.INVALID_ROW for non-validatable cell [{row},{col_idx}] (column {invalid_col_name})"
                                                 )
                                                 item.setData(
-                                                    ValidationStatus.INVALID_ROW,
-                                                    Qt.UserRole + 1,
+                                                    ValidationStatus.INVALID_ROW, Qt.UserRole + 1
                                                 )
                                         break
                     else:
@@ -1428,13 +1684,12 @@ class DataView(QWidget):
                                                     ValidationStatus.INVALID, Qt.UserRole + 1
                                                 )
                                             else:
-                                                # Non-validatable columns should never be INVALID
+                                                # Non-validatable columns should be marked as INVALID_ROW
                                                 logger.debug(
-                                                    f"Setting non-validatable cell [{row_idx},{col_idx}] to INVALID_ROW instead of INVALID"
+                                                    f"Setting ValidationStatus.INVALID_ROW for non-validatable cell [{row_idx},{col_idx}] (column {invalid_col_name})"
                                                 )
                                                 item.setData(
-                                                    ValidationStatus.INVALID_ROW,
-                                                    Qt.UserRole + 1,
+                                                    ValidationStatus.INVALID_ROW, Qt.UserRole + 1
                                                 )
                                         break
             else:
@@ -1584,7 +1839,9 @@ class DataView(QWidget):
                                                 orig_column, "N/A"
                                             )
                                             # Use repr() for safe logging of Unicode values
-                                            safe_value = repr(value) if value else "None"
+                                            safe_value = (
+                                                repr(value) if value is not None else "None"
+                                            )
                                             logger.debug(
                                                 f"Row {row_idx} has invalid column: {orig_column}={safe_value}"
                                             )
@@ -1614,11 +1871,11 @@ class DataView(QWidget):
 
                         # Determine the appropriate validation status
                         if column_name in specific_invalid_columns:
-                            # This is a specifically invalid cell - ONLY set INVALID on validatable columns
+                            # This is a specifically invalid cell
                             if column_name in validatable_columns:
                                 value = item.data(Qt.DisplayRole)
                                 # Use repr() for safe logging of Unicode values
-                                safe_value = repr(value) if value else "None"
+                                safe_value = repr(value) if value is not None else "None"
                                 logger.debug(
                                     f"Setting ValidationStatus.INVALID for specific cell [{filtered_idx},{col}] ({column_name}={safe_value})"
                                 )
@@ -1633,7 +1890,7 @@ class DataView(QWidget):
                             # This is just a cell in an invalid row, but not specifically invalid
                             value = item.data(Qt.DisplayRole)
                             # Use repr() for safe logging of Unicode values
-                            safe_value = repr(value) if value else "None"
+                            safe_value = repr(value) if value is not None else "None"
                             logger.debug(
                                 f"Setting ValidationStatus.INVALID_ROW for cell [{filtered_idx},{col}] ({column_name}={safe_value})"
                             )
