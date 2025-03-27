@@ -804,24 +804,34 @@ class DataView(QWidget):
         try:
             # Get validation status for each cell
             for row in range(self._table_model.rowCount()):
-                for col in range(self._table_model.columnCount()):
+                # Determine if this row has valid data for all columns
+                row_valid = True
+
+                for col in range(
+                    min(self._table_model.columnCount(), len(self._data_model.column_names))
+                ):
                     # Get the actual row index if filtered
                     actual_row = row
                     if self._filtered_rows and row < len(self._filtered_rows):
                         actual_row = self._filtered_rows[row]
 
-                    column_name = self._data_model.column_names[col]
+                    try:
+                        column_name = self._data_model.column_names[col]
 
-                    # Get cell validation status
-                    validation_info = self._data_model.get_cell_validation_status(
-                        actual_row, column_name
-                    )
+                        # Get cell validation status
+                        validation_info = self._data_model.get_cell_validation_status(
+                            actual_row, column_name
+                        )
 
-                    # Check the 'valid' key from the validation_info dictionary
-                    index = self._table_model.index(row, col)
-                    if validation_info and "valid" in validation_info:
-                        # Set validation status based on the 'valid' value
-                        if validation_info["valid"]:
+                        # Check the 'valid' key from the validation_info dictionary
+                        index = self._table_model.index(row, col)
+                        is_valid = True
+
+                        if validation_info and "valid" in validation_info:
+                            is_valid = validation_info["valid"]
+
+                        # Set validation status based on validity
+                        if is_valid:
                             self._table_model.setData(
                                 index, ValidationStatus.VALID, Qt.ItemDataRole.UserRole + 1
                             )
@@ -829,11 +839,29 @@ class DataView(QWidget):
                             self._table_model.setData(
                                 index, ValidationStatus.INVALID, Qt.ItemDataRole.UserRole + 1
                             )
-                    else:
-                        # Default to VALID if no validation info
-                        self._table_model.setData(
-                            index, ValidationStatus.VALID, Qt.ItemDataRole.UserRole + 1
+                            row_valid = False
+
+                    except IndexError:
+                        # Handle case where model column count doesn't match data column count
+                        logger.debug(f"Column index {col} out of range for data model columns")
+                        continue
+                    except Exception as e:
+                        logger.debug(
+                            f"Error getting validation status for cell [{actual_row}, {col}]: {e}"
                         )
+                        continue
+
+                # Update status column if it exists
+                status_col = self._table_model.columnCount() - 1
+                if status_col >= len(self._data_model.column_names):
+                    status_item = self._table_model.item(row, status_col)
+                    if status_item:
+                        if row_valid:
+                            status_item.setText("Valid")
+                            status_item.setBackground(QColor(0, 180, 0, 50))  # Light green
+                        else:
+                            status_item.setText("Invalid")
+                            status_item.setBackground(QColor(180, 0, 0, 50))  # Light red
         except Exception as e:
             logger.error(f"Error updating validation status in view: {e}")
 
@@ -1101,19 +1129,27 @@ class DataView(QWidget):
             if self._filtered_rows and row < len(self._filtered_rows):
                 actual_row = self._filtered_rows[row]
 
-            # Check any column's validation status
-            if not self._data_model.is_empty and cols > 0:
-                first_col_name = self._data_model.column_names[0]
-                validation_info = self._data_model.get_cell_validation_status(
-                    actual_row, first_col_name
-                )
+            # Check all columns' validation status
+            if not self._data_model.is_empty and len(self._data_model.column_names) > 0:
+                # Default to valid until we find an invalid column
+                row_is_valid = True
+                has_validation = False
 
-                # Determine status based on validation info
-                if validation_info and "valid" in validation_info:
-                    if validation_info["valid"]:
-                        status_text = "Valid"
-                    else:
-                        status_text = "Invalid"
+                # Check each column for validation status
+                for col_name in self._data_model.column_names:
+                    validation_info = self._data_model.get_cell_validation_status(
+                        actual_row, col_name
+                    )
+
+                    if validation_info:
+                        has_validation = True
+                        if "valid" in validation_info and not validation_info["valid"]:
+                            row_is_valid = False
+                            break
+
+                # Determine status text based on validation
+                if has_validation:
+                    status_text = "Valid" if row_is_valid else "Invalid"
 
             # Create and set status item
             status_item = QStandardItem(status_text)

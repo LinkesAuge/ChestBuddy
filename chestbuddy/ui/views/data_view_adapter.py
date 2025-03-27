@@ -409,8 +409,27 @@ class DataViewAdapter(UpdatableView):
     def _on_data_changed(self):
         """Handle data model changes."""
         logger.debug("DataViewAdapter: Data model changed, requesting update")
-        # Use the standardized update mechanism instead of direct update
-        self.request_update()
+
+        # Mark as needing population
+        self._needs_population = True
+
+        # Try to update directly if update manager isn't available
+        try:
+            # Use the standardized update mechanism
+            self.request_update()
+
+            # As a fallback, try to populate directly if update_manager isn't working
+            if not self._data_model.is_empty and hasattr(self._data_view, "populate_table"):
+                logger.debug("DataViewAdapter: Direct population fallback")
+                self.populate_table()
+        except Exception as e:
+            logger.error(f"Error handling data changed: {e}")
+            # Still try direct population as last resort
+            if not self._data_model.is_empty and hasattr(self._data_view, "populate_table"):
+                try:
+                    self._data_view.populate_table()
+                except Exception as inner_e:
+                    logger.error(f"Error in last resort population: {inner_e}")
 
     def _update_data_state(self):
         """Update our tracking of the data state to detect changes."""

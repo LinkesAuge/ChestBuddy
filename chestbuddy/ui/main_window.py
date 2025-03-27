@@ -1299,3 +1299,12 @@ class MainWindow(QMainWindow):
             self._data_view_controller.populate_table()
         else:
             logger.info("Data view doesn't need refresh, skipping table population")
+
+        # As a fallback, try to force population on any data view adapters
+        try:
+            data_view_adapter = self._view_state_controller.get_view("Data")
+            if data_view_adapter and hasattr(data_view_adapter, "populate_table"):
+                logger.info("Forcing population on DataViewAdapter as fallback")
+                data_view_adapter.populate_table()
+        except Exception as e:
+            logger.error(f"Error in fallback table population: {e}")

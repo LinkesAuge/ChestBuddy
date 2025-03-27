@@ -221,7 +221,7 @@ class ValidationService(QObject):
 
     def _check_data_types(self, df=None) -> Dict[int, str]:
         """
-        Check for data type mismatches in the data.
+        Check that data types are correct.
 
         Args:
             df (pd.DataFrame, optional): The DataFrame to check. If not provided, uses the model's data.
@@ -232,38 +232,46 @@ class ValidationService(QObject):
         if df is None:
             df = self._data_model.data
 
+        result = {}
+
         try:
-            result = {}
-
-            # Check each column
             for column in df.columns:
-                # Skip columns that are not used for validation
-                if self._should_skip_column(column):
-                    continue
-
-                # Try to determine column type
                 try:
-                    # Check numeric columns
-                    if pd.api.types.is_numeric_dtype(df[column]):
-                        for idx, value in df[column].items():
-                            if not pd.isna(value) and not isinstance(value, (int, float)):
-                                try:
-                                    # Try to convert to numeric
-                                    float(value)
-                                except (ValueError, TypeError):
-                                    result[idx] = (
-                                        result.get(idx, "")
-                                        + f"Non-numeric value in numeric column {column}: {value}. "
-                                    )
+                    # Skip columns that don't need type validation
+                    if self._should_skip_column(column):
+                        continue
 
-                    # Check date columns
-                    elif column.lower() in ["date", "datetime", "time"]:
+                    # Apply specific type checks based on column name
+                    if column == "DATE":
+                        # Check date format
                         for idx, value in df[column].items():
-                            if not pd.isna(value) and not self._is_valid_date(value):
+                            if pd.isna(value) or value == "":
+                                continue
+
+                            try:
+                                # Try to parse as date
+                                pd.to_datetime(value)
+                            except:
                                 result[idx] = (
                                     result.get(idx, "")
-                                    + f"Invalid date in {column}: {df.loc[idx, column]}. "
+                                    + f"Invalid date format in {column}: {value}. "
                                 )
+
+                    elif column == "SCORE":
+                        # Check numeric values
+                        for idx, value in df[column].items():
+                            if pd.isna(value) or value == "":
+                                continue
+
+                            try:
+                                # Try to convert to numeric
+                                float(value)
+                            except:
+                                result[idx] = (
+                                    result.get(idx, "")
+                                    + f"Invalid numeric value in {column}: {value}. "
+                                )
+
                 except Exception as e:
                     logger.error(f"Error checking data type for column {column}: {e}")
 
@@ -447,30 +455,32 @@ class ValidationService(QObject):
 
     def _check_players(self) -> Dict[int, str]:
         """
-        Check that all player names are in the player validation list.
+        Check that player names are in the validation list.
 
         Returns:
             Dict[int, str]: Dictionary mapping row indices to error messages.
         """
-        if not self._player_list_model:
-            logger.warning("Player validation list not available.")
-            return {}
-
         try:
+            # Skip if validation list is not available
+            if not self._player_list_model:
+                return {}
+
             result = {}
             df = self._data_model.data
 
+            # Skip if column is not available
             if self.PLAYER_COLUMN not in df.columns:
-                logger.warning(f"Player column '{self.PLAYER_COLUMN}' not found in dataframe.")
                 return {}
 
-            # Check each player name
-            for idx, row in df.iterrows():
-                player = row.get(self.PLAYER_COLUMN)
+            # Check each player name against validation list
+            for idx, player in df[self.PLAYER_COLUMN].items():
+                # Skip empty values
                 if pd.isna(player) or player == "":
-                    result[idx] = f"Missing player name."
-                elif not self._player_list_model.contains(player):
-                    result[idx] = f"Invalid player name: '{player}'."
+                    continue
+
+                # Check if player is in validation list
+                if not self._player_list_model.contains(player):
+                    result[idx] = f"Invalid player name: {player}"
 
             return result
         except Exception as e:
@@ -479,30 +489,32 @@ class ValidationService(QObject):
 
     def _check_chest_types(self) -> Dict[int, str]:
         """
-        Check that all chest types are in the chest type validation list.
+        Check that chest types are in the validation list.
 
         Returns:
             Dict[int, str]: Dictionary mapping row indices to error messages.
         """
-        if not self._chest_type_list_model:
-            logger.warning("Chest type validation list not available.")
-            return {}
-
         try:
+            # Skip if validation list is not available
+            if not self._chest_type_list_model:
+                return {}
+
             result = {}
             df = self._data_model.data
 
+            # Skip if column is not available
             if self.CHEST_COLUMN not in df.columns:
-                logger.warning(f"Chest column '{self.CHEST_COLUMN}' not found in dataframe.")
                 return {}
 
-            # Check each chest type
-            for idx, row in df.iterrows():
-                chest = row.get(self.CHEST_COLUMN)
-                if pd.isna(chest) or chest == "":
-                    result[idx] = f"Missing chest type."
-                elif not self._chest_type_list_model.contains(chest):
-                    result[idx] = f"Invalid chest type: '{chest}'."
+            # Check each chest type against validation list
+            for idx, chest_type in df[self.CHEST_COLUMN].items():
+                # Skip empty values
+                if pd.isna(chest_type) or chest_type == "":
+                    continue
+
+                # Check if chest type is in validation list
+                if not self._chest_type_list_model.contains(chest_type):
+                    result[idx] = f"Invalid chest type: {chest_type}"
 
             return result
         except Exception as e:
@@ -511,30 +523,32 @@ class ValidationService(QObject):
 
     def _check_sources(self) -> Dict[int, str]:
         """
-        Check that all sources are in the source validation list.
+        Check that sources are in the validation list.
 
         Returns:
             Dict[int, str]: Dictionary mapping row indices to error messages.
         """
-        if not self._source_list_model:
-            logger.warning("Source validation list not available.")
-            return {}
-
         try:
+            # Skip if validation list is not available
+            if not self._source_list_model:
+                return {}
+
             result = {}
             df = self._data_model.data
 
+            # Skip if column is not available
             if self.SOURCE_COLUMN not in df.columns:
-                logger.warning(f"Source column '{self.SOURCE_COLUMN}' not found in dataframe.")
                 return {}
 
-            # Check each source
-            for idx, row in df.iterrows():
-                source = row.get(self.SOURCE_COLUMN)
+            # Check each source against validation list
+            for idx, source in df[self.SOURCE_COLUMN].items():
+                # Skip empty values
                 if pd.isna(source) or source == "":
-                    result[idx] = f"Missing source."
-                elif not self._source_list_model.contains(source):
-                    result[idx] = f"Invalid source: '{source}'."
+                    continue
+
+                # Check if source is in validation list
+                if not self._source_list_model.contains(source):
+                    result[idx] = f"Invalid source: {source}"
 
             return result
         except Exception as e:
