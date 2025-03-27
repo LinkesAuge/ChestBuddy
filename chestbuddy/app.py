@@ -169,20 +169,32 @@ class ChestBuddyApp(QObject):
             log_dir = Path("logs")
             log_dir.mkdir(exist_ok=True)
 
-            # Set up file handler
+            # Set up file handler with UTF-8 encoding
             log_file = log_dir / "chestbuddy.log"
-            file_handler = logging.FileHandler(log_file)
+            file_handler = logging.FileHandler(log_file, encoding="utf-8")
             file_handler.setLevel(logging.DEBUG)
 
-            # Set up console handler
+            # Set up console handler with error handling for non-UTF-8 characters
             console_handler = logging.StreamHandler()
             console_handler.setLevel(logging.INFO)
+
+            # Create a custom formatter that handles encoding errors
+            class EncodingFormatter(logging.Formatter):
+                def format(self, record):
+                    # Format the message first
+                    formatted_message = super().format(record)
+                    # Handle any encoding issues
+                    try:
+                        return formatted_message
+                    except UnicodeEncodeError:
+                        # Replace any problematic characters
+                        return formatted_message.encode("ascii", "replace").decode("ascii")
 
             # Set up formatters
             file_formatter = logging.Formatter(
                 "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
             )
-            console_formatter = logging.Formatter("%(levelname)s: %(message)s")
+            console_formatter = EncodingFormatter("%(levelname)s: %(message)s")
 
             # Apply formatters
             file_handler.setFormatter(file_formatter)
@@ -191,10 +203,15 @@ class ChestBuddyApp(QObject):
             # Configure root logger
             root_logger = logging.getLogger()
             root_logger.setLevel(logging.DEBUG)
+
+            # Remove any existing handlers to avoid duplicates
+            for handler in root_logger.handlers[:]:
+                root_logger.removeHandler(handler)
+
             root_logger.addHandler(file_handler)
             root_logger.addHandler(console_handler)
 
-            logger.info("Logging initialized")
+            logger.info("Logging initialized with Unicode support")
         except Exception as e:
             print(f"Error setting up logging: {e}")
             # Continue without logging
