@@ -1017,7 +1017,7 @@ class DataView(QWidget):
             }
             QTableView::item {
                 color: white;
-                background-color: #1A2C42;
+                /* Remove background-color to allow delegate painting to show through */
                 padding: 12px;
             }
             QTableView::item:alternate {
@@ -1501,6 +1501,9 @@ class DataView(QWidget):
                 logger.error("Status column not found in table model")
                 return
 
+            # Track rows with invalid status
+            invalid_rows = []
+
             # Handle different validation_status data types
             if validation_status is None:
                 # If validation_status is None, set all to "Not validated"
@@ -1558,6 +1561,8 @@ class DataView(QWidget):
                     # Set the cell's status based on validation results
                     if row_has_validation:
                         status_text = "Valid" if row_is_valid else "Invalid"
+                        if not row_is_valid:
+                            invalid_rows.append(row)
                     else:
                         status_text = "Not validated"
 
@@ -1595,10 +1600,13 @@ class DataView(QWidget):
 
                     # If we have validation results, update the status
                     if validation_results:
-                        status_text = "Valid" if all(validation_results) else "Invalid"
+                        is_valid = all(validation_results)
+                        status_text = "Valid" if is_valid else "Invalid"
                         self._table_model.setData(
                             self._table_model.index(row_idx, status_col), status_text
                         )
+                        if not is_valid:
+                            invalid_rows.append(row_idx)
             else:
                 # Unknown validation_status type, log error
                 logger.error(f"Unknown validation_status type: {type(validation_status)}")
@@ -1607,6 +1615,17 @@ class DataView(QWidget):
                     self._table_model.setData(
                         self._table_model.index(row, status_col), "Not validated"
                     )
+
+            # Set cell-specific validation status for invalid rows
+            logger.debug(f"Setting cell validation status for {len(invalid_rows)} invalid rows")
+            for row in invalid_rows:
+                # Set all cells in invalid rows to have ValidationStatus.INVALID
+                for col in range(self._table_model.columnCount()):
+                    if col != status_col:  # Skip status column
+                        item = self._table_model.item(row, col)
+                        if item:
+                            item.setData(ValidationStatus.INVALID, Qt.UserRole + 1)
+                            logger.debug(f"Set ValidationStatus.INVALID for cell [{row},{col}]")
 
             # Make the view update
             self._table_view.viewport().update()
@@ -1669,12 +1688,15 @@ class DataView(QWidget):
                             self._table_model.index(filtered_idx, status_col), "Invalid"
                         )
 
-                    # Force update of the row
+                    # Set ValidationStatus.INVALID for all cells in this row
                     for col in range(self._table_model.columnCount()):
-                        idx = self._table_model.index(filtered_idx, col)
-                        # Update data model to trigger a repaint
-                        value = self._table_model.data(idx, Qt.DisplayRole)
-                        self._table_model.setData(idx, value, Qt.DisplayRole)
+                        if col != status_col:  # Skip the status column
+                            item = self._table_model.item(filtered_idx, col)
+                            if item:
+                                item.setData(ValidationStatus.INVALID, Qt.UserRole + 1)
+                                logger.debug(
+                                    f"Set ValidationStatus.INVALID for filtered cell [{filtered_idx},{col}]"
+                                )
 
             # Force redraw of the view
             self._table_view.viewport().update()
