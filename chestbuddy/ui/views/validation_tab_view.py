@@ -80,8 +80,8 @@ class ValidationTabView(QWidget):
                 background-color: {Colors.DARK_CONTENT_BG};
             }}
             QSplitter::handle {{
-                background-color: {Colors.SECONDARY};
-                width: 2px;
+                background-color: {Colors.DARK_CONTENT_BG};
+                width: 4px;
             }}
         """)
         # Ensure the splitter has correct background
@@ -105,6 +105,9 @@ class ValidationTabView(QWidget):
         self._splitter.addWidget(self._players_section)
         self._splitter.addWidget(self._chest_types_section)
         self._splitter.addWidget(self._sources_section)
+
+        # Set initial sizes (equal distribution)
+        self._splitter.setSizes([1, 1, 1])
 
         # Add splitter to layout
         main_layout.addWidget(self._splitter, 1)  # 1 = stretch factor to take available space
@@ -224,7 +227,7 @@ class ValidationTabView(QWidget):
 
     def _create_validation_list_section(self, title: str, list_path: Path) -> QWidget:
         """
-        Create a validation list section with search, toolbar, and list view.
+        Create a validation list section with toolbar and list view.
 
         Args:
             title (str): Title of the section
@@ -251,8 +254,8 @@ class ValidationTabView(QWidget):
             model = ValidationListModel(list_path)
 
         layout = QVBoxLayout(container)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(8)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(12)
 
         # Section header with title and count
         header_layout = QHBoxLayout()
@@ -260,72 +263,20 @@ class ValidationTabView(QWidget):
         header_layout.setSpacing(4)
 
         header = QLabel(title)
-        header.setStyleSheet(f"font-weight: bold; font-size: 14px; color: {Colors.TEXT_PRIMARY};")
+        header.setStyleSheet(
+            f"font-weight: bold; font-size: 16px; color: {Colors.TEXT_LIGHT}; background-color: {Colors.PRIMARY_DARK}; padding: 4px 8px; border-radius: 4px;"
+        )
         header_layout.addWidget(header)
 
         # Count label will be updated later
         count_label = QLabel("(0)")
-        count_label.setStyleSheet(f"color: {Colors.TEXT_SECONDARY}; font-size: 12px;")
+        count_label.setStyleSheet(
+            f"color: {Colors.SECONDARY}; font-size: 14px; font-weight: bold; margin-left: 8px;"
+        )
         header_layout.addWidget(count_label)
 
         header_layout.addStretch()
         layout.addLayout(header_layout)
-
-        # Enhanced search bar with icon
-        search_layout = QHBoxLayout()
-        search_layout.setContentsMargins(0, 0, 0, 0)
-        search_layout.setSpacing(0)
-
-        search_container = QWidget()
-        search_container.setStyleSheet(f"""
-            QWidget {{
-                background-color: {Colors.BACKGROUND_PRIMARY};
-                border: 1px solid {Colors.SECONDARY};
-                border-radius: 4px;
-                padding: 2px;
-            }}
-            QWidget:focus-within {{
-                border: 1px solid {Colors.SECONDARY};
-                background-color: {Colors.PRIMARY_LIGHT};
-            }}
-        """)
-        search_container.setAutoFillBackground(
-            True
-        )  # Ensure search container has correct background
-
-        search_container_layout = QHBoxLayout(search_container)
-        search_container_layout.setContentsMargins(8, 4, 8, 4)
-        search_container_layout.setSpacing(6)
-
-        # Search icon with better styling
-        search_icon = QLabel()
-        search_icon.setPixmap(IconProvider.get_icon("search").pixmap(16, 16))
-        search_icon.setStyleSheet("margin-right: 2px;")
-        search_container_layout.addWidget(search_icon)
-
-        # Search input with improved styling
-        search_bar = QLineEdit()
-        search_bar.setPlaceholderText(f"Search {title.lower()}...")
-        search_bar.setStyleSheet(f"""
-            QLineEdit {{
-                border: none;
-                background: transparent;
-                padding: 3px;
-                font-size: 12px;
-                color: {Colors.TEXT_PRIMARY};
-            }}
-            QLineEdit:focus {{
-                color: {Colors.TEXT_PRIMARY_DARK};
-            }}
-            QLineEdit::placeholder {{
-                color: {Colors.TEXT_PLACEHOLDER};
-            }}
-        """)
-        search_bar.setClearButtonEnabled(True)  # Add clear button
-        search_container_layout.addWidget(search_bar)
-
-        search_layout.addWidget(search_container)
-        layout.addLayout(search_layout)
 
         # Create buttons layout (horizontal instead of grid)
         buttons_layout = QHBoxLayout()
@@ -420,15 +371,11 @@ class ValidationTabView(QWidget):
 
         # Store references
         setattr(self, f"_{section_name}_count", count_label)
-        setattr(self, f"_{section_name}_search", search_bar)
         setattr(self, f"_{section_name}_list", list_view)
         setattr(self, f"_{section_name}_add", add_button)
         setattr(self, f"_{section_name}_remove", remove_button)
         setattr(self, f"_{section_name}_import", import_button)
         setattr(self, f"_{section_name}_export", export_button)
-
-        # Connect search
-        search_bar.textChanged.connect(lambda text: list_view.filter_entries(text))
 
         return container
 
