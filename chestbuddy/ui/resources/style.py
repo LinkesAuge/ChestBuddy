@@ -19,6 +19,8 @@ class Colors:
     PRIMARY = "#1A2C42"  # Dark blue
     PRIMARY_DARK = "#0F1A2A"  # Darker version of primary
     PRIMARY_LIGHT = "#263D5A"  # Lighter version of primary
+    PRIMARY_HOVER = "#263D5A"  # Hover state for primary
+    PRIMARY_ACTIVE = "#0F1A2A"  # Active/pressed state for primary
     SECONDARY = "#D4AF37"  # Gold
     ACCENT = "#4A90E2"  # Light blue
 
@@ -27,20 +29,45 @@ class Colors:
     ERROR = "#DC3545"  # Red
     WARNING = "#FFC107"  # Amber/Yellow
     INFO = "#17A2B8"  # Cyan
+    DISABLED = "#4A5568"  # Disabled state
 
     # Background colors
     BG_DARK = "#2D3748"  # Dark gray
     BG_MEDIUM = "#4A5568"  # Medium gray
     BG_LIGHT = "#718096"  # Light gray
 
+    # CHANGED: Replace light background colors with dark theme equivalents
+    # Original light theme colors:
+    # BACKGROUND_PRIMARY = "#F7FAFC"  # Light background for containers
+    # BACKGROUND_SECONDARY = "#F1F5F9"  # Slightly darker background for secondary elements
+    # BACKGROUND_INPUT = "#FFFFFF"  # Background for input fields
+
+    # Dark theme replacements:
+    BACKGROUND_PRIMARY = "#2D3748"  # Dark background for containers (same as BG_DARK)
+    BACKGROUND_SECONDARY = "#263D5A"  # Secondary background (same as PRIMARY_LIGHT)
+    BACKGROUND_INPUT = "#1A2C42"  # Background for input fields (same as PRIMARY)
+
+    # Dark theme background colors
+    DARK_BG_PRIMARY = "#1A2C42"  # Main dark background (same as PRIMARY)
+    DARK_BG_SECONDARY = "#263D5A"  # Secondary dark background (same as PRIMARY_LIGHT)
+    DARK_BG_TERTIARY = "#0F1A2A"  # Tertiary dark background (same as PRIMARY_DARK)
+    DARK_CONTENT_BG = "#2D3748"  # Content area background (same as BG_DARK)
+
     # Text colors
     TEXT_LIGHT = "#FFFFFF"  # White
     TEXT_MUTED = "#E2E8F0"  # Light gray
     TEXT_DISABLED = "#889EB8"  # Muted blue-gray
+    TEXT_PRIMARY = "#2D3748"  # Main text color
+    TEXT_PRIMARY_DARK = "#1A202C"  # Darker text for emphasis
+    TEXT_SECONDARY = "#718096"  # Secondary text color
+    TEXT_PLACEHOLDER = "#A0AEC0"  # Placeholder text color
+    TEXT_ON_PRIMARY = "#FFFFFF"  # Text on primary colored backgrounds
 
     # Border colors
-    BORDER = "#4A5568"  # Medium gray
+    BORDER = "#CBD5E0"  # Standard border
+    BORDER_LIGHT = "#E2E8F0"  # Light border
     BORDER_DARK = "#2D3748"  # Dark gray border
+    DARK_BORDER = "#4A5568"  # Border for dark theme elements
 
 
 def get_sidebar_style():
@@ -67,8 +94,8 @@ def get_sidebar_style():
         
         QListWidget::item:selected {{
             background-color: {Colors.PRIMARY};
-            color: {Colors.ACCENT};
-            border-left: 3px solid {Colors.ACCENT};
+            color: {Colors.SECONDARY};
+            border-left: 3px solid {Colors.SECONDARY};
         }}
         
         QListWidget::item:hover:!selected {{
@@ -118,229 +145,304 @@ def apply_application_style(app):
     app.setFont(font)
 
     # Set stylesheet for customized widgets
-    app.setStyleSheet("""
-        QMainWindow, QDialog {
-            background-color: #2D3748;
-        }
+    app.setStyleSheet(f"""
+        /* Main window and dialogs */
+        QMainWindow, QDialog {{
+            background-color: {Colors.BG_DARK};
+        }}
         
-        QTabWidget::pane {
-            border: 1px solid #4A5568;
-            background-color: #1A2C42;
-        }
+        /* Content views - Dark Theme (Note: We're keeping the lightContentView name to avoid breaking existing code) */
+        .LightContentView, QWidget[lightContentView="true"] {{
+            background-color: {Colors.DARK_CONTENT_BG};
+            color: {Colors.TEXT_LIGHT};
+        }}
         
-        QTabBar::tab {
-            background-color: #2D3748;
-            color: #E2E8F0;
+        /* Container widgets for consistent background */
+        .Container, QWidget[container="true"] {{
+            background-color: {Colors.DARK_CONTENT_BG};
+            color: {Colors.TEXT_LIGHT};
+        }}
+        
+        /* Validation views - we explicitly set these to ensure consistency */
+        ValidationTabView, ValidationListView {{
+            background-color: {Colors.DARK_CONTENT_BG};
+            color: {Colors.TEXT_LIGHT};
+        }}
+        
+        /* Tab widgets */
+        QTabWidget::pane {{
+            border: 1px solid {Colors.DARK_BORDER};
+            background-color: {Colors.PRIMARY};
+        }}
+        
+        QTabBar::tab {{
+            background-color: {Colors.BG_DARK};
+            color: {Colors.TEXT_MUTED};
             padding: 8px 12px;
-            border: 1px solid #4A5568;
+            border: 1px solid {Colors.DARK_BORDER};
             border-bottom: none;
             border-top-left-radius: 4px;
             border-top-right-radius: 4px;
-        }
+        }}
         
-        QTabBar::tab:selected {
-            background-color: #1A2C42;
-            border-bottom: 2px solid #D4AF37;
-        }
+        QTabBar::tab:selected {{
+            background-color: {Colors.PRIMARY};
+            border-bottom: 2px solid {Colors.SECONDARY};
+            color: {Colors.TEXT_LIGHT};
+        }}
         
-        QTabBar::tab:hover:!selected {
-            background-color: #4A5568;
-        }
+        QTabBar::tab:hover:!selected {{
+            background-color: {Colors.BG_MEDIUM};
+        }}
         
-        QPushButton {
-            background-color: #1A2C42;
-            color: #E2E8F0;
-            border: 1px solid #4A5568;
+        /* Buttons */
+        QPushButton {{
+            background-color: {Colors.PRIMARY};
+            color: {Colors.TEXT_LIGHT};
+            border: 1px solid {Colors.SECONDARY};
             padding: 6px 12px;
             border-radius: 4px;
-        }
+        }}
         
-        QPushButton:hover {
-            background-color: #4A90E2;
-            border: 1px solid #4A90E2;
-        }
+        QPushButton:hover {{
+            background-color: {Colors.PRIMARY_LIGHT};
+            border: 1px solid {Colors.SECONDARY};
+        }}
         
-        QPushButton:pressed {
-            background-color: #3A7EC5;
-        }
+        QPushButton:pressed {{
+            background-color: {Colors.PRIMARY_DARK};
+            border: 1px solid {Colors.SECONDARY};
+        }}
         
-        QPushButton:disabled {
-            background-color: #4A5568;
-            color: #718096;
-            border: 1px solid #4A5568;
-        }
+        QPushButton:disabled {{
+            background-color: {Colors.DISABLED};
+            color: {Colors.TEXT_DISABLED};
+            border: 1px solid {Colors.DISABLED};
+        }}
         
-        QPushButton.primary {
-            background-color: #4A90E2;
-            border: 1px solid #4A90E2;
+        QPushButton.primary {{
+            background-color: {Colors.SECONDARY};
+            border: 1px solid {Colors.SECONDARY};
+            color: {Colors.TEXT_LIGHT};
+        }}
+        
+        QPushButton.primary:hover {{
+            background-color: {Colors.SECONDARY};
+            opacity: 0.9;
+        }}
+        
+        QPushButton.secondary {{
+            background-color: {Colors.PRIMARY_LIGHT};
+            border: 1px solid {Colors.SECONDARY};
+            color: {Colors.TEXT_LIGHT};
+        }}
+        
+        QPushButton.secondary:hover {{
+            background-color: {Colors.PRIMARY_HOVER};
+            opacity: 0.9;
+        }}
+        
+        QPushButton.success {{
+            background-color: {Colors.SUCCESS};
+            border: 1px solid {Colors.SUCCESS};
             color: white;
-        }
+        }}
         
-        QPushButton.primary:hover {
-            background-color: #3A7EC5;
-        }
+        QPushButton.success:hover {{
+            background-color: {Colors.SUCCESS};
+            opacity: 0.9;
+        }}
         
-        QPushButton.secondary {
-            background-color: #D4AF37;
-            border: 1px solid #D4AF37;
-            color: #1A2C42;
-        }
-        
-        QPushButton.secondary:hover {
-            background-color: #C4A030;
-        }
-        
-        QPushButton.success {
-            background-color: #28A745;
-            border: 1px solid #28A745;
+        QPushButton.danger {{
+            background-color: {Colors.ERROR};
+            border: 1px solid {Colors.ERROR};
             color: white;
-        }
+        }}
         
-        QPushButton.success:hover {
-            background-color: #218838;
-        }
+        QPushButton.danger:hover {{
+            background-color: {Colors.ERROR};
+            opacity: 0.9;
+        }}
         
-        QPushButton.danger {
-            background-color: #DC3545;
-            border: 1px solid #DC3545;
-            color: white;
-        }
-        
-        QPushButton.danger:hover {
-            background-color: #C82333;
-        }
-        
-        QLineEdit, QTextEdit, QPlainTextEdit, QSpinBox, QDoubleSpinBox, QComboBox {
-            background-color: #1A2C42;
-            color: #E2E8F0;
-            border: 1px solid #4A5568;
+        /* Form Controls */
+        QLineEdit, QTextEdit, QPlainTextEdit, QSpinBox, QDoubleSpinBox, QComboBox {{
+            background-color: {Colors.PRIMARY_LIGHT};
+            color: {Colors.TEXT_LIGHT};
+            border: 1px solid {Colors.DARK_BORDER};
             border-radius: 4px;
             padding: 4px 8px;
-        }
+        }}
         
-        QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus {
-            border: 1px solid #D4AF37;
-        }
+        QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus {{
+            border: 1px solid {Colors.SECONDARY};
+            background-color: {Colors.PRIMARY_LIGHT};
+        }}
         
-        QComboBox::drop-down {
+        QLineEdit:disabled, QTextEdit:disabled, QPlainTextEdit:disabled, QSpinBox:disabled, QDoubleSpinBox:disabled, QComboBox:disabled {{
+            background-color: {Colors.BG_MEDIUM};
+            color: {Colors.TEXT_DISABLED};
+        }}
+        
+        /* Combo box */
+        QComboBox::drop-down {{
             border: none;
             padding-right: 10px;
-        }
+        }}
         
-        QComboBox::down-arrow {
-            image: url(:/down-arrow.png);
-        }
+        QComboBox QAbstractItemView {{
+            background-color: {Colors.PRIMARY_LIGHT};
+            color: {Colors.TEXT_LIGHT};
+            border: 1px solid {Colors.DARK_BORDER};
+            selection-background-color: {Colors.PRIMARY};
+            selection-color: {Colors.SECONDARY};
+        }}
         
-        QComboBox QAbstractItemView {
-            background-color: #1A2C42;
-            color: #E2E8F0;
-            border: 1px solid #4A5568;
-            selection-background-color: #D4AF37;
-            selection-color: #1A2C42;
-        }
+        /* List, Table, and Tree Views */
+        QTableView, QTreeView, QListView {{
+            background-color: {Colors.PRIMARY_LIGHT};
+            color: {Colors.TEXT_LIGHT};
+            border: 1px solid {Colors.DARK_BORDER};
+            gridline-color: {Colors.DARK_BORDER};
+            selection-background-color: {Colors.PRIMARY};
+            selection-color: {Colors.SECONDARY};
+            alternate-background-color: {Colors.PRIMARY_DARK};
+        }}
         
-        QTableView, QTreeView, QListView {
-            background-color: #1A2C42;
-            color: #E2E8F0;
-            border: 1px solid #4A5568;
-            gridline-color: #4A5568;
-            selection-background-color: #D4AF37;
-            selection-color: #1A2C42;
-        }
+        QTableView::item, QTreeView::item, QListView::item {{
+            padding: 4px;
+            border-bottom: 1px solid {Colors.DARK_BORDER};
+        }}
         
-        QHeaderView::section {
-            background-color: #2D3748;
-            color: #E2E8F0;
-            padding: 6px;
-            border: 1px solid #4A5568;
-        }
+        QTableView::item:selected, QTreeView::item:selected, QListView::item:selected {{
+            background-color: {Colors.PRIMARY};
+            color: {Colors.SECONDARY};
+        }}
         
-        QScrollBar:vertical {
-            border: none;
-            background-color: #2D3748;
+        QHeaderView::section {{
+            background-color: {Colors.PRIMARY_DARK};
+            color: {Colors.TEXT_LIGHT};
+            padding: 5px;
+            border: 1px solid {Colors.DARK_BORDER};
+        }}
+        
+        /* Splitters */
+        QSplitter {{
+            background-color: {Colors.DARK_CONTENT_BG};
+        }}
+        
+        QSplitter::handle {{
+            background-color: {Colors.DARK_BORDER};
+        }}
+        
+        /* Status Bar */
+        QStatusBar {{
+            background-color: {Colors.PRIMARY_DARK};
+            color: {Colors.TEXT_LIGHT};
+        }}
+        
+        /* Scroll bars */
+        QScrollBar:vertical {{
+            background-color: {Colors.PRIMARY_DARK};
             width: 12px;
             margin: 0px;
-        }
+        }}
         
-        QScrollBar::handle:vertical {
-            background-color: #4A5568;
+        QScrollBar::handle:vertical {{
+            background-color: {Colors.PRIMARY_LIGHT};
             min-height: 20px;
             border-radius: 6px;
-        }
+        }}
         
-        QScrollBar::handle:vertical:hover {
-            background-color: #D4AF37;
-        }
+        QScrollBar::handle:vertical:hover {{
+            background-color: {Colors.SECONDARY};
+        }}
         
-        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-            height: 0px;
-        }
-        
-        QScrollBar:horizontal {
-            border: none;
-            background-color: #2D3748;
+        QScrollBar:horizontal {{
+            background-color: {Colors.PRIMARY_DARK};
             height: 12px;
             margin: 0px;
-        }
+        }}
         
-        QScrollBar::handle:horizontal {
-            background-color: #4A5568;
+        QScrollBar::handle:horizontal {{
+            background-color: {Colors.PRIMARY_LIGHT};
             min-width: 20px;
             border-radius: 6px;
-        }
+        }}
         
-        QScrollBar::handle:horizontal:hover {
-            background-color: #D4AF37;
-        }
+        QScrollBar::handle:horizontal:hover {{
+            background-color: {Colors.SECONDARY};
+        }}
         
-        QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
-            width: 0px;
-        }
+        /* ViewHeader from base_view.py */
+        ViewHeader {{
+            background-color: {Colors.PRIMARY_DARK};
+            color: {Colors.TEXT_LIGHT};
+            border-bottom: 1px solid {Colors.DARK_BORDER};
+        }}
         
-        QProgressBar {
-            border: 1px solid #4A5568;
+        /* Search inputs and buttons in the validation view */
+        QWidget#searchContainer {{
+            background-color: {Colors.PRIMARY_LIGHT};
             border-radius: 4px;
-            background-color: #2D3748;
-            text-align: center;
-            color: #E2E8F0;
-        }
+            border: 1px solid {Colors.DARK_BORDER};
+        }}
         
-        QProgressBar::chunk {
-            background-color: #D4AF37;
-            width: 1px;
-        }
+        QLineEdit#searchInput {{
+            background-color: transparent;
+            border: none;
+            color: {Colors.TEXT_LIGHT};
+            padding-left: 5px;
+        }}
         
-        QStatusBar {
-            background-color: #1A2C42;
-            color: #E2E8F0;
-            border-top: 1px solid #4A5568;
-        }
+        /* Make context menus consistent with dark theme */
+        QMenu {{
+            background-color: {Colors.PRIMARY};
+            color: {Colors.TEXT_LIGHT};
+            border: 1px solid {Colors.DARK_BORDER};
+        }}
         
-        QMenuBar {
-            background-color: #1A2C42;
-            color: #E2E8F0;
-        }
+        QMenu::item {{
+            padding: 6px 24px 6px 8px;
+        }}
         
-        QMenuBar::item {
-            background: transparent;
-            padding: 6px 12px;
-        }
+        QMenu::item:selected {{
+            background-color: {Colors.PRIMARY_LIGHT};
+            color: {Colors.SECONDARY};
+        }}
         
-        QMenuBar::item:selected {
-            background-color: #4A5568;
-        }
+        QMenu::separator {{
+            height: 1px;
+            background-color: {Colors.DARK_BORDER};
+            margin: 4px 8px;
+        }}
         
-        QMenu {
-            background-color: #1A2C42;
-            color: #E2E8F0;
-            border: 1px solid #4A5568;
-        }
+        /* Tooltips */
+        QToolTip {{
+            background-color: {Colors.PRIMARY};
+            color: {Colors.TEXT_LIGHT};
+            border: 1px solid {Colors.DARK_BORDER};
+            padding: 4px;
+        }}
         
-        QMenu::item {
-            padding: 6px 24px 6px 20px;
-        }
+        /* Labels should use light text on dark backgrounds */
+        QLabel {{
+            color: {Colors.TEXT_LIGHT};
+        }}
         
-        QMenu::item:selected {
-            background-color: #4A5568;
-        }
+        /* Group boxes */
+        QGroupBox {{
+            background-color: {Colors.DARK_CONTENT_BG};
+            color: {Colors.TEXT_LIGHT};
+            border: 1px solid {Colors.DARK_BORDER};
+            border-radius: 4px;
+            margin-top: 20px;
+            padding-top: 10px;
+        }}
+        
+        QGroupBox::title {{
+            subcontrol-origin: margin;
+            subcontrol-position: top left;
+            padding: 0 5px;
+            color: {Colors.SECONDARY};
+        }}
     """)

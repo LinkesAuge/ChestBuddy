@@ -83,14 +83,14 @@ class ActionButton(QPushButton):
         style = f"""
         QPushButton {{
             padding: 6px 12px;
-            border: 1px solid {Colors.BORDER};
+            border: 1px solid {Colors.SECONDARY};
             border-radius: 4px;
             background-color: {Colors.PRIMARY};
             color: {Colors.TEXT_LIGHT};
         }}
         QPushButton:hover {{
             background-color: {Colors.PRIMARY_LIGHT};
-            border-color: {Colors.BORDER_DARK};
+            border-color: {Colors.SECONDARY};
         }}
         QPushButton:pressed {{
             background-color: {Colors.PRIMARY_DARK};
@@ -107,14 +107,14 @@ class ActionButton(QPushButton):
             style = f"""
             QPushButton {{
                 padding: 4px 8px;
-                border: 1px solid {Colors.BORDER};
+                border: 1px solid {Colors.SECONDARY};
                 border-radius: 3px;
                 background-color: {Colors.PRIMARY};
                 color: {Colors.TEXT_LIGHT};
             }}
             QPushButton:hover {{
                 background-color: {Colors.PRIMARY_LIGHT};
-                border-color: {Colors.BORDER_DARK};
+                border-color: {Colors.SECONDARY};
             }}
             QPushButton:pressed {{
                 background-color: {Colors.PRIMARY_DARK};
