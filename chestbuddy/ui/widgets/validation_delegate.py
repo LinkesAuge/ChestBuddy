@@ -102,6 +102,14 @@ class ValidationStatusDelegate(QStyledItemDelegate):
             if status_text == "Invalid":
                 row_has_invalid_status = True
 
+        # Get cell-specific validation status from model data (Qt.UserRole + 1)
+        validation_status = index.data(Qt.ItemDataRole.UserRole + 1)
+
+        # Add debug logging
+        self.logger.debug(
+            f"Cell [{index.row()},{index.column()}]: column={column_name}, row_invalid={row_has_invalid_status}, validation_status={validation_status}, status_text={status_text}"
+        )
+
         # If this is the status column, paint based on the text value
         if is_status_column:
             # Get the display text
@@ -118,9 +126,6 @@ class ValidationStatusDelegate(QStyledItemDelegate):
                 # Light gray for not validated
                 painter.fillRect(option.rect, self.NOT_VALIDATED_COLOR)
         else:
-            # Get cell-specific validation status from model data (Qt.UserRole + 1)
-            validation_status = index.data(Qt.ItemDataRole.UserRole + 1)
-
             # Apply row highlighting if the row has invalid status
             if row_has_invalid_status:
                 painter.fillRect(option.rect, self.INVALID_ROW_COLOR)
