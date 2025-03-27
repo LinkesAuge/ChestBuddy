@@ -1533,7 +1533,7 @@ class DataView(QWidget):
                     f"Handling DataFrame validation status with columns: {validation_status.columns.tolist()}"
                 )
 
-                # Get all columns that indicate validation status (end with _valid)
+                # Get all validation columns
                 validation_columns = [
                     col for col in validation_status.columns if col.endswith("_valid")
                 ]
@@ -1585,33 +1585,38 @@ class DataView(QWidget):
                                 f"Row {row} is invalid. Invalid columns: {invalid_columns}"
                             )
 
-                            # Set ValidationStatus.INVALID for each cell in invalid columns
-                            for invalid_col_name in invalid_columns:
-                                # Find the column index for this column name
-                                for col_idx in range(self._table_model.columnCount()):
-                                    if (
-                                        self._table_model.headerData(col_idx, Qt.Horizontal)
-                                        == invalid_col_name
-                                    ):
-                                        item = self._table_model.item(row, col_idx)
-                                        if item:
-                                            # Only apply INVALID to validatable columns
-                                            if invalid_col_name in ["PLAYER", "SOURCE", "CHEST"]:
-                                                logger.debug(
-                                                    f"Setting ValidationStatus.INVALID for cell [{row},{col_idx}] (column {invalid_col_name})"
-                                                )
-                                                item.setData(
-                                                    ValidationStatus.INVALID, Qt.UserRole + 1
-                                                )
-                                            else:
-                                                # Non-validatable columns should be marked as INVALID_ROW
-                                                logger.debug(
-                                                    f"Setting ValidationStatus.INVALID_ROW for non-validatable cell [{row},{col_idx}] (column {invalid_col_name})"
-                                                )
-                                                item.setData(
-                                                    ValidationStatus.INVALID_ROW, Qt.UserRole + 1
-                                                )
-                                        break
+                            # Set cell-specific ValidationStatus for each column
+                            for col_idx in range(self._table_model.columnCount()):
+                                column_name = self._table_model.headerData(col_idx, Qt.Horizontal)
+                                item = self._table_model.item(row, col_idx)
+
+                                if item:
+                                    # Determine the appropriate validation status for this cell
+                                    if column_name in invalid_columns:
+                                        # This is a specifically invalid cell
+                                        if column_name in ["PLAYER", "SOURCE", "CHEST"]:
+                                            value = item.data(Qt.DisplayRole)
+                                            safe_value = (
+                                                repr(value) if value is not None else "None"
+                                            )
+                                            logger.debug(
+                                                f"Setting ValidationStatus.INVALID for specific cell [{row},{col_idx}] ({column_name}={safe_value})"
+                                            )
+                                            item.setData(ValidationStatus.INVALID, Qt.UserRole + 1)
+                                        else:
+                                            logger.debug(
+                                                f"Setting ValidationStatus.INVALID_ROW for non-validatable column [{row},{col_idx}] ({column_name})"
+                                            )
+                                            item.setData(
+                                                ValidationStatus.INVALID_ROW, Qt.UserRole + 1
+                                            )
+                                    else:
+                                        # This cell has no specific validation error
+                                        # Just mark as part of an invalid row
+                                        logger.debug(
+                                            f"Setting ValidationStatus.INVALID_ROW for cell [{row},{col_idx}] in invalid row (column {column_name})"
+                                        )
+                                        item.setData(ValidationStatus.INVALID_ROW, Qt.UserRole + 1)
                     else:
                         status_text = "Not validated"
 
@@ -1665,40 +1670,43 @@ class DataView(QWidget):
                                 f"Row {row_idx} is invalid. Invalid columns: {invalid_columns}"
                             )
 
-                            # Set ValidationStatus.INVALID for each cell in invalid columns
-                            for invalid_col_name in invalid_columns:
-                                # Find the column index for this column name
-                                for col_idx in range(self._table_model.columnCount()):
-                                    if (
-                                        self._table_model.headerData(col_idx, Qt.Horizontal)
-                                        == invalid_col_name
-                                    ):
-                                        item = self._table_model.item(row_idx, col_idx)
-                                        if item:
-                                            # Only apply INVALID to validatable columns
-                                            if invalid_col_name in ["PLAYER", "SOURCE", "CHEST"]:
-                                                logger.debug(
-                                                    f"Setting ValidationStatus.INVALID for cell [{row_idx},{col_idx}] (column {invalid_col_name})"
-                                                )
-                                                item.setData(
-                                                    ValidationStatus.INVALID, Qt.UserRole + 1
-                                                )
-                                            else:
-                                                # Non-validatable columns should be marked as INVALID_ROW
-                                                logger.debug(
-                                                    f"Setting ValidationStatus.INVALID_ROW for non-validatable cell [{row_idx},{col_idx}] (column {invalid_col_name})"
-                                                )
-                                                item.setData(
-                                                    ValidationStatus.INVALID_ROW, Qt.UserRole + 1
-                                                )
-                                        break
-            else:
-                # Unknown validation_status type, log error
-                logger.error(f"Unknown validation_status type: {type(validation_status)}")
-                # Set all to "Not validated"
-                for row in range(self._table_model.rowCount()):
+                            # Set cell-specific ValidationStatus for each column
+                            for col_idx in range(self._table_model.columnCount()):
+                                column_name = self._table_model.headerData(col_idx, Qt.Horizontal)
+                                item = self._table_model.item(row_idx, col_idx)
+
+                                if item:
+                                    # Determine the appropriate validation status for this cell
+                                    if column_name in invalid_columns:
+                                        # This is a specifically invalid cell
+                                        if column_name in ["PLAYER", "SOURCE", "CHEST"]:
+                                            value = item.data(Qt.DisplayRole)
+                                            safe_value = (
+                                                repr(value) if value is not None else "None"
+                                            )
+                                            logger.debug(
+                                                f"Setting ValidationStatus.INVALID for specific cell [{row_idx},{col_idx}] ({column_name}={safe_value})"
+                                            )
+                                            item.setData(ValidationStatus.INVALID, Qt.UserRole + 1)
+                                        else:
+                                            logger.debug(
+                                                f"Setting ValidationStatus.INVALID_ROW for non-validatable column [{row_idx},{col_idx}] ({column_name})"
+                                            )
+                                            item.setData(
+                                                ValidationStatus.INVALID_ROW, Qt.UserRole + 1
+                                            )
+                                    else:
+                                        # This cell has no specific validation error
+                                        # Just mark as part of an invalid row
+                                        logger.debug(
+                                            f"Setting ValidationStatus.INVALID_ROW for cell [{row_idx},{col_idx}] in invalid row (column {column_name})"
+                                        )
+                                        item.setData(ValidationStatus.INVALID_ROW, Qt.UserRole + 1)
+                    else:
+                        status_text = "Not validated"
+
                     self._table_model.setData(
-                        self._table_model.index(row, status_col), "Not validated"
+                        self._table_model.index(row_idx, status_col), status_text
                     )
 
             # Additional diagnostic logging
@@ -1814,7 +1822,7 @@ class DataView(QWidget):
                         if status_item:
                             status_item.setData("Invalid", Qt.DisplayRole)
 
-                    # Identify specifically invalid cells from validation data
+                    # Find which specific columns are invalid
                     specific_invalid_columns = []
                     if validation_status_df is not None and not validation_status_df.empty:
                         try:
@@ -1833,29 +1841,25 @@ class DataView(QWidget):
                                         # Get the original column name by removing _valid suffix
                                         orig_column = val_col.replace("_valid", "")
                                         # Only add if it's a validatable column
-                                        if orig_column in validatable_columns:
-                                            specific_invalid_columns.append(orig_column)
-                                            value = self._data_model.data.iloc[row_idx].get(
-                                                orig_column, "N/A"
-                                            )
-                                            # Use repr() for safe logging of Unicode values
-                                            safe_value = (
-                                                repr(value) if value is not None else "None"
-                                            )
-                                            logger.debug(
-                                                f"Row {row_idx} has invalid column: {orig_column}={safe_value}"
-                                            )
+                                        specific_invalid_columns.append(orig_column)
+                                        value = self._data_model.data.iloc[row_idx].get(
+                                            orig_column, "N/A"
+                                        )
+                                        # Use repr() for safe logging of Unicode values
+                                        safe_value = repr(value) if value is not None else "None"
+                                        logger.debug(
+                                            f"Row {row_idx} has invalid column: {orig_column}={safe_value}"
+                                        )
                         except Exception as e:
                             logger.error(
                                 f"Error processing validation status for row {row_idx}: {e}"
                             )
 
                     # If we couldn't identify specific invalid columns but the row is invalid,
-                    # assume all validatable columns are potentially invalid
+                    # mark the row as invalid but don't mark any specific cells
                     if not specific_invalid_columns:
-                        specific_invalid_columns = validatable_columns
                         logger.debug(
-                            f"No specific invalid columns identified for row {row_idx}, marking all validatable columns"
+                            f"No specific invalid columns identified for row {row_idx}, marking row as invalid"
                         )
 
                     # Process all columns in the row
@@ -1871,7 +1875,7 @@ class DataView(QWidget):
 
                         # Determine the appropriate validation status
                         if column_name in specific_invalid_columns:
-                            # This is a specifically invalid cell
+                            # This is a specifically invalid cell - only apply INVALID to validatable columns
                             if column_name in validatable_columns:
                                 value = item.data(Qt.DisplayRole)
                                 # Use repr() for safe logging of Unicode values
@@ -1881,7 +1885,7 @@ class DataView(QWidget):
                                 )
                                 item.setData(ValidationStatus.INVALID, Qt.UserRole + 1)
                             else:
-                                # Non-validatable column but in invalid list
+                                # Non-validatable columns should just be marked as part of an invalid row
                                 logger.debug(
                                     f"Setting ValidationStatus.INVALID_ROW for non-validatable column [{filtered_idx},{col}] ({column_name})"
                                 )
