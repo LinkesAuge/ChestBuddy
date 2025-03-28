@@ -1620,7 +1620,8 @@ class DataView(QWidget):
                             if status_item and status_item.data(Qt.DisplayRole) != "Valid":
                                 cells_to_update[(filtered_idx, status_col)] = ("Valid", None)
 
-                        # For other cells, only reset to VALID if they were previously invalid
+                        # For cells that were previously marked as invalid, reset them to None
+                        # instead of setting to VALID to keep standard styling
                         for col_idx in range(self._table_model.columnCount()):
                             if col_idx == status_col:
                                 continue  # Skip status column
@@ -1632,15 +1633,12 @@ class DataView(QWidget):
                             # Get current validation status for this cell
                             current_status = item.data(Qt.UserRole + 1)
 
-                            # Only update if the status is changing from invalid to valid
+                            # Only reset cells that were previously invalid, and set to None instead of VALID
                             if current_status in [
                                 ValidationStatus.INVALID,
                                 ValidationStatus.INVALID_ROW,
                             ]:
-                                cells_to_update[(filtered_idx, col_idx)] = (
-                                    None,
-                                    ValidationStatus.VALID,
-                                )
+                                cells_to_update[(filtered_idx, col_idx)] = (None, None)
             else:
                 # Unknown validation_status type, log error
                 logger.error(f"Unknown validation_status type: {type(validation_status)}")
@@ -1936,6 +1934,13 @@ class DataView(QWidget):
         # Reset UI elements
         if hasattr(self, "_filter_input") and self._filter_input:
             self._filter_input.setText("")
+
+        # Reset the validation status of all cells to None - no styling
+        for row in range(self._table_model.rowCount()):
+            for col in range(self._table_model.columnCount()):
+                item = self._table_model.item(row, col)
+                if item:
+                    item.setData(None, Qt.UserRole + 1)
 
         logger.debug("Data view reset after data cleared")
 

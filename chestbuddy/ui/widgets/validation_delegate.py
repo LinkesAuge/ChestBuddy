@@ -39,7 +39,7 @@ class ValidationStatusDelegate(QStyledItemDelegate):
     WARNING_COLOR = QColor(255, 240, 0, 80)  # Light yellow
     INVALID_COLOR = QColor(170, 0, 0, 255)  # Deep crimson, fully opaque
     INVALID_BORDER_COLOR = QColor(0, 0, 0, 255)  # Black border
-    INVALID_ROW_COLOR = QColor(255, 230, 230, 120)  # Light pink with low opacity
+    INVALID_ROW_COLOR = QColor(255, 220, 220, 120)  # Light pink for invalid rows
     NOT_VALIDATED_COLOR = QColor(200, 200, 200, 40)  # Light gray for not validated
 
     # Column name constants
@@ -70,7 +70,7 @@ class ValidationStatusDelegate(QStyledItemDelegate):
             option: Style options for the item
             index: Model index of the item to paint
         """
-        # Save painter state
+        # Save painter state to restore later
         painter.save()
 
         # Get the text content to determine if this is a status column
@@ -96,28 +96,30 @@ class ValidationStatusDelegate(QStyledItemDelegate):
         # Get cell-specific validation status from model data (Qt.UserRole + 1)
         validation_status = index.data(Qt.ItemDataRole.UserRole + 1)
 
-        # More verbose logging to diagnose the issue (only when debug logging is enabled)
-        if logger.isEnabledFor(logging.DEBUG):
-            value = index.data(Qt.DisplayRole)
-            # Use repr() to safely handle potentially problematic Unicode characters
-            safe_value = repr(value) if value is not None else "None"
-            self.logger.debug(
-                f"Cell [{index.row()},{index.column()}]: column={column_name}, "
-                f"validation_status={validation_status}, "
-                f"is_validatable={is_validatable_column}, "
-                f"value={safe_value}"
-            )
+        # Get correction status from model data (Qt.UserRole + 2)
+        correction_status = index.data(Qt.ItemDataRole.UserRole + 2)
 
-        # Copy the style option for modifications
+        # Store the original options to use for drawing
         opt = QStyleOptionViewItem(option)
 
-        # Draw any selections, focus, or other basic styling using the parent style
-        # This ensures selections still work properly
-        opt.state &= ~QStyle.State_Selected  # Clear the selection state to draw our own background
+        # Disable the focus rectangle - we'll use our own visual cues
+        opt.state &= ~QStyle.State_HasFocus
 
-        # Special handling for specifically invalid cells in validatable columns
+        # If the item is selected, let the style handle it
+        if option.state & QStyle.State_Selected:
+            painter.restore()
+            super().paint(painter, option, index)
+            return
+
+        # Create a priority-based styling system:
+        # INVALID cells take highest priority (especially in validatable columns)
+        # Status column is styled based on text value
+        # Row-level invalids are styled with lighter backgrounds
+
+        # Apply styling based on validation status
         if validation_status == ValidationStatus.INVALID and is_validatable_column:
-            # This is a specifically invalid cell (in a validatable column)
+            # This is a specifically invalid cell in a validatable column
+            # It should stand out clearly from other cells
             value = index.data(Qt.DisplayRole)
             # Use repr() for safe Unicode handling
             safe_value = repr(value) if value is not None else "None"
@@ -125,7 +127,7 @@ class ValidationStatusDelegate(QStyledItemDelegate):
                 f"Painting invalid cell [{index.row()},{index.column()}], col={column_name}, value={safe_value}"
             )
 
-            # Draw with dark red background - fill completely
+            # Draw with deep crimson background
             painter.fillRect(opt.rect, self.INVALID_COLOR)
 
             # Draw a more visible border to make invalid cells stand out
@@ -138,17 +140,7 @@ class ValidationStatusDelegate(QStyledItemDelegate):
             border_rect = opt.rect.adjusted(0, 0, -1, -1)
             painter.drawRect(border_rect)
 
-            # Add a small indicator in the corner of invalid cells to make them more visible
-            indicator_size = 6
-            indicator_rect = QRect(
-                opt.rect.right() - indicator_size - 2,
-                opt.rect.top() + 2,
-                indicator_size,
-                indicator_size,
-            )
-            painter.fillRect(indicator_rect, self.INVALID_BORDER_COLOR)
-
-        # If this is the status column, paint based on the text value
+        # Else if this is the status column, paint based on the text value
         elif is_status_column:
             # Get the display text
             text = index.data(Qt.DisplayRole)
@@ -162,34 +154,32 @@ class ValidationStatusDelegate(QStyledItemDelegate):
             elif text == "Not validated":
                 # Light gray for not validated
                 painter.fillRect(opt.rect, self.NOT_VALIDATED_COLOR)
-        else:
-            # Apply styling based on validation status (for non-invalid validatable columns)
-            if validation_status == ValidationStatus.INVALID:
-                # Handle non-validatable columns
-                self.logger.debug(
-                    f"Non-validatable column {column_name} has INVALID status, treating as INVALID_ROW"
-                )
-                painter.fillRect(opt.rect, self.INVALID_ROW_COLOR)
-            elif validation_status == ValidationStatus.INVALID_ROW:
-                # This is just a cell in an invalid row (but not the specific invalid cell)
-                # Use a subtle background to indicate this is in an invalid row
-                painter.fillRect(opt.rect, self.INVALID_ROW_COLOR)
-            elif validation_status == ValidationStatus.WARNING:
-                # Draw with warning highlighting
-                painter.fillRect(opt.rect, self.WARNING_COLOR)
-            elif validation_status == ValidationStatus.VALID:
-                # Use light green for valid status
-                painter.fillRect(opt.rect, self.VALID_COLOR)
-            elif validation_status == ValidationStatus.NOT_VALIDATED:
-                # Light gray for not validated
-                painter.fillRect(opt.rect, self.NOT_VALIDATED_COLOR)
+        # Apply styling for all other cases - only if there's a validation status
+        elif validation_status == ValidationStatus.INVALID_ROW:
+            # This is just a cell in an invalid row (but not the specific invalid cell)
+            # Use a subtle background to indicate this is in an invalid row
+            painter.fillRect(opt.rect, self.INVALID_ROW_COLOR)
+        elif validation_status == ValidationStatus.WARNING:
+            # Draw with warning highlighting
+            painter.fillRect(opt.rect, self.WARNING_COLOR)
+        elif validation_status == ValidationStatus.VALID:
+            # Use light green for valid status
+            painter.fillRect(opt.rect, self.VALID_COLOR)
+        elif validation_status == ValidationStatus.NOT_VALIDATED:
+            # Light gray for not validated
+            painter.fillRect(opt.rect, self.NOT_VALIDATED_COLOR)
+        # If no validation status (None), don't apply any special styling
 
-        # Restore painter state before drawing the text
+        # Restore painter state before calling the parent paint method
         painter.restore()
 
+        # Use a new painter state for the text drawing to ensure it's not affected by our previous painter
+        painter.save()
+
         # Draw the text content using the standard delegate's paint method
-        # This needs to be outside the saved painter state to ensure it's drawn on top
         super().paint(painter, opt, index)
+
+        painter.restore()
 
     def createEditor(self, parent, option, index):
         """
