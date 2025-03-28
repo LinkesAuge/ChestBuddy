@@ -70,6 +70,12 @@ class ValidationStatusDelegate(QStyledItemDelegate):
             option: Style options for the item
             index: Model index of the item to paint
         """
+        # Critical: Don't apply custom painting when item is being edited
+        if option.state & QStyle.State_Editing:
+            # Let the standard implementation handle painting during editing
+            super().paint(painter, option, index)
+            return
+
         # Get cell-specific validation status from model data (Qt.UserRole + 1)
         validation_status = index.data(Qt.ItemDataRole.UserRole + 1)
 
@@ -188,40 +194,14 @@ class ValidationStatusDelegate(QStyledItemDelegate):
 
         painter.restore()
 
-    def createEditor(self, parent, option, index):
+    def updateEditorGeometry(self, editor, option, index):
         """
-        Create an editor for editing the item.
+        Update the geometry of the editor.
 
         Args:
-            parent: Parent widget
+            editor: The editor widget
             option: Style options for the item
-            index: Model index of the item to edit
-
-        Returns:
-            Editor widget
-        """
-        # Use the standard editor creation
-        return super().createEditor(parent, option, index)
-
-    def setEditorData(self, editor, index):
-        """
-        Set the editor data.
-
-        Args:
-            editor: Editor widget
             index: Model index of the item being edited
         """
-        # Use the standard editor data setting
-        super().setEditorData(editor, index)
-
-    def setModelData(self, editor, model, index):
-        """
-        Set the model data from the editor.
-
-        Args:
-            editor: Editor widget
-            model: Data model
-            index: Model index of the item being edited
-        """
-        # Use the standard model data setting
-        super().setModelData(editor, model, index)
+        # Make the editor exactly fit the cell
+        editor.setGeometry(option.rect)

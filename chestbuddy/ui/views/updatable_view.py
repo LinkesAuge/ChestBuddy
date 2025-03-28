@@ -349,8 +349,9 @@ class UpdatableView(BaseView):
             update_manager.schedule_update(self, debounce_ms)
             logger.debug(f"{self.__class__.__name__} scheduled for update")
         except Exception as e:
-            logger.error(f"Error scheduling update for {self.__class__.__name__}: {e}")
+            logger.error(f'Error scheduling update for {self.__class__.__name__}: "{e}"')
             # Fall back to direct update if UpdateManager is not available
+            logger.debug(f"Falling back to direct update for {self.__class__.__name__}")
             self.update()
 
     def request_update(self, data_state=None) -> None:

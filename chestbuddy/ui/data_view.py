@@ -7,9 +7,18 @@ This module provides the DataView class for displaying and editing CSV data.
 import logging
 from typing import Dict, List, Optional, Any
 import time
+import hashlib
 
 import pandas as pd
-from PySide6.QtCore import Qt, Signal, Slot, QModelIndex, QTimer, QSortFilterProxyModel
+from PySide6.QtCore import (
+    Qt,
+    Signal,
+    Slot,
+    QModelIndex,
+    QTimer,
+    QSortFilterProxyModel,
+    QRegularExpression,
+)
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -46,6 +55,138 @@ from chestbuddy.core.validation_enums import ValidationStatus
 
 # Set up logger
 logger = logging.getLogger(__name__)
+
+
+class CustomFilterProxyModel(QSortFilterProxyModel):
+    """
+    Custom filter proxy model for QTableView that provides more flexible filtering.
+
+    This proxy model allows filtering by specific column or across all columns,
+    with support for different filter modes (contains, equals, etc.) and
+    case sensitivity.
+
+    Implementation Notes:
+        - Extends QSortFilterProxyModel
+        - Provides custom filtering logic
+        - Optimized for large datasets
+    """
+
+    def __init__(self, parent=None):
+        """Initialize the proxy model."""
+        super().__init__(parent)
+        self._filter_column = -1  # -1 means filter all columns
+        self._filter_text = ""
+        self._filter_mode = "Contains"  # Contains, Equals, Starts with, Ends with
+        self._case_sensitive = False
+        self._regex = QRegularExpression()
+        self._regex.setPatternOptions(QRegularExpression.CaseInsensitiveOption)
+
+    def set_filter_settings(
+        self, column_index: int, filter_text: str, filter_mode: str, case_sensitive: bool
+    ):
+        """
+        Set the filter settings for this proxy model.
+
+        Args:
+            column_index: The column to filter on (-1 for all columns)
+            filter_text: The text to filter by
+            filter_mode: The filter mode (Contains, Equals, Starts with, Ends with)
+            case_sensitive: Whether the filter is case sensitive
+        """
+        self._filter_column = column_index
+        self._filter_text = filter_text
+        self._filter_mode = filter_mode
+        self._case_sensitive = case_sensitive
+
+        # Set regex pattern options
+        self._regex.setPattern(self._get_regex_pattern())
+        options = QRegularExpression.NoPatternOption
+        if not self._case_sensitive:
+            options |= QRegularExpression.CaseInsensitiveOption
+        self._regex.setPatternOptions(options)
+
+        # Apply filter
+        self.invalidateFilter()
+
+    def filterAcceptsRow(self, source_row: int, source_parent: QModelIndex) -> bool:
+        """
+        Determine if a row should be included in the filtered data.
+
+        Args:
+            source_row: The row in the source model
+            source_parent: The parent index
+
+        Returns:
+            True if the row should be included, False otherwise
+        """
+        # If no filter text, show all rows
+        if not self._filter_text:
+            return True
+
+        # Get source model
+        source_model = self.sourceModel()
+        if not source_model:
+            return True
+
+        # Specific column filter
+        if self._filter_column >= 0 and self._filter_column < source_model.columnCount():
+            index = source_model.index(source_row, self._filter_column, source_parent)
+            return self._text_matches(index)
+
+        # All columns filter - return True if any column matches
+        for col in range(source_model.columnCount()):
+            index = source_model.index(source_row, col, source_parent)
+            if self._text_matches(index):
+                return True
+
+        return False
+
+    def _get_regex_pattern(self) -> str:
+        """
+        Get the regex pattern based on the current filter mode.
+
+        Returns:
+            The regex pattern string
+        """
+        # Escape special characters in filter text
+        escaped_text = QRegularExpression.escape(self._filter_text)
+
+        # Create pattern based on filter mode
+        if self._filter_mode == "Contains":
+            return escaped_text
+        elif self._filter_mode == "Equals":
+            return f"^{escaped_text}$"
+        elif self._filter_mode == "Starts with":
+            return f"^{escaped_text}"
+        elif self._filter_mode == "Ends with":
+            return f"{escaped_text}$"
+        else:
+            return escaped_text  # Default to Contains
+
+    def _text_matches(self, index: QModelIndex) -> bool:
+        """
+        Check if the text at the given index matches the filter criteria.
+
+        Args:
+            index: The index to check
+
+        Returns:
+            True if the text matches, False otherwise
+        """
+        # Get the text from the model
+        data = self.sourceModel().data(index, Qt.DisplayRole)
+        if data is None:
+            return False
+
+        text = str(data)
+
+        # Empty filter text always matches
+        if not self._filter_text:
+            return True
+
+        # Use regex for matching (more efficient than multiple string operations)
+        match = self._regex.match(text)
+        return match.hasMatch()
 
 
 class DataView(QWidget):
@@ -105,8 +246,13 @@ class DataView(QWidget):
         # Create a QStandardItemModel for the table
         self._table_model = QStandardItemModel(self)
 
+        # Create a proxy model for filtering and sorting
+        self._proxy_model = CustomFilterProxyModel(self)
+        self._proxy_model.setSourceModel(self._table_model)
+        self._proxy_model.setDynamicSortFilter(True)
+
         # Initialize filter state
-        self._filter_text = ""
+        self._filter_criteria = ""  # Rename to avoid conflict with _filter_text UI element
         self._filtered_data = None
         self._filtered_rows = None
 
@@ -114,6 +260,7 @@ class DataView(QWidget):
         self._is_updating = False
         self._population_in_progress = False
         self._initial_load = True
+        self._auto_update_enabled = True  # Default to enabled
 
         # Initialize the table header columns based on data_model columns
         self._columns = (
@@ -178,10 +325,16 @@ class DataView(QWidget):
         try:
             logger.debug("Handling data changed in DataView")
 
+            # Clear validation cache when data changes
+            self._clear_validation_cache()
+
             # Get data from the model
             if not hasattr(self._data_model, "data") or self._data_model.data is None:
                 logger.warning("No data available in data model")
                 return
+
+            # Repopulate column selector in case columns changed
+            self._populate_column_selector()
 
             # Update the view
             self._update_view()
@@ -190,70 +343,59 @@ class DataView(QWidget):
             logger.error(f"Error handling data changed: {e}")
 
     def _apply_filter(self) -> None:
-        """Apply the current filter text to the data."""
+        """Apply the current filter to the data."""
+        if (
+            not hasattr(self, "_data_model")
+            or self._data_model is None
+            or self._data_model.is_empty
+        ):
+            logger.warning("Cannot apply filter: No data in model")
+            self._status_label.setText("No data to filter")
+            return
+
         try:
-            # Cancel if no data model
-            if not self._has_valid_models():
-                return
+            # Get filter parameters from UI elements
+            column_name = self._filter_column.currentText()
+            filter_text = self._filter_text.text().strip()
+            filter_mode = self._filter_mode.currentText()
+            case_sensitive = self._case_sensitive.isChecked()
 
-            # Emit the filter changed signal with the current filter text
-            self.filter_changed.emit(self._filter_text)
+            # Store the filter criteria for later reference
+            self._filter_criteria = filter_text
 
-            # Get the data to filter
-            if not hasattr(self._data_model, "data") or self._data_model.data is None:
-                logger.warning("No data available to filter")
-                return
+            # Get column index from name
+            column_index = -1  # Default to all columns
+            if column_name != "All Columns":
+                for i in range(self._table_model.columnCount()):
+                    if self._table_model.headerData(i, Qt.Horizontal) == column_name:
+                        column_index = i
+                        break
 
-            # Start with a copy of the original data
-            original_data = self._data_model.data
+            # Apply filter using the proxy model
+            self._proxy_model.set_filter_settings(
+                column_index, filter_text, filter_mode, case_sensitive
+            )
 
-            # If no filter, use all data
-            if not self._filter_text:
-                self._filtered_data = None
-                self._filtered_rows = None
-                self._update_view_with_filtered_data(original_data)
-                return
+            # Update status label with row counts
+            filtered_count = self._proxy_model.rowCount()
+            total_count = self._table_model.rowCount()
 
-            # Apply the filter across all columns
-            filtered_rows = []
-            filter_lower = self._filter_text.lower()
+            if filter_text:
+                if filtered_count == 0:
+                    self._status_label.setText(f"No matches found for '{filter_text}'")
+                else:
+                    self._status_label.setText(f"Showing {filtered_count} of {total_count} rows")
+            else:
+                self._status_label.setText(f"Showing all {total_count} rows")
 
-            # For each row in the data
-            for i, row in original_data.iterrows():
-                # Check if any cell in this row contains the filter text
-                match_found = False
-                for col, value in row.items():
-                    # Convert value to string and check if it contains the filter text
-                    if pd.notna(value):
-                        str_value = str(value).lower()
-                        if filter_lower in str_value:
-                            match_found = True
-                            break
-
-                # If a match was found, add this row to the filtered list
-                if match_found:
-                    filtered_rows.append(i)
-
-            # No matches found
-            if not filtered_rows:
-                # Show empty table
-                self._filtered_data = original_data.iloc[0:0]
-                self._filtered_rows = []
-                self._update_view_with_filtered_data(self._filtered_data)
-                logger.debug("No matches found for filter")
-                return
-
-            # Update with filtered data
-            self._filtered_data = original_data.iloc[filtered_rows]
-            self._filtered_rows = filtered_rows
-            self._update_view_with_filtered_data(self._filtered_data)
-            logger.debug(f"Applied filter, showing {len(filtered_rows)} rows")
+            logger.info(
+                f"Applied filter: column='{column_name}', text='{filter_text}', mode='{filter_mode}', case_sensitive={case_sensitive}"
+            )
+            logger.info(f"Filter result: {filtered_count} of {total_count} rows visible")
 
         except Exception as e:
             logger.error(f"Error applying filter: {e}")
-            # Reset filter state
-            self._filtered_data = None
-            self._filtered_rows = None
+            self._status_label.setText(f"Filter error: {str(e)}")
 
     def _init_ui(self) -> None:
         """Initialize the user interface."""
@@ -312,6 +454,8 @@ class DataView(QWidget):
         column_layout.addWidget(QLabel("Column:"))
         self._filter_column = QComboBox()
         self._filter_column.setMinimumWidth(150)
+        # Populate the column selector with available columns
+        self._populate_column_selector()
         column_layout.addWidget(self._filter_column)
         filter_layout.addWidget(column_container)
 
@@ -321,7 +465,7 @@ class DataView(QWidget):
         text_layout.setContentsMargins(0, 0, 0, 0)
         text_layout.setSpacing(4)
         text_layout.addWidget(QLabel("Value:"))
-        self._filter_text = QLineEdit()
+        self._filter_text = QLineEdit()  # UI element for filter text
         self._filter_text.setPlaceholderText("Enter filter text...")
         self._filter_text.setMinimumWidth(200)
         text_layout.addWidget(self._filter_text)
@@ -356,7 +500,7 @@ class DataView(QWidget):
 
         # Table view with minimal spacing
         self._table_view = QTableView()
-        self._table_view.setModel(self._table_model)
+        self._table_view.setModel(self._proxy_model)  # Set the proxy model instead of direct model
         self._table_view.setContextMenuPolicy(Qt.CustomContextMenu)
         self._table_view.horizontalHeader().setStretchLastSection(
             False
@@ -364,6 +508,20 @@ class DataView(QWidget):
         self._table_view.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
         self._table_view.verticalHeader().setDefaultSectionSize(24)  # Compact rows
         self._table_view.verticalHeader().setVisible(True)
+
+        # Explicitly enable editing with all triggers for better user experience
+        self._table_view.setEditTriggers(
+            QTableView.DoubleClicked | QTableView.EditKeyPressed | QTableView.AnyKeyPressed
+        )
+
+        # Allow selection of multiple items for batch operations
+        self._table_view.setSelectionMode(QTableView.ExtendedSelection)
+
+        # Enable tab key navigation between cells
+        self._table_view.setTabKeyNavigation(True)
+
+        # Ensure the table can accept focus for editing
+        self._table_view.setFocusPolicy(Qt.StrongFocus)
 
         # Enable sorting on the table view
         self._table_view.setSortingEnabled(True)
@@ -381,7 +539,7 @@ class DataView(QWidget):
         self._table_view.installEventFilter(self)
         logger.info("Installed event filter on table view")
 
-        # Enable keyboard shortcuts for copy/paste
+        # Enable keyboard shortcuts for copy/paste - moved to a dedicated method
         self._setup_shortcuts()
 
         # Apply additional styling to ensure visibility
@@ -391,22 +549,47 @@ class DataView(QWidget):
         main_layout.addWidget(self._table_view)
         main_layout.setStretch(1, 1)  # Give table view all available space
 
+    def _populate_column_selector(self) -> None:
+        """Populate the column selector dropdown with available columns."""
+        if not hasattr(self, "_filter_column") or self._filter_column is None:
+            return
+
+        # Clear the current items
+        self._filter_column.clear()
+
+        # Get the available columns from the data model
+        available_columns = []
+        if hasattr(self._data_model, "column_names") and self._data_model.column_names:
+            available_columns = self._data_model.column_names
+        elif self._columns:
+            available_columns = self._columns
+
+        # Add an "All Columns" option first
+        self._filter_column.addItem("All Columns")
+
+        # Add the column names
+        for column in available_columns:
+            self._filter_column.addItem(column)
+
+        logger.debug(f"Populated column selector with {len(available_columns)} columns")
+
     def _setup_shortcuts(self) -> None:
         """Set up keyboard shortcuts for common operations."""
         # Copy shortcut (Ctrl+C)
-        copy_shortcut = QShortcut(QKeySequence.Copy, self._table_view)
-        copy_shortcut.activated.connect(self._copy_selected_cells)
-        copy_shortcut.setContext(Qt.WidgetShortcut)  # Only active when table has focus
-        logger.info("Registered Ctrl+C shortcut for copying (table-specific)")
-
-        # We're removing redundant Ctrl+V shortcuts and only keeping one at the widget level
-        # This helps avoid the "Ambiguous shortcut overload" error
-        widget_paste_shortcut = QShortcut(QKeySequence.Paste, self)
-        widget_paste_shortcut.activated.connect(self._paste_to_selected_cells)
-        widget_paste_shortcut.setContext(
+        self._copy_shortcut = QShortcut(QKeySequence.Copy, self._table_view)
+        self._copy_shortcut.activated.connect(self._copy_selected_cells)
+        self._copy_shortcut.setContext(
             Qt.WidgetWithChildrenShortcut
-        )  # Active for widget and children
-        logger.info("Registered widget-level Ctrl+V shortcut for pasting (widget hierarchy)")
+        )  # Active for the table view and its children
+        logger.info("Registered Ctrl+C shortcut for copying")
+
+        # Paste shortcut (Ctrl+V)
+        self._paste_shortcut = QShortcut(QKeySequence.Paste, self._table_view)
+        self._paste_shortcut.activated.connect(self._paste_to_selected_cells)
+        self._paste_shortcut.setContext(
+            Qt.WidgetWithChildrenShortcut
+        )  # Active for the table view and its children
+        logger.info("Registered Ctrl+V shortcut for pasting")
 
     def _connect_signals(self) -> None:
         """Connect signals and slots."""
@@ -430,20 +613,18 @@ class DataView(QWidget):
         if clear_button:
             clear_button.clicked.connect(self._clear_filter)
 
-        # Connect and install event filter on the table view for key events
-        self._table_view.installEventFilter(self)
-        logger.info("Installed event filter on table view")
+        # Connect Enter key press in filter text field to apply filter
+        if hasattr(self, "_filter_text") and self._filter_text is not None:
+            self._filter_text.returnPressed.connect(self._apply_filter)
+            logger.debug("Connected filter text Enter key to apply filter")
 
-        # Register custom shortcuts since the event filter might not capture all key combinations
-        # Create a shortcut for copying (table-specific)
-        self._copy_shortcut = QShortcut(QKeySequence.Copy, self._table_view)
-        self._copy_shortcut.activated.connect(self._copy_selected_cells)
-        logger.info("Registered Ctrl+C shortcut for copying (table-specific)")
+        # Connect custom context menu
+        self._table_view.customContextMenuRequested.connect(self._show_context_menu)
+        logger.info("Connected custom context menu")
 
-        # Create a shortcut for pasting (widget-level)
-        self._paste_shortcut = QShortcut(QKeySequence.Paste, self)
-        self._paste_shortcut.activated.connect(self._paste_to_selected_cells)
-        logger.info("Registered widget-level Ctrl+V shortcut for pasting (widget hierarchy)")
+        # Connect double-click signal for starting edit directly
+        self._table_view.doubleClicked.connect(self._on_cell_double_clicked)
+        logger.info("Connected double-click handler for direct editing")
 
         # Connect table model for data editing
         if isinstance(self._table_model, QStandardItemModel):
@@ -461,6 +642,12 @@ class DataView(QWidget):
             self._data_model.validation_changed.connect(self._on_validation_changed)
         if hasattr(self._data_model, "correction_applied"):
             self._data_model.correction_applied.connect(self._on_correction_applied)
+
+        # Connect refresh button
+        refresh_button = self._action_toolbar.get_button_by_name("refresh")
+        if refresh_button:
+            refresh_button.clicked.connect(self._on_refresh_clicked)
+            logger.debug("Connected refresh button")
 
     def _update_view(self) -> None:
         """
@@ -497,308 +684,78 @@ class DataView(QWidget):
         finally:
             self._is_updating = False
 
-    def _apply_filter(self) -> None:
-        """Apply the current filter to the data."""
-        if self._data_model.is_empty:
-            return
-
-        column = self._filter_column.currentText()
-        filter_text = self._filter_text.text()
-        filter_mode = self._filter_mode.currentText()
-        case_sensitive = self._case_sensitive.isChecked()
-
-        # Apply filter to data model
-        filtered_data = self._data_model.filter_data(
-            column, filter_text, filter_mode, case_sensitive
-        )
-
-        if filtered_data is None:
-            QMessageBox.warning(
-                self, "Filter Error", f"Failed to apply filter to column '{column}'"
-            )
-            return
-
-        # Update table with filtered data
-        self._update_view_with_filtered_data(filtered_data)
-
-        # Save current filter
-        self._current_filter = {
-            "column": column,
-            "text": filter_text,
-            "mode": filter_mode,
-            "case_sensitive": case_sensitive,
-        }
-
-        # Update status label
-        row_count = len(filtered_data)
-        total_count = len(self._data_model.data)
-        self._status_label.setText(f"Showing {row_count} of {total_count} rows")
-
-    def _update_view_with_filtered_data(self, filtered_data: pd.DataFrame) -> None:
-        """
-        Update the view with filtered data.
-
-        Args:
-            filtered_data: The filtered data to display.
-        """
-        # Guard against recursive calls
-        if self._is_updating:
-            logger.debug("Skipping recursive _update_view_with_filtered_data call")
-            return
-
-        try:
-            self._is_updating = True
-
-            # Store filtered data
-            self._filtered_data = filtered_data
-
-            # Clear the table model
-            self._table_model.clear()
-
-            # Check if filtered data is empty
-            if filtered_data.empty:
-                self._status_label.setText("No data matches the filter")
-                self._filtered_rows = []
-                return
-
-            # Store the column names to avoid repeated access
-            column_names = self._data_model.column_names
-
-            # Explicitly set model dimensions - important for proper initialization
-            row_count = len(filtered_data)
-            col_count = len(column_names)
-            logger.info(
-                f"Setting filtered table model dimensions to {row_count} rows and {col_count} columns"
-            )
-            self._table_model.setRowCount(row_count)
-            self._table_model.setColumnCount(col_count)
-
-            # Set headers
-            self._table_model.setHorizontalHeaderLabels(column_names)
-
-            # Store the filtered row indices - convert to plain Python list to avoid DataFrame operations
-            self._filtered_rows = list(filtered_data.index)
-
-            # Show filter status
-            filter_text = self._filter_text.text()
-            if filter_text:
-                filter_count = len(filtered_data)
-                total_count = len(self._data_model.data)
-                self._status_label.setText(
-                    f"Showing {filter_count} of {total_count} records matching '{filter_text}'"
-                )
-
-            # Add filtered data to the table model using a safer approach
-            try:
-                logger.info("Populating filtered table model (simplified approach)")
-
-                # Ensure the model has the right dimensions
-                row_count = len(filtered_data)
-                col_count = len(column_names)
-                self._table_model.setRowCount(row_count)
-                self._table_model.setColumnCount(col_count)
-
-                # Convert filtered data to a list of lists for direct access
-                # This avoids repeated DataFrame accesses which can cause recursion
-                data_array = filtered_data.values.tolist()
-
-                # Store the filtered row indices for data model access
-                self._filtered_rows = filtered_data.index.tolist()
-
-                # Pre-fetch validation and correction status to avoid repeated calls
-                # This reduces the risk of recursion by doing all data access upfront
-                try:
-                    validation_status = self._data_model.get_validation_status()
-                    correction_status = self._data_model.get_correction_status()
-                    has_validation = not validation_status.empty
-                    has_correction = not correction_status.empty
-                    logger.debug(
-                        f"Pre-fetched validation status ({has_validation}) and correction status ({has_correction})"
-                    )
-                except Exception as e:
-                    logger.warning(f"Could not pre-fetch status data: {e}")
-                    has_validation = False
-                    has_correction = False
-
-                # Process all rows at once
-                for local_row_idx in range(row_count):
-                    # Get the actual row index from the original data
-                    actual_row_idx = self._filtered_rows[local_row_idx]
-
-                    for col_idx, column_name in enumerate(column_names):
-                        # Get value directly from the pre-converted array
-                        cell_value = data_array[local_row_idx][col_idx]
-                        # Convert to string with proper None/NaN handling
-                        value = (
-                            ""
-                            if cell_value is None
-                            or (isinstance(cell_value, float) and pd.isna(cell_value))
-                            else str(cell_value)
-                        )
-
-                        # Create item with explicit text
-                        item = QStandardItem(value)
-
-                        # Set foreground explicitly - changed from white to black for visibility
-                        item.setForeground(QColor("#000000"))  # Black text
-
-                        # Set validation and correction status as user data
-                        # Use pre-fetched data instead of making method calls for each cell
-                        if has_validation:
-                            try:
-                                val_status = self._data_model.get_cell_validation_status(
-                                    actual_row_idx,
-                                    column_name,  # Use actual_row_idx here
-                                )
-                                if val_status:
-                                    # Get validation columns from validation_status DataFrame if available
-                                    validation_columns = []
-                                    validation_status = None
-                                    if hasattr(self._data_model, "get_validation_status"):
-                                        validation_status = self._data_model.get_validation_status()
-                                        if (
-                                            isinstance(validation_status, pd.DataFrame)
-                                            and not validation_status.empty
-                                        ):
-                                            validation_columns = [
-                                                col
-                                                for col in validation_status.columns
-                                                if col.endswith("_valid")
-                                            ]
-
-                                    # Debug logging for validation status
-                                    logger.debug(
-                                        f"Cell [{actual_row_idx},{column_name}] validation status: {val_status}"
-                                    )
-                                    logger.debug(
-                                        f"Validation columns available: {validation_columns}"
-                                    )
-                                    if validation_status is not None and isinstance(
-                                        validation_status, pd.DataFrame
-                                    ):
-                                        logger.debug(
-                                            f"Validation status DataFrame shape: {validation_status.shape}"
-                                        )
-
-                                    # Convert the validation status dictionary to a ValidationStatus enum value
-                                    # Check if there's a validation column for this column
-                                    val_column = f"{column_name}_valid"
-                                    if val_column in validation_columns:
-                                        # Check if we have validation data for this cell
-                                        if val_column in validation_status.columns and not pd.isna(
-                                            validation_status.iloc[actual_row_idx].get(
-                                                val_column, None
-                                            )
-                                        ):
-                                            cell_is_valid = validation_status.iloc[actual_row_idx][
-                                                val_column
-                                            ]
-                                            logger.debug(
-                                                f"Cell [{actual_row_idx},{column_name}] has validation data: valid={cell_is_valid}"
-                                            )
-
-                                            # If the validation status is False, set as INVALID
-                                            if not cell_is_valid:
-                                                # Only mark validatable columns as INVALID
-                                                if column_name in ["PLAYER", "SOURCE", "CHEST"]:
-                                                    logger.debug(
-                                                        f"Setting cell [{actual_row_idx},{column_name}] to INVALID"
-                                                    )
-                                                    item.setData(
-                                                        ValidationStatus.INVALID, Qt.UserRole + 1
-                                                    )
-                                                else:
-                                                    # Non-validatable columns should never be INVALID
-                                                    logger.debug(
-                                                        f"Setting non-validatable cell [{actual_row_idx},{column_name}] to INVALID_ROW instead of INVALID"
-                                                    )
-                                                    item.setData(
-                                                        ValidationStatus.INVALID_ROW,
-                                                        Qt.UserRole + 1,
-                                                    )
-                                            else:
-                                                logger.debug(
-                                                    f"Setting cell [{actual_row_idx},{column_name}] to VALID"
-                                                )
-                                                item.setData(
-                                                    ValidationStatus.VALID, Qt.UserRole + 1
-                                                )
-                                        else:
-                                            # No validation status available
-                                            logger.debug(
-                                                f"No validation data for cell [{actual_row_idx},{column_name}]"
-                                            )
-                                            item.setData(None, Qt.UserRole + 1)
-                                    else:
-                                        # Just store the original validation status dictionary
-                                        logger.debug(
-                                            f"Using original validation status for cell [{actual_row_idx},{column_name}]: {val_status}"
-                                        )
-                                        item.setData(val_status, Qt.UserRole + 1)
-
-                            except Exception as vs_error:
-                                # Don't let validation status errors block the display
-                                logger.debug(f"Validation status access error: {vs_error}")
-
-                        if has_correction:
-                            try:
-                                corr_status = self._data_model.get_cell_correction_status(
-                                    actual_row_idx,
-                                    column_name,  # Use actual_row_idx here
-                                )
-                                if corr_status:
-                                    item.setData(corr_status, Qt.UserRole + 2)
-                            except Exception as cs_error:
-                                # Don't let correction status errors block the display
-                                logger.debug(f"Correction status access error: {cs_error}")
-
-                        # Set the item directly
-                        self._table_model.setItem(local_row_idx, col_idx, item)
-
-                # Log detailed info about first few rows for debugging
-                if row_count > 0:
-                    logger.debug(f"First filtered row values: {data_array[0]}")
-
-                logger.info(
-                    f"Successfully populated filtered model with {row_count} rows and {col_count} columns"
-                )
-            except Exception as e:
-                logger.error(f"Error populating filtered table model: {e}", exc_info=True)
-                self._status_label.setText("Error displaying filtered data")
-
-            # Resize columns to contents
-            self._table_view.resizeColumnsToContents()
-
-            # Force the table to refresh - use the correct approach for QTableView
-            self._table_view.reset()
-            self._table_view.viewport().update()
-
-            # Select the first row to ensure data is visible
-            if self._table_model.rowCount() > 0:
-                self._table_view.selectRow(0)
-
-            # Add final verification of model state for debugging
-            logger.info(
-                f"Final table model state: {self._table_model.rowCount()} rows, {self._table_model.columnCount()} columns"
-            )
-            if self._table_model.rowCount() > 0 and self._table_model.columnCount() > 0:
-                # Log a sample item to verify content
-                sample_item = self._table_model.item(0, 0)
-                sample_text = sample_item.text() if sample_item else "None"
-                logger.info(f"Sample cell [0,0] content: '{sample_text}'")
-            else:
-                logger.warning("No data in table - cannot verify content")
-        finally:
-            self._is_updating = False
-
     def _clear_filter(self) -> None:
         """Clear the current filter."""
-        self._filter_text.clear()
-        self._current_filter = {}
-        self._filtered_rows = []
+        # Clear the filter text field
+        if hasattr(self, "_filter_text") and self._filter_text is not None:
+            self._filter_text.clear()
 
-        # Reset the view
-        self._update_view()
+        # Reset the filter criteria
+        self._filter_criteria = ""
+
+        # Reset filter data
+        self._filtered_data = None
+        self._filtered_rows = None
+
+        # Reset to first column ("All Columns")
+        if hasattr(self, "_filter_column") and self._filter_column is not None:
+            self._filter_column.setCurrentIndex(0)
+
+        # Reset filter mode to first option ("Contains")
+        if hasattr(self, "_filter_mode") and self._filter_mode is not None:
+            self._filter_mode.setCurrentIndex(0)
+
+        # Uncheck case sensitivity
+        if hasattr(self, "_case_sensitive") and self._case_sensitive is not None:
+            self._case_sensitive.setChecked(False)
+
+        # Clear the proxy model filter
+        if hasattr(self, "_proxy_model") and self._proxy_model is not None:
+            self._proxy_model.set_filter_settings(-1, "", "Contains", False)
+
+        # Update status label
+        if hasattr(self, "_status_label") and self._status_label is not None:
+            if hasattr(self._table_model, "rowCount"):
+                row_count = self._table_model.rowCount()
+                self._status_label.setText(f"Showing all {row_count} rows")
+            else:
+                self._status_label.setText("No data loaded")
+
+        logger.info("Filter cleared")
+
+    def _get_original_row_index(self, proxy_row_index):
+        """
+        Convert a proxy model row index to the original source model row index.
+
+        Args:
+            proxy_row_index: The row index in the proxy model
+
+        Returns:
+            The corresponding row index in the source model
+        """
+        proxy_index = self._proxy_model.index(proxy_row_index, 0)
+        source_index = self._proxy_model.mapToSource(proxy_index)
+        return source_index.row()
+
+    def _get_data_model_row_index(self, proxy_row_index):
+        """
+        Convert a proxy model row index to the data model row index.
+
+        Args:
+            proxy_row_index: The row index in the proxy model
+
+        Returns:
+            The corresponding row index in the data model
+        """
+        # First map to source model (table model)
+        source_row = self._get_original_row_index(proxy_row_index)
+
+        # Then map to data model if filtered
+        if self._filtered_rows and source_row < len(self._filtered_rows):
+            return self._filtered_rows[source_row]
+
+        # If no filtering in the data model, return the source row
+        return source_row
 
     def _show_context_menu(self, position) -> None:
         """
@@ -837,24 +794,29 @@ class DataView(QWidget):
 
         # Add validation-related options
         if index.isValid():
+            # Map to source index for accessing model data
+            source_index = self._proxy_model.mapToSource(index)
+
             # Get column and value
-            row = index.row()
-            col = index.column()
+            source_row = source_index.row()
+            source_col = source_index.column()
 
             if (
-                0 <= row < self._table_model.rowCount()
-                and 0 <= col < self._table_model.columnCount()
+                0 <= source_row < self._table_model.rowCount()
+                and 0 <= source_col < self._table_model.columnCount()
             ):
                 # Get the actual row index if we're using filtered data
-                actual_row = row
-                if self._filtered_rows and row < len(self._filtered_rows):
-                    actual_row = self._filtered_rows[row]
+                actual_row = source_row
+                if self._filtered_rows and source_row < len(self._filtered_rows):
+                    actual_row = self._filtered_rows[source_row]
 
-                column_name = self._data_model.column_names[col]
-                cell_value = self._table_model.data(index, Qt.DisplayRole)
+                column_name = self._data_model.column_names[source_col]
+                cell_value = self._table_model.data(source_index, Qt.DisplayRole)
 
                 # Get validation status for this cell
-                validation_status = index.data(Qt.ItemDataRole.UserRole + 1)
+                validation_status = self._table_model.data(
+                    source_index, Qt.ItemDataRole.UserRole + 1
+                )
 
                 # Add option to add to validation list if this is a validation-related column
                 validation_columns = {
@@ -916,8 +878,8 @@ class DataView(QWidget):
         if not index.isValid():
             return
 
-        # Get the value
-        value = self._table_model.data(index, Qt.DisplayRole)
+        # Get the value from the proxy model
+        value = self._proxy_model.data(index, Qt.DisplayRole)
 
         # Copy to clipboard
         QApplication.clipboard().setText(value)
@@ -941,24 +903,28 @@ class DataView(QWidget):
         if selected_indexes:
             # Multiple cells selected, paste to all of them
             for sel_index in selected_indexes:
-                # Set the value for each selected cell
-                self._table_model.setData(sel_index, text, Qt.EditRole)
+                # Map to source index for model update
+                source_index = self._proxy_model.mapToSource(sel_index)
+
+                # Set the value in the source model
+                self._table_model.setData(source_index, text, Qt.EditRole)
 
                 # Also update the data model directly to ensure it's updated properly
                 try:
-                    row = sel_index.row()
-                    col = sel_index.column()
+                    # Get the row in the original model
+                    source_row = source_index.row()
+                    source_col = source_index.column()
 
                     if (
-                        0 <= row < self._table_model.rowCount()
-                        and 0 <= col < self._table_model.columnCount()
+                        0 <= source_row < self._table_model.rowCount()
+                        and 0 <= source_col < self._table_model.columnCount()
                     ):
-                        # Get the actual row index if we're using filtered data
-                        actual_row = row
-                        if self._filtered_rows and row < len(self._filtered_rows):
-                            actual_row = self._filtered_rows[row]
+                        # Get the actual row index in the data model if we're using filtered data
+                        actual_row = source_row
+                        if self._filtered_rows and source_row < len(self._filtered_rows):
+                            actual_row = self._filtered_rows[source_row]
 
-                        column_name = self._data_model.column_names[col]
+                        column_name = self._data_model.column_names[source_col]
                         self._data_model.update_cell(actual_row, column_name, text)
                 except Exception as e:
                     logger.error(f"Error updating data model directly: {e}")
@@ -966,23 +932,27 @@ class DataView(QWidget):
             logger.info(f"Pasted value to {len(selected_indexes)} selected cells")
         elif index.isValid():
             # Single cell via context menu, just paste to that
-            self._table_model.setData(index, text, Qt.EditRole)
+            # Map to source index for model update
+            source_index = self._proxy_model.mapToSource(index)
+
+            # Set the value in the source model
+            self._table_model.setData(source_index, text, Qt.EditRole)
 
             # Also update the data model directly
             try:
-                row = index.row()
-                col = index.column()
+                source_row = source_index.row()
+                source_col = source_index.column()
 
                 if (
-                    0 <= row < self._table_model.rowCount()
-                    and 0 <= col < self._table_model.columnCount()
+                    0 <= source_row < self._table_model.rowCount()
+                    and 0 <= source_col < self._table_model.columnCount()
                 ):
                     # Get the actual row index if we're using filtered data
-                    actual_row = row
-                    if self._filtered_rows and row < len(self._filtered_rows):
-                        actual_row = self._filtered_rows[row]
+                    actual_row = source_row
+                    if self._filtered_rows and source_row < len(self._filtered_rows):
+                        actual_row = self._filtered_rows[source_row]
 
-                    column_name = self._data_model.column_names[col]
+                    column_name = self._data_model.column_names[source_col]
                     self._data_model.update_cell(actual_row, column_name, text)
             except Exception as e:
                 logger.error(f"Error updating data model directly: {e}")
@@ -994,204 +964,125 @@ class DataView(QWidget):
             logger.warning("Paste operation failed: No valid cell selected")
             return
 
-    @Slot()
-    def _on_data_changed(self) -> None:
-        """Handle data model changes."""
-        logger.debug("DataView._on_data_changed called")
-        print("DataView._on_data_changed called!")
-
-        # Skip if auto-update is disabled
-        if not self._auto_update_enabled:
-            logger.debug("Auto-update disabled, skipping table update")
-            print("Auto-update disabled, skipping table update")
-            return
-
-        # Add debug logging to verify data model state
-        has_data = not self._data_model.is_empty
-        data_shape = (
-            "empty"
-            if self._data_model.is_empty
-            else f"{len(self._data_model.data)} rows x {len(self._data_model.column_names)} columns"
-        )
-        print(f"Data model state in _on_data_changed: has_data={has_data}, shape={data_shape}")
-        logger.debug(
-            f"Data model state in _on_data_changed: has_data={has_data}, shape={data_shape}"
-        )
-
-        # Rate-limit updates to prevent UI freezing
-        current_time = time.time() * 1000
-        time_since_last_update = current_time - self._last_update_time
-
-        if time_since_last_update < self._update_debounce_ms:
-            logger.debug(
-                f"Skipping update due to rate limiting: {time_since_last_update}ms < {self._update_debounce_ms}ms"
-            )
-            print(
-                f"Skipping update due to rate limiting: {time_since_last_update}ms < {self._update_debounce_ms}ms"
-            )
-            return
-
-        print("Forcing _update_view call from _on_data_changed")
-        # Force update the view
-        self._update_view()
-        self._last_update_time = current_time
-        print("_update_view completed from _on_data_changed")
-        logger.debug("_update_view completed from _on_data_changed")
-
-    @Slot(int, Qt.SortOrder)
-    def _on_sort_indicator_changed(self, logical_index: int, order: Qt.SortOrder) -> None:
+    def _paste_structured_data(self, clipboard_text: str, selected_indexes: list) -> None:
         """
-        Handle changes in the sort indicator using the built-in QTableView sorting capability.
+        Paste structured data (tab-delimited, newline-separated) to the grid.
 
         Args:
-            logical_index: The column index being sorted
-            order: The sort order (ascending or descending)
+            clipboard_text: The structured clipboard text
+            selected_indexes: The currently selected cells
         """
-        # Skip sorting during initial load or if population is in progress
-        if self._initial_load or self._population_in_progress:
-            logger.debug("Skipping sort during initial load or population")
+        # Split the text into rows and columns
+        rows = clipboard_text.split("\n")
+        grid_data = [row.split("\t") for row in rows]
+
+        # Get dimensions of the paste data
+        paste_height = len(grid_data)
+        paste_width = max(len(row) for row in grid_data)
+
+        logger.info(f"Structured paste: {paste_width}x{paste_height} grid of cells")
+
+        # Find the top-left cell of the selection
+        if not selected_indexes:
+            logger.warning("No cells selected for structured paste")
             return
 
-        # Set flag to indicate this is a user-initiated sort
-        self._user_initiated_sort = True
+        # Get the top-left cell position in the proxy model
+        top_left_row = min(index.row() for index in selected_indexes)
+        top_left_col = min(index.column() for index in selected_indexes)
 
-        try:
-            # Get the column name for the logical index
-            column_name = self._table_model.headerData(logical_index, Qt.Horizontal)
-            if not column_name:
-                logger.warning(f"Cannot sort: No column name for index {logical_index}")
-                return
+        # For each cell in the paste data, update the corresponding cell in the table
+        cells_updated = 0
+        for r, row_data in enumerate(grid_data):
+            for c, cell_value in enumerate(row_data):
+                # Calculate target position in the proxy model
+                target_row = top_left_row + r
+                target_col = top_left_col + c
 
-            logger.debug(
-                f"User requested sorting by column {column_name} (index {logical_index}), order: {order}"
-            )
+                # Get the proxy model index
+                proxy_index = self._proxy_model.index(target_row, target_col)
+                if not proxy_index.isValid():
+                    continue
 
-            # Let the built-in sorting handle the display
-            # The table is already in sortable state because setSortingEnabled(True) was called in _init_ui
+                # Map to source index
+                source_index = self._proxy_model.mapToSource(proxy_index)
+                source_row = source_index.row()
+                source_col = source_index.column()
 
-        except Exception as e:
-            logger.error(f"Error during sort indicator change: {e}")
-        finally:
-            self._user_initiated_sort = False  # Reset the user-initiated sort flag
+                # Skip if outside table bounds
+                if (
+                    source_row >= self._table_model.rowCount()
+                    or source_col >= self._table_model.columnCount()
+                ):
+                    continue
 
-    @Slot(QStandardItem)
-    def _on_item_changed(self, item: QStandardItem) -> None:
-        """
-        Update the data model when an item in the view changes.
+                # Set the value in the source model
+                self._table_model.setData(source_index, cell_value, Qt.EditRole)
 
-        Args:
-            item: The item that changed.
-        """
-        try:
-            # Ignore item changes if we're currently updating
-            if self._is_updating:
-                return
-
-            # Get the row and column of the changed item
-            row = item.row()
-            column = item.column()
-
-            # If we have a valid row and column
-            if row >= 0 and column >= 0 and column < len(self._data_model.column_names):
-                # Get the new value from the item - use item.text() instead of item.data()
-                # This avoids the Qt.EditRole vs int role issue
-                new_value = item.text()
-
-                # Get the column name for this column index
-                column_name = self._data_model.column_names[column]
-
-                # Get the current value from the model first
+                # Also update the data model directly
                 try:
-                    actual_row = row
-                    if self._filtered_rows and row < len(self._filtered_rows):
-                        actual_row = self._filtered_rows[row]
+                    # Get the actual row index if we're using filtered data
+                    actual_row = source_row
+                    if self._filtered_rows and source_row < len(self._filtered_rows):
+                        actual_row = self._filtered_rows[source_row]
 
-                    current_value = self._data_model.get_cell_value(actual_row, column_name)
+                    column_name = self._data_model.column_names[source_col]
+                    self._data_model.update_cell(actual_row, column_name, cell_value)
+                    cells_updated += 1
                 except Exception as e:
-                    logger.error(f"Error getting current cell value: {str(e)}")
-                    return
+                    logger.error(f"Error updating data model during structured paste: {e}")
 
-                # Check if the value has actually changed
-                if str(current_value) == str(new_value):
-                    logger.debug(
-                        f"Skipping cell update at [{row}, {column_name}] - value unchanged"
-                    )
-                    return
-
-                logger.debug(
-                    f"Updating cell at [{row}, {column_name}] from '{current_value}' to '{new_value}'"
-                )
-
-                # Use a more efficient update method that doesn't recreate the DataFrame
-                actual_row = row
-                if self._filtered_rows and row < len(self._filtered_rows):
-                    actual_row = self._filtered_rows[row]
-
-                success = self._data_model.update_cell(actual_row, column_name, new_value)
-
-                if not success:
-                    logger.error(f"Failed to update cell at [{row}, {column_name}]")
-                    # Reload the item to show the original value
-                    self._is_updating = True
-                    try:
-                        # Use setText instead of setData to avoid the role issue
-                        item.setText(str(current_value))
-                    finally:
-                        self._is_updating = False
-
-        except Exception as e:
-            logger.error(f"Error handling item change: {str(e)}")
-
-    def _apply_table_styling(self) -> None:
-        """Apply additional styling to ensure table content is visible."""
-        # Set text color explicitly via stylesheet
-        self._table_view.setStyleSheet("""
-            QTableView {
-                color: white;
-                background-color: #1A2C42;
-                gridline-color: transparent;
-                selection-background-color: #D4AF37;
-                selection-color: #1A2C42;
-            }
-            QTableView::item {
-                color: white;
-                /* No background color to allow delegate painting to show through */
-                padding: 12px;
-            }
-            QTableView::item:alternate {
-                /* Very subtle alternating row color that won't interfere with validation highlighting */
-                background-color: rgba(45, 55, 72, 40);
-            }
-            QTableView::item:selected {
-                color: #1A2C42;
-                background-color: #D4AF37;
-            }
-        """)
-
-        # Re-enable alternating row colors with subtle effect
-        self._table_view.setAlternatingRowColors(True)
-
-        # Make sure the model has appropriate default foreground color
-        self._table_model.setItemPrototype(QStandardItem())
-        prototype = self._table_model.itemPrototype()
-        if prototype:
-            prototype.setForeground(QColor("white"))
+        logger.info(f"Updated {cells_updated} cells with structured paste data")
+        self._status_label.setText(f"Pasted {cells_updated} cells from clipboard")
 
     def _copy_selected_cells(self) -> None:
         """Copy the currently selected cell(s) to clipboard."""
         selected_indexes = self._table_view.selectedIndexes()
         if not selected_indexes:
+            logger.debug("No cells selected for copy operation")
             return
 
-        # If only one cell is selected, use the existing copy function
+        # Log the copy operation
+        logger.info(f"Copying {len(selected_indexes)} selected cells")
+
+        # If only one cell is selected, use the simple copy function
         if len(selected_indexes) == 1:
             self._copy_cell(selected_indexes[0])
             return
 
-        # For multiple cells, we could implement more advanced copying in the future
-        # For now, just copy the first selected cell
-        self._copy_cell(selected_indexes[0])
-        logger.info(f"Copied first of {len(selected_indexes)} selected cells")
+        # For multiple cells, we need to create a structured text representation
+        # First, organize the selected cells by row and column
+        cells_by_position = {}
+        min_row = min_col = float("inf")
+        max_row = max_col = -1
+
+        for index in selected_indexes:
+            row, col = index.row(), index.column()
+            # Track min/max row and column to determine the selection rectangle
+            min_row = min(min_row, row)
+            max_row = max(max_row, row)
+            min_col = min(min_col, col)
+            max_col = max(max_col, col)
+
+            # Store the cell value indexed by position
+            value = self._proxy_model.data(index, Qt.DisplayRole) or ""
+            cells_by_position[(row, col)] = str(value)
+
+        # Build a tab-delimited text representation of the selection
+        buffer = []
+        for row in range(min_row, max_row + 1):
+            row_texts = []
+            for col in range(min_col, max_col + 1):
+                value = cells_by_position.get((row, col), "")
+                row_texts.append(value)
+            buffer.append("\t".join(row_texts))
+
+        # Join rows with newlines
+        clipboard_text = "\n".join(buffer)
+
+        # Copy to clipboard
+        QApplication.clipboard().setText(clipboard_text)
+        logger.info(f"Copied structured data from {len(selected_indexes)} cells to clipboard")
 
     def _paste_to_selected_cells(self) -> None:
         """Paste clipboard content to the currently selected cell(s)."""
@@ -1206,9 +1097,6 @@ class DataView(QWidget):
         # Ensure table has focus for proper visual feedback
         self._table_view.setFocus()
 
-        # Get currently selected cells
-        selected_indexes = self._table_view.selectedIndexes()
-
         # Get the clipboard text
         clipboard_text = QApplication.clipboard().text().strip()
         if not clipboard_text:
@@ -1216,9 +1104,12 @@ class DataView(QWidget):
             self._status_label.setText("Cannot paste: Clipboard is empty")
             return
 
-        # If no cells are selected, try to use the current cell or select the first cell
+        # Get currently selected cells
+        selected_indexes = self._table_view.selectedIndexes()
+
+        # If no cells are selected, try to use the current cell
         if not selected_indexes:
-            logger.warning("No cells explicitly selected for paste operation")
+            logger.warning("No cells selected for paste operation")
 
             current_index = self._table_view.currentIndex()
             if current_index.isValid():
@@ -1231,7 +1122,7 @@ class DataView(QWidget):
                 # If no current cell, select the first cell if data exists
                 if self._table_model.rowCount() > 0 and self._table_model.columnCount() > 0:
                     logger.info("Selecting first cell for paste operation")
-                    first_index = self._table_model.index(0, 0)
+                    first_index = self._proxy_model.index(0, 0)
                     self._table_view.setCurrentIndex(first_index)
                     self._table_view.selectionModel().select(
                         first_index, self._table_view.selectionModel().SelectCurrent
@@ -1243,17 +1134,45 @@ class DataView(QWidget):
                     self._status_label.setText("Cannot paste: No valid target cells")
             return
 
-        # Log number of cells that will receive the pasted value
-        logger.info(f"Pasting to {len(selected_indexes)} selected cells")
+        # Check if we have structured data with tabs and newlines
+        has_tabs = "\t" in clipboard_text
+        has_newlines = "\n" in clipboard_text
 
-        # Use an empty QModelIndex for the first parameter because we're not
-        # responding to a context menu click but to a keyboard shortcut
-        self._paste_cell(QModelIndex())
-
-        # Update status label with paste confirmation
-        if len(selected_indexes) == 1:
-            self._status_label.setText("Pasted to selected cell")
+        # If we have structured data, handle as a grid paste
+        if has_tabs or has_newlines:
+            self._paste_structured_data(clipboard_text, selected_indexes)
         else:
+            # Simple paste to all selected cells
+            logger.info(f"Pasting '{clipboard_text}' to {len(selected_indexes)} selected cells")
+
+            # Set the value for each selected cell
+            for sel_index in selected_indexes:
+                # Map to source index for model update
+                source_index = self._proxy_model.mapToSource(sel_index)
+
+                # Set the value in the source model
+                self._table_model.setData(source_index, clipboard_text, Qt.EditRole)
+
+                # Also update the data model directly
+                try:
+                    # Get the row in the original model
+                    source_row = source_index.row()
+                    source_col = source_index.column()
+
+                    if (
+                        0 <= source_row < self._table_model.rowCount()
+                        and 0 <= source_col < self._table_model.columnCount()
+                    ):
+                        # Get the actual row index if we're using filtered data
+                        actual_row = source_row
+                        if self._filtered_rows and source_row < len(self._filtered_rows):
+                            actual_row = self._filtered_rows[source_row]
+
+                        column_name = self._data_model.column_names[source_col]
+                        self._data_model.update_cell(actual_row, column_name, clipboard_text)
+                except Exception as e:
+                    logger.error(f"Error updating data model directly: {e}")
+
             self._status_label.setText(f"Pasted to {len(selected_indexes)} selected cells")
 
     def eventFilter(self, watched, event):
@@ -1272,19 +1191,32 @@ class DataView(QWidget):
             # Check for key press events
             if event.type() == event.Type.KeyPress:
                 key_event = event
-                # Check for Ctrl+V (paste)
-                if key_event.matches(QKeySequence.Paste):
-                    logger.info("Captured Ctrl+V via table view event filter")
-                    self._paste_to_selected_cells()
+                # Check for F2 key (explicit edit start)
+                if key_event.key() == Qt.Key_F2:
+                    logger.info("F2 pressed, explicitly starting edit")
+                    self._start_editing_current_cell()
                     return True
-                # Check for Ctrl+C (copy)
-                elif key_event.matches(QKeySequence.Copy):
-                    logger.info("Captured Ctrl+C via table view event filter")
-                    self._copy_selected_cells()
+                # Let the shortcuts handle Ctrl+C and Ctrl+V
+                # The event filter should not interfere with them
+            # Check for double-click events separately
+            elif event.type() == event.Type.MouseButtonDblClick:
+                logger.info("Double-click captured, explicitly starting edit")
+                index = self._table_view.indexAt(event.pos())
+                if index.isValid():
+                    QTimer.singleShot(0, lambda idx=index: self._table_view.edit(idx))
                     return True
 
         # Pass the event on to the standard event processing
         return super().eventFilter(watched, event)
+
+    def _start_editing_current_cell(self):
+        """Explicitly start editing the current cell if it's valid."""
+        current_index = self._table_view.currentIndex()
+        if current_index.isValid() and (current_index.flags() & Qt.ItemIsEditable):
+            logger.info(
+                f"Starting edit for cell at [{current_index.row()}, {current_index.column()}]"
+            )
+            self._table_view.edit(current_index)
 
     def _on_import_clicked(self):
         """Handle import button click."""
@@ -1318,6 +1250,16 @@ class DataView(QWidget):
                 self._population_in_progress = False
                 return
 
+            # Make sure the status column is included in the columns list
+            if self.STATUS_COLUMN not in columns:
+                columns = list(columns) + [self.STATUS_COLUMN]
+                logger.debug(f"Added STATUS_COLUMN to columns list: {columns}")
+
+            # Temporarily disconnect the proxy model to prevent filtering during population
+            if hasattr(self, "_table_view") and hasattr(self, "_proxy_model"):
+                logger.debug("Temporarily setting proxy model's source model to None")
+                self._proxy_model.setSourceModel(None)
+
             # Clear the model and reset it with correct dimensions
             self._table_model.clear()
             self._table_model.setHorizontalHeaderLabels(columns)
@@ -1328,6 +1270,10 @@ class DataView(QWidget):
             self._table_model.setRowCount(row_count)
             self._table_model.setColumnCount(col_count)
 
+            # Reset filters to ensure all rows are visible once data is loaded
+            if hasattr(self, "_proxy_model"):
+                self._proxy_model.set_filter_settings(-1, "", "Contains", False)
+
             # Prepare for chunked population
             self._chunk_columns = columns
             self._chunk_data = data
@@ -1336,14 +1282,26 @@ class DataView(QWidget):
             self._chunk_size = min(500, row_count)  # Process 500 rows at a time
             self._chunk_start = 0
 
+            logger.debug(f"Starting chunked population: {row_count} rows, {col_count} columns")
+
+            # Process events before starting the chunking process
+            QApplication.processEvents()
+
             # Start the chunked population process - use immediate processing for the first chunk
             self._populate_chunk()
+
+            # NOTE: We moved the proxy model reconnection to _finalize_population
+            # It will be reconnected after ALL chunks are loaded, not just the first one
 
         except Exception as e:
             logger.error(f"Error populating table: {e}")
             self._update_status(f"Error: {str(e)}", True)
             self._is_updating = False
             self._population_in_progress = False
+
+            # Make sure proxy model is reconnected even in case of error
+            if hasattr(self, "_table_view") and hasattr(self, "_proxy_model"):
+                self._proxy_model.setSourceModel(self._table_model)
 
     def _populate_chunk(self):
         """Populate one chunk of data to the table."""
@@ -1352,6 +1310,7 @@ class DataView(QWidget):
                 logger.error("Error in _populate_chunk: _chunk_start attribute not found")
                 self._is_updating = False
                 self._population_in_progress = False
+                self._finalize_population()
                 return
 
             # Get current chunk boundaries
@@ -1362,36 +1321,58 @@ class DataView(QWidget):
                 f"Populating chunk from {chunk_start} to {chunk_end} of {self._chunk_row_count} rows"
             )
 
-            # Get the data for the current chunk
-            column_names = self._chunk_columns
-
             # Process only the current chunk of data
             if hasattr(self, "_chunk_data") and self._chunk_data is not None:
-                data_subset = self._chunk_data.iloc[chunk_start:chunk_end]
+                try:
+                    # For large dataframes, accessing a subset might be faster than iloc
+                    start_idx = self._chunk_data.index[chunk_start]
+                    end_idx = self._chunk_data.index[chunk_end - 1]
+                    data_subset = self._chunk_data.loc[start_idx:end_idx]
 
-                # Convert to a format that's faster to iterate
-                values = data_subset.to_dict("records")
+                    # Convert to a format that's faster to iterate
+                    values = data_subset.to_dict("records")
 
-                # Batch creation of items for better performance
-                for i, row_data in enumerate(values):
-                    row_idx = chunk_start + i
-                    for col_idx, col_name in enumerate(column_names):
-                        # Get value with proper None/NaN handling
-                        cell_value = row_data.get(col_name, "")
-                        str_value = (
-                            ""
-                            if cell_value is None
-                            or (isinstance(cell_value, float) and pd.isna(cell_value))
-                            else str(cell_value)
-                        )
+                    # Batch creation of items for better performance
+                    for i, row_data in enumerate(values):
+                        row_idx = chunk_start + i
+                        for col_idx, col_name in enumerate(self._chunk_columns):
+                            # Handle STATUS column specially
+                            if col_name == self.STATUS_COLUMN:
+                                # Create a default "Not validated" status cell
+                                status_item = QStandardItem("Not validated")
+                                status_item.setFlags(
+                                    status_item.flags() & ~Qt.ItemIsEditable
+                                )  # Make non-editable
+                                self._table_model.setItem(row_idx, col_idx, status_item)
+                                continue
 
-                        # Create the item and add it to the model
-                        item = QStandardItem(str_value)
-                        self._table_model.setItem(row_idx, col_idx, item)
+                            # Get value with proper None/NaN handling
+                            cell_value = row_data.get(col_name, "")
+                            str_value = (
+                                ""
+                                if cell_value is None
+                                or (isinstance(cell_value, float) and pd.isna(cell_value))
+                                else str(cell_value)
+                            )
+
+                            # Create the item and add it to the model
+                            item = QStandardItem(str_value)
+                            item.setFlags(
+                                item.flags() | Qt.ItemIsEditable
+                            )  # Make the item editable
+                            self._table_model.setItem(row_idx, col_idx, item)
+
+                    # Process events after each chunk to keep UI responsive
+                    QApplication.processEvents()
+
+                except Exception as chunk_error:
+                    logger.error(f"Error processing data chunk: {chunk_error}")
+                    # Continue with next chunk despite error
             else:
                 logger.error("_chunk_data attribute is missing or None")
                 self._is_updating = False
                 self._population_in_progress = False
+                self._finalize_population()  # Still try to finalize even with error
                 return
 
             # Check if we've processed all rows
@@ -1405,21 +1386,72 @@ class DataView(QWidget):
             # Update for next chunk
             self._chunk_start = chunk_end
 
+            # Explicitly update the UI before scheduling the next chunk
+            QApplication.processEvents()
+
             # Schedule the next chunk with a small delay to keep UI responsive
-            QTimer.singleShot(5, self._populate_chunk)
+            # Use a direct call instead of QTimer for more reliable processing
+            if not self._is_updating and not self._population_in_progress:
+                logger.warning("Population flags were reset unexpectedly, stopping chunking")
+                self._finalize_population()
+                return
+
+            self._populate_chunk()
 
         except Exception as e:
             logger.error(f"Error in chunk population: {e}")
             self._update_status(f"Error: {str(e)}", True)
             self._is_updating = False
             self._population_in_progress = False
+            self._finalize_population()  # Try to finalize what we've got
 
     def _finalize_population(self):
         """Finalize the population process."""
-        self._ensure_no_text_wrapping()
-        self._customize_column_widths()
-        self._update_status_from_row_count()
-        self._initial_load = False  # Reset initial load flag
+        try:
+            logger.debug("Finalizing data population")
+
+            # Make sure the proxy model is reconnected
+            if hasattr(self, "_proxy_model") and hasattr(self, "_table_model"):
+                logger.debug("Reconnecting proxy model to source model during finalization")
+                self._proxy_model.setSourceModel(self._table_model)
+
+                # Apply any pending filters after model is connected
+                if hasattr(self, "_filter_criteria") and self._filter_criteria:
+                    logger.debug(f"Reapplying filter: {self._filter_criteria}")
+                    self._apply_filter()
+
+            # Apply table styling
+            self._ensure_no_text_wrapping()
+            self._customize_column_widths()
+            self._update_status_from_row_count()
+
+            # Reset state flags
+            self._initial_load = False
+            self._is_updating = False
+            self._population_in_progress = False
+
+            # Explicitly clear any chunking artifacts
+            self._chunk_start = 0
+            self._chunk_size = 0
+            self._chunk_row_count = 0
+            self._chunk_data = None
+
+            logger.debug("Data population completed successfully")
+
+            # Process events to ensure UI updates
+            QApplication.processEvents()
+
+        except Exception as e:
+            logger.error(f"Error in _finalize_population: {e}")
+            self._is_updating = False
+            self._population_in_progress = False
+            self._initial_load = False
+
+            # Still try to reconnect proxy model in case of error
+            if hasattr(self, "_proxy_model") and hasattr(self, "_table_model"):
+                if self._proxy_model.sourceModel() is None:
+                    logger.debug("Reconnecting proxy model to source model despite error")
+                    self._proxy_model.setSourceModel(self._table_model)
 
     def _ensure_no_text_wrapping(self):
         """Ensure that text does not wrap in table cells."""
@@ -1612,61 +1644,40 @@ class DataView(QWidget):
     @Slot(object)
     def _on_validation_changed(self, validation_status=None) -> None:
         """
-        Handle validation changed signal with optimized updates.
+        Handle changes in validation status.
 
         Args:
-            validation_status: The validation status.
+            validation_status: The validation status data
         """
         try:
-            # Check if we have valid models
-            if not self._has_valid_models():
-                logger.warning("Cannot update validation status: Invalid models")
+            logger.debug("Handling validation status change")
+
+            # Skip updating during table population or updates
+            if self._is_updating or self._population_in_progress:
+                logger.debug("Skipping validation update during table population/update")
                 return
 
-            logger.debug("Handling validation changed in DataView")
-
-            # Get the model's validation status if not provided
-            if validation_status is None and hasattr(self._data_model, "get_validation_status"):
-                try:
-                    validation_status = self._data_model.get_validation_status()
-                    logger.debug(f"Got validation status: {type(validation_status)}")
-                except Exception as e:
-                    logger.error(f"Error getting validation status: {e}")
+            # Get the validation status
+            if validation_status is None:
+                if not hasattr(self._data_model, "get_validation_status"):
+                    logger.warning("Data model does not have get_validation_status method")
                     return
+                validation_status = self._data_model.get_validation_status()
 
-            # Ensure status column exists
-            self._ensure_status_column()
-
-            # Get status column index
-            status_col = self._get_column_index(self.STATUS_COLUMN)
-            if status_col < 0:
-                logger.error("Status column not found in table model")
-                return
-
-            # Initialize dictionary to track cells that need updating
-            cells_to_update = {}
-
-            # Track rows with invalid status
+            # Get the indices of invalid rows
             invalid_rows = []
 
-            # Define validatable columns (for specifically invalid cells)
-            validatable_columns = ["PLAYER", "SOURCE", "CHEST"]
-
-            # Process the validation status
-            if isinstance(validation_status, pd.DataFrame) and not validation_status.empty:
-                # Get validation columns (ending with _valid)
-                validation_columns = [
-                    col for col in validation_status.columns if col.endswith("_valid")
-                ]
-                logger.debug(f"Found validation columns: {validation_columns}")
-
-                # For each row in the validation DataFrame
+            if validation_status is not None and not validation_status.empty:
+                # Find invalid rows by checking validation columns
                 for row_idx in range(len(validation_status)):
-                    # Track if this row has any invalid value
-                    row_has_invalid = False
-                    invalid_column_names = []
+                    # Default to valid
+                    is_invalid = False
 
-                    # Check each validation column for this row
+                    # Check all validation columns for this row
+                    validation_columns = [
+                        col for col in validation_status.columns if col.endswith("_valid")
+                    ]
+
                     for val_col in validation_columns:
                         # Skip NaN values
                         if pd.isna(validation_status.iloc[row_idx].get(val_col, None)):
@@ -1674,102 +1685,167 @@ class DataView(QWidget):
 
                         # Check if this validation column failed
                         if not validation_status.iloc[row_idx][val_col]:
-                            row_has_invalid = True
+                            is_invalid = True
+                            break
+
+                    # If this row has any invalid columns, add it to our list
+                    if is_invalid:
+                        invalid_rows.append(row_idx)
+
+                logger.debug(
+                    f"Found {len(invalid_rows)} invalid rows out of {len(validation_status)}"
+                )
+
+                # Process a hash of status values to see if they've changed
+                status_hash = hashlib.md5(str(validation_status).encode()).hexdigest()
+
+                # If the status hash is the same as the last time, skip the update
+                if self._previous_validation_states.get("status_hash") == status_hash:
+                    logger.debug("Validation status unchanged, skipping visual update")
+                    return
+
+                # Store the new hash
+                self._previous_validation_states["status_hash"] = status_hash
+
+            # Update the status column to show validation status
+            self._highlight_invalid_rows(invalid_rows)
+
+        except Exception as e:
+            logger.error(f"Error handling validation changed: {e}")
+
+    def _highlight_invalid_rows(self, invalid_rows):
+        """
+        Highlight rows that have validation issues.
+
+        Args:
+            invalid_rows: List of row indices that have validation issues
+        """
+        try:
+            if not self._table_model:
+                logger.warning("No table model available for validation highlighting")
+                return
+
+            # Get columns that can be validated
+            validatable_columns = [self.PLAYER_COLUMN, self.CHEST_COLUMN, self.SOURCE_COLUMN]
+
+            # Get the validation status for details
+            validation_status = None
+            if hasattr(self._data_model, "get_validation_status"):
+                validation_status = self._data_model.get_validation_status()
+
+            if validation_status is None or validation_status.empty:
+                logger.warning("No validation status available for highlighting")
+                return
+
+            # Find the STATUS column index
+            status_col = -1
+            for col in range(self._table_model.columnCount()):
+                if self._table_model.headerData(col, Qt.Horizontal) == self.STATUS_COLUMN:
+                    status_col = col
+                    break
+
+            # Block signals before batch updates to prevent thousands of itemChanged signals
+            self._table_model.blockSignals(True)
+
+            try:
+                # Prepare list of updates for batch processing
+                status_updates = []
+
+                # Update the status column for all rows
+                for row_idx in range(len(self._data_model.data)):
+                    # Check if this row is invalid
+                    is_valid = row_idx not in invalid_rows
+
+                    # Get the appropriate status text
+                    status_text = "Valid" if is_valid else "Invalid"
+
+                    # Convert data model row index to view row index
+                    filtered_idx = self._get_filtered_row_index(row_idx)
+                    if filtered_idx >= 0:  # Skip if not in filtered view
+                        status_updates.append((filtered_idx, status_col, status_text, is_valid))
+
+                # Process each invalid row for specific cell highlighting
+                invalid_column_names = []
+
+                for row_idx in invalid_rows:
+                    # Find which validation columns failed
+                    validation_columns = [
+                        col for col in validation_status.columns if col.endswith("_valid")
+                    ]
+
+                    for val_col in validation_columns:
+                        # Skip NaN values
+                        if pd.isna(validation_status.iloc[row_idx].get(val_col, None)):
+                            continue
+
+                        # Check if this validation column failed
+                        if not validation_status.iloc[row_idx][val_col]:
                             # Get the original column name by removing _valid suffix
                             orig_column = val_col.replace("_valid", "")
                             invalid_column_names.append(orig_column)
 
-                    # Use a filtered index for display row lookup
+                    # Use filtered index for display row lookup
                     filtered_idx = self._get_filtered_row_index(row_idx)
                     if filtered_idx < 0:
                         continue  # Skip if not in filtered view
 
-                    # Update status column for all rows
-                    if row_has_invalid:
-                        # Add row to invalid rows list
-                        invalid_rows.append(row_idx)
+                    # Process each column in the row
+                    for col_idx in range(self._table_model.columnCount()):
+                        if col_idx == status_col:
+                            continue  # Skip status column
 
-                        # Update status cell to "Invalid"
-                        if status_col >= 0:
-                            # Only update if needed
-                            status_item = self._table_model.item(filtered_idx, status_col)
-                            if status_item and status_item.data(Qt.DisplayRole) != "Invalid":
-                                cells_to_update[(filtered_idx, status_col)] = ("Invalid", None)
+                        column_name = self._table_model.headerData(col_idx, Qt.Horizontal)
+                        item = self._table_model.item(filtered_idx, col_idx)
+                        if not item:
+                            continue
 
-                        # Process each column in the row
-                        for col_idx in range(self._table_model.columnCount()):
-                            if col_idx == status_col:
-                                continue  # Skip status column
+                        # Get current validation status
+                        current_status = item.data(Qt.UserRole + 1)
 
-                            column_name = self._table_model.headerData(col_idx, Qt.Horizontal)
-                            item = self._table_model.item(filtered_idx, col_idx)
-                            if not item:
-                                continue  # Skip if item doesn't exist
-
-                            # Get current validation status for this cell
-                            current_status = item.data(Qt.UserRole + 1)
-
-                            # Only set validation status on specifically invalid cells
-                            if (
-                                column_name in invalid_column_names
-                                and column_name in validatable_columns
-                            ):
-                                # This is a specifically invalid cell in a validatable column
-                                if current_status != ValidationStatus.INVALID:
-                                    cells_to_update[(filtered_idx, col_idx)] = (
-                                        None,
-                                        ValidationStatus.INVALID,
-                                    )
-                            else:
-                                # For all other cells, if they have a validation status, clear it
-                                if current_status is not None:
-                                    cells_to_update[(filtered_idx, col_idx)] = (None, None)
-                    else:
-                        # This row is valid
-                        # Update status column to "Valid"
-                        if status_col >= 0:
-                            status_item = self._table_model.item(filtered_idx, status_col)
-                            if status_item and status_item.data(Qt.DisplayRole) != "Valid":
-                                cells_to_update[(filtered_idx, status_col)] = ("Valid", None)
-
-                        # For all other cells, if they have a validation status, clear it
-                        for col_idx in range(self._table_model.columnCount()):
-                            if col_idx == status_col:
-                                continue  # Skip status column
-
-                            item = self._table_model.item(filtered_idx, col_idx)
-                            if not item:
-                                continue  # Skip if item doesn't exist
-
-                            # Get current validation status for this cell
-                            current_status = item.data(Qt.UserRole + 1)
-
-                            # Clear the status if it was previously set
+                        # Only set validation status on specifically invalid cells
+                        if (
+                            column_name in invalid_column_names
+                            and column_name in validatable_columns
+                        ):
+                            # This is a specifically invalid cell in a validatable column
+                            if current_status != ValidationStatus.INVALID:
+                                item.setData(ValidationStatus.INVALID, Qt.UserRole + 1)
+                        else:
+                            # For all other cells, if they have a validation status, clear it
                             if current_status is not None:
-                                cells_to_update[(filtered_idx, col_idx)] = (None, None)
+                                item.setData(None, Qt.UserRole + 1)
 
-            # Apply all cell updates at once
-            logger.debug(f"Applying {len(cells_to_update)} selective updates to cells")
-            for (row, col), (text_value, validation_value) in cells_to_update.items():
-                # Get the item at the specified position
-                item = self._table_model.item(row, col)
-                if not item:
-                    continue
+                # Now batch update all status cells
+                for filtered_idx, status_col, status_text, is_valid in status_updates:
+                    # Create item or get existing one
+                    item = self._table_model.item(filtered_idx, status_col)
+                    if not item:
+                        item = QStandardItem(status_text)
+                        self._table_model.setItem(filtered_idx, status_col, item)
+                    else:
+                        item.setText(status_text)
 
-                # Update the display text if specified
-                if text_value is not None:
-                    item.setData(text_value, Qt.DisplayRole)
+                    # Set visual styling without triggering signals
+                    if is_valid:
+                        if item.data(Qt.UserRole + 1) != ValidationStatus.VALID:
+                            item.setData(ValidationStatus.VALID, Qt.UserRole + 1)
+                    else:
+                        if item.data(Qt.UserRole + 1) != ValidationStatus.INVALID:
+                            item.setData(ValidationStatus.INVALID, Qt.UserRole + 1)
 
-                # Update the validation status
-                item.setData(validation_value, Qt.UserRole + 1)
+            finally:
+                # Unblock signals after batch updates
+                self._table_model.blockSignals(False)
 
-            # If there are invalid rows, highlight them
-            if invalid_rows:
-                # Call the method to highlight invalid rows
-                self._highlight_invalid_rows(invalid_rows)
+            # Update the view
+            self._table_view.viewport().update()
+            logger.debug(f"Highlighted {len(invalid_rows)} invalid rows with specific cell marking")
 
         except Exception as e:
-            logger.error(f"Error handling validation change: {e}")
+            logger.error(f"Error highlighting invalid rows: {e}")
+            # Make sure signals are unblocked even if there's an error
+            if hasattr(self, "_table_model") and self._table_model:
+                self._table_model.blockSignals(False)
 
     @Slot(object)
     def _on_correction_applied(self, correction_status) -> None:
@@ -1781,97 +1857,6 @@ class DataView(QWidget):
         """
         # Update the view to reflect correction changes
         self._on_data_changed()
-
-    def _highlight_invalid_rows(self, invalid_rows):
-        """
-        Highlight rows with validation issues.
-
-        Args:
-            invalid_rows: List of row indices with validation issues.
-        """
-        try:
-            # Check if we have valid models
-            if not self._has_valid_models():
-                logger.warning("Cannot highlight invalid rows: Invalid models")
-                return
-
-            # Ensure we have invalid rows to process
-            if not invalid_rows:
-                logger.debug("No invalid rows to highlight")
-                return
-
-            # Get status column index
-            status_col = self._get_column_index(self.STATUS_COLUMN)
-
-            # Define validatable columns
-            validatable_columns = ["PLAYER", "SOURCE", "CHEST"]
-
-            # Attempt to get validation status dataframe
-            validation_status = None
-            if hasattr(self._data_model, "get_validation_status"):
-                try:
-                    validation_status = self._data_model.get_validation_status()
-                except Exception as e:
-                    logger.error(f"Error getting validation status: {e}")
-
-            if validation_status is None or not isinstance(validation_status, pd.DataFrame):
-                logger.error("Cannot highlight invalid rows: No validation status dataframe")
-                return
-
-            # Get validation columns (ending with _valid)
-            validation_columns = [
-                col for col in validation_status.columns if col.endswith("_valid")
-            ]
-
-            # For each invalid row, identify which specific columns are invalid
-            for row_idx in invalid_rows:
-                # Identify specifically invalid columns for this row
-                invalid_column_names = []
-                for val_col in validation_columns:
-                    # Skip NaN values
-                    if pd.isna(validation_status.iloc[row_idx].get(val_col, None)):
-                        continue
-
-                    # Check if this validation column failed
-                    if not validation_status.iloc[row_idx][val_col]:
-                        # Get the original column name by removing _valid suffix
-                        orig_column = val_col.replace("_valid", "")
-                        invalid_column_names.append(orig_column)
-
-                # Use filtered index for display row lookup
-                filtered_idx = self._get_filtered_row_index(row_idx)
-                if filtered_idx < 0:
-                    continue  # Skip if not in filtered view
-
-                # Process each column in the row
-                for col_idx in range(self._table_model.columnCount()):
-                    if col_idx == status_col:
-                        continue  # Skip status column
-
-                    column_name = self._table_model.headerData(col_idx, Qt.Horizontal)
-                    item = self._table_model.item(filtered_idx, col_idx)
-                    if not item:
-                        continue
-
-                    # Get current validation status
-                    current_status = item.data(Qt.UserRole + 1)
-
-                    # Only set validation status on specifically invalid cells
-                    if column_name in invalid_column_names and column_name in validatable_columns:
-                        # This is a specifically invalid cell in a validatable column
-                        if current_status != ValidationStatus.INVALID:
-                            item.setData(ValidationStatus.INVALID, Qt.UserRole + 1)
-                    else:
-                        # For all other cells, if they have a validation status, clear it
-                        if current_status is not None:
-                            item.setData(None, Qt.UserRole + 1)
-
-            # Update the view
-            self._table_view.viewport().update()
-            logger.debug(f"Highlighted {len(invalid_rows)} invalid rows with specific cell marking")
-
-        except Exception as e:
-            logger.error(f"Error highlighting invalid rows: {e}")
 
     def _get_filtered_row_index(self, model_row_idx: int) -> int:
         """
@@ -1959,77 +1944,159 @@ class DataView(QWidget):
                 logger.warning("No data available in data model")
                 return
 
+            # Repopulate column selector in case columns changed
+            self._populate_column_selector()
+
             # Update the view
             self._update_view()
 
         except Exception as e:
             logger.error(f"Error handling data changed: {e}")
 
-    def _apply_filter(self) -> None:
-        """Apply the current filter text to the data."""
+    def _on_cell_double_clicked(self, index):
+        """
+        Handle double-click on a cell to start editing.
+
+        Args:
+            index (QModelIndex): The index of the clicked cell
+        """
+        logger.info(f"Double-clicked cell at row {index.row()}, column {index.column()}")
+        if index.isValid() and (index.flags() & Qt.ItemIsEditable):
+            logger.info(f"Starting edit for cell at [{index.row()}, {index.column()}]")
+            self._table_view.edit(index)
+
+    def _on_refresh_clicked(self) -> None:
+        """Handle refresh button click."""
+        logger.info("Refresh button clicked")
+        # Repopulate column selector in case columns changed
+        self._populate_column_selector()
+        # Update the view
+        self._update_view()
+
+    def _apply_table_styling(self) -> None:
+        """Apply additional styling to ensure table content is visible."""
+        # Set text color explicitly via stylesheet
+        self._table_view.setStyleSheet("""
+            QTableView {
+                color: white;
+                background-color: #1A2C42;
+                gridline-color: transparent;
+                selection-background-color: #D4AF37;
+                selection-color: #1A2C42;
+            }
+            QTableView::item {
+                color: white;
+                /* No background color to allow delegate painting to show through */
+                padding: 12px;
+            }
+            QTableView::item:alternate {
+                /* Very subtle alternating row color that won't interfere with validation highlighting */
+                background-color: rgba(45, 55, 72, 40);
+            }
+            QTableView::item:selected {
+                color: #1A2C42;
+                background-color: #D4AF37;
+            }
+        """)
+
+        # Re-enable alternating row colors with subtle effect
+        self._table_view.setAlternatingRowColors(True)
+
+        # Make sure the model has appropriate default foreground color
+        self._table_model.setItemPrototype(QStandardItem())
+        prototype = self._table_model.itemPrototype()
+        if prototype:
+            prototype.setForeground(QColor("white"))
+
+    def _on_item_changed(self, item):
+        """
+        Handle changes to items in the table model.
+
+        Args:
+            item: The QStandardItem that changed
+        """
+        # Skip processing if currently updating the table
+        if self._is_updating:
+            return
+
         try:
-            # Cancel if no data model
-            if not self._has_valid_models():
+            # Get the row and column of the changed item
+            row = item.row()
+            col = item.column()
+
+            # Map from proxy model to source model if needed
+            if hasattr(self, "_proxy_model") and self._proxy_model:
+                proxy_index = self._proxy_model.index(row, col)
+                source_index = self._proxy_model.mapToSource(proxy_index)
+                row = source_index.row()
+                col = source_index.column()
+
+            # Map to data model row if filtered
+            data_model_row = row
+            if (
+                hasattr(self, "_filtered_rows")
+                and self._filtered_rows
+                and row < len(self._filtered_rows)
+            ):
+                data_model_row = self._filtered_rows[row]
+
+            # Get the column name from the header
+            column_name = self._table_model.headerData(col, Qt.Horizontal)
+
+            # Get the new value
+            new_value = item.data(Qt.DisplayRole)
+
+            logger.debug(f"Item changed at ({row}, {col}) - column '{column_name}': '{new_value}'")
+
+            # Skip STATUS column updates - this is a display-only column handled by validation
+            if column_name == self.STATUS_COLUMN:
+                logger.debug(f"Skipping update for STATUS column (display-only)")
                 return
 
-            # Emit the filter changed signal with the current filter text
-            self.filter_changed.emit(self._filter_text)
+            # Verify that the column exists in the data model before updating
+            if (
+                hasattr(self._data_model, "column_names")
+                and column_name in self._data_model.column_names
+            ):
+                # Check that the row is within range
+                if data_model_row < len(self._data_model.data):
+                    # Update the data model
+                    if hasattr(self._data_model, "update_cell"):
+                        self._data_model.update_cell(data_model_row, column_name, new_value)
 
-            # Get the data to filter
-            if not hasattr(self._data_model, "data") or self._data_model.data is None:
-                logger.warning("No data available to filter")
-                return
-
-            # Start with a copy of the original data
-            original_data = self._data_model.data
-
-            # If no filter, use all data
-            if not self._filter_text:
-                self._filtered_data = None
-                self._filtered_rows = None
-                self._update_view_with_filtered_data(original_data)
-                return
-
-            # Clear validation cache when filter changes
-            self._clear_validation_cache()
-
-            # Apply the filter across all columns
-            filtered_rows = []
-            filter_lower = self._filter_text.lower()
-
-            # For each row in the data
-            for i, row in original_data.iterrows():
-                # Check if any cell in this row contains the filter text
-                match_found = False
-                for col, value in row.items():
-                    # Convert value to string and check if it contains the filter text
-                    if pd.notna(value):
-                        str_value = str(value).lower()
-                        if filter_lower in str_value:
-                            match_found = True
-                            break
-
-                # If a match was found, add this row to the filtered list
-                if match_found:
-                    filtered_rows.append(i)
-
-            # No matches found
-            if not filtered_rows:
-                # Show empty table
-                self._filtered_data = original_data.iloc[0:0]
-                self._filtered_rows = []
-                self._update_view_with_filtered_data(self._filtered_data)
-                logger.debug("No matches found for filter")
-                return
-
-            # Update with filtered data
-            self._filtered_data = original_data.iloc[filtered_rows]
-            self._filtered_rows = filtered_rows
-            self._update_view_with_filtered_data(self._filtered_data)
-            logger.debug(f"Applied filter, showing {len(filtered_rows)} rows")
+                        # Emit the data_edited signal
+                        self.data_edited.emit(data_model_row, col, new_value)
+                else:
+                    logger.warning(
+                        f"Row index {data_model_row} out of range ({len(self._data_model.data)} rows)"
+                    )
+            else:
+                logger.warning(
+                    f"Column '{column_name}' not found in data model columns: {self._data_model.column_names if hasattr(self._data_model, 'column_names') else 'N/A'}"
+                )
 
         except Exception as e:
-            logger.error(f"Error applying filter: {e}")
-            # Reset filter state
-            self._filtered_data = None
-            self._filtered_rows = None
+            logger.error(f"Error handling item change: {e}")
+
+    def _on_sort_indicator_changed(self, logical_index, order):
+        """
+        Handle changes to sort indicator in the table header.
+
+        Args:
+            logical_index: The index of the column being sorted
+            order: The sort order (ascending or descending)
+        """
+        try:
+            # Convert Qt.SortOrder to string for logging
+            order_str = "Ascending" if order == Qt.AscendingOrder else "Descending"
+
+            # Get the column name
+            column_name = self._table_model.headerData(logical_index, Qt.Horizontal)
+
+            logger.info(f"Sorting by column {column_name} ({order_str})")
+
+            # Let the proxy model handle the actual sorting
+            # No need to implement custom sorting logic here as the proxy model handles it
+
+        except Exception as e:
+            logger.error(f"Error handling sort indicator change: {e}")
