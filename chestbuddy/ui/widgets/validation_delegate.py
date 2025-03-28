@@ -70,6 +70,16 @@ class ValidationStatusDelegate(QStyledItemDelegate):
             option: Style options for the item
             index: Model index of the item to paint
         """
+        # Get cell-specific validation status from model data (Qt.UserRole + 1)
+        validation_status = index.data(Qt.ItemDataRole.UserRole + 1)
+
+        # If no validation status is set, use standard styling (let Qt handle it)
+        if validation_status is None:
+            super().paint(painter, option, index)
+            return
+
+        # From here on, we know we have a specific validation status to apply
+
         # Save painter state to restore later
         painter.save()
 
@@ -92,9 +102,6 @@ class ValidationStatusDelegate(QStyledItemDelegate):
 
         # Check if this is a validatable column
         is_validatable_column = column_name in self.VALIDATABLE_COLUMNS
-
-        # Get cell-specific validation status from model data (Qt.UserRole + 1)
-        validation_status = index.data(Qt.ItemDataRole.UserRole + 1)
 
         # Get correction status from model data (Qt.UserRole + 2)
         correction_status = index.data(Qt.ItemDataRole.UserRole + 2)

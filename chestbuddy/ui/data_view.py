@@ -89,27 +89,35 @@ class DataView(QWidget):
 
     def __init__(self, data_model: ChestDataModel, parent: Optional[QWidget] = None) -> None:
         """
-        Initialize the DataView.
+        Initialize the DataView widget.
 
         Args:
-            data_model: The data model to display.
-            parent: The parent widget.
+            data_model: Data model to display
+            parent: Parent widget
         """
+        # Call parent init first
         super().__init__(parent)
 
-        # Initialize class variables
+        # Initialize the data model
         self._data_model = data_model
-        self._table_model = QStandardItemModel()
-        self._filtered_rows: List[int] = []
-        self._current_filter: Dict[str, str] = {}
-        self._is_updating = False  # Guard against recursive updates
-        self._auto_update_enabled = True  # Enable auto-update by default
-        self._population_in_progress = False  # Track if table population is in progress
-        self._initial_load = True  # Track if this is the initial data load
-        self._user_initiated_sort = False  # Flag to track if sorting was initiated by user
 
-        # Initialize columns list with default columns
-        self._columns = [
+        # Create a QStandardItemModel for the table
+        self._table_model = QStandardItemModel(self)
+
+        # Initialize filter state
+        self._filter_text = ""
+        self._filtered_data = None
+        self._filtered_rows = None
+
+        # Initialize the table header columns based on data_model columns
+        self._columns = (
+            self._data_model.column_names if hasattr(self._data_model, "column_names") else []
+        )
+        self._columns.append(self.STATUS_COLUMN)
+
+        # Track which columns are visible (initially all)
+        self._visible_columns = [
+            self.DATE_COLUMN,
             self.PLAYER_COLUMN,
             self.SOURCE_COLUMN,
             self.CHEST_COLUMN,
@@ -118,21 +126,128 @@ class DataView(QWidget):
             self.STATUS_COLUMN,
         ]
 
-        # Track previous validation states to optimize updates
-        self._previous_validation_states = {}
-
-        # Set up UI
+        # Set up the UI components
         self._init_ui()
 
         # Connect signals
         self._connect_signals()
 
-        # Initial update
-        self._update_view()
+        # Set up the table view
+        self.populate_table()
 
-        # Ensure status column and proper column widths
-        self._ensure_status_column()
-        self._customize_column_widths()
+    @Slot()
+    def _on_data_cleared(self) -> None:
+        """Handle data cleared signal."""
+        # Reset the table model
+        if self._table_model:
+            self._table_model.clear()
+            self._table_model.setHorizontalHeaderLabels(self._visible_columns)
+
+        # Reset filter
+        self._filter_text = ""
+        self._filtered_data = None
+        self._filtered_rows = None
+
+        # Reset UI elements
+        if hasattr(self, "_filter_input") and self._filter_input:
+            self._filter_input.setText("")
+
+        # Reset the validation status of all cells to None - no styling
+        for row in range(self._table_model.rowCount()):
+            for col in range(self._table_model.columnCount()):
+                item = self._table_model.item(row, col)
+                if item:
+                    item.setData(None, Qt.UserRole + 1)
+
+        logger.debug("Data view reset after data cleared")
+
+    @Slot()
+    def _on_data_changed(self, data_state=None) -> None:
+        """
+        Handle data changed signal.
+
+        Args:
+            data_state: The current data state
+        """
+        try:
+            logger.debug("Handling data changed in DataView")
+
+            # Get data from the model
+            if not hasattr(self._data_model, "data") or self._data_model.data is None:
+                logger.warning("No data available in data model")
+                return
+
+            # Update the view
+            self._update_view()
+
+        except Exception as e:
+            logger.error(f"Error handling data changed: {e}")
+
+    def _apply_filter(self) -> None:
+        """Apply the current filter text to the data."""
+        try:
+            # Cancel if no data model
+            if not self._has_valid_models():
+                return
+
+            # Emit the filter changed signal with the current filter text
+            self.filter_changed.emit(self._filter_text)
+
+            # Get the data to filter
+            if not hasattr(self._data_model, "data") or self._data_model.data is None:
+                logger.warning("No data available to filter")
+                return
+
+            # Start with a copy of the original data
+            original_data = self._data_model.data
+
+            # If no filter, use all data
+            if not self._filter_text:
+                self._filtered_data = None
+                self._filtered_rows = None
+                self._update_view_with_filtered_data(original_data)
+                return
+
+            # Apply the filter across all columns
+            filtered_rows = []
+            filter_lower = self._filter_text.lower()
+
+            # For each row in the data
+            for i, row in original_data.iterrows():
+                # Check if any cell in this row contains the filter text
+                match_found = False
+                for col, value in row.items():
+                    # Convert value to string and check if it contains the filter text
+                    if pd.notna(value):
+                        str_value = str(value).lower()
+                        if filter_lower in str_value:
+                            match_found = True
+                            break
+
+                # If a match was found, add this row to the filtered list
+                if match_found:
+                    filtered_rows.append(i)
+
+            # No matches found
+            if not filtered_rows:
+                # Show empty table
+                self._filtered_data = original_data.iloc[0:0]
+                self._filtered_rows = []
+                self._update_view_with_filtered_data(self._filtered_data)
+                logger.debug("No matches found for filter")
+                return
+
+            # Update with filtered data
+            self._filtered_data = original_data.iloc[filtered_rows]
+            self._filtered_rows = filtered_rows
+            self._update_view_with_filtered_data(self._filtered_data)
+            logger.debug(f"Applied filter, showing {len(filtered_rows)} rows")
+
+        except Exception as e:
+            logger.error(f"Error applying filter: {e}")
+            # Reset filter state
+            self._filtered_data = None
+            self._filtered_rows = None
 
     def _init_ui(self) -> None:
         """Initialize the user interface."""
@@ -1539,6 +1654,9 @@ class DataView(QWidget):
                 ]
                 logger.debug(f"Found validation columns: {validation_columns}")
 
+                # Create a set to track which rows we've processed
+                processed_rows = set()
+
                 # For each row in the validation DataFrame
                 for row_idx in range(len(validation_status)):
                     # Track if this row has any invalid value
@@ -1562,6 +1680,9 @@ class DataView(QWidget):
                     filtered_idx = self._get_filtered_row_index(row_idx)
                     if filtered_idx < 0:
                         continue  # Skip if not in filtered view
+
+                    # Mark this row as processed
+                    processed_rows.add(filtered_idx)
 
                     # Update status column for all rows
                     if row_has_invalid:
@@ -1620,8 +1741,8 @@ class DataView(QWidget):
                             if status_item and status_item.data(Qt.DisplayRole) != "Valid":
                                 cells_to_update[(filtered_idx, status_col)] = ("Valid", None)
 
-                        # For cells that were previously marked as invalid, reset them to None
-                        # instead of setting to VALID to keep standard styling
+                        # For cells that were previously marked as invalid, just clear the status
+                        # Don't set to ValidationStatus.VALID - let them use normal table styling
                         for col_idx in range(self._table_model.columnCount()):
                             if col_idx == status_col:
                                 continue  # Skip status column
@@ -1633,12 +1754,47 @@ class DataView(QWidget):
                             # Get current validation status for this cell
                             current_status = item.data(Qt.UserRole + 1)
 
-                            # Only reset cells that were previously invalid, and set to None instead of VALID
-                            if current_status in [
-                                ValidationStatus.INVALID,
-                                ValidationStatus.INVALID_ROW,
-                            ]:
+                            # Only clear the status if it was previously set
+                            if current_status is not None:
                                 cells_to_update[(filtered_idx, col_idx)] = (None, None)
+
+                # For any processed valid rows, clear validation status from cells
+                # This ensures any rows that were previously invalid but are now valid have their styling cleared
+                for row in range(self._table_model.rowCount()):
+                    if row in processed_rows:
+                        continue  # Skip rows we've already processed
+
+                    # Get the actual row index in the data model
+                    if self._filtered_rows:
+                        if row >= len(self._filtered_rows):
+                            continue
+                        actual_row_idx = self._filtered_rows[row]
+                    else:
+                        actual_row_idx = row
+
+                    # If the row is in the validation status DataFrame, ensure it appears as valid
+                    if actual_row_idx < len(validation_status):
+                        # Set status to Valid
+                        if status_col >= 0:
+                            status_item = self._table_model.item(row, status_col)
+                            if status_item and status_item.data(Qt.DisplayRole) != "Valid":
+                                cells_to_update[(row, status_col)] = ("Valid", None)
+
+                        # Clear any existing validation status from cells
+                        for col_idx in range(self._table_model.columnCount()):
+                            if col_idx == status_col:
+                                continue  # Skip status column
+
+                            item = self._table_model.item(row, col_idx)
+                            if not item:
+                                continue
+
+                            # Get current validation status for this cell
+                            current_status = item.data(Qt.UserRole + 1)
+
+                            # Only clear status if it was previously set
+                            if current_status is not None:
+                                cells_to_update[(row, col_idx)] = (None, None)
             else:
                 # Unknown validation_status type, log error
                 logger.error(f"Unknown validation_status type: {type(validation_status)}")
@@ -1656,8 +1812,9 @@ class DataView(QWidget):
                         item = self._table_model.item(row, col)
                         if item:
                             current_status = item.data(Qt.UserRole + 1)
-                            if current_status != ValidationStatus.NOT_VALIDATED:
-                                cells_to_update[(row, col)] = (None, ValidationStatus.NOT_VALIDATED)
+                            # Only update if the cell has a validation status
+                            if current_status is not None:
+                                cells_to_update[(row, col)] = (None, None)
 
             # Now apply all the updates we've collected
             logger.debug(f"Applying {len(cells_to_update)} selective updates to cells")
@@ -1671,12 +1828,12 @@ class DataView(QWidget):
                     self._table_model.setData(self._table_model.index(row, col), display_value)
 
                 # Update user role value if provided
-                if user_role_value is not None:
+                if (
+                    user_role_value is not None
+                    or user_role_value is None
+                    and item.data(Qt.UserRole + 1) is not None
+                ):
                     item.setData(user_role_value, Qt.UserRole + 1)
-
-                # Update our tracking dictionary
-                if user_role_value is not None:
-                    self._previous_validation_states[(row, col)] = user_role_value
 
             # Additional diagnostic logging
             logger.debug(
@@ -1719,13 +1876,6 @@ class DataView(QWidget):
 
             # Define validatable columns
             validatable_columns = ["PLAYER", "SOURCE", "CHEST"]
-
-            # Get column indices for validatable columns
-            validatable_col_indices = {}
-            for col_name in validatable_columns:
-                col_idx = self._get_column_index(col_name)
-                if col_idx >= 0:
-                    validatable_col_indices[col_name] = col_idx
 
             # Get validation status dataframe if available
             validation_status_df = None
@@ -1863,12 +2013,12 @@ class DataView(QWidget):
                     self._table_model.setData(self._table_model.index(row, col), display_value)
 
                 # Update user role value if provided
-                if user_role_value is not None:
+                if (
+                    user_role_value is not None
+                    or user_role_value is None
+                    and item.data(Qt.UserRole + 1) is not None
+                ):
                     item.setData(user_role_value, Qt.UserRole + 1)
-
-                # Update our tracking dictionary
-                if user_role_value is not None:
-                    self._previous_validation_states[(row, col)] = user_role_value
 
             # Force a single redraw of the view
             self._table_view.viewport().update()
