@@ -1126,3 +1126,158 @@ Fixed. Validation list import now replaces all existing entries with the importe
 - **Status**: Fixed, the UI now remains responsive during table population for large datasets. The user sees progress updates as rows are processed in chunks.
 - **Note**: This is a significant improvement to the overall user experience, as the application no longer appears frozen after importing large files.
 
+### 2025-03-28: Table Validation Optimization Plan
+
+- **Issue**: Excessive cell updates during validation causing performance issues and console spam. Logs show thousands of "Skipping cell update" messages.
+- **Root Cause**: 
+  1. The validation system updates all validatable cells on every validation change instead of tracking specific invalid cells
+  2. No persistent tracking of which cells currently have validation styling applied
+  3. Inefficient full-table scan to apply/remove validation status
+  4. Row-level validation results requiring translation to cell-level styling
+- **Current Fix**: 
+  - Modified validation handling to only set validation status for specifically invalid cells
+  - Improved performance by avoiding unnecessary cell updates
+- **Proposed Advanced Implementation**:
+  1. Create a `ValidationStateTracker` class to maintain a persistent map of invalid cells
+  2. Integrate directly with Qt's model/view framework:
+     ```python
+     class ValidationStateTracker:
+         """Tracks validation states for table cells."""
+         
+         def __init__(self):
+             # Dictionary tracking invalid cells: {(row, col_name): ValidationStatus}
+             self._invalid_cells = {}
+             
+         def set_invalid(self, row, col_name, status=ValidationStatus.INVALID):
+             """Mark a cell as invalid with specific status."""
+             self._invalid_cells[(row, col_name)] = status
+             
+         def clear_invalid(self, row, col_name):
+             """Clear invalid status for a cell."""
+             if (row, col_name) in self._invalid_cells:
+                 del self._invalid_cells[(row, col_name)]
+                 
+         def is_invalid(self, row, col_name):
+             """Check if a cell is marked invalid."""
+             return (row, col_name) in self._invalid_cells
+             
+         def get_status(self, row, col_name):
+             """Get validation status for a cell."""
+             return self._invalid_cells.get((row, col_name), None)
+             
+         def get_invalid_cells(self):
+             """Get all invalid cells."""
+             return list(self._invalid_cells.keys())
+             
+         def clear_all(self):
+             """Clear all validation states."""
+             self._invalid_cells.clear()
+             
+         def update_from_validation_results(self, invalid_rows, validation_columns):
+             """Calculate cell updates from validation results."""
+             # Track cells before update
+             old_invalid_cells = set(self._invalid_cells.keys())
+             new_invalid_cells = set()
+             
+             # Calculate new invalid cells
+             for row_idx in invalid_rows:
+                 for col_name in validation_columns:
+                     # Check if this column is invalid in this row
+                     col_valid = invalid_rows[row_idx].get(f"{col_name.lower()}_valid", True)
+                     if not col_valid:
+                         new_invalid_cells.add((row_idx, col_name))
+                         self.set_invalid(row_idx, col_name)
+             
+             # Find cells that were invalid but are now valid
+             fixed_cells = old_invalid_cells - new_invalid_cells
+             for row, col in fixed_cells:
+                 self.clear_invalid(row, col)
+                 
+             # Return changes for efficient UI updates
+             return {
+                 'new_invalid': new_invalid_cells - old_invalid_cells,
+                 'fixed': fixed_cells,
+                 'unchanged': old_invalid_cells & new_invalid_cells
+             }
+     ```
+  3. Optimize DataView for targeted updates:
+     ```python
+     def _emit_targeted_update_signals(self, changes):
+         """Emit optimized dataChanged signals for validation updates."""
+         if not self._table_model:
+             return
+             
+         # Group changes by column for more efficient updates
+         by_column = {}
+         
+         # Process all changed cells (new invalid + fixed)
+         all_changed = changes['new_invalid'].union(changes['fixed'])
+         for row, col in all_changed:
+             if col not in by_column:
+                 by_column[col] = []
+             by_column[col].append(row)
+         
+         # For each column, find continuous ranges and emit signals
+         for col, rows in by_column.items():
+             col_idx = self._table_model.get_column_index(col)
+             if col_idx == -1:
+                 continue
+                 
+             # Sort rows for range detection
+             rows.sort()
+             
+             # Find continuous ranges of rows
+             ranges = []
+             range_start = rows[0]
+             prev_row = rows[0]
+             
+             for row in rows[1:]:
+                 if row > prev_row + 1:  # Gap detected
+                     # Complete current range
+                     ranges.append((range_start, prev_row))
+                     # Start new range
+                     range_start = row
+                 prev_row = row
+                 
+             # Add final range
+             ranges.append((range_start, prev_row))
+             
+             # Emit dataChanged for each continuous range
+             for start_row, end_row in ranges:
+                 top_left = self._table_model.index(start_row, col_idx)
+                 bottom_right = self._table_model.index(end_row, col_idx)
+                 self._table_model.dataChanged.emit(top_left, bottom_right, [ValidationRole])
+     ```
+- **Benefits**:
+  1. Precise tracking of cells with validation status
+  2. Minimal UI updates - only cells that change state get updated
+  3. Efficient Qt signaling using dataChanged with specific ranges
+  4. Better alignment with Qt's model/view architecture
+  5. Reduced logging noise by eliminating unnecessary cell checks
+  6. Significantly improved performance for large datasets
+  7. Better code maintainability with centralized validation tracking
+- **Status**: Partially fixed with simpler solution. Advanced implementation planned.
+
+### 2025-03-27: Fixed Parameter Error in ValidationViewAdapter Initialization
+
+- **Issue**: Application failed to start with error: `BaseView.__init__() got an unexpected keyword argument 'name'`
+- **Root Cause**: The ValidationViewAdapter class was passing a 'name' parameter to its parent BaseView constructor, but the BaseView constructor doesn't accept a 'name' parameter.
+- **Fix**: Removed the 'name' parameter from the super().__init__() call in ValidationViewAdapter.__init__ method:
+  ```python
+  # Before:
+  super().__init__(
+      name="validation",  # This parameter doesn't exist in BaseView.__init__
+      title="Validation",
+      parent=parent,
+      debug_mode=debug_mode,
+  )
+  
+  # After:
+  super().__init__(
+      title="Validation",
+      parent=parent,
+      debug_mode=debug_mode,
+  )
+  ```
+- **Status**: Fixed, application now starts properly and the validation tab view works correctly.
+

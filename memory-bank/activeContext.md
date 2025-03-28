@@ -23,10 +23,19 @@ We are currently working on three main areas:
    - Limited each processing chunk to 200 rows to maintain responsiveness
    - Created a better user experience with visual feedback during long operations
 
-3. **Planned Performance Improvements**:
+3. **Validation Performance Optimization**:
+   - Fixed inefficient cell validation update process that was causing excessive log messages
+   - Improved performance by only setting validation status on specifically invalid cells
+   - Eliminated unnecessary cell status checks for valid rows
+   - Developed detailed plan for advanced validation optimization using `ValidationStateTracker`
+   - Planned implementation of targeted Qt dataChanged signals for more efficient updates
+
+4. **Planned Performance Improvements**:
    - Apply similar chunking approach to validation process
    - Implement background processing for other intensive operations
    - Optimize memory usage for large datasets
+   - Implement the proposed `ValidationStateTracker` for precise cell validation tracking
+   - Use Qt's model/view architecture more effectively for validation visualization
 
 ### Table Sorting Performance Optimization
 
@@ -88,6 +97,9 @@ We are currently working on three main areas:
 
 ## Recent Changes
 
+- Fixed table row coloring issue by optimizing the validation status update process to only apply validation status to cells with actual errors
+- Eliminated thousands of unnecessary cell validation checks that were causing excessive log messages and UI update operations
+- Designed a comprehensive optimization plan for table validation using a `ValidationStateTracker` class to precisely track invalid cells
 - Optimized table sorting performance by leveraging built-in Qt capabilities and removing redundant update mechanisms
 - Improved table population process with more efficient data iteration and reduced overhead
 - Standardized the dark theme throughout the application by updating the color definitions in style.py and ensuring all UI components use consistent dark theme colors.
