@@ -1660,9 +1660,6 @@ class DataView(QWidget):
                 ]
                 logger.debug(f"Found validation columns: {validation_columns}")
 
-                # Create a set to track which rows we've processed
-                processed_rows = set()
-
                 # For each row in the validation DataFrame
                 for row_idx in range(len(validation_status)):
                     # Track if this row has any invalid value
@@ -1686,9 +1683,6 @@ class DataView(QWidget):
                     filtered_idx = self._get_filtered_row_index(row_idx)
                     if filtered_idx < 0:
                         continue  # Skip if not in filtered view
-
-                    # Mark this row as processed
-                    processed_rows.add(filtered_idx)
 
                     # Update status column for all rows
                     if row_has_invalid:
@@ -1715,40 +1709,30 @@ class DataView(QWidget):
                             # Get current validation status for this cell
                             current_status = item.data(Qt.UserRole + 1)
 
-                            # Check if this column has validation issues
-                            if column_name in invalid_column_names:
-                                # This is a specifically invalid cell
-                                if column_name in validatable_columns:
-                                    # Only update if needed (status changed)
-                                    if current_status != ValidationStatus.INVALID:
-                                        cells_to_update[(filtered_idx, col_idx)] = (
-                                            None,
-                                            ValidationStatus.INVALID,
-                                        )
-                                else:
-                                    # Non-validatable columns should never be INVALID
-                                    if current_status != ValidationStatus.INVALID_ROW:
-                                        cells_to_update[(filtered_idx, col_idx)] = (
-                                            None,
-                                            ValidationStatus.INVALID_ROW,
-                                        )
-                            else:
-                                # This is just a cell in an invalid row
-                                if current_status != ValidationStatus.INVALID_ROW:
+                            # Only set validation status on specifically invalid cells
+                            if (
+                                column_name in invalid_column_names
+                                and column_name in validatable_columns
+                            ):
+                                # This is a specifically invalid cell in a validatable column
+                                if current_status != ValidationStatus.INVALID:
                                     cells_to_update[(filtered_idx, col_idx)] = (
                                         None,
-                                        ValidationStatus.INVALID_ROW,
+                                        ValidationStatus.INVALID,
                                     )
+                            else:
+                                # For all other cells, if they have a validation status, clear it
+                                if current_status is not None:
+                                    cells_to_update[(filtered_idx, col_idx)] = (None, None)
                     else:
                         # This row is valid
-                        # Only update status column to "Valid"
+                        # Update status column to "Valid"
                         if status_col >= 0:
                             status_item = self._table_model.item(filtered_idx, status_col)
                             if status_item and status_item.data(Qt.DisplayRole) != "Valid":
                                 cells_to_update[(filtered_idx, status_col)] = ("Valid", None)
 
-                        # For cells that were previously marked as invalid, just clear the status
-                        # Don't set to ValidationStatus.VALID - let them use normal table styling
+                        # For all other cells, if they have a validation status, clear it
                         for col_idx in range(self._table_model.columnCount()):
                             if col_idx == status_col:
                                 continue  # Skip status column
@@ -1760,98 +1744,32 @@ class DataView(QWidget):
                             # Get current validation status for this cell
                             current_status = item.data(Qt.UserRole + 1)
 
-                            # Only clear the status if it was previously set
+                            # Clear the status if it was previously set
                             if current_status is not None:
                                 cells_to_update[(filtered_idx, col_idx)] = (None, None)
 
-                # For any processed valid rows, clear validation status from cells
-                # This ensures any rows that were previously invalid but are now valid have their styling cleared
-                for row in range(self._table_model.rowCount()):
-                    if row in processed_rows:
-                        continue  # Skip rows we've already processed
-
-                    # Get the actual row index in the data model
-                    if self._filtered_rows:
-                        if row >= len(self._filtered_rows):
-                            continue
-                        actual_row_idx = self._filtered_rows[row]
-                    else:
-                        actual_row_idx = row
-
-                    # If the row is in the validation status DataFrame, ensure it appears as valid
-                    if actual_row_idx < len(validation_status):
-                        # Set status to Valid
-                        if status_col >= 0:
-                            status_item = self._table_model.item(row, status_col)
-                            if status_item and status_item.data(Qt.DisplayRole) != "Valid":
-                                cells_to_update[(row, status_col)] = ("Valid", None)
-
-                        # Clear any existing validation status from cells
-                        for col_idx in range(self._table_model.columnCount()):
-                            if col_idx == status_col:
-                                continue  # Skip status column
-
-                            item = self._table_model.item(row, col_idx)
-                            if not item:
-                                continue
-
-                            # Get current validation status for this cell
-                            current_status = item.data(Qt.UserRole + 1)
-
-                            # Only clear status if it was previously set
-                            if current_status is not None:
-                                cells_to_update[(row, col_idx)] = (None, None)
-            else:
-                # Unknown validation_status type, log error
-                logger.error(f"Unknown validation_status type: {type(validation_status)}")
-                # Set all to "Not validated" - being selective even in this case
-                for row in range(self._table_model.rowCount()):
-                    status_item = self._table_model.item(row, status_col)
-                    if status_item and status_item.data(Qt.DisplayRole) != "Not validated":
-                        cells_to_update[(row, status_col)] = ("Not validated", None)
-
-                    # Reset validation status for all cells in this row, but only if needed
-                    for col in range(self._table_model.columnCount()):
-                        if col == status_col:
-                            continue  # Skip status column
-
-                        item = self._table_model.item(row, col)
-                        if item:
-                            current_status = item.data(Qt.UserRole + 1)
-                            # Only update if the cell has a validation status
-                            if current_status is not None:
-                                cells_to_update[(row, col)] = (None, None)
-
-            # Now apply all the updates we've collected
+            # Apply all cell updates at once
             logger.debug(f"Applying {len(cells_to_update)} selective updates to cells")
-            for (row, col), (display_value, user_role_value) in cells_to_update.items():
+            for (row, col), (text_value, validation_value) in cells_to_update.items():
+                # Get the item at the specified position
                 item = self._table_model.item(row, col)
                 if not item:
                     continue
 
-                # Update display value if provided
-                if display_value is not None:
-                    self._table_model.setData(self._table_model.index(row, col), display_value)
+                # Update the display text if specified
+                if text_value is not None:
+                    item.setData(text_value, Qt.DisplayRole)
 
-                # Update user role value if provided
-                if (
-                    user_role_value is not None
-                    or user_role_value is None
-                    and item.data(Qt.UserRole + 1) is not None
-                ):
-                    item.setData(user_role_value, Qt.UserRole + 1)
+                # Update the validation status
+                item.setData(validation_value, Qt.UserRole + 1)
 
-            # Additional diagnostic logging
-            logger.debug(
-                f"Found {len(invalid_rows)} invalid rows: {invalid_rows[:10]}{'...' if len(invalid_rows) > 10 else ''}"
-            )
-
-            # Make the view update - just once after all changes
-            self._table_view.viewport().update()
-            logger.debug("Optimized validation status update complete")
+            # If there are invalid rows, highlight them
+            if invalid_rows:
+                # Call the method to highlight invalid rows
+                self._highlight_invalid_rows(invalid_rows)
 
         except Exception as e:
-            logger.error(f"Error updating validation status in data view: {e}", exc_info=True)
+            logger.error(f"Error handling validation change: {e}")
 
     @Slot(object)
     def _on_correction_applied(self, correction_status) -> None:
@@ -1864,18 +1782,23 @@ class DataView(QWidget):
         # Update the view to reflect correction changes
         self._on_data_changed()
 
-    def _highlight_invalid_rows(self, invalid_rows: List[int]) -> None:
+    def _highlight_invalid_rows(self, invalid_rows):
         """
-        Highlight rows with validation issues using selective updates.
+        Highlight rows with validation issues.
 
         Args:
-            invalid_rows: List of row indices that have validation issues
+            invalid_rows: List of row indices with validation issues.
         """
         try:
-            if not self._has_valid_models() or not invalid_rows:
+            # Check if we have valid models
+            if not self._has_valid_models():
+                logger.warning("Cannot highlight invalid rows: Invalid models")
                 return
 
-            logger.debug(f"Highlighting {len(invalid_rows)} invalid rows")
+            # Ensure we have invalid rows to process
+            if not invalid_rows:
+                logger.debug("No invalid rows to highlight")
+                return
 
             # Get status column index
             status_col = self._get_column_index(self.STATUS_COLUMN)
@@ -1883,155 +1806,72 @@ class DataView(QWidget):
             # Define validatable columns
             validatable_columns = ["PLAYER", "SOURCE", "CHEST"]
 
-            # Get validation status dataframe if available
-            validation_status_df = None
-            validation_columns = []
+            # Attempt to get validation status dataframe
+            validation_status = None
             if hasattr(self._data_model, "get_validation_status"):
                 try:
-                    validation_status_df = self._data_model.get_validation_status()
-                    if (
-                        isinstance(validation_status_df, pd.DataFrame)
-                        and not validation_status_df.empty
-                    ):
-                        validation_columns = [
-                            col for col in validation_status_df.columns if col.endswith("_valid")
-                        ]
-                        logger.debug(f"Found validation columns: {validation_columns}")
+                    validation_status = self._data_model.get_validation_status()
                 except Exception as e:
                     logger.error(f"Error getting validation status: {e}")
 
-            # Track cells that need to be updated
-            cells_to_update = {}
+            if validation_status is None or not isinstance(validation_status, pd.DataFrame):
+                logger.error("Cannot highlight invalid rows: No validation status dataframe")
+                return
 
-            # For each invalid row, we need to process it
+            # Get validation columns (ending with _valid)
+            validation_columns = [
+                col for col in validation_status.columns if col.endswith("_valid")
+            ]
+
+            # For each invalid row, identify which specific columns are invalid
             for row_idx in invalid_rows:
-                # Convert from data model row index to view row index
+                # Identify specifically invalid columns for this row
+                invalid_column_names = []
+                for val_col in validation_columns:
+                    # Skip NaN values
+                    if pd.isna(validation_status.iloc[row_idx].get(val_col, None)):
+                        continue
+
+                    # Check if this validation column failed
+                    if not validation_status.iloc[row_idx][val_col]:
+                        # Get the original column name by removing _valid suffix
+                        orig_column = val_col.replace("_valid", "")
+                        invalid_column_names.append(orig_column)
+
+                # Use filtered index for display row lookup
                 filtered_idx = self._get_filtered_row_index(row_idx)
                 if filtered_idx < 0:
                     continue  # Skip if not in filtered view
 
-                # Make sure the status cell shows "Invalid" if it's not already set
-                if status_col >= 0:
-                    status_item = self._table_model.item(filtered_idx, status_col)
-                    if status_item and status_item.data(Qt.DisplayRole) != "Invalid":
-                        cells_to_update[(filtered_idx, status_col)] = ("Invalid", None)
-
-                # Find which specific columns are invalid
-                specific_invalid_columns = []
-                if validation_status_df is not None and not validation_status_df.empty:
-                    try:
-                        # Check which specific columns are invalid in this row
-                        for val_col in validation_columns:
-                            # Only proceed if this validation column exists and the row exists in the validation data
-                            if (
-                                val_col in validation_status_df.columns
-                                and row_idx < len(validation_status_df)
-                                and not pd.isna(
-                                    validation_status_df.iloc[row_idx].get(val_col, None)
-                                )
-                            ):
-                                # Check if this specific validation failed (is False)
-                                if not validation_status_df.iloc[row_idx][val_col]:
-                                    # Get the original column name by removing _valid suffix
-                                    orig_column = val_col.replace("_valid", "")
-                                    specific_invalid_columns.append(orig_column)
-                                    value = self._data_model.data.iloc[row_idx].get(
-                                        orig_column, "N/A"
-                                    )
-                                    # Use repr() for safe logging of Unicode values
-                                    safe_value = repr(value) if value is not None else "None"
-                                    logger.debug(
-                                        f"Row {row_idx} has invalid column: {orig_column}={safe_value}"
-                                    )
-                    except Exception as e:
-                        logger.error(f"Error processing validation status for row {row_idx}: {e}")
-
-                # If we couldn't identify specific invalid columns but the row is invalid,
-                # mark the row as invalid but don't mark any specific cells
-                if not specific_invalid_columns:
-                    logger.debug(
-                        f"No specific invalid columns identified for row {row_idx}, marking row as invalid"
-                    )
-
-                # Now update the cells with the appropriate status
-                for col in range(self._table_model.columnCount()):
-                    if col == status_col:
+                # Process each column in the row
+                for col_idx in range(self._table_model.columnCount()):
+                    if col_idx == status_col:
                         continue  # Skip status column
 
-                    item = self._table_model.item(filtered_idx, col)
+                    column_name = self._table_model.headerData(col_idx, Qt.Horizontal)
+                    item = self._table_model.item(filtered_idx, col_idx)
                     if not item:
-                        continue  # Skip if item doesn't exist
+                        continue
 
                     # Get current validation status
                     current_status = item.data(Qt.UserRole + 1)
-                    column_name = self._table_model.headerData(col, Qt.Horizontal)
 
-                    if column_name in specific_invalid_columns:
-                        # This is a specifically invalid cell
-                        if column_name in validatable_columns:
-                            # Only update if needed
-                            if current_status != ValidationStatus.INVALID:
-                                value = item.data(Qt.DisplayRole)
-                                # Use repr() for safe logging of Unicode values
-                                safe_value = repr(value) if value is not None else "None"
-                                logger.debug(
-                                    f"Setting ValidationStatus.INVALID for cell [{filtered_idx},{col}] ({column_name}={safe_value})"
-                                )
-                                cells_to_update[(filtered_idx, col)] = (
-                                    None,
-                                    ValidationStatus.INVALID,
-                                )
-                        else:
-                            # Non-validatable columns should never be INVALID
-                            if current_status != ValidationStatus.INVALID_ROW:
-                                logger.debug(
-                                    f"Setting ValidationStatus.INVALID_ROW for non-validatable cell [{filtered_idx},{col}] ({column_name})"
-                                )
-                                cells_to_update[(filtered_idx, col)] = (
-                                    None,
-                                    ValidationStatus.INVALID_ROW,
-                                )
+                    # Only set validation status on specifically invalid cells
+                    if column_name in invalid_column_names and column_name in validatable_columns:
+                        # This is a specifically invalid cell in a validatable column
+                        if current_status != ValidationStatus.INVALID:
+                            item.setData(ValidationStatus.INVALID, Qt.UserRole + 1)
                     else:
-                        # This is just a cell in an invalid row, but not specifically invalid
-                        if current_status != ValidationStatus.INVALID_ROW:
-                            value = item.data(Qt.DisplayRole)
-                            # Use repr() for safe logging of Unicode values
-                            safe_value = repr(value) if value is not None else "None"
-                            logger.debug(
-                                f"Setting ValidationStatus.INVALID_ROW for cell [{filtered_idx},{col}] ({column_name}={safe_value})"
-                            )
-                            cells_to_update[(filtered_idx, col)] = (
-                                None,
-                                ValidationStatus.INVALID_ROW,
-                            )
+                        # For all other cells, if they have a validation status, clear it
+                        if current_status is not None:
+                            item.setData(None, Qt.UserRole + 1)
 
-            # Apply all the updates we've collected
-            logger.debug(
-                f"Applying {len(cells_to_update)} selective updates to cells for highlighting"
-            )
-            for (row, col), (display_value, user_role_value) in cells_to_update.items():
-                item = self._table_model.item(row, col)
-                if not item:
-                    continue
-
-                # Update display value if provided
-                if display_value is not None:
-                    self._table_model.setData(self._table_model.index(row, col), display_value)
-
-                # Update user role value if provided
-                if (
-                    user_role_value is not None
-                    or user_role_value is None
-                    and item.data(Qt.UserRole + 1) is not None
-                ):
-                    item.setData(user_role_value, Qt.UserRole + 1)
-
-            # Force a single redraw of the view
+            # Update the view
             self._table_view.viewport().update()
-            logger.debug("Optimized invalid row highlighting complete")
+            logger.debug(f"Highlighted {len(invalid_rows)} invalid rows with specific cell marking")
 
         except Exception as e:
-            logger.error(f"Error highlighting invalid rows: {e}", exc_info=True)
+            logger.error(f"Error highlighting invalid rows: {e}")
 
     def _get_filtered_row_index(self, model_row_idx: int) -> int:
         """
