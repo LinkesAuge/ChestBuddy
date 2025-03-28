@@ -83,6 +83,7 @@ class DataView(QWidget):
     SCORE_COLUMN = "SCORE"
     CLAN_COLUMN = "CLAN"
     STATUS_COLUMN = "STATUS"
+    DATE_COLUMN = "DATE"
 
     # Filter delay in milliseconds
     FILTER_DELAY_MS = 300
@@ -108,6 +109,11 @@ class DataView(QWidget):
         self._filter_text = ""
         self._filtered_data = None
         self._filtered_rows = None
+
+        # Initialize state tracking variables
+        self._is_updating = False
+        self._population_in_progress = False
+        self._initial_load = True
 
         # Initialize the table header columns based on data_model columns
         self._columns = (
