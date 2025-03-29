@@ -150,6 +150,17 @@ The ChestBuddy application follows a two-panel layout structure:
   - Selected Item: Background #263D5A (PRIMARY_LIGHT) with gold text
   - Separator: 1px solid #4A5568 (DARK_BORDER)
 
+- **Multi-Entry Dialog**:
+  - Background: #1A2C42 (PRIMARY)
+  - Border: 1px solid #4A5568 (DARK_BORDER)
+  - Border Radius: 6px
+  - Text Area: #263D5A (PRIMARY_LIGHT) background with monospace font
+  - Primary Button: Gold accent (#D4AF37)
+  - Cancel Button: Dark background (#1A2C42)
+  - Helper Text: Small, italicized text in muted color
+  - Minimum Size: 500x400 pixels
+  - Resizable: True to accommodate various amounts of input text
+
 #### Scrollbars
 - **Vertical Scrollbar**:
   - Width: 12px
@@ -198,6 +209,10 @@ The ChestBuddy application follows a two-panel layout structure:
 - **Bottom Elements**:
   - Toolbar with Preferences and Validate buttons
   - Status bar showing validation statistics
+- **Special Components**:
+  - MultiEntryDialog for adding multiple entries at once
+  - Confirmation dialog for deleting multiple entries
+  - Import/Export dialogs with overwrite/append options
 
 ### 3.4 Correction View
 - **Layout**: Split view with data table and correction panel
