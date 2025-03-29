@@ -175,3 +175,67 @@ The ChestBuddy application follows a layered architecture:
    - ServiceLocator for service access
 
 This layered approach provides a clean separation of concerns and facilitates maintainability, testability, and extensibility.
+
+## Testing Framework
+
+### Testing Tools
+- **pytest**: Main testing framework
+- **pytest-qt**: Plugin for testing Qt applications
+- **pytest-cov**: Plugin for measuring code coverage
+
+### Test Categories
+- **Unit Tests**: Test individual components in isolation
+  - Located in `tests/unit/`
+  - Mock dependencies for true isolation
+
+- **Integration Tests**: Test how components work together
+  - Located in `tests/integration/`
+  - Test real interactions between components
+  - Focus on service integration, like `ValidationService` with `ConfigManager`
+
+- **UI Tests**: 
+  - Most UI tests require QtBot and can't run in headless CI environments
+  - Use `pytest.mark.skipif` to conditionally skip these tests
+
+### Test Runner Scripts
+- `scripts/run_all_tests.py`: Run all tests with filtering options
+  ```python
+  python scripts/run_all_tests.py [--all|--unit|--integration] [--coverage] [--verbose] [--module MODULE]
+  ```
+  
+- `scripts/run_integration_tests.py`: Run only integration tests
+  ```python
+  python scripts/run_integration_tests.py
+  ```
+  
+- `scripts/run_validation_integration_tests.py`: Run ValidationService integration tests
+  ```python
+  python scripts/run_validation_integration_tests.py
+  ```
+
+## Configuration System
+
+The application uses a `ConfigManager` class for managing application settings:
+
+### Key Features
+- **Singleton Pattern**: Ensures consistent access to configuration throughout the app
+- **Default Configuration**: Provides sensible defaults for all settings
+- **Type Conversion**: Methods for getting typed values (`get_bool`, `get_int`, etc.)
+- **List Support**: Handles list values through JSON serialization
+- **Error Handling**: Gracefully handles corrupted config files
+- **Auto-save**: Automatically saves after changes
+- **Migration Support**: Can update configuration from older versions
+
+### Recent Enhancements
+- Improved boolean value handling in `get_bool()` method
+- Added configuration version migration support
+- Added permission error handling in `save()` method
+- Added `has_option()` method to check for option existence
+- Added `load()` method to reload configuration from disk
+
+### Configuration Sections
+- **General**: Theme, language, version
+- **Files**: Recent files, import/export directories
+- **Validation**: Validation preferences, paths to validation lists
+- **Correction**: Auto-correction settings, path to correction rules
+- **UI**: Window size, table pagination

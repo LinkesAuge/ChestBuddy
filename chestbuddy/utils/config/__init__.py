@@ -73,7 +73,7 @@ class ConfigManager:
             "General": {
                 "theme": "Light",
                 "language": "English",
-                "config_version": "1.0",
+                "version": "1.1",  # Update this to current version
             },
             "Files": {
                 "recent_files": "",
@@ -107,6 +107,9 @@ class ConfigManager:
                 with open(self._config_file, "r", encoding="utf-8") as f:
                     self._config.read_file(f)
                 logger.debug(f"Loaded existing configuration from: {self._config_file}")
+
+                # Check for configuration updates/migrations
+                self._perform_migrations()
             except Exception as e:
                 # Handle ANY error reading the config file
                 logger.error(f"Error reading configuration file: {e}")
@@ -120,6 +123,38 @@ class ConfigManager:
             self._create_default_config()
             self._file_corrupted = False
             logger.info(f"Created new default configuration at: {self._config_file}")
+
+    def _perform_migrations(self) -> None:
+        """
+        Perform any necessary migrations for older configuration versions.
+        This includes updating settings that have been renamed or adding new default settings.
+        """
+        # Ensure General section with version exists
+        if not self._config.has_section("General"):
+            self._config.add_section("General")
+            self.set("General", "version", "1.1")
+        elif not self._config.has_option("General", "version"):
+            self.set("General", "version", "1.1")
+
+        # Handle migration from auto_validate to validate_on_import
+        if self._config.has_section("Validation") and self._config.has_option(
+            "Validation", "auto_validate"
+        ):
+            auto_validate = self.get_bool("Validation", "auto_validate")
+            # Ensure the Validation section exists
+            if not self._config.has_section("Validation"):
+                self._config.add_section("Validation")
+            # Set the new option
+            self.set("Validation", "validate_on_import", str(auto_validate))
+            # Remove the old option
+            self._config.remove_option("Validation", "auto_validate")
+            logger.info("Migrated 'auto_validate' to 'validate_on_import'")
+
+        # Check if we need to migrate from older versions
+        current_version = self.get("General", "version")
+        if current_version == "1.0":
+            logger.info("Migrating configuration from version 1.0 to 1.1")
+            self.set("General", "version", "1.1")
 
     def _create_default_config(self) -> None:
         """Create the default configuration file."""
@@ -139,9 +174,32 @@ class ConfigManager:
 
     def save(self) -> None:
         """Save the current configuration to the config file."""
-        with open(self._config_file, "w") as config_file:
-            self._config.write(config_file)
-        logger.debug(f"Saved configuration to: {self._config_file}")
+        try:
+            with open(self._config_file, "w") as config_file:
+                self._config.write(config_file)
+            logger.debug(f"Saved configuration to: {self._config_file}")
+        except PermissionError as e:
+            logger.error(f"Permission error saving configuration: {e}")
+            raise
+
+    def load(self) -> None:
+        """Reload the configuration from the file."""
+        try:
+            # Create a new config parser to ensure clean state
+            new_config = configparser.ConfigParser()
+
+            with open(self._config_file, "r", encoding="utf-8") as f:
+                new_config.read_file(f)
+
+            # Replace the current config with the new one
+            self._config = new_config
+            logger.debug(f"Reloaded configuration from: {self._config_file}")
+
+            # Perform any necessary migrations after loading
+            self._perform_migrations()
+        except Exception as e:
+            logger.error(f"Error reading configuration file: {e}")
+            logger.warning("Error loading configuration file, using current values")
 
     def get(self, section: str, option: str, fallback: Any = None) -> str:
         """
@@ -172,13 +230,22 @@ class ConfigManager:
             The configuration value as a boolean.
         """
         try:
-            result = self._config.getboolean(section, option, fallback=fallback)
-            logger.debug(f"Config get_bool: {section}.{option} = {result}")
-            return result
+            value = self.get(section, option, None)
+            if value is None:
+                return fallback
+
+            # Handle standard boolean values using configparser
+            if value.lower() in ("true", "1", "yes", "y"):
+                return True
+            elif value.lower() in ("false", "0", "no", "n"):
+                return False
+            else:
+                # Fall back to configparser's getboolean for other cases
+                return self._config.getboolean(section, option, fallback=fallback)
         except ValueError as e:
             # Handle case where value is not a valid boolean
             logger.warning(
-                f"Error parsing boolean for {section}.{option}: {e}. Using fallback: {fallback}"
+                f"Error parsing boolean for {section}.{option}: Not a boolean: {value}. Using fallback: {fallback}"
             )
             return fallback
 
@@ -510,3 +577,16 @@ class ConfigManager:
         except Exception as e:
             logger.error(f"Error importing configuration: {e}")
             raise
+
+    def has_option(self, section: str, option: str) -> bool:
+        """
+        Check if an option exists in a section.
+
+        Args:
+            section: The configuration section.
+            option: The configuration option.
+
+        Returns:
+            True if the option exists in the section, False otherwise.
+        """
+        return self._config.has_option(section, option)
