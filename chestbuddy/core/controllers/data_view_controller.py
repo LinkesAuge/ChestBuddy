@@ -17,6 +17,7 @@ import pandas as pd
 from chestbuddy.core.services.validation_service import ValidationService
 from chestbuddy.core.services.correction_service import CorrectionService
 from chestbuddy.core.controllers.base_controller import BaseController
+from chestbuddy.utils.service_locator import ServiceLocator
 
 # Set up logger
 logger = logging.getLogger(__name__)
