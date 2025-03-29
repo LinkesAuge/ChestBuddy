@@ -1,143 +1,120 @@
 ---
-title: Active Context - ChestBuddy Application
-date: 2024-06-29
+title: Active Context - ChestBuddy Development
+date: 2024-03-29
 ---
 
-# Active Context: Testing Framework Improvements
+# Current Development Focus
 
-## Current Focus
+## Configuration Management System Enhancement
 
-We've successfully implemented a comprehensive testing framework for the ChestBuddy application with significant improvements to address signal handling and recursion issues. The framework now provides a robust approach for testing different components and interactions within the application.
+We are currently focused on enhancing the configuration management system in ChestBuddy to ensure reliable settings persistence, validation, and user-friendly interaction. This includes several key areas:
 
-### Key Components
+### Recent Accomplishments
 
-1. **Test Directory Structure**
-   - Organized tests into unit, integration, UI, and end-to-end categories
-   - Created utilities for test helpers and data generation
-   - Established fixtures and patterns for consistent testing
-   - All test examples in each category are now passing successfully
+1. **Fixed Critical Application Startup Issues**
+   - Resolved `MainWindow` missing `_config_manager` attribute error by properly passing the config manager instance from app.py to MainWindow
+   - Added missing color constants `DANGER_BG` and `DANGER_ACTIVE` to the Colors class to fix UI styling issues
+   - These fixes allowed the application to start successfully without crashing
 
-2. **Test Types**
-   - Unit Tests: Testing individual components in isolation (working correctly)
-   - UI Tests: Testing UI components and interactions (working correctly)
-   - Integration Tests: Testing component interactions (fixed and working)
-   - End-to-End Tests: Testing complete workflows (fixed and working)
+2. **Enhanced ConfigManager Functionality**
+   - Added robust error handling for corrupted configuration files
+   - Implemented comprehensive reset_to_defaults functionality that supports both global and section-specific resets
+   - Created validate_config method to check configuration integrity
+   - Added export_config and import_config methods for backup and restore capabilities
+   - All tests for ConfigManager now pass successfully
 
-3. **Testing Tools**
-   - Implemented SignalSpy for monitoring Qt signals with proper cleanup
-   - Enhanced QtBot for improved widget testing with signal tracking
-   - Created TestDataFactory with SimpleData for generating test datasets
-   - Set up fixtures for common testing scenarios and proper signal management
-   - Added wait_for_signal functionality for better event loop handling
+3. **Fixed Settings Synchronization Between Views**
+   - Resolved issue where validation settings changed in one view weren't reflected in the other
+   - Added proper signal handling for ValidationService's validation_preferences_changed signal
+   - Enhanced SettingsTabView to directly update ValidationService when validation settings change
+   - Improved reset and import functionality to properly synchronize all components
+   - Added signal blocking to prevent feedback loops during UI updates
+   - Added missing auto-save feature to ValidationTabView
+   - Implemented auto-save property and related methods in ValidationService
+   - Ensured all settings are consistently synchronized between views
 
-### Current Status
+### Current Tasks
 
-- **Working Components**:
-  - Unit tests are running successfully
-  - UI tests are working correctly with enhanced_qtbot
-  - Integration tests now work with SimpleData instead of pandas DataFrames
-  - End-to-end tests are functioning with proper signal handling
-  - Signal tracking and cleanup mechanisms are functioning correctly
-  - All example tests in each category are passing
+1. **Testing Configuration System Stability**
+   - Verifying settings persistence across application restarts
+   - Testing configuration validation in edge cases
+   - Ensuring proper error recovery when configuration becomes corrupted
 
-- **Improvements Made**:
-  - Fixed recursion issues by replacing pandas DataFrames with SimpleData
-  - Implemented better signal disconnection to prevent signal leakage
-  - Enhanced event loop handling with process_events function
-  - Created an integrated, clean way to handle Qt events and signals
-  - Fixed signal manager NoneType issues in connection cleanup
+2. **Addressing Non-Critical Issues**
+   - Monitoring application logs for warning messages related to signal connections
+   - Investigating UpdateManager service registration warnings
+   - Looking into Unicode encoding errors in the logging system
 
-- **Current Challenges**:
-  - Many main application tests are still failing and need updating
-  - Need to update test expectations to match new column naming conventions
-  - Some test fixtures need updating to use the new SimpleData approach
-  - Signal cleanup errors occurring in BaseController during teardown
+### Immediate Next Steps
 
-### Next Steps
+1. Complete comprehensive testing of configuration system
+2. Address identified non-critical issues
+3. Update documentation for the configuration system components
+4. Consider improvements to the settings UI based on testing feedback
 
-1. **Update Main Application Tests**:
-   - Fix column naming expectations in tests
-   - Update tests to use SimpleData instead of pandas DataFrames
-   - Fix signal cleanup errors in BaseController
-   - Address NoneType connection issues in destructor methods
+## Application Architecture Review
 
-2. **Expand Test Coverage**:
-   - Add tests for more application components
-   - Implement more comprehensive UI tests
-   - Create additional integration test scenarios
-   - Complete end-to-end test workflows
+As part of our ongoing development, we're conducting a review of the ChestBuddy architecture to identify areas for improvement:
 
-3. **Documentation and Standardization**:
-   - Document best practices for each test type
-   - Create templates for new tests
-   - Establish consistent patterns for UI component testing
+### Key Observations
 
-## Recent Changes
+1. **Dependency Management**
+   - Some components have tight coupling that should be reduced
+   - Service instantiation and dependency injection need more consistency
+   - The current approach mixes direct instantiation with service location in some components
 
-1. Fixed integration tests with SimpleData and improved signal handling
-2. Improved SignalSpy with better event loop management and cleanup
-3. Added wait_for_signal function for proper signal synchronization
-4. Enhanced conftest.py with better fixture management
-5. Verified all test framework improvements with successful test runs
-6. Created test_simple_integration.py with cleaner approach to component testing
-7. Resolved QObject signal disconnection issues
-8. Implemented better event loop handling for asynchronous tests
+2. **Signal Flow**
+   - Signal connections between components should be better documented
+   - Some signal emissions may be redundant or inefficient
+   - Need to ensure consistent signal naming patterns
 
-## Active Decisions
+### Architectural Principles
 
-1. **Use SimpleData for all tests** - We've successfully replaced pandas DataFrames with SimpleData class across all tests, solving recursion issues with Qt signals.
+We are reinforcing these architectural principles in current development:
 
-2. **Focus on signal cleanup implementation** - We'll continue improving signal connection tracking and explicit disconnection to ensure proper resource cleanup between tests.
+1. **Separation of Concerns**
+   - UI components should focus solely on presentation
+   - Business logic should reside in services
+   - Data management should be handled by dedicated components
 
-3. **Event loop standardization** - Our standardized approach to processing Qt events and waiting for signals works well and should be used consistently.
+2. **Dependency Injection**
+   - Components should declare dependencies explicitly
+   - Services should be provided through constructor injection
+   - ServiceLocator is used for cases where direct injection is impractical
 
-4. **Update column name expectations** - Tests need to be updated to use the standardized column names (DATE, PLAYER, SOURCE, etc.) instead of the display names.
+3. **Configuration as a Service**
+   - Configuration should be treated as a core service
+   - All configurable components should receive config through injection
+   - Default configurations should be well-documented
 
-5. **Focus on BaseController cleanup issues** - We need to address the NoneType errors happening during controller cleanup and destructor calls.
+## Technical Debt
 
-## Related Files and Components
+The following technical debt items have been identified and are being tracked:
 
-- `tests/` - Main test directory
-- `tests/utils/helpers.py` - Contains SignalSpy, process_events, and other testing helpers
-- `tests/data/test_data_factory.py` - Contains TestDataFactory and SimpleData for test data generation
-- `tests/conftest.py` - Common test fixtures with enhanced signal management
-- `tests/unit/test_example.py` - Example unit tests (passing)
-- `tests/ui/test_example_widget.py` - Example UI tests (passing)
-- `tests/integration/test_example_integration.py` - Fixed integration tests (passing)
-- `tests/integration/test_simple_integration.py` - New simplified integration tests (passing)
-- `tests/e2e/test_example_e2e.py` - Fixed end-to-end tests (passing)
-- `chestbuddy/core/controllers/base_controller.py` - Contains BaseController with signal cleanup issues
+1. **Code Duplication in UI Components**
+   - Several tab views contain similar initialization patterns
+   - Consider creating a base tab view with common functionality
 
-## Notes on Solutions
+2. **Error Handling**
+   - Error handling is inconsistent across components
+   - Need standardized approach for user-facing errors
 
-1. **Recursion Issue with Qt Signals**: 
-   - Solved by replacing pandas DataFrames with SimpleData class
-   - SimpleData is a simple container with explicit copy methods to avoid reference cycles
-   - This prevents the recursion that occurred when Qt tried to serialize complex objects
+3. **Testing Coverage**
+   - More comprehensive tests needed for UI components
+   - Service integration tests should be expanded
 
-2. **Signal Cleanup**:
-   - Implemented connection tracking in Controller classes
-   - Added disconnect() method to SignalSpy
-   - Enhanced conftest.py with signal_connections fixture for automatic cleanup
-   - Added QObject.disconnect() calls after signal use
+## Documentation Status
 
-3. **Event Loop Management**:
-   - Added process_events() utility function for consistent event processing
-   - Implemented wait_for_signal function with proper timeout handling
-   - Enhanced SignalSpy with wait_for_emission method for more readable tests
+The following documentation is being maintained:
 
-4. **Main Application Test Issues**:
-   - Column naming convention mismatch (tests expecting "Player Name" but columns are "PLAYER")
-   - BaseController cleanup issues with NoneType signal_manager
-   - Object lifecycle issues causing errors during test teardown
-   - These issues are now our next focus for improvement
+1. **Class and Module Documentation**
+   - All new classes have docstrings
+   - Need to improve existing class documentation
 
-## Test Status Summary
+2. **Architecture Documentation**
+   - Component interaction diagrams should be updated
+   - Need to document service relationships more clearly
 
-A complete test run shows that our test framework improvements are working correctly:
-- All example tests are passing successfully (unit, integration, UI, e2e)
-- Core test utilities and fixtures are functioning as expected
-- Many application tests still need updating to match new column naming and data models
-- Signal cleanup during test teardown needs additional improvements
-
-We have a clear path forward to fix the remaining issues in the main application tests while maintaining the stability of our testing framework.
+3. **User Documentation**
+   - Settings documentation needs updating with new features
+   - Operation guides should be expanded

@@ -116,28 +116,29 @@ class MainWindow(QMainWindow):
         view_state_controller: ViewStateController,
         data_view_controller: DataViewController,
         ui_state_controller: UIStateController,
+        config_manager=None,
         parent: Optional[QWidget] = None,
     ) -> None:
         """
         Initialize the MainWindow.
 
         Args:
-            data_model: The data model to use.
-            csv_service: Service for CSV operations.
-            validation_service: Service for data validation.
-            correction_service: Service for data correction.
-            chart_service: Service for chart generation.
-            data_manager: The data manager service (optional).
-            file_operations_controller: Controller for file operations.
-            progress_controller: Controller for progress reporting.
-            view_state_controller: Controller for view state management.
-            data_view_controller: Controller for data view operations.
-            ui_state_controller: Controller for UI state management.
-            parent: The parent widget.
+            data_model (ChestDataModel): The data model.
+            csv_service (CSVService): The CSV service.
+            validation_service (ValidationService): The validation service.
+            correction_service (CorrectionService): The correction service.
+            chart_service (ChartService): The chart service.
+            data_manager: The data manager.
+            file_operations_controller (FileOperationsController): The file operations controller.
+            progress_controller (ProgressController): The progress controller.
+            view_state_controller (ViewStateController): The view state controller.
+            data_view_controller (DataViewController): The data view controller.
+            ui_state_controller (UIStateController): The UI state controller.
+            config_manager: The configuration manager.
+            parent (Optional[QWidget], optional): Parent widget. Defaults to None.
         """
         super().__init__(parent)
 
-        # Store references to services
         self._data_model = data_model
         self._csv_service = csv_service
         self._validation_service = validation_service
@@ -149,6 +150,7 @@ class MainWindow(QMainWindow):
         self._view_state_controller = view_state_controller
         self._data_view_controller = data_view_controller
         self._ui_state_controller = ui_state_controller
+        self._config_manager = config_manager
 
         if self._data_manager:
             logger.debug("MainWindow initialized with data_manager")
@@ -576,6 +578,17 @@ class MainWindow(QMainWindow):
         self._content_stack.addWidget(chart_view)
         self._views["Charts"] = chart_view
 
+        # Create Settings view
+        from chestbuddy.ui.views import SettingsViewAdapter
+
+        settings_view = SettingsViewAdapter(config_manager=self._config_manager)
+        settings_view.settings_changed.connect(self._on_settings_changed)
+        settings_view.config_reset.connect(self._on_config_reset)
+        settings_view.config_imported.connect(self._on_config_imported)
+        settings_view.config_exported.connect(self._on_config_exported)
+        self._content_stack.addWidget(settings_view)
+        self._views["Settings"] = settings_view
+
         # Set services in the data view controller
         self._data_view_controller.set_services(
             validation_service=self._validation_service, correction_service=self._correction_service
@@ -583,7 +596,7 @@ class MainWindow(QMainWindow):
         logger.info("Services set in data view controller")
 
         # TODO: Add placeholder views for other sections
-        # For Reports, Settings, Help if needed
+        # For Reports, Help if needed
 
     def _init_menus(self) -> None:
         """Initialize the application menus."""
@@ -1337,3 +1350,79 @@ class MainWindow(QMainWindow):
                 data_view_adapter.populate_table()
         except Exception as e:
             logger.error(f"Error in fallback table population: {e}")
+
+    # Add handler methods for settings view signals
+    def _on_settings_changed(self, section: str, option: str, value: str) -> None:
+        """
+        Handle settings changed event.
+
+        Args:
+            section (str): Configuration section
+            option (str): Configuration option
+            value (str): New value
+        """
+        logger.info(f"Setting changed: [{section}] {option} = {value}")
+
+        # Update status bar
+        self._status_bar.showMessage(f"Setting updated: [{section}] {option}", 3000)
+
+        # Apply certain settings immediately if needed
+        if section == "UI":
+            # UI settings might require immediate application
+            pass
+        elif section == "General":
+            # General settings like theme might need application restart
+            if option == "theme":
+                # Show hint that restart is needed for full effect
+                self._show_info_message(
+                    "Theme Change",
+                    "The theme has been changed. Some changes may require an application restart to take full effect.",
+                )
+
+    def _on_config_reset(self, section: str) -> None:
+        """
+        Handle configuration reset event.
+
+        Args:
+            section (str): The section that was reset, or "all"
+        """
+        logger.info(f"Configuration reset: {section}")
+
+        # Update status bar
+        self._status_bar.showMessage(f"Settings reset: {section}", 3000)
+
+        # Show notification
+        self._show_info_message(
+            "Settings Reset",
+            f"The {'settings' if section == 'all' else section + ' settings'} have been reset to defaults.",
+        )
+
+    def _on_config_imported(self, file_path: str) -> None:
+        """
+        Handle configuration import event.
+
+        Args:
+            file_path (str): Path to the imported file
+        """
+        logger.info(f"Configuration imported from: {file_path}")
+
+        # Update status bar
+        self._status_bar.showMessage(f"Settings imported from: {file_path}", 3000)
+
+        # Show notification
+        self._show_info_message(
+            "Settings Imported",
+            f"Settings have been imported from:\n{file_path}\n\nSome changes may require an application restart to take full effect.",
+        )
+
+    def _on_config_exported(self, file_path: str) -> None:
+        """
+        Handle configuration export event.
+
+        Args:
+            file_path (str): Path to the exported file
+        """
+        logger.info(f"Configuration exported to: {file_path}")
+
+        # Update status bar
+        self._status_bar.showMessage(f"Settings exported to: {file_path}", 3000)

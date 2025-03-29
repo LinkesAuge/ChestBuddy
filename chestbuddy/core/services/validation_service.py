@@ -67,16 +67,25 @@ class ValidationService(QObject):
         # Initialize validation configuration
         self._case_sensitive = False
         self._validate_on_import = True
+        self._auto_save = True
+        self._config_manager = config_manager
 
         # Load settings from configuration if provided
         if config_manager:
-            self._case_sensitive = config_manager.get_bool("Validation", "case_sensitive", False)
-            self._validate_on_import = config_manager.get_bool(
-                "Validation", "validate_on_import", True
+            # Load with detailed logging
+            case_sensitive = config_manager.get_bool("Validation", "case_sensitive", False)
+            validate_on_import = config_manager.get_bool("Validation", "validate_on_import", True)
+            auto_save = config_manager.get_bool("Validation", "auto_save", True)
+
+            logger.info(
+                f"Loading validation settings from config - case_sensitive: {case_sensitive}, validate_on_import: {validate_on_import}, auto_save: {auto_save}"
             )
-            self._config_manager = config_manager
+
+            self._case_sensitive = case_sensitive
+            self._validate_on_import = validate_on_import
+            self._auto_save = auto_save
         else:
-            self._config_manager = None
+            logger.warning("No config_manager provided, using default validation settings")
 
         # Initialize validation list models
         self._player_list_model = None
@@ -650,7 +659,7 @@ class ValidationService(QObject):
 
             logger.info(f"Set case sensitivity to: {case_sensitive}")
 
-            # Emit signal
+            # Emit signal with a dictionary containing the updated preference
             self.validation_preferences_changed.emit({"case_sensitive": case_sensitive})
 
     def is_case_sensitive(self) -> bool:
@@ -669,20 +678,39 @@ class ValidationService(QObject):
         Args:
             validate_on_import (bool): Whether validation should be performed on import
         """
+        # Convert to proper boolean to avoid string confusion
+        validate_on_import = bool(validate_on_import)
+
+        # Log current and new values
+        logger.debug(
+            f"Setting validate_on_import from {self._validate_on_import} to {validate_on_import}"
+        )
+
+        # Only update if the value is changing
         if self._validate_on_import != validate_on_import:
             self._validate_on_import = validate_on_import
 
             # Save to config if available
             if self._config_manager:
-                self._config_manager.set(
-                    "Validation", "validate_on_import", str(validate_on_import)
-                )
+                # Save as string representation of boolean, ensuring consistent format
+                value_to_save = "True" if validate_on_import else "False"
+                self._config_manager.set("Validation", "validate_on_import", value_to_save)
                 self._config_manager.save()
+                logger.info(f"Saved validate_on_import={value_to_save} to config")
+            else:
+                logger.warning(
+                    "No config_manager available, validate_on_import setting not saved to config"
+                )
 
-            logger.info(f"Set validate on import to: {validate_on_import}")
-
-            # Emit signal
+            # Emit signal with the new value in a dictionary
             self.validation_preferences_changed.emit({"validate_on_import": validate_on_import})
+            logger.info(
+                f"Set validate_on_import to: {validate_on_import} and emitted change signal"
+            )
+        else:
+            logger.debug(
+                f"validate_on_import already set to {validate_on_import}, no change needed"
+            )
 
     def get_validate_on_import(self) -> bool:
         """
@@ -691,6 +719,20 @@ class ValidationService(QObject):
         Returns:
             bool: Whether validation should be performed on import
         """
+        # Log current value when requested
+        logger.debug(f"Getting validate_on_import: {self._validate_on_import}")
+
+        # If config manager is available, refresh the value to ensure consistency
+        if self._config_manager:
+            config_value = self._config_manager.get_bool(
+                "Validation", "validate_on_import", self._validate_on_import
+            )
+            if config_value != self._validate_on_import:
+                logger.warning(
+                    f"validate_on_import value inconsistent: memory={self._validate_on_import}, config={config_value}, using config value"
+                )
+                self._validate_on_import = config_value
+
         return self._validate_on_import
 
     def get_player_list_model(self) -> ValidationListModel:
@@ -730,6 +772,7 @@ class ValidationService(QObject):
         return {
             "case_sensitive": self._case_sensitive,
             "validate_on_import": self._validate_on_import,
+            "auto_save": self._auto_save,
         }
 
     def set_validation_preferences(self, preferences: Dict[str, bool]) -> None:
@@ -746,6 +789,10 @@ class ValidationService(QObject):
         # Update validate on import
         if "validate_on_import" in preferences:
             self.set_validate_on_import(preferences["validate_on_import"])
+
+        # Update auto save
+        if "auto_save" in preferences:
+            self.set_auto_save(preferences["auto_save"])
 
         logger.info(f"Updated validation preferences: {preferences}")
 
@@ -974,3 +1021,57 @@ class ValidationService(QObject):
         default_path = Path(__file__).parents[2] / "data" / "validation" / filename
         logger.warning(f"Using default validation list path: {default_path}")
         return default_path
+
+    def set_auto_save(self, auto_save: bool) -> None:
+        """
+        Set whether validation lists should be automatically saved when modified.
+
+        Args:
+            auto_save (bool): Whether validation lists should be auto-saved
+        """
+        # Convert to proper boolean to avoid string confusion
+        auto_save = bool(auto_save)
+
+        # Log current and new values
+        logger.debug(f"Setting auto_save from {self._auto_save} to {auto_save}")
+
+        # Only update if the value is changing
+        if self._auto_save != auto_save:
+            self._auto_save = auto_save
+
+            # Save to config if available
+            if self._config_manager:
+                # Save as string representation of boolean, ensuring consistent format
+                value_to_save = "True" if auto_save else "False"
+                self._config_manager.set("Validation", "auto_save", value_to_save)
+                self._config_manager.save()
+                logger.info(f"Saved auto_save={value_to_save} to config")
+            else:
+                logger.warning("No config_manager available, auto_save setting not saved to config")
+
+            # Emit signal with the new value
+            self.validation_preferences_changed.emit({"auto_save": auto_save})
+            logger.info(f"Set auto_save to: {auto_save} and emitted change signal")
+        else:
+            logger.debug(f"auto_save already set to {auto_save}, no change needed")
+
+    def get_auto_save(self) -> bool:
+        """
+        Get whether validation lists should be automatically saved when modified.
+
+        Returns:
+            bool: Whether validation lists should be auto-saved
+        """
+        # Log current value when requested
+        logger.debug(f"Getting auto_save: {self._auto_save}")
+
+        # If config manager is available, refresh the value to ensure consistency
+        if self._config_manager:
+            config_value = self._config_manager.get_bool("Validation", "auto_save", self._auto_save)
+            if config_value != self._auto_save:
+                logger.warning(
+                    f"auto_save value inconsistent: memory={self._auto_save}, config={config_value}, using config value"
+                )
+                self._auto_save = config_value
+
+        return self._auto_save

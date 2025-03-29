@@ -31,6 +31,11 @@ class Colors:
     INFO = "#17A2B8"  # Cyan
     DISABLED = "#4A5568"  # Disabled state
 
+    # Danger theme colors
+    DANGER = "#DC3545"  # Same as ERROR
+    DANGER_BG = "#481A1D"  # Dark red background
+    DANGER_ACTIVE = "#BD2130"  # Darker red for active state
+
     # Background colors
     BG_DARK = "#2D3748"  # Dark gray
     BG_MEDIUM = "#4A5568"  # Medium gray

@@ -207,27 +207,27 @@ class ChestBuddyApp(QObject):
             # Continue without logging
 
     def _create_ui(self) -> None:
-        """Create the user interface."""
+        """
+        Create and setup the UI components.
+        """
         try:
-            # Create main window
+            logging.info("Creating UI...")
             self._main_window = MainWindow(
-                self._data_model,
-                self._csv_service,
-                self._validation_service,
-                self._correction_service,
-                self._chart_service,
-                self._data_manager,
-                self._file_controller,
-                self._progress_controller,
-                self._view_state_controller,
-                self._data_view_controller,
-                self._ui_state_controller,
+                data_model=self._data_model,
+                csv_service=self._csv_service,
+                validation_service=self._validation_service,
+                correction_service=self._correction_service,
+                chart_service=self._chart_service,
+                data_manager=self._data_manager,
+                file_operations_controller=self._file_controller,
+                progress_controller=self._progress_controller,
+                view_state_controller=self._view_state_controller,
+                data_view_controller=self._data_view_controller,
+                ui_state_controller=self._ui_state_controller,
+                config_manager=self._config_manager,
             )
-
-            # Show the main window
             self._main_window.show()
-
-            logger.info("UI created and shown")
+            logging.info("UI created successfully")
         except Exception as e:
             logger.critical(f"Failed to create UI: {e}")
             self._error_controller.handle_exception(e, "Failed to create UI")

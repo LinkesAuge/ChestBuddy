@@ -14,6 +14,8 @@ from chestbuddy.ui.views.dashboard_view import DashboardView
 from chestbuddy.ui.views.validation_list_view import ValidationListView
 from chestbuddy.ui.views.validation_preferences_view import ValidationPreferencesView
 from chestbuddy.ui.views.validation_tab_view import ValidationTabView
+from chestbuddy.ui.views.settings_tab_view import SettingsTabView
+from chestbuddy.ui.views.settings_view_adapter import SettingsViewAdapter
 
 __all__ = [
     "BaseView",
@@ -26,4 +28,6 @@ __all__ = [
     "ValidationListView",
     "ValidationPreferencesView",
     "ValidationTabView",
+    "SettingsTabView",
+    "SettingsViewAdapter",
 ]

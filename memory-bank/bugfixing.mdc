@@ -24,6 +24,8 @@ As of the project completion, all known bugs and issues have been resolved. The 
 
 7. **Validation Status Visualization**: Fixed rendering issues with the ValidationStatusDelegate to properly display validation status indicators.
 
+8. **Settings Synchronization**: Fixed synchronization issues between ValidationTabView and SettingsTabView for validation preferences, ensuring changes in one view are reflected in the other.
+
 ## Historical Bug Tracking
 
 ## Resolved Issues
@@ -615,10 +617,9 @@ The application had inconsistent theming where some UI components were using lig
 
 ### Fix
 1. Updated `style.py` to replace light-themed background colors with dark theme equivalents:
-   - Changed `BACKGROUND_PRIMARY` to `Colors.DARK_CONTENT_BG`
-   - Changed `BACKGROUND_SECONDARY` to `Colors.DARK_CONTENT_BG`
-   - Changed `BACKGROUND_INPUT` to a darker variant for input fields
-
+   - Changed background color to `#2D3748` (dark gray) for widgets with `lightContentView="true"`
+   - Ensured proper text colors (light on dark) across all components
+   - Added consistent styling for various widget types (buttons, lists, tables, etc.)
 2. Updated `validation_list_view.py`:
    - Changed the background color of the container widget to `Colors.DARK_CONTENT_BG`
    - Updated the search input stylesheet to use dark theme colors
@@ -656,7 +657,7 @@ The application had inconsistent theming where some UI components were using lig
 
 ### Issue: Delayed UI Response After Import
 - **Problem**: After importing data and closing the progress window, there was a long delay (2000ms) before the data view became responsive.
-- **Cause**: In the _on_load_finished method of ChestBuddyApp, there was an excessive delay before populating the data table: QTimer.singleShot(2000, self._main_window.populate_data_table)
+- **Cause**: In the _on_load_finished method of ChestBuddyApp, there was an excessive delay before populating the data table after the progress dialog was closed.
 - **Impact**: Users experienced a confusing "dead time" after import, where the progress dialog had closed but the application appeared unresponsive.
 - **Solution**: 
   1. Reduced the delay from 2000ms to 100ms to improve responsiveness
@@ -1090,7 +1091,7 @@ Fixed. Validation list import now replaces all existing entries with the importe
 
 ### 2024-03-27: Fixed UI Responsiveness Issue After Data Import
 
-- **Issue**: After importing data and closing the progress window, there was a long delay (several seconds) before the data view became responsive, causing a poor user experience.
+- **Issue**: After importing data and closing the progress window, there was a long delay (several seconds) before the data view became responsive.
 - **Root Cause**: In the `_on_load_finished` method of the `ChestBuddyApp` class, there was a 2000ms (2 second) delay before starting to populate the data table after the progress dialog was closed.
 - **Fix**: Reduced the delay from 2000ms to 100ms in the `QTimer.singleShot` call:
   ```python
@@ -1392,10 +1393,6 @@ Here's how validation data now flows through the application:
    - Updates UI elements based on validation status
    - Emits its own `validation_changed` signal for parent components
 
-5. **ValidationViewAdapter**
-   - Connects to ValidationTabView's validation_changed signal
-   - Processes validation results for display in the UI
-
 This fix ensures proper data flow from the validation service to the UI components, resolving the TypeError and enabling validation results to be properly displayed in the data table.
 
 ### 2024-03-29: Fixed "Validate on Import" Toggle Persistence Issue (Second Fix)
@@ -1412,7 +1409,7 @@ This fix ensures proper data flow from the validation service to the UI componen
          # ...
          "Validation": {
              "auto_validate": "True",
-             "validation_lists_dir": str(self._config_dir / "validation_lists"),
+             "validation_lists_dir": str(self._config_dir / "validation"),
              "validate_on_import": "True",  # Added this line
          },
          # ...
@@ -1452,4 +1449,133 @@ This fix ensures proper data flow from the validation service to the UI componen
          logger.info(f"Migrated auto_validate setting ({auto_val}) to validate_on_import")
      ```
 - **Status**: Fixed. The validation toggle setting is now stored in a single location, eliminating potential inconsistency while maintaining backward compatibility.
+
+# Configuration System Bugfixes (March 29, 2023)
+
+## Issues Fixed
+
+### 1. "Validate on Import" Setting Not Persisted Between Sessions
+
+**Problem:** 
+The "validate on import" setting in the validation view was not being properly persisted between application sessions.
+
+**Root Cause:**
+- The setting was being saved to config.ini but not properly loaded when the application started again
+- The ValidationService was not correctly handling the saved boolean value
+- The UI component wasn't properly connected to update the setting
+
+**Solution:**
+```python
+# Enhanced ValidationService to better handle boolean values
+def set_validate_on_import(self, validate_on_import: bool) -> None:
+    # Convert to proper boolean to avoid string confusion
+    validate_on_import = bool(validate_on_import)
+    
+    # Only update if the value is changing
+    if self._validate_on_import != validate_on_import:
+        self._validate_on_import = validate_on_import
+
+        # Save as string representation of boolean, ensuring consistent format
+        if self._config_manager:
+            value_to_save = "True" if validate_on_import else "False"
+            self._config_manager.set("Validation", "validate_on_import", value_to_save)
+            self._config_manager.save()
+```
+
+### 2. Validation Lists Overwritten When Config Deleted
+
+**Problem:**
+When the config.ini file was deleted, validation lists in the validation_lists folder were overwritten with empty files instead of being initialized with default content.
+
+**Root Cause:**
+- ValidationListModel was creating empty files but not populating them with default content
+- There was no mechanism to copy default lists from the application's built-in lists
+
+**Solution:**
+```python
+# Added method to ValidationListModel to initialize from defaults
+def _initialize_from_default(self) -> bool:
+    try:
+        # Find the default file in the application's data directory
+        filename = self.file_path.name
+        default_path = Path(__file__).parents[2] / "data" / "validation" / filename
+        
+        # If default file exists, copy its content
+        if default_path.exists() and default_path.is_file():
+            with open(default_path, "r", encoding="utf-8") as src, open(self.file_path, "w", encoding="utf-8") as dst:
+                content = src.read()
+                dst.write(content)
+                
+            return True
+    except Exception as e:
+        logger.error(f"Error initializing from default: {e}")
+        return False
+```
+
+### 3. Import Buttons Not Working in Validation View
+
+**Problem:** 
+The import buttons in the validation view weren't functioning properly when clicked.
+
+**Root Cause:**
+- Signal connections were not properly set up in the ValidationTabView
+- The import implementation in ValidationListView needed improvements
+
+**Solution:**
+```python
+# Fixed button connections in ValidationTabView._setup_connections
+self._players_import.clicked.connect(lambda checked=False: self._on_list_import_clicked("players"))
+self._chest_types_import.clicked.connect(lambda checked=False: self._on_list_import_clicked("chest_types"))
+self._sources_import.clicked.connect(lambda checked=False: self._on_list_import_clicked("sources"))
+
+# Enhanced import functionality in ValidationListView
+def import_entries(self) -> None:
+    # Show file dialog
+    # ...
+    
+    # Ask if user wants to replace or append
+    msg_box = QMessageBox(self)
+    msg_box.setWindowTitle("Import Options")
+    msg_box.setText("How do you want to import entries?")
+    
+    replace_button = msg_box.addButton("Replace All", QMessageBox.ActionRole)
+    append_button = msg_box.addButton("Append New", QMessageBox.ActionRole)
+    # ...
+```
+
+## Additional Improvements
+
+1. **Enhanced ConfigManager:**
+   - Added comprehensive logging for better debugging
+   - Added proper error handling for boolean values
+   - Added methods for resetting to defaults
+   - Added configuration validation
+
+2. **Improved ValidationListView:**
+   - Added ability to both replace or append during import
+   - Added better error handling and user feedback
+   - Implemented directory memory for file dialogs
+
+3. **Error Recovery:**
+   - Added graceful error handling throughout the validation system
+   - Ensured validation lists are correctly initialized from defaults
+   - Added consistency checks between memory and saved values
+
+These fixes provide a more robust configuration system that properly persists settings and manages validation lists effectively.
+
+### 2024-03-29: Fixed Settings Synchronization Between Views (Update)
+
+- **Issue**: Incomplete synchronization of validation settings between views. Auto-save feature was missing in ValidationTabView but present in SettingsTabView.
+- **Root Cause**: 
+  1. The ValidatorService was missing methods to handle the auto_save setting
+  2. The ValidationTabView was missing the auto_save checkbox
+  3. Signal connections for auto_save were incomplete
+- **Fix**: 
+  1. Added `_auto_save` property to ValidationService with proper getter and setter methods
+  2. Added auto_save checkbox to ValidationTabView with proper styling and tooltip
+  3. Connected the checkbox to the proper update method
+  4. Updated preferences management methods in ValidationService to handle auto_save
+  5. Enhanced SettingsTabView to properly update ValidationService when auto_save changes
+  6. Updated import/reset functionality to properly sync auto_save setting
+- **Status**: Fixed, all validation settings (case_sensitive, validate_on_import, auto_save) now properly sync between views.
 

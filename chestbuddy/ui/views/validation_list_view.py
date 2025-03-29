@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
     QInputDialog,
     QFileDialog,
 )
-from PySide6.QtCore import Qt, Signal, QTimer
+from PySide6.QtCore import Qt, Signal, QTimer, QObject
 
 from chestbuddy.core.models.validation_list_model import ValidationListModel
 from chestbuddy.ui.resources.style import Colors
@@ -318,19 +318,71 @@ class ValidationListView(QWidget):
             QMessageBox.information(self, "Remove", "No items selected")
 
     def import_entries(self) -> None:
-        """Import entries from a file, replacing all existing entries."""
-        file_path, _ = QFileDialog.getOpenFileName(self, "Import Entries", "", "Text Files (*.txt)")
-        if file_path:
-            # Ask for confirmation since this will replace all existing entries
-            result = QMessageBox.question(
-                self,
-                "Confirm Import",
-                "This will replace ALL existing entries with the imported ones. Continue?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No,
+        """Import entries from a file, with options to replace or append."""
+        try:
+            # Start with last used directory if available
+            start_dir = ""
+            if hasattr(self, "_last_import_dir") and self._last_import_dir:
+                start_dir = self._last_import_dir
+            else:
+                # Try to get from service locator
+                service_locator = self.parent().findChild(QObject, "ServiceLocator")
+                if service_locator:
+                    config_manager = service_locator.get("config_manager")
+                    if config_manager:
+                        start_dir = config_manager.get("Files", "last_import_dir", "")
+
+            # Show file dialog
+            file_path, _ = QFileDialog.getOpenFileName(
+                self, "Import Entries", start_dir, "Text Files (*.txt)"
             )
 
-            if result == QMessageBox.StandardButton.Yes:
+            if not file_path:
+                return
+
+            # Remember this directory for next time
+            self._last_import_dir = str(Path(file_path).parent)
+
+            # Save to config if available
+            service_locator = self.parent().findChild(QObject, "ServiceLocator")
+            if service_locator:
+                config_manager = service_locator.get("config_manager")
+                if config_manager:
+                    config_manager.set("Files", "last_import_dir", self._last_import_dir)
+
+            # Ask if user wants to replace or append
+            msg_box = QMessageBox(self)
+            msg_box.setWindowTitle("Import Options")
+            msg_box.setText("How do you want to import entries?")
+            msg_box.setIcon(QMessageBox.Question)
+
+            replace_button = msg_box.addButton("Replace All", QMessageBox.ActionRole)
+            append_button = msg_box.addButton("Append New", QMessageBox.ActionRole)
+            cancel_button = msg_box.addButton("Cancel", QMessageBox.RejectRole)
+
+            msg_box.exec()
+
+            chosen_button = msg_box.clickedButton()
+
+            if chosen_button == cancel_button:
+                return
+
+            replace_mode = chosen_button == replace_button
+
+            if replace_mode:
+                # Double-check for replace mode
+                confirm = QMessageBox.question(
+                    self,
+                    "Confirm Replace",
+                    "This will replace ALL existing entries with the imported ones. Continue?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.No,
+                )
+
+                if confirm != QMessageBox.StandardButton.Yes:
+                    return
+
+                # Import with replace mode
                 success, _ = self._model.import_from_file(Path(file_path))
                 if success:
                     self.status_changed.emit(
@@ -338,15 +390,81 @@ class ValidationListView(QWidget):
                     )
                 else:
                     QMessageBox.critical(self, "Import Failed", "Failed to import entries")
+            else:
+                # Append mode - read file and add entries one by one
+                try:
+                    with open(file_path, "r", encoding="utf-8") as f:
+                        entries = [line.strip() for line in f.readlines() if line.strip()]
+
+                    # Track statistics
+                    added = 0
+                    duplicates = 0
+
+                    # Add each entry
+                    for entry in entries:
+                        if self._model.add_entry(entry):
+                            added += 1
+                        else:
+                            duplicates += 1
+
+                    # Report results
+                    self.status_changed.emit(
+                        f"Imported {added} new entries (skipped {duplicates} duplicates)"
+                    )
+
+                except Exception as e:
+                    logger.error(f"Error appending entries from {file_path}: {e}")
+                    QMessageBox.critical(self, "Import Failed", f"Error: {str(e)}")
+        except Exception as e:
+            logger.error(f"Error in import_entries: {e}")
+            QMessageBox.critical(self, "Import Error", f"An unexpected error occurred: {str(e)}")
 
     def export_entries(self) -> None:
         """Export entries to a file."""
-        file_path, _ = QFileDialog.getSaveFileName(self, "Export Entries", "", "Text Files (*.txt)")
-        if file_path:
-            if self._model.export_to_file(Path(file_path)):
-                self.status_changed.emit(f"Exported entries successfully")
+        try:
+            # Start with last used directory if available
+            start_dir = ""
+            if hasattr(self, "_last_export_dir") and self._last_export_dir:
+                start_dir = self._last_export_dir
+            else:
+                # Try to get from service locator
+                service_locator = self.parent().findChild(QObject, "ServiceLocator")
+                if service_locator:
+                    config_manager = service_locator.get("config_manager")
+                    if config_manager:
+                        start_dir = config_manager.get("Files", "last_export_dir", "")
+
+            # Show file dialog
+            file_path, _ = QFileDialog.getSaveFileName(
+                self, "Export Entries", start_dir, "Text Files (*.txt)"
+            )
+
+            if not file_path:
+                return
+
+            # Remember this directory for next time
+            self._last_export_dir = str(Path(file_path).parent)
+
+            # Save to config if available
+            service_locator = self.parent().findChild(QObject, "ServiceLocator")
+            if service_locator:
+                config_manager = service_locator.get("config_manager")
+                if config_manager:
+                    config_manager.set("Files", "last_export_dir", self._last_export_dir)
+
+            # Add .txt extension if not present
+            if not file_path.lower().endswith(".txt"):
+                file_path += ".txt"
+
+            # Export entries
+            success = self._model.export_to_file(Path(file_path))
+            if success:
+                self.status_changed.emit(f"Exported {self._model.count()} entries successfully")
             else:
                 QMessageBox.critical(self, "Export Failed", "Failed to export entries")
+        except Exception as e:
+            logger.error(f"Error in export_entries: {e}")
+            QMessageBox.critical(self, "Export Error", f"An unexpected error occurred: {str(e)}")
 
     def refresh(self) -> None:
         """Refresh the list view."""

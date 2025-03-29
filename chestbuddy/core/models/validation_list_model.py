@@ -46,12 +46,54 @@ class ValidationListModel(QObject):
         if not self.file_path.exists():
             self.file_path.touch()
             logger.info(f"Created new validation file: {self.file_path}")
+            # Try to initialize from default
+            self._initialize_from_default()
+        # If file exists but is empty, try to initialize from default
+        elif self.file_path.exists() and self.file_path.stat().st_size == 0:
+            logger.info(f"Validation file exists but is empty: {self.file_path}")
+            self._initialize_from_default()
 
         # Load entries from file
         self._load_entries()
         logger.info(
             f"Initialized ValidationListModel with {len(self.entries)} entries from {self.file_path}"
         )
+
+    def _initialize_from_default(self) -> bool:
+        """
+        Initialize an empty validation list file from default content.
+
+        Returns:
+            bool: True if successfully initialized from default, False otherwise
+        """
+        try:
+            # Find the default file in the application's data directory
+            filename = self.file_path.name
+            default_path = Path(__file__).parents[2] / "data" / "validation" / filename
+
+            # If default file exists, copy its content
+            if default_path.exists() and default_path.is_file():
+                try:
+                    with (
+                        open(default_path, "r", encoding="utf-8") as src,
+                        open(self.file_path, "w", encoding="utf-8") as dst,
+                    ):
+                        content = src.read()
+                        dst.write(content)
+
+                    logger.info(
+                        f"Initialized validation file from default: {default_path} -> {self.file_path}"
+                    )
+                    return True
+                except Exception as e:
+                    logger.error(f"Error copying default validation content: {e}")
+                    return False
+            else:
+                logger.warning(f"No default validation file found at: {default_path}")
+                return False
+        except Exception as e:
+            logger.error(f"Error initializing from default: {e}")
+            return False
 
     def _load_entries(self) -> None:
         """Load entries from the file."""

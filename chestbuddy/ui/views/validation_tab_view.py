@@ -202,10 +202,26 @@ class ValidationTabView(QWidget):
         self._case_sensitive_checkbox.setChecked(prefs.get("case_sensitive", False))
         self._validate_on_import_checkbox.setChecked(prefs.get("validate_on_import", True))
 
+        # Add auto_save checkbox
+        self._auto_save_checkbox = QCheckBox("Auto-save lists")
+        self._auto_save_checkbox.setStyleSheet(f"color: {Colors.TEXT_LIGHT};")
+        self._auto_save_checkbox.setToolTip(
+            "When enabled, validation lists will be automatically saved when modified"
+        )
+
+        # Try to get auto_save setting from config
+        auto_save = False
+        if self._validation_service._config_manager:
+            auto_save = self._validation_service._config_manager.get_bool(
+                "Validation", "auto_save", True
+            )
+        self._auto_save_checkbox.setChecked(auto_save)
+
         # Add widgets to options layout
         options_layout.addWidget(options_label)
         options_layout.addWidget(self._case_sensitive_checkbox)
         options_layout.addWidget(self._validate_on_import_checkbox)
+        options_layout.addWidget(self._auto_save_checkbox)
         options_layout.addStretch(1)  # Add stretch to push everything to the left
 
         # Add validate button on the right side
@@ -447,12 +463,33 @@ class ValidationTabView(QWidget):
         else:
             logger.warning("ValidationService has no validation_changed signal.")
 
+        # Connect to the validation_preferences_changed signal
+        if hasattr(self._validation_service, "validation_preferences_changed"):
+            try:
+                self._validation_service.validation_preferences_changed.disconnect(
+                    self._on_validation_preferences_changed
+                )
+                logger.debug("Disconnected existing validation_preferences_changed signal.")
+            except (TypeError, RuntimeError):
+                logger.debug("No existing validation_preferences_changed signal to disconnect.")
+
+            # Connect the signal
+            self._validation_service.validation_preferences_changed.connect(
+                self._on_validation_preferences_changed
+            )
+            logger.debug(
+                "Connected validation_preferences_changed signal to _on_validation_preferences_changed."
+            )
+        else:
+            logger.warning("ValidationService has no validation_preferences_changed signal.")
+
         # Connect button actions
         self._validate_action.triggered.connect(self._on_validate_clicked)
 
         # Connect checkbox signals
         self._case_sensitive_checkbox.stateChanged.connect(self._update_validation_preference)
         self._validate_on_import_checkbox.stateChanged.connect(self._update_validation_preference)
+        self._auto_save_checkbox.stateChanged.connect(self._update_validation_preference)
 
         # Connect signals for each list view
         for list_view in self.findChildren(ValidationListView):
@@ -487,6 +524,7 @@ class ValidationTabView(QWidget):
         prefs = {
             "case_sensitive": self._case_sensitive_checkbox.isChecked(),
             "validate_on_import": self._validate_on_import_checkbox.isChecked(),
+            "auto_save": self._auto_save_checkbox.isChecked(),
         }
         self._validation_service.set_validation_preferences(prefs)
         logger.info(f"Validation preferences updated: {prefs}")
@@ -560,8 +598,15 @@ class ValidationTabView(QWidget):
         Args:
             section (str): Section name (players, chest_types, sources)
         """
-        list_view = getattr(self, f"_{section}_list")
-        list_view.import_entries()
+        try:
+            list_view = getattr(self, f"_{section}_list")
+            logger.debug(
+                f"Import button clicked for {section}, calling import_entries on list_view"
+            )
+            list_view.import_entries()
+        except Exception as e:
+            logger.error(f"Error importing {section} list: {e}")
+            self._display_error(f"Error importing {section} list: {str(e)}")
 
     def _on_list_export_clicked(self, section: str) -> None:
         """
@@ -570,8 +615,15 @@ class ValidationTabView(QWidget):
         Args:
             section (str): Section name (players, chest_types, sources)
         """
-        list_view = getattr(self, f"_{section}_list")
-        list_view.export_entries()
+        try:
+            list_view = getattr(self, f"_{section}_list")
+            logger.debug(
+                f"Export button clicked for {section}, calling export_entries on list_view"
+            )
+            list_view.export_entries()
+        except Exception as e:
+            logger.error(f"Error exporting {section} list: {e}")
+            self._display_error(f"Error exporting {section} list: {str(e)}")
 
     def _on_entries_changed(self) -> None:
         """Handle changes to validation list entries."""
@@ -675,12 +727,20 @@ class ValidationTabView(QWidget):
         Args:
             checked (bool): Whether the checkbox is checked
         """
-        # Update validation service preferences
-        prefs = self._validation_service.get_validation_preferences()
-        prefs["validate_on_import"] = checked
-        self._validation_service.set_validation_preferences(prefs)
-        logger.info(f"Validate on import set to: {checked}")
-        # Do NOT set status message to avoid showing "Validating..." when just toggling preference
+        # Add detailed logging
+        logger.debug(f"Validate on import checkbox toggled: {checked}")
+
+        try:
+            # Update validation service preferences
+            if self._validation_service:
+                # Use direct method instead of going through preferences dict
+                self._validation_service.set_validate_on_import(checked)
+                logger.info(f"Set validate_on_import to {checked} via ValidationService")
+            else:
+                logger.warning("ValidationService not available, validate_on_import not updated")
+        except Exception as e:
+            logger.error(f"Error setting validate_on_import: {e}")
+            self._display_error(f"Error updating preference: {str(e)}")
 
     def _display_service_error(self) -> None:
         """Display an error message when the validation service is not available."""
@@ -690,3 +750,128 @@ class ValidationTabView(QWidget):
         msg_box.setText("Validation service is not available.")
         msg_box.setStandardButtons(QMessageBox.Ok)
         msg_box.exec()
+
+    def _display_error(self, message: str) -> None:
+        """
+        Display an error message.
+
+        Args:
+            message (str): Error message to display
+        """
+        QMessageBox.critical(self, "Error", message)
+        self._on_status_changed(f"Error: {message}")
+
+    def _on_validation_preferences_changed(self, preferences: dict) -> None:
+        """
+        Update UI when validation preferences change in the service.
+
+        Args:
+            preferences (dict): Updated preferences
+        """
+        logger.debug(f"Received validation_preferences_changed signal: {preferences}")
+
+        # Block signals to prevent loops
+        try:
+            self._case_sensitive_checkbox.blockSignals(True)
+            self._validate_on_import_checkbox.blockSignals(True)
+            self._auto_save_checkbox.blockSignals(True)
+
+            # Update UI to match new preferences
+            if "case_sensitive" in preferences:
+                self._case_sensitive_checkbox.setChecked(preferences["case_sensitive"])
+                logger.debug(f"Updated case_sensitive checkbox to {preferences['case_sensitive']}")
+
+            if "validate_on_import" in preferences:
+                self._validate_on_import_checkbox.setChecked(preferences["validate_on_import"])
+                logger.debug(
+                    f"Updated validate_on_import checkbox to {preferences['validate_on_import']}"
+                )
+
+            if "auto_save" in preferences:
+                self._auto_save_checkbox.setChecked(preferences["auto_save"])
+                logger.debug(f"Updated auto_save checkbox to {preferences['auto_save']}")
+
+        finally:
+            # Unblock signals
+            self._case_sensitive_checkbox.blockSignals(False)
+            self._validate_on_import_checkbox.blockSignals(False)
+            self._auto_save_checkbox.blockSignals(False)
+
+        # Update status message
+        self._set_status_message("Validation preferences updated")
+
+    def _setup_connections(self) -> None:
+        """Set up signal connections."""
+        # Connect options checkboxes
+        self._case_sensitive_checkbox.toggled.connect(self._on_case_sensitive_toggled)
+        self._validate_on_import_checkbox.toggled.connect(self._on_validate_on_import_toggled)
+        self._auto_save_checkbox.toggled.connect(self._update_validation_preference)
+
+        # Connect validation result view signals
+        self._validation_result_view.status_changed.connect(self._on_status_changed)
+
+        # Connect validation action
+        self._validate_action.triggered.connect(self._on_validate_clicked)
+
+        # Connect tab selection
+        self._tab_widget.currentChanged.connect(self._on_tab_changed)
+
+        # Connect section buttons
+        # Use lambda with default arguments to avoid late binding issues
+        self._players_add.clicked.connect(
+            lambda checked=False: self._on_list_add_clicked("players")
+        )
+        self._players_remove.clicked.connect(
+            lambda checked=False: self._on_list_remove_clicked("players")
+        )
+        self._players_import.clicked.connect(
+            lambda checked=False: self._on_list_import_clicked("players")
+        )
+        self._players_export.clicked.connect(
+            lambda checked=False: self._on_list_export_clicked("players")
+        )
+
+        self._chest_types_add.clicked.connect(
+            lambda checked=False: self._on_list_add_clicked("chest_types")
+        )
+        self._chest_types_remove.clicked.connect(
+            lambda checked=False: self._on_list_remove_clicked("chest_types")
+        )
+        self._chest_types_import.clicked.connect(
+            lambda checked=False: self._on_list_import_clicked("chest_types")
+        )
+        self._chest_types_export.clicked.connect(
+            lambda checked=False: self._on_list_export_clicked("chest_types")
+        )
+
+        self._sources_add.clicked.connect(
+            lambda checked=False: self._on_list_add_clicked("sources")
+        )
+        self._sources_remove.clicked.connect(
+            lambda checked=False: self._on_list_remove_clicked("sources")
+        )
+        self._sources_import.clicked.connect(
+            lambda checked=False: self._on_list_import_clicked("sources")
+        )
+        self._sources_export.clicked.connect(
+            lambda checked=False: self._on_list_export_clicked("sources")
+        )
+
+        # Connect validation list view signals
+        for section in ["players", "chest_types", "sources"]:
+            list_view = getattr(self, f"_{section}_list")
+            list_view.status_changed.connect(self._on_status_changed)
+            list_view.model().entries_changed.connect(self._on_entries_changed)
+
+        # Connect validation service signals if available
+        if self._validation_service:
+            self._validation_service.validation_preferences_changed.connect(
+                self._on_validation_preferences_changed
+            )
+
+        # Log connections
+        logger.debug("Set up ValidationTabView signal connections")
+        # Log specific import button connections
+        logger.debug(
+            f"Connected import buttons: {self._players_import.isEnabled()}, {self._chest_types_import.isEnabled()}, {self._sources_import.isEnabled()}"
+        )
