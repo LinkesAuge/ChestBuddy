@@ -680,6 +680,7 @@ class ValidationTabView(QWidget):
         prefs["validate_on_import"] = checked
         self._validation_service.set_validation_preferences(prefs)
         logger.info(f"Validate on import set to: {checked}")
+        # Do NOT set status message to avoid showing "Validating..." when just toggling preference
 
     def _display_service_error(self) -> None:
         """Display an error message when the validation service is not available."""

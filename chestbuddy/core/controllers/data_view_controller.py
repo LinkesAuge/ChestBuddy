@@ -1235,21 +1235,29 @@ class DataViewController(BaseController):
     @Slot()
     def _validate_after_import(self) -> None:
         """
-        Check if validate_on_import is enabled and run validation if true.
-        This method is designed to be connected to the data_loaded signal.
+        Validate data after import if auto-validate is enabled.
+        This method is connected to the data_loaded signal from DataManager.
         """
         try:
-            if not hasattr(self, "_validation_service") or self._validation_service is None:
-                logger.warning("Cannot validate after import: Validation service not available")
+            # Get validation service from ServiceLocator
+            validation_service = ServiceLocator.get("validation_service")
+
+            if not validation_service:
+                logger.warning("ValidationService not available for auto-validation")
                 return
 
-            # Check if auto-validation is enabled
-            if self._validation_service.get_validate_on_import():
+            # Check if auto-validate is enabled
+            if validation_service.get_validate_on_import():
                 logger.info("Auto-validation is enabled, validating data after import")
+                # Set status message before validation starts
+                if self._ui_state_controller:
+                    self._ui_state_controller.update_status_message("Validating...")
+
+                # Run validation
                 self.validate_data()
             else:
                 logger.info("Auto-validation is disabled, skipping validation after import")
-
+                # Don't update status message when auto-validation is disabled
         except Exception as e:
-            logger.error(f"Error in validate_after_import: {e}")
-            self.operation_error.emit(f"Error validating after import: {str(e)}")
+            logger.error(f"Error in auto-validation after import: {e}")
+            self.operation_error.emit(str(e))
