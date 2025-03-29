@@ -849,111 +849,89 @@ None currently.
 
 ## Current Status (March 30, 2023)
 
-We've been working on improving the configuration system in the application to make it more robust and user-friendly. We identified several issues in the configuration system, including:
+The ChestBuddy application is currently undergoing a significant enhancement with the refactoring of the correction feature. This refactoring aims to replace the existing general correction strategies with a more targeted, mapping-based approach for data corrections.
 
-1. The "validate on import" setting not being properly persisted between sessions.
-2. Validation lists in the `validation_lists` folder being overwritten when the config is deleted.
-3. Import buttons in the validation view not functioning correctly.
+### What Works
 
-## Implementation Progress
+- **Core Functionality**: The application's core data management, visualization, and import/export capabilities are fully functional.
+- **Validation System**: The validation system is fully implemented and working, providing real-time validation of data entries.
+- **Configuration System**: The configuration management system is stable and provides persistent settings.
+- **UI Framework**: The application's UI framework, including the data view, settings, and navigation is in place.
 
-### Phase 1: Immediate Fixes (COMPLETED)
+### What's In Progress
 
-#### 1. Fixed "validate_on_import" Setting Persistence
-- Enhanced `ValidationService` with improved logging in set/get methods
-- Fixed signal connections in `ValidationTabView`
-- Added checks for consistent values between memory and config
-- Improved error handling throughout the process
+#### Correction Feature Refactoring
 
-#### 2. Fixed Validation Lists Management
-- Added `_initialize_from_default` method to `ValidationListModel`
-- Added code to copy default lists when creating new files
-- Enhanced `ConfigManager` with `get_validation_list_path` method
-- Improved handling of empty list files
+The correction feature is being completely refactored to implement a mapping-based approach for data corrections. This refactoring is divided into six phases:
 
-#### 3. Fixed Import Button Functionality
-- Fixed signal connections in `ValidationTabView`
-- Enhanced `import_entries` method in `ValidationListView`
-- Added options to replace or append during import
-- Added proper error handling and user feedback
+##### Phase 1: Core Data Model (Planned)
+- Create `CorrectionRule` model class
+- Implement `CorrectionRuleManager` for rule storage
+- Support loading from existing correction_rules.csv
+- Add rule ordering and prioritization functionality
 
-### Phase 2: System Enhancement (IN PROGRESS)
+##### Phase 2: Services Layer (Planned)
+- Develop `CorrectionService` with two-pass algorithm
+- Implement validation system integration
+- Add tracking for corrected cells
+- Create configuration integration
 
-#### 1. Added Settings View Implementation
-- Created `settings_tab_view.py` with comprehensive settings UI
-- Created `settings_view_adapter.py` to integrate with application structure
-- Implemented tabs for General, Validation, UI, and Backup & Reset settings
-- Added configuration export/import functionality
-- Added ability to reset configurations to defaults (all or by section)
+##### Phase 3: Controller Layer (Planned)
+- Implement `CorrectionController`
+- Create handlers for user interactions
+- Add configuration management
+- Implement background processing
 
-#### 2. UI Design and Integration
-- Designed settings UI with consistent styling
-- Added tabs for organizing different settings categories
-- Implemented intuitive controls for all settings
-- Created a dedicated backup and reset section for configuration management
+##### Phase 4: UI Implementation (Planned)
+- Create `CorrectionView` with rule table
+- Implement rule management operations
+- Add import/export functionality
+- Build batch rule creation dialog
+- Create progress reporting dialogs
 
-#### 3. Connection with ConfigManager
-- Connected all settings controls to the ConfigManager
-- Implemented real-time settings updates
-- Added proper error handling for all operations
-- Enhanced logging for better debugging
+##### Phase 5: Data View Integration (Planned)
+- Add cell highlighting for correction states
+- Implement selection for rule creation
+- Create context menu integration
+- Add tooltips for status information
 
-## Next Steps
+##### Phase 6: Testing and Optimization (Planned)
+- Develop integration tests for end-to-end workflows
+- Optimize performance for large datasets
+- Ensure proper encoding support for international characters
 
-1. **Testing:**
-   - Test all settings functionality
-   - Verify settings persistence between sessions
-   - Test configuration export/import
-   - Test reset functionality
-   - Ensure proper error handling
+### What's Next
 
-2. **UI/UX Refinements:**
-   - Improve feedback for settings changes
-   - Add tooltips and help text
-   - Add input validation for numeric fields
-   - Enhance visual feedback for actions
+After completing the correction feature refactoring, these areas will be addressed:
 
-3. **Documentation:**
-   - Update user documentation for settings system
-   - Document configuration file format
-   - Add developer documentation for extending settings
+1. **Enhanced Data Visualization**: Additional visualizations for data analysis
+2. **Export Enhancements**: Additional export formats and customization options
+3. **Performance Optimizations**: Further optimizations for larger datasets
+4. **Extended Validation Rules**: Additional validation rule types and custom rules
 
-## Implementation Details
+## Key Changes
 
-### Settings View Structure
-The settings view is organized into four tabs:
+### Recent Significant Changes
 
-1. **General:**
-   - Theme selection
-   - Language selection
-   - Config version display
+- Decision to refactor the correction feature with a mapping-based approach
+- Implementation plan and architecture design for the correction feature
+- Design of the two-pass correction algorithm for efficient rule application
 
-2. **Validation:**
-   - Validate on import toggle
-   - Case-sensitive validation toggle
-   - Auto-save validation lists toggle
-   - Validation lists directory selection
+### Upcoming Changes
 
-3. **UI:**
-   - Window dimensions settings
-   - Table page size setting
+- Implementation of the correction feature's core data model
+- Development of the services layer with two-pass algorithm
+- Creation of UI components for rule management and visualization
+- Integration with the data view for visual feedback
 
-4. **Backup & Reset:**
-   - Export configuration to JSON
-   - Import configuration from JSON
-   - Reset configuration sections to defaults
-   - Reset all settings to defaults
+## Known Issues
 
-### New Files
-- `settings_tab_view.py`: Main settings UI implementation
-- `settings_view_adapter.py`: Adapter to integrate with BaseView structure
+- The current correction system lacks precision for cell-level corrections
+- Performance can degrade with very large datasets
+- The existing correction UI is not intuitive enough for complex corrections
 
-### Updated Files
-- `__init__.py`: Updated to export new classes
-- `main_window.py`: Updated to add settings view to the application
+## Technical Debt
 
-### Configuration Export/Import
-- Export saves all settings to a JSON file
-- Import loads settings from a JSON file
-- Reset to defaults restores original settings
-- Section-specific reset allows targeted restoration
+- Refactoring needed for the correction feature (in progress)
+- Code organization improvements needed in some areas
+- Additional test coverage needed for complex scenarios

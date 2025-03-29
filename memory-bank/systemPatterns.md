@@ -572,4 +572,173 @@ The ChestBuddy application uses a robust signal-slot mechanism for propagating v
        self.validation_changed.emit(status_df)
    ```
 
-The validation signal pattern allows for flexible component configuration while maintaining a consistent flow of validation data through the application. This approach ensures that validation results are properly displayed in the UI regardless of which component initiates the validation process. 
+The validation signal pattern allows for flexible component configuration while maintaining a consistent flow of validation data through the application. This approach ensures that validation results are properly displayed in the UI regardless of which component initiates the validation process.
+
+## 13. Correction System Architecture Pattern
+
+The refactored correction system follows a comprehensive architecture that integrates with existing patterns while introducing specialized components for rule-based corrections.
+
+### Core Architecture
+
+```
+┌───────────────┐      ┌───────────────┐      ┌───────────────┐
+│  Model Layer  │◄────►│ Service Layer │◄────►│ Controller    │
+│               │      │               │      │ Layer         │
+└───────┬───────┘      └───────┬───────┘      └───────┬───────┘
+        │                      │                      │
+        │                      │                      │
+        │                      │                      │
+        ▼                      ▼                      ▼
+┌───────────────┐      ┌───────────────┐      ┌───────────────┐
+│ CorrectionRule│      │CorrectionServi│      │CorrectionContr│
+│ Model         │◄────►│ce             │◄────►│oller          │
+└───────────────┘      └───────────────┘      └───────┬───────┘
+                                                      │
+                                                      │
+                                                      │
+                                                      ▼
+                                              ┌───────────────┐
+                                              │  View Layer   │
+                                              │               │
+                                              └───────┬───────┘
+                                                      │
+                                                      │
+                                                      │
+                                                      ▼
+                                              ┌───────────────┐
+                                              │CorrectionView │
+                                              │               │
+                                              └───────────────┘
+```
+
+### Pattern Implementation Details
+
+#### 1. Model Layer
+- **CorrectionRule**: Simple data class representing a correction rule mapping
+- **CorrectionRuleManager**: Manages persistence and CRUD operations for rules
+- **Rule storage**: CSV-based with clear structured format
+- **Specialized Model Capabilities**:
+  - Rule ordering and prioritization
+  - Category-based organization
+  - Status tracking (enabled/disabled)
+
+#### 2. Service Layer
+- **CorrectionService**: Core business logic for applying corrections
+- **Two-pass correction algorithm**:
+  - First pass: Apply general rules
+  - Second pass: Apply category-specific rules
+- **Integration with ValidationService** for identifying invalid cells
+- **Background processing** support for performance
+
+#### 3. Controller Layer
+- **CorrectionController**: Mediates between views and service layer
+- **Orchestrates UI operations**:
+  - Rule management (add, edit, delete, reorder)
+  - Rule application with progress tracking
+  - Configuration management
+- **Error handling and recovery**
+- **Event propagation** using signal/slot mechanism
+
+#### 4. View Layer
+- **CorrectionView**: User interface for rule management
+- **CorrectionRuleTable**: Table with sorting and filtering
+- **BatchCorrectionDialog**: UI for creating multiple rules
+- **ProgressDialog**: Feedback during correction operations
+- **UI-only responsibilities** with business logic in controller/service
+
+### Integration with Existing Patterns
+
+The correction system leverages several of our established patterns:
+
+#### 1. Observer Pattern
+```python
+# Signal declarations in CorrectionController
+class CorrectionController(BaseController):
+    # Signals
+    correction_started = Signal(str)  # Strategy name
+    correction_completed = Signal(str, int)  # Strategy name, affected rows
+    correction_error = Signal(str)  # Error message
+    operation_error = Signal(str)  # General error message
+    
+    # Signal emissions
+    def apply_corrections(self):
+        self.correction_started.emit("Applying corrections")
+        # ... correction logic ...
+        self.correction_completed.emit("Corrections applied", affected_count)
+```
+
+#### 2. Service Pattern
+```python
+class CorrectionService:
+    def __init__(self, rule_manager, data_model):
+        self._rule_manager = rule_manager
+        self._data_model = data_model
+        
+    def apply_corrections(self, only_invalid=False):
+        """Apply corrections to the data model"""
+        # Core business logic
+```
+
+#### 3. Adapter Pattern
+```python
+class CorrectionViewAdapter(BaseView):
+    """Adapter to integrate correction functionality with the main UI"""
+    def __init__(self, correction_controller):
+        super().__init__("Correction")
+        self._controller = correction_controller
+        self._setup_ui()
+        self._connect_signals()
+```
+
+#### 4. Command Pattern
+```python
+class ApplyCorrectionRuleCommand:
+    """Command for applying a single correction rule"""
+    def __init__(self, service, rule, data_model):
+        self.service = service
+        self.rule = rule
+        self.data_model = data_model
+        
+    def execute(self):
+        return self.service.apply_single_rule(self.rule)
+```
+
+#### 5. Worker Pattern
+```python
+class CorrectionWorker(QObject):
+    """Worker for handling corrections in a background thread"""
+    progress = Signal(int, int)  # current, total
+    result = Signal(dict)  # correction results
+    finished = Signal()  # work complete
+    
+    def run(self):
+        """Execute correction processing in background"""
+        # Background processing logic
+```
+
+### Key Design Decisions
+
+1. **Strict separation between UI and business logic**:
+   - UI components never directly manipulate data
+   - Controllers mediate all interactions
+   - Services contain all business logic
+
+2. **Two-level prioritization for rules**:
+   - Category-level: general vs. specific categories
+   - Order within category: position in the list
+
+3. **Background processing with progress reporting**:
+   - Worker objects for non-blocking operations
+   - Progress signals for UI feedback
+   - Cancellation support
+
+4. **Visual feedback integration**:
+   - Non-invasive integration with existing highlighting system
+   - Color-coded cell states for different correction situations
+
+5. **Rule storage**:
+   - CSV-based persistence for simplicity and compatibility
+   - Regular backups during operations
+   - Import/export support
+
+This architecture provides a clean, maintainable system for managing correction rules and applying them to data, while maintaining strict separation of concerns and leveraging existing architectural patterns. 

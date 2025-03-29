@@ -1,48 +1,48 @@
-From,To,Category,enabled
-Маһоп12,D4rkBlizZ4rD,player,enabled
-АЙ,D4rkBlizZ4rD,player,enabled
-Fenrir"s Chest,Fenrir's Chest,chest,enabled
-Hermes" Store,Hermes' Store,source,enabled
-VVarrior"s Chest",Warrior's Chest,chest,enabled
-Clan vvealth,Clan wealth,source,enabled
-OsmanliTorunu,OsmanlıTorunu,player,enabled
-Epic Ancient sguad,Epic Ancient squad,source,enabled
-Snovvvveaver,Snowweaver,player,enabled
-Krimelmonster,Krümelmonster,player,enabled
-GUARDIENOfTHUNDER,GUARDIENofTHUNDER,player,enabled
-Rare Chest of VVealth,Rare Chest of Wealth,chest,enabled
-Epic Chest of Vvealth,Epic Chest of Wealth,chest,enabled
-Sir Nightvvoolf,Sir Nightwoolf,player,enabled
-Hammerschlagi,Hammerschlag1,player,enabled
-Feldjager,Feldjäger,player,enabled
-Feldj䧥r,Feldjäger,player,enabled
-Lord Ore,Lord Öre,player,enabled
-Lord ֲe,Lord Öre,player,enabled
-Epic Fenrir sguad,Epic Fenrir squad,source,enabled
-Ouick March Chest,Quick March Chest,chest_type,enabled
-Epic Fenrir sguad,Epic Fenrir squad,source,enabled
-Union of Triumph personal revvard,Union of Triumph personal reward,source,enabled
-revvard,reward,general,enabled
-sguad,squad,general,enabled
-Vvealth,Wealth,general,enabled
-VVealth,Wealth,general,enabled
-Juslius C䳡r,Julius Cäsar,player,enabled
-Juslius Cäsar,Julius Cäsar,player,enabled
-Julius Casar,Julius Cäsar,player,enabled
-Ancients",Ancients',general,enabled
-Quick March Chest Chest,Quick March Chest,chest_type,enabled
-Union of Triumf personal reward,Union of Triumph personal reward,general,enabled
-Triumf,Triumph,general,enabled
-Triumfp,Triumph,general,enabled
-JÃªrmungandr,Jormungandr,general,enabled
-Jêrmungandr,Jormungandr,general,enabled
-J㪲mungandr,Jormungandr,general,enabled
-JÃ²rmungandr,Jormungandr,general,enabled
-Jòrmungandr's,Jormungandr's,general,enabled
-JÃ²rmungandr's,Jormungandr's,general,enabled
-JÃ²rmungandr Shop,Jormungandr Shop,source,enabled
-Jòrmungandr Shop,Jormungandr Shop,source,enabled
-Jòrmungandr's Chest,Jormungandr's Chest,chest_type,enabled
-Epic Jêrmungandr sguad,Epic Jormungandr squad,source,enabled
-Arachne's Svvarm Epic sguad,Arachne's Swarm Epic squad,source,enabled
-Arachne's Swarm Epic sguad,Arachne's Swarm Epic squad,source,enabled
+To,From,Category,Status
+D4rkBlizZ4rD,?????12,player,enabled
+D4rkBlizZ4rD,??,player,enabled
+Fenrir's Chest,"Fenrir""s Chest",chest,enabled
+Hermes' Store,"Hermes"" Store",source,disabled
+Warrior's Chest,"VVarrior""s Chest""",chest,disabled
+Clan wealth,Clan vvealth,source,enabled
+Osmanl?Torunu,OsmanliTorunu,player,enabled
+Epic Ancient squad,Epic Ancient sguad,source,enabled
+Snowweaver,Snovvvveaver,player,enabled
+Kr�melmonster,Krimelmonster,player,enabled
+GUARDIENofTHUNDER,GUARDIENOfTHUNDER,player,enabled
+Rare Chest of Wealth,Rare Chest of VVealth,chest,enabled
+Epic Chest of Wealth,Epic Chest of Vvealth,chest,enabled
+Sir Nightwoolf,Sir Nightvvoolf,player,enabled
+Hammerschlag1,Hammerschlagi,player,enabled
+Feldj�ger,Feldjager,player,enabled
+Feldj�ger,Feldj?r,player,enabled
+Lord �re,Lord Ore,player,enabled
+Lord �re,Lord ?e,player,enabled
+Epic Fenrir squad,Epic Fenrir sguad,source,enabled
+Quick March Chest,Ouick March Chest,chest_type,enabled
+Epic Fenrir squad,Epic Fenrir sguad,source,enabled
+Union of Triumph personal reward,Union of Triumph personal revvard,source,enabled
+reward,revvard,general,enabled
+squad,sguad,general,enabled
+Wealth,Vvealth,general,enabled
+Wealth,VVealth,general,enabled
+Julius C�sar,Juslius C?r,player,enabled
+Julius C�sar,Juslius C�sar,player,enabled
+Julius C�sar,Julius Casar,player,enabled
+Ancients',"Ancients""",general,enabled
+Quick March Chest,Quick March Chest Chest,chest_type,enabled
+Union of Triumph personal reward,Union of Triumf personal reward,general,enabled
+Triumph,Triumf,general,enabled
+Triumph,Triumfp,general,enabled
+Jormungandr,Jêrmungandr,general,enabled
+Jormungandr,J�rmungandr,general,enabled
+Jormungandr,J?mungandr,general,enabled
+Jormungandr,Jòrmungandr,general,enabled
+Jormungandr's,J�rmungandr's,general,enabled
+Jormungandr's,Jòrmungandr's,general,enabled
+Jormungandr Shop,Jòrmungandr Shop,source,enabled
+Jormungandr Shop,J�rmungandr Shop,source,enabled
+Jormungandr's Chest,J�rmungandr's Chest,chest_type,enabled
+Epic Jormungandr squad,Epic J�rmungandr sguad,source,enabled
+Arachne's Swarm Epic squad,Arachne's Svvarm Epic sguad,source,enabled
+Arachne's Swarm Epic squad,Arachne's Swarm Epic sguad,source,enabled

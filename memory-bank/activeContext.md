@@ -1,155 +1,137 @@
 ---
 title: ChestBuddy Active Development Context
-date: 2024-03-29
+date: 2024-03-30
 ---
 
-# Current Focus
+# Active Context
 
-We are currently focused on enhancing the validation system functionality and user experience, with a specific focus on improving the efficiency of managing validation lists. This follows our previous work on the configuration management system.
+*Last Updated: March 30, 2024*
 
-## Recent Accomplishments
+## Current Focus
 
-1. **Enhanced validation list management with multi-entry functionality**:
-   - Created a new `MultiEntryDialog` class that provides a multi-line input interface
-   - Added the ability to add multiple entries at once to validation lists
-   - Implemented proper handling of duplicate entries and empty lines
-   - Updated UI to maintain consistent styling with the application's dark theme
-   - Provided user feedback for added entries and skipped duplicates
+The current focus is on refactoring the correction feature in the ChestBuddy application. This refactoring will implement a more targeted, mapping-based approach for data corrections, replacing the existing general correction strategies with a precise system for mapping incorrect values to their correct equivalents.
 
-2. Created a comprehensive test plan for the configuration system with over 35 test cases across 7 categories:
-   - Settings Persistence
-   - Configuration Export/Import
-   - Reset Functionality
-   - Error Handling
-   - Settings Synchronization
-   - ValidationService Integration
-   - ConfigManager API
+### Key Aspects
 
-3. Implemented detailed unit tests for ConfigManager enhancements:
-   - Boolean value handling with extensive parametrized tests
-   - Error recovery for corrupted or missing config files
-   - Configuration migration from older formats
-   - Performance testing with large configurations
+#### 1. Precise Cell-Level Corrections
+- Implementing a mapping-based correction system that allows correcting specific cell values
+- Supporting category-based rules (player, chest_type, source, general)
+- Implementing rule prioritization (specific over general, order-based within categories)
 
-4. Enhanced ConfigManager.get_bool() method to support additional boolean formats:
-   - Added support for 'Y'/'N' formats
-   - Improved error handling for invalid values
-   - Fixed case-insensitive comparison for boolean strings
+#### 2. CSV-Based Rule Management
+- Supporting import/export functionality for correction rules
+- Implementing alphabetical sorting capabilities
+- Enabling/disabling individual rules
+- Ensuring UTF-8 encoding support for German and international characters
 
-5. Implemented ValidationService integration tests:
-   - Created test_validation_service_config_integration.py
-   - Tested initialization from configuration
-   - Tested preference updates propagation
-   - Tested signal emissions on preference changes
-   - Tested case sensitivity and auto-save behaviors
-   - Created a dedicated script for running these tests
+#### 3. Improved UI Experience
+- Designing an intuitive interface for rule management
+- Implementing batch creation for multiple rules
+- Providing visual feedback through color-coded cell highlighting
+- Adding status bar for statistics and summary information
 
-## Current Work Focus
+#### 4. Performance Considerations
+- Implementing background processing for large datasets
+- Creating progress dialog with cancelation capability
+- Ensuring responsive UI during processing
+- Providing summary information upon completion
 
-We're currently working on enhancing the user experience in the validation system, particularly focusing on:
+#### 5. Integration with Validation
+- Connecting correction system with existing validation functionality
+- Adding option to correct only invalid entries
+- Implementing visual indicators for invalid and correctable cells
 
-1. **Validation List Management Improvements**:
-   - ✅ Added multi-entry functionality for more efficient entry management
-   - Considering additional validation list management features
-   - Exploring potential keyboard shortcuts for common validation operations
+## Implementation Plan
 
-2. **Test Infrastructure Enhancement**: 
-   - Created multiple script runners for integration, validation, and all tests
-   - Fixed all integration tests for `ValidationService` and `ConfigManager`
-   - Fixed all unit tests for `ConfigManager` including boolean handling, migrations, and performance tests
-   - Created a comprehensive `run_all_tests.py` script with filtering and coverage options
+### Phase 1: Core Data Model (Days 1-2)
+- Create `CorrectionRule` model class
+- Implement `CorrectionRuleManager` for rule storage and operations
+- Develop unit tests for model layer
 
-3. **Integration Testing Focus**:
-   - Successfully implemented integration tests between `ValidationService` and `ConfigManager`
-   - Ensured proper configuration loading, preference updates, and validation behavior
-   - Added tests for configuration resets and auto-save behavior
+### Phase 2: Services Layer (Days 3-4)
+- Implement `CorrectionService` with two-pass algorithm
+- Add configuration integration through ConfigManager
+- Create unit tests for services layer
 
-4. **ConfigManager Improvements**:
-   - Enhanced the `get_bool()` method to properly handle 'Y' and 'y' values
-   - Added proper migration support for old configuration versions
-   - Improved error handling for permission errors
-   - Added methods to check for option existence and to reload configuration
+### Phase 3: Controller Layer (Days 5-6)
+- Implement `CorrectionController` for mediating between views and services
+- Develop background worker for processing large datasets
+- Develop unit tests for controller layer
 
-## Recent Changes
+### Phase 4: UI Implementation (Days 7-10)
+- Create `CorrectionView` for rule management
+- Implement `CorrectionRuleTable` for displaying and editing rules
+- Add `BatchCorrectionDialog` for creating multiple rules at once
+- Develop `CorrectionProgressDialog` for processing feedback
 
-- **Added multi-entry functionality to validation lists**:
-  - Created new `MultiEntryDialog` class for adding multiple entries at once
-  - Implemented `add_multiple_entries` method in `ValidationListView`
-  - Updated `ValidationTabView` to use the new functionality
-  - Added the new dialog class to the views package initialization
-  - Ensured consistent styling with dark theme and gold accents
+### Phase 5: Data View Integration (Days 11-12)
+- Implement cell highlighting based on correction status
+- Add context menu integration for creating rules from cells
+- Create tooltips showing correction details
 
-- Fixed all integration tests for `ValidationService` and `ConfigManager` 
-- Fixed all unit tests for `ConfigManager` including:
-  - Boolean value handling (proper recognition of 'Y'/'y' as True)
-  - Configuration version migration
-  - Better error handling for permission errors
-  - Performance testing for large configurations
-- Added versatile test runners:
-  - `run_integration_tests.py`: Runs only integration tests
-  - `run_validation_integration_tests.py`: Runs validation service integration tests
-  - `run_all_tests.py`: Comprehensive runner with options for test categories and coverage
-- Added missing methods to `ConfigManager` class:
-  - `has_option()`: Checks if an option exists in a section
-  - `load()`: Reloads configuration from disk
-  - `_perform_migrations()`: Handles upgrades from older config versions
+### Phase 6: Testing and Optimization (Days 13-14)
+- Develop integration tests for end-to-end workflows
+- Optimize performance for large datasets
+- Ensure proper encoding support for international characters
 
 ## Current Tasks
 
-1. **Enhancing Validation System Usability**:
-   - ✅ Added multi-entry functionality for adding validation list entries
-   - Testing the new functionality in real-world scenarios
-   - Gathering feedback for potential additional improvements
+1. **Design and Implement Model Layer**
+   - Create `CorrectionRule` class with attributes and methods
+   - Implement `CorrectionRuleManager` for CRUD operations
+   - Develop serialization/deserialization for CSV format
 
-2. **Testing the Configuration System**:
-   - ✅ Created comprehensive test plan
-   - ✅ Implemented unit tests for ConfigManager
-   - ✅ Fixed boolean value handling in ConfigManager
-   - ✅ Implemented ValidationService integration tests
-   - Creating test scripts for manual testing
-   - Performing manual testing according to the test plan
-   - Documenting test results
+2. **Develop Services Layer**
+   - Implement two-pass correction algorithm
+   - Create integration with ConfigManager
+   - Build connection with ValidationService
 
-3. **Addressing Non-Critical Issues**:
-   - Monitoring for signal connection issues in application logs
-   - Investigating Unicode encoding errors in logging system
+3. **Create Controller and Worker Classes**
+   - Implement `CorrectionController` with required methods
+   - Develop background worker for processing
+   - Set up signal/slot connections for UI updates
 
-## Immediate Next Steps
+4. **Design and Implement UI Components**
+   - Create rule management view with table and controls
+   - Implement batch correction dialog
+   - Develop progress dialog with cancelation
 
-1. Evaluate potential additional validation list management improvements
-2. Complete manual testing for the configuration system
-3. Document validation list enhancements in the system documentation
-4. Consider additional UX improvements based on user feedback
-5. Explore potential performance optimizations for large validation lists
+5. **Integrate with Data View**
+   - Add cell highlighting functionality
+   - Implement context menu actions
+   - Create tooltips for cell status
 
 ## Technical Decisions
 
-1. **Multi-Entry Dialog Design**:
-   - Used QTextEdit for multi-line input instead of QLineEdit
-   - Implemented entry filtering to handle empty lines and duplicates
-   - Provided clear feedback on the number of entries added vs. duplicates skipped
-   - Used consistent styling with application's dark theme
-   - Made dialog resizable to accommodate different entry list sizes
+1. **Two-Pass Correction Algorithm**
+   - First pass: Apply general rules to all columns
+   - Second pass: Apply category-specific rules to their respective columns
+   - Within each pass, rules are applied in order of priority
 
-2. **Config System Testing Approach**:
-   - Using a combination of automated unit tests and integration tests
-   - Creating dedicated temporary directories for test configurations
-   - Using mock objects for testing ValidationService integration
-   - Implementing test scripts for reproducible manual testing
+2. **Background Processing Pattern**
+   - Use `QThread` with worker object pattern
+   - Implement progress reporting through signals
+   - Handle cancelation and error cases
 
-3. **Error Handling Strategy**:
-   - Adding robust error recovery for corrupted configuration files
-   - Implementing graceful fallback to defaults
-   - Adding detailed logging for troubleshooting
+3. **CSV File Format**
+   - Use UTF-8 encoding with fallback to latin1
+   - Header format: To,From,Category,Status,Order
+   - Support import/export with options for appending/overwriting
+
+4. **Rule Prioritization**
+   - General rules applied first (to all columns)
+   - Category-specific rules applied second (to specific columns)
+   - Within each category, rules applied in order specified
+   - User can reorder rules to change priority
 
 ## Ongoing Discussions
 
-1. **Configuration UI Improvements**:
-   - Considering adding a Config Debug view for developers
-   - Evaluating the need for configuration schema versioning
-   - Discussing backup/restore workflow improvements
+1. **Future Enhancements**
+   - Potential implementation of smart matching using NLP techniques
+   - Additional optimizations for very large datasets
+   - Enhanced rule suggestion based on validation patterns
 
-2. **Validation System Extensions**:
-   - Considering adding support for regex patterns in validation lists
-   - Evaluating performance optimizations for large validation lists
-   - Discussing potential for fuzzy matching in validation
+2. **Performance Considerations**
+   - Vectorized operations for efficiently processing large datasets
+   - Chunked processing to maintain UI responsiveness
+   - Caching validation results to avoid redundant calculations

@@ -215,15 +215,93 @@ The ChestBuddy application follows a two-panel layout structure:
   - Import/Export dialogs with overwrite/append options
 
 ### 3.4 Correction View
-- **Layout**: Split view with data table and correction panel
+- **Layout**: Two-panel design with rule table and controls
 - **Components**:
-  - Data table showing errors/warnings
-  - Correction panel with form fields
-  - Action buttons for applying corrections
+  - Rule management table with sorting and filtering
+  - Action buttons for rule operations
+  - Toggle controls for correction settings
+  - Status bar with statistics
+  - Import/export functionality
 - **Interactions**:
-  - Select row to load in correction panel
-  - Form validation with visual feedback
-  - Apply button to save changes
+  - Double-click row to edit rule
+  - Right-click for context menu
+  - Drag and drop for reordering
+  - Column header click for sorting
+  - Mouse or keyboard for selection
+
+### Correction UI Components
+
+#### Rule Table
+- **Headers**: To, From, Category, Status, Actions
+- **Actions Column**: Up/down buttons for reordering
+- **Status Column**: Checkmark for enabled, X for disabled
+- **Sorting**: Click column headers to sort alphabetically
+- **Selection**: Multi-select support for batch operations
+- **Context Menu**: Full set of rule operations
+- **Row Height**: 30px for comfortable viewing
+- **Alternate Row Colors**: #0F1A2A for odd rows
+
+#### Rule Management Dialogs
+
+**Add/Edit Rule Dialog**:
+- Modal dialog with form layout
+- To field with dropdown suggestions from validation lists
+- From field with text input
+- Category radio buttons (player, chest_type, source, general)
+- Status checkbox (enabled/disabled)
+- Validation to ensure required fields are filled
+- Option to add new "To" values to validation lists
+
+**Batch Rule Creation Dialog**:
+- Grid layout for multiple rule entries
+- From column showing selected cell values
+- Category dropdown for each entry
+- To field dropdown with validation list suggestions
+- Toggle for enabling all rules
+- Toggle for adding new values to validation lists
+
+#### Correction Controls
+- **Auto-correct**: Toggle for auto-correction after validation
+- **Correct Invalid Only**: Toggle to limit correction to invalid cells
+- **Auto-enable New Rules**: Toggle for default status of new/imported rules
+- **Action Buttons**: Import, Export, Apply Corrections
+- **Statistics Display**: Total rules count, enabled/disabled count
+- **Status Bar**: Information about last correction operation
+
+#### Progress Dialog
+- Modal dialog showing correction progress
+- Progress bar with percentage
+- Status text showing current operation
+- Detail text with statistics
+- Cancel button for interrupting operation
+- Summary display after completion
+
+### Data View Integration
+
+#### Cell Highlighting
+- **Red**: Invalid cells without correction rules
+- **Orange**: Invalid cells with correction rules
+- **Green**: Corrected cells
+- **Purple**: Cells that can be corrected with existing rules
+
+#### Context Menu Integration
+- Right-click cell to access "Add Correction Rule" option
+- Multi-select cells for "Create Batch Correction Rules"
+- Option to immediately apply rules after creation
+
+#### Tooltips
+- Hover over highlighted cells to see correction information
+- Tooltip shows available correction rule details
+- Includes category and status information
+
+### Keyboard Navigation
+- Arrow keys to navigate table
+- Enter to edit selected rule
+- Delete to remove selected rule(s)
+- Ctrl+Up/Down to move rules
+- Ctrl+Home/End to move to top/bottom
+- Ctrl+A to select all rules
+- Ctrl+F to focus search field
 
 ### 3.5 Chart View
 - **Layout**: Chart display with controls panel
