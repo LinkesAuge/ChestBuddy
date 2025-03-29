@@ -25,6 +25,7 @@ from PySide6.QtCore import Qt, Signal, QTimer, QObject
 from chestbuddy.core.models.validation_list_model import ValidationListModel
 from chestbuddy.ui.resources.style import Colors
 from chestbuddy.ui.views.confirmation_dialog import ConfirmationDialog
+from chestbuddy.ui.views.multi_entry_dialog import MultiEntryDialog
 
 logger = logging.getLogger(__name__)
 
@@ -343,6 +344,43 @@ class ValidationListView(QWidget):
                 QMessageBox.warning(
                     self, "Add Failed", f"The entry '{text}' already exists in the list."
                 )
+
+    def add_multiple_entries(self) -> None:
+        """Add multiple entries to the list at once."""
+        dialog = MultiEntryDialog(
+            self,
+            title=f"Add Multiple {self._name} Entries",
+            message=f"Enter each {self._name} entry on a new line:",
+            ok_text="Add Entries",
+            cancel_text="Cancel",
+        )
+
+        if dialog.exec() == QDialog.Accepted:
+            entries = dialog.get_entries()
+
+            if not entries:
+                QMessageBox.information(self, "No Entries", "No valid entries were provided.")
+                return
+
+            # Track statistics
+            added = 0
+            duplicates = 0
+
+            # Add each entry
+            for entry in entries:
+                if self._model.add_entry(entry):
+                    added += 1
+                else:
+                    duplicates += 1
+
+            # Report results
+            if added > 0:
+                self.status_changed.emit(
+                    f"Added {added} new entries"
+                    + (f" (skipped {duplicates} duplicates)" if duplicates > 0 else "")
+                )
+            else:
+                QMessageBox.warning(self, "Add Failed", "All entries already exist in the list.")
 
     def remove_selected_entries(self) -> None:
         """Remove selected entries from the list."""

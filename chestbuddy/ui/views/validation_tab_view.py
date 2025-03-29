@@ -640,8 +640,10 @@ class ValidationTabView(QWidget):
         """
         try:
             list_view = getattr(self, f"_{section}_list")
-            logger.debug(f"Add button clicked for {section}, calling add_entry on list_view")
-            list_view.add_entry()
+            logger.debug(
+                f"Add button clicked for {section}, calling add_multiple_entries on list_view"
+            )
+            list_view.add_multiple_entries()
         except Exception as e:
             logger.error(f"Error adding to {section} list: {e}")
             self._display_error(f"Error adding to {section} list: {str(e)}")
