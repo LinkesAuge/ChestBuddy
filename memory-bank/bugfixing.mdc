@@ -1398,3 +1398,58 @@ Here's how validation data now flows through the application:
 
 This fix ensures proper data flow from the validation service to the UI components, resolving the TypeError and enabling validation results to be properly displayed in the data table.
 
+### 2024-03-29: Fixed "Validate on Import" Toggle Persistence Issue (Second Fix)
+
+- **Issue**: The "Validate on Import" toggle in the validation view was still not persisting between application sessions, even after fixing the ConfigManager reference in ValidationService.
+- **Root Cause**: 
+  1. The "validate_on_import" setting was not explicitly included in the ConfigManager's default configuration.
+  2. When the config file was first created or if the setting hadn't been set before, it wouldn't exist in the file.
+  3. This caused the setting to always default back to True when restarting the application.
+- **Fix**: 
+  1. Added "validate_on_import" setting to the default configuration in ConfigManager:
+     ```python
+     self._default_config = {
+         # ...
+         "Validation": {
+             "auto_validate": "True",
+             "validation_lists_dir": str(self._config_dir / "validation_lists"),
+             "validate_on_import": "True",  # Added this line
+         },
+         # ...
+     }
+     ```
+  2. Added code to ensure the setting exists in the config before initializing ValidationService:
+     ```python
+     # Ensure validate_on_import setting exists in config
+     if not self._config_manager._config.has_section("Validation"):
+         self._config_manager._config.add_section("Validation")
+     if not self._config_manager._config.has_option("Validation", "validate_on_import"):
+         self._config_manager.set("Validation", "validate_on_import", "True")
+         self._config_manager.save()
+     ```
+- **Status**: Fixed, the "Validate on Import" toggle now properly persists between application sessions.
+
+### 2024-03-29: Standardized Validation Auto Toggle Configuration
+
+- **Issue**: The application had two separate configuration settings (`auto_validate` and `validate_on_import`) controlling the same behavior: whether validation should run automatically after data import. This caused confusion and potential inconsistency.
+- **Root Cause**: 
+  1. The `UIStateController` used `auto_validate` in the config
+  2. The `ValidationService` used `validate_on_import` in the config
+  3. `DataViewController` bridged between them by translating UI actions to service calls
+  4. Both settings were saved to config separately, creating potential inconsistency
+- **Fix**: 
+  1. Standardized on the more descriptive `validate_on_import` setting
+  2. Updated `UIStateController` to save/load using `validate_on_import` while keeping method names the same
+  3. Removed `auto_validate` from default configuration
+  4. Added migration code to handle existing configurations:
+     ```python
+     # Migrate auto_validate to validate_on_import if needed
+     if (self._config_manager._config.has_section("Validation") and
+         self._config_manager._config.has_option("Validation", "auto_validate") and
+         not self._config_manager._config.has_option("Validation", "validate_on_import")):
+         auto_val = self._config_manager.get_bool("Validation", "auto_validate", True)
+         self._config_manager.set("Validation", "validate_on_import", str(auto_val))
+         logger.info(f"Migrated auto_validate setting ({auto_val}) to validate_on_import")
+     ```
+- **Status**: Fixed. The validation toggle setting is now stored in a single location, eliminating potential inconsistency while maintaining backward compatibility.
+

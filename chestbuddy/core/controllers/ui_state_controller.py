@@ -76,8 +76,10 @@ class UIStateController(BaseController):
             "clear_validation": False,
             "refresh_validation": False,
             "auto_validate": self._config_manager.get_bool(
-                "Validation", "auto_validate", True
-            ),  # Load from config
+                "Validation",
+                "validate_on_import",
+                self._config_manager.get_bool("Validation", "auto_validate", True),
+            ),
         }
         self._ui_theme = "default"
         self._validation_state = {
@@ -128,10 +130,10 @@ class UIStateController(BaseController):
                 # Save auto_validate setting to config if it changed
                 if action_name == "auto_validate":
                     try:
-                        self._config_manager.set("Validation", "auto_validate", str(state))
-                        logger.debug(f"Saved auto_validate setting to config: {state}")
+                        self._config_manager.set("Validation", "validate_on_import", str(state))
+                        logger.debug(f"Saved validate_on_import setting to config: {state}")
                     except Exception as e:
-                        logger.error(f"Error saving auto_validate setting to config: {e}")
+                        logger.error(f"Error saving validate_on_import setting to config: {e}")
 
         if changed:
             self.actions_state_changed.emit(self._action_states.copy())
@@ -358,10 +360,10 @@ class UIStateController(BaseController):
 
         # Save to config
         try:
-            self._config_manager.set("Validation", "auto_validate", str(new_state))
-            logger.info(f"Saved auto_validate toggle to config: {new_state}")
+            self._config_manager.set("Validation", "validate_on_import", str(new_state))
+            logger.info(f"Saved validate_on_import toggle to config: {new_state}")
         except Exception as e:
-            logger.error(f"Error saving auto_validate toggle to config: {e}")
+            logger.error(f"Error saving validate_on_import toggle to config: {e}")
 
         logger.info(f"Auto-validate toggled from {current_state} to {new_state}")
         return new_state
@@ -378,10 +380,10 @@ class UIStateController(BaseController):
 
             # Save to config
             try:
-                self._config_manager.set("Validation", "auto_validate", str(enabled))
-                logger.info(f"Saved auto_validate setting to config: {enabled}")
+                self._config_manager.set("Validation", "validate_on_import", str(enabled))
+                logger.info(f"Saved validate_on_import setting to config: {enabled}")
             except Exception as e:
-                logger.error(f"Error saving auto_validate setting to config: {e}")
+                logger.error(f"Error saving validate_on_import setting to config: {e}")
 
             logger.info(f"Auto-validate set to {enabled}")
 

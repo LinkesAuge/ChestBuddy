@@ -77,8 +77,8 @@ class ConfigManager:
                 "last_export_dir": "",
             },
             "Validation": {
-                "auto_validate": "True",
                 "validation_lists_dir": str(self._config_dir / "validation_lists"),
+                "validate_on_import": "True",
             },
             "Correction": {
                 "auto_correct": "True",

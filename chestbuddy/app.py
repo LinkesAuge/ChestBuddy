@@ -86,6 +86,16 @@ class ChestBuddyApp(QObject):
             # Create configuration manager
             self._config_manager = ConfigManager("chestbuddy")
 
+            # Migrate auto_validate to validate_on_import if needed
+            if (
+                self._config_manager._config.has_section("Validation")
+                and self._config_manager._config.has_option("Validation", "auto_validate")
+                and not self._config_manager._config.has_option("Validation", "validate_on_import")
+            ):
+                auto_val = self._config_manager.get_bool("Validation", "auto_validate", True)
+                self._config_manager.set("Validation", "validate_on_import", str(auto_val))
+                logger.info(f"Migrated auto_validate setting ({auto_val}) to validate_on_import")
+
             # Initialize data model
             self._data_model = ChestDataModel()
 
@@ -100,7 +110,7 @@ class ChestBuddyApp(QObject):
                 # Create DataManager with the correct arguments
                 self._data_manager = DataManager(self._data_model, self._csv_service)
 
-                self._validation_service = ValidationService(self._data_model)
+                self._validation_service = ValidationService(self._data_model, self._config_manager)
                 self._correction_service = CorrectionService(self._data_model)
                 self._chart_service = ChartService(self._data_model)
 
@@ -276,6 +286,15 @@ class ChestBuddyApp(QObject):
                 "validation_preferences_changed",
                 self._data_view_controller,
                 "validate_data",
+            )
+
+            # Connect data_loaded signal to validate_after_import method
+            # This ensures validation happens after import if validate_on_import is enabled
+            self._signal_manager.connect(
+                self._data_manager,
+                "data_loaded",
+                self._data_view_controller,
+                "_validate_after_import",
             )
 
             logger.info("Application signals connected")
