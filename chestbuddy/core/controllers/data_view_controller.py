@@ -1155,69 +1155,100 @@ class DataViewController(BaseController):
         logger.debug("DataViewController connected to UIStateController")
 
     @Slot(dict)
-    def _handle_action_states_changed(self, action_states: Dict[str, bool]) -> None:
+    def _handle_action_states_changed(self, action_states: dict) -> None:
         """
-        Handle changes to action states that may affect validation behavior.
+        Handle changes in UI action states.
 
         Args:
-            action_states: Dictionary of action states by name
+            action_states: Dictionary of action states
         """
-        # Check if auto_validate is in the action states
-        if "auto_validate" in action_states:
-            auto_validate = action_states["auto_validate"]
-            logger.debug(f"Auto-validate action state changed to: {auto_validate}")
+        try:
+            # Validation service is required for this method
+            validation_service = ServiceLocator.get("validation_service")
+            if not validation_service:
+                logger.warning("ValidationService not available for action state updates")
+                return
 
-            # If we have a validation service, update its setting
-            if hasattr(self, "_validation_service") and self._validation_service is not None:
-                try:
-                    # Update the validate_on_import setting in the validation service
-                    self._validation_service.set_validate_on_import(auto_validate)
-                    logger.info(
-                        f"Updated validation service auto-validate setting to: {auto_validate}"
-                    )
-                except Exception as e:
-                    logger.error(f"Error updating auto-validate setting: {e}")
+            # Update validation service based on action states
+            # Check if auto_validate is in the action states
+            if "auto_validate" in action_states:
+                auto_validate = action_states["auto_validate"]
+                logger.debug(f"Auto-validate action state changed to: {auto_validate}")
+
+                # Update validation service with new auto-validate state
+                # This ensures validation happens automatically after import if enabled
+                self._validation_service.set_validate_on_import(auto_validate)
+                logger.debug(
+                    f"Updated validation service auto-validate setting to: {auto_validate}"
+                )
+        except Exception as e:
+            logger.error(f"Error handling action states changed: {e}")
+            self.operation_error.emit(str(e))
 
     def set_auto_validate(self, enabled: bool) -> None:
         """
-        Set the auto-validate feature on or off.
+        Set the auto validation state.
 
         Args:
             enabled: Whether auto-validation should be enabled
         """
-        if not hasattr(self, "_validation_service") or self._validation_service is None:
-            logger.warning("Cannot set auto-validate: Validation service not available")
-            return
-
         try:
-            # Update the validate_on_import setting in the validation service
-            self._validation_service.set_validate_on_import(enabled)
+            # Update validation service
+            if self._validation_service:
+                self._validation_service.set_validate_on_import(enabled)
+                logger.info(f"Set validate_on_import to {enabled}")
+            else:
+                logger.warning("ValidationService not available for setting auto-validate")
 
-            # Update UI state if controller is available
+            # Update UI state
             if self._ui_state_controller:
                 self._ui_state_controller.update_action_states(auto_validate=enabled)
-
-            logger.info(f"Auto-validate set to: {enabled}")
+            else:
+                logger.warning("UIStateController not available for setting auto-validate")
         except Exception as e:
             logger.error(f"Error setting auto-validate: {e}")
-            if self._ui_state_controller:
-                self._ui_state_controller.update_status_message(
-                    f"Error setting auto-validate: {str(e)}"
-                )
+            self.operation_error.emit(str(e))
 
     def get_auto_validate(self) -> bool:
         """
-        Get the current auto-validate setting.
+        Get the current auto-validate state.
 
         Returns:
-            bool: Whether auto-validation is enabled
+            Whether auto-validation is enabled
         """
-        if not hasattr(self, "_validation_service") or self._validation_service is None:
-            logger.warning("Cannot get auto-validate: Validation service not available")
-            return False
-
         try:
-            return self._validation_service.get_validate_on_import()
+            # Try to get from validation service first
+            if self._validation_service:
+                return self._validation_service.get_validate_on_import()
+
+            # Fall back to UI state controller
+            if self._ui_state_controller:
+                return self._ui_state_controller.get_auto_validate()
+
+            # Default if neither is available
+            return True
         except Exception as e:
-            logger.error(f"Error getting auto-validate setting: {e}")
-            return False
+            logger.error(f"Error getting auto-validate state: {e}")
+            return True
+
+    @Slot()
+    def _validate_after_import(self) -> None:
+        """
+        Check if validate_on_import is enabled and run validation if true.
+        This method is designed to be connected to the data_loaded signal.
+        """
+        try:
+            if not hasattr(self, "_validation_service") or self._validation_service is None:
+                logger.warning("Cannot validate after import: Validation service not available")
+                return
+
+            # Check if auto-validation is enabled
+            if self._validation_service.get_validate_on_import():
+                logger.info("Auto-validation is enabled, validating data after import")
+                self.validate_data()
+            else:
+                logger.info("Auto-validation is disabled, skipping validation after import")
+
+        except Exception as e:
+            logger.error(f"Error in validate_after_import: {e}")
+            self.operation_error.emit(f"Error validating after import: {str(e)}")

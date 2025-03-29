@@ -86,16 +86,6 @@ class ChestBuddyApp(QObject):
             # Create configuration manager
             self._config_manager = ConfigManager("chestbuddy")
 
-            # Migrate auto_validate to validate_on_import if needed
-            if (
-                self._config_manager._config.has_section("Validation")
-                and self._config_manager._config.has_option("Validation", "auto_validate")
-                and not self._config_manager._config.has_option("Validation", "validate_on_import")
-            ):
-                auto_val = self._config_manager.get_bool("Validation", "auto_validate", True)
-                self._config_manager.set("Validation", "validate_on_import", str(auto_val))
-                logger.info(f"Migrated auto_validate setting ({auto_val}) to validate_on_import")
-
             # Initialize data model
             self._data_model = ChestDataModel()
 

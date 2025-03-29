@@ -76,9 +76,7 @@ class UIStateController(BaseController):
             "clear_validation": False,
             "refresh_validation": False,
             "auto_validate": self._config_manager.get_bool(
-                "Validation",
-                "validate_on_import",
-                self._config_manager.get_bool("Validation", "auto_validate", True),
+                "Validation", "validate_on_import", True
             ),
         }
         self._ui_theme = "default"
