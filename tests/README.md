@@ -42,6 +42,13 @@ make test-coverage
 make test-file file=tests/unit/test_example.py
 ```
 
+## Current Test Status
+
+- **Unit Tests**: Working correctly
+- **UI Tests**: Working correctly
+- **Integration Tests**: Experiencing recursion issues with signal handling (Work in progress)
+- **End-to-End Tests**: Experiencing issues with test execution (Work in progress)
+
 ## Testing Categories
 
 ### Unit Tests
@@ -108,4 +115,12 @@ The `tests/utils/` directory contains helper functions and classes for testing:
 - File I/O helpers (temporary files and directories)
 - Qt testing helpers (enhanced QtBot, signal spies, etc.)
 - Waiting utilities (wait for conditions, signals, etc.)
-- Widget finding utilities 
+- Widget finding utilities
+
+## Known Issues and Limitations
+
+- **Recursion Issues with Qt Signals**: Some tests may experience recursion issues when using PySide6 signals with complex data structures like pandas DataFrames.
+- **Enhancement Ideas**: 
+  - Use simpler data structures for integration tests
+  - Add disconnect logic to properly clean up signal connections
+  - Implement better handling of Qt's event loop in tests 
