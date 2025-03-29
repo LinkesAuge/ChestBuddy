@@ -1,133 +1,111 @@
-# ChestBuddy Tests
+# ChestBuddy Testing Framework
 
-This directory contains tests for the ChestBuddy application. The tests are written using pytest and cover various aspects of the application, including core utilities, models, services, and UI components.
+This directory contains all the tests for the ChestBuddy application.
 
-## Test Structure
+## Directory Structure
 
-The tests are organized as follows:
+- **tests/**
+  - **unit/**: Unit tests for individual components
+  - **integration/**: Tests for interactions between components
+  - **ui/**: Tests for UI components and interactions
+  - **e2e/**: End-to-end workflow tests
+  - **data/**: Test data factories and datasets
+  - **utils/**: Testing utilities and helpers
+  - **resources/**: Test resources and assets
+  - **conftest.py**: Common test fixtures
+  - **README.md**: This file
 
-- `test_config_manager.py`: Tests for the ConfigManager class.
-- `test_chest_data_model.py`: Tests for the ChestDataModel class.
-- `test_services.py`: Tests for the service classes (CSVService, ValidationService, CorrectionService).
-- `test_ui_components.py`: Tests for the UI components (DataView, ValidationTab, CorrectionTab).
-- `test_app.py`: Tests for the ChestBuddyApp class.
+## Running Tests
 
-## Default Files
-
-The application uses several default files that are also used in testing:
-
-### Input Data
-- **Location**: `data/input/Chests_input_test.csv`
-- **Format**: CSV with columns (DATE, PLAYER, SOURCE, CHEST, SCORE, CLAN)
-- **Purpose**: Sample data for testing and default data for the application
-
-### Validation Lists
-- **Location**: `data/validation/`
-- **Files**:
-  - `chest_types.txt`: List of valid chest types, one per line
-  - `players.txt`: List of valid player names, one per line
-  - `sources.txt`: List of valid source/location names, one per line
-- **Purpose**: Used to validate the input data
-
-### Correction Lists
-- **Location**: `data/corrections/standard_corrections.csv`
-- **Format**: CSV with columns (From, To, Category, enabled)
-- **Purpose**: Used to apply automatic corrections to invalid data
-
-## Running the Tests
-
-To run the tests, you will need to have pytest installed. You can install it using:
+You can run tests using `pytest` directly or using the Makefile:
 
 ```bash
-uv add pytest --dev
+# Run all tests
+make test-all
+
+# Run only unit tests
+make test-unit
+
+# Run only integration tests
+make test-integration
+
+# Run only UI tests
+make test-ui
+
+# Run only end-to-end tests
+make test-e2e
+
+# Run tests with coverage
+make test-coverage
+
+# Run a specific test file
+make test-file file=tests/unit/test_example.py
 ```
 
-Then, from the project root directory, run:
+## Testing Categories
 
-```bash
-python -m pytest tests/
-```
+### Unit Tests
+- Test individual components in isolation
+- Fast execution
+- Use mocks for dependencies
+- Located in the `tests/unit/` directory
 
-To run a specific test file:
+### Integration Tests
+- Test interactions between components
+- Medium execution speed
+- Minimal mocking
+- Located in the `tests/integration/` directory
 
-```bash
-python -m pytest tests/test_config_manager.py
-```
+### UI Tests
+- Test UI components and interactions
+- Use QtBot and widget tests
+- Located in the `tests/ui/` directory
 
-To run a specific test function:
+### End-to-End Tests
+- Test complete application workflows
+- Slower execution
+- No mocking of core components
+- Located in the `tests/e2e/` directory
 
-```bash
-python -m pytest tests/test_config_manager.py::test_singleton_pattern
-```
+## Test Fixtures
 
-## Test Coverage
+Common test fixtures are defined in `conftest.py`. These include:
 
-To generate a test coverage report, install pytest-cov:
+- **Sample Data**: Pre-generated test datasets
+- **Temporary Files/Directories**: For file I/O tests
+- **Enhanced QtBot**: Improved QtBot with additional helper methods
+- **Main Window**: Common QMainWindow for UI tests
 
-```bash
-uv add pytest-cov --dev
-```
+## Markers
 
-Then run:
+The following pytest markers are available:
 
-```bash
-python -m pytest tests/ --cov=chestbuddy
-```
+- `@pytest.mark.unit`: Unit tests
+- `@pytest.mark.integration`: Integration tests
+- `@pytest.mark.ui`: UI tests
+- `@pytest.mark.e2e`: End-to-end tests
+- `@pytest.mark.slow`: Tests that take a long time to run
+- `@pytest.mark.model`: Tests for data models
+- `@pytest.mark.service`: Tests for service components
+- `@pytest.mark.controller`: Tests for controller components
+- `@pytest.mark.utility`: Tests for utility functions
 
-## UI Tests
+## Test Data
 
-The UI component tests require a QApplication instance to be created. This is handled automatically by the fixtures in the test files. Note that these tests do not actually display any UI, they just test that the components initialize correctly and respond appropriately to method calls.
+Test data is generated using the `TestDataFactory` class in the `tests/data/` directory. You can use it to create:
 
-## Data Format
+- Empty datasets
+- Small datasets (10 rows)
+- Medium datasets (100 rows)
+- Large datasets (1000 rows)
+- Very large datasets (10,000 rows)
+- Datasets with specific errors
 
-The tests expect data to have the following structure:
+## Testing Utilities
 
-1. **ChestDataModel Expected Columns**:
-   - Date: Date of the chest drop (YYYY-MM-DD format)
-   - Player Name: Name of the player
-   - Source/Location: Where the chest was obtained
-   - Chest Type: Type of chest
-   - Value: Numeric value of the chest
-   - Clan: Clan name
+The `tests/utils/` directory contains helper functions and classes for testing:
 
-2. **Validation Status DataFrame**:
-   - Contains columns named after data columns with "_valid" suffix
-   - For example: "Date_valid", "Player Name_valid", etc.
-   - Boolean values indicating validity
-
-3. **Correction Status DataFrame**:
-   - Contains columns named after data columns with "_corrected" suffix
-   - For example: "Date_corrected", "Player Name_corrected", etc.
-   - Boolean values indicating if corrections were applied
-   - Also contains "_original" columns to store original values
-
-## Adding New Tests
-
-When adding new tests, follow these guidelines:
-
-1. Create a new test file in the tests directory.
-2. Use pytest fixtures for common setup code.
-3. Follow the naming convention: `test_*` for test files and test functions.
-4. Group related tests into classes.
-5. Add docstrings to explain what each test does.
-6. Clean up any temporary files or resources created during tests.
-7. Use the default files for testing when possible.
-
-## Example
-
-Here's an example of how to add a new test:
-
-```python
-import pytest
-from chestbuddy.some_module import SomeClass
-
-@pytest.fixture
-def some_object():
-    """Create a SomeClass instance for testing."""
-    return SomeClass()
-
-def test_some_functionality(some_object):
-    """Test that some functionality works correctly."""
-    result = some_object.some_method()
-    assert result == expected_value
-``` 
+- File I/O helpers (temporary files and directories)
+- Qt testing helpers (enhanced QtBot, signal spies, etc.)
+- Waiting utilities (wait for conditions, signals, etc.)
+- Widget finding utilities 
