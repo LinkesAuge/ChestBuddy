@@ -505,6 +505,66 @@ class ValidationTabView(QWidget):
                     f"ValidationListView {list_view.objectName()} has no model or missing expected signal"
                 )
 
+        # Connect section buttons
+        # Use lambda with default arguments to avoid late binding issues
+        self._players_add.clicked.connect(
+            lambda checked=False: self._on_list_add_clicked("players")
+        )
+        self._players_remove.clicked.connect(
+            lambda checked=False: self._on_list_remove_clicked("players")
+        )
+        self._players_import.clicked.connect(
+            lambda checked=False: self._on_list_import_clicked("players")
+        )
+        self._players_export.clicked.connect(
+            lambda checked=False: self._on_list_export_clicked("players")
+        )
+
+        self._chest_types_add.clicked.connect(
+            lambda checked=False: self._on_list_add_clicked("chest_types")
+        )
+        self._chest_types_remove.clicked.connect(
+            lambda checked=False: self._on_list_remove_clicked("chest_types")
+        )
+        self._chest_types_import.clicked.connect(
+            lambda checked=False: self._on_list_import_clicked("chest_types")
+        )
+        self._chest_types_export.clicked.connect(
+            lambda checked=False: self._on_list_export_clicked("chest_types")
+        )
+
+        self._sources_add.clicked.connect(
+            lambda checked=False: self._on_list_add_clicked("sources")
+        )
+        self._sources_remove.clicked.connect(
+            lambda checked=False: self._on_list_remove_clicked("sources")
+        )
+        self._sources_import.clicked.connect(
+            lambda checked=False: self._on_list_import_clicked("sources")
+        )
+        self._sources_export.clicked.connect(
+            lambda checked=False: self._on_list_export_clicked("sources")
+        )
+
+        # Connect validation list view signals
+        for section in ["players", "chest_types", "sources"]:
+            list_view = getattr(self, f"_{section}_list")
+            list_view.status_changed.connect(self._on_status_changed)
+            list_view.model().entries_changed.connect(self._on_entries_changed)
+
+        # Connect validation service signals if available
+        if self._validation_service:
+            self._validation_service.validation_preferences_changed.connect(
+                self._on_validation_preferences_changed
+            )
+
+        # Log connections
+        logger.debug("Set up ValidationTabView signal connections")
+        # Log specific import button connections
+        logger.debug(
+            f"Connected import buttons: {self._players_import.isEnabled()}, {self._chest_types_import.isEnabled()}, {self._sources_import.isEnabled()}"
+        )
+
     def _on_validation_changed(self, status_df: pd.DataFrame) -> None:
         """
         Slot to handle validation changes.
@@ -571,25 +631,37 @@ class ValidationTabView(QWidget):
         # Update statistics after validation
         self._update_validation_stats()
 
-    def _on_add_clicked(self, section: str) -> None:
+    def _on_list_add_clicked(self, section: str) -> None:
         """
         Handle add button click for a section.
 
         Args:
             section (str): Section name (players, chest_types, sources)
         """
-        list_view = getattr(self, f"_{section}_list")
-        list_view.add_entry()
+        try:
+            list_view = getattr(self, f"_{section}_list")
+            logger.debug(f"Add button clicked for {section}, calling add_entry on list_view")
+            list_view.add_entry()
+        except Exception as e:
+            logger.error(f"Error adding to {section} list: {e}")
+            self._display_error(f"Error adding to {section} list: {str(e)}")
 
-    def _on_remove_clicked(self, section: str) -> None:
+    def _on_list_remove_clicked(self, section: str) -> None:
         """
         Handle remove button click for a section.
 
         Args:
             section (str): Section name (players, chest_types, sources)
         """
-        list_view = getattr(self, f"_{section}_list")
-        list_view.remove_selected_entries()
+        try:
+            list_view = getattr(self, f"_{section}_list")
+            logger.debug(
+                f"Remove button clicked for {section}, calling remove_selected_entries on list_view"
+            )
+            list_view.remove_selected_entries()
+        except Exception as e:
+            logger.error(f"Error removing from {section} list: {e}")
+            self._display_error(f"Error removing from {section} list: {str(e)}")
 
     def _on_list_import_clicked(self, section: str) -> None:
         """

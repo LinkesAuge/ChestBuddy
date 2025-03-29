@@ -90,7 +90,6 @@ Thommy
 Treibhaus
 Triple X
 Tugo
-Type,player
 Tyroler Bua
 Volkspark
 Weinkeller
@@ -98,4 +97,4 @@ Zeus
 mimin
 nobby
 nobe
-rainstream
+test
