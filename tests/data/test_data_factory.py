@@ -4,9 +4,30 @@ Test data factory for generating sample data for tests.
 This module provides utilities to create test datasets of various sizes and characteristics.
 """
 
-import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
+import random
+from typing import Dict, List, Any, Optional
+
+
+class SimpleData:
+    """
+    Simple data container for testing.
+
+    Designed to avoid recursion issues when used in signals.
+    """
+
+    def __init__(self, data=None):
+        """Initialize with simple data."""
+        self.data = data or {}
+
+    def copy(self):
+        """Create a safe copy of the data."""
+        return SimpleData({k: v.copy() if isinstance(v, list) else v for k, v in self.data.items()})
+
+    def __repr__(self):
+        """String representation for debugging."""
+        return f"SimpleData({self.data})"
 
 
 class TestDataFactory:
@@ -40,8 +61,8 @@ class TestDataFactory:
 
     @classmethod
     def create_empty_data(cls):
-        """Create an empty DataFrame with the expected columns."""
-        return pd.DataFrame(columns=cls.EXPECTED_COLUMNS)
+        """Create an empty data container with the expected columns."""
+        return SimpleData({col: [] for col in cls.EXPECTED_COLUMNS})
 
     @classmethod
     def create_small_data(cls, with_errors=False, num_rows=10):
@@ -75,41 +96,48 @@ class TestDataFactory:
 
     @classmethod
     def _create_data(cls, num_rows, with_errors=False, error_rate=0.1):
-        """Create a DataFrame with the specified number of rows."""
+        """Create a SimpleData object with the specified number of rows."""
         # Set seed for reproducible results
+        random.seed(42)
         np.random.seed(42)
 
         # Generate base data
         start_date = datetime.now() - timedelta(days=num_rows)
-        date_range = [start_date + timedelta(days=i) for i in range(num_rows)]
+        dates = [(start_date + timedelta(days=i)).strftime("%Y-%m-%d") for i in range(num_rows)]
+
+        players = [random.choice(cls.SAMPLE_PLAYERS) for _ in range(num_rows)]
+        sources = [random.choice(cls.SAMPLE_SOURCES) for _ in range(num_rows)]
+        chests = [random.choice(cls.SAMPLE_CHESTS) for _ in range(num_rows)]
+        scores = [random.randint(1, 100) for _ in range(num_rows)]
+        clans = [random.choice(cls.SAMPLE_CLANS) for _ in range(num_rows)]
 
         data = {
-            "DATE": date_range,
-            "PLAYER": np.random.choice(cls.SAMPLE_PLAYERS, num_rows),
-            "SOURCE": np.random.choice(cls.SAMPLE_SOURCES, num_rows),
-            "CHEST": np.random.choice(cls.SAMPLE_CHESTS, num_rows),
-            "SCORE": np.random.randint(1, 100, num_rows),
-            "CLAN": np.random.choice(cls.SAMPLE_CLANS, num_rows),
+            "DATE": dates,
+            "PLAYER": players,
+            "SOURCE": sources,
+            "CHEST": chests,
+            "SCORE": scores,
+            "CLAN": clans,
         }
 
-        # Create DataFrame
-        df = pd.DataFrame(data)
+        # Create SimpleData
+        simple_data = SimpleData(data)
 
         # Add errors if requested
         if with_errors:
             error_count = int(num_rows * error_rate)
-            error_indices = np.random.choice(num_rows, error_count, replace=False)
+            error_indices = random.sample(range(num_rows), min(error_count, num_rows))
 
             for idx in error_indices:
-                error_type = np.random.choice(["player", "chest", "source"])
+                error_type = random.choice(["player", "chest", "source"])
                 if error_type == "player":
-                    df.loc[idx, "PLAYER"] = f"Invalid{idx}"
+                    simple_data.data["PLAYER"][idx] = f"Invalid{idx}"
                 elif error_type == "chest":
-                    df.loc[idx, "CHEST"] = f"InvalidChest{idx}"
+                    simple_data.data["CHEST"][idx] = f"InvalidChest{idx}"
                 elif error_type == "source":
-                    df.loc[idx, "SOURCE"] = f"InvalidSource{idx}"
+                    simple_data.data["SOURCE"][idx] = f"InvalidSource{idx}"
 
-        return df
+        return simple_data
 
     @classmethod
     def create_data_with_specific_errors(cls, error_types=None):
@@ -120,24 +148,24 @@ class TestDataFactory:
                          indicating the number of errors to introduce for each type.
 
         Returns:
-            DataFrame with specific errors.
+            SimpleData with specific errors.
         """
         if error_types is None:
             error_types = {"player": 2, "chest": 2, "source": 2}
 
         total_errors = sum(error_types.values())
         # Create a dataset with enough rows to hold all errors
-        df = cls.create_small_data(False, 20 + total_errors)
+        simple_data = cls.create_small_data(False, 20 + total_errors)
 
         row_idx = 0
         for error_type, count in error_types.items():
             for i in range(count):
                 if error_type == "player":
-                    df.loc[row_idx, "PLAYER"] = f"InvalidPlayer{i}"
+                    simple_data.data["PLAYER"][row_idx] = f"InvalidPlayer{i}"
                 elif error_type == "chest":
-                    df.loc[row_idx, "CHEST"] = f"InvalidChest{i}"
+                    simple_data.data["CHEST"][row_idx] = f"InvalidChest{i}"
                 elif error_type == "source":
-                    df.loc[row_idx, "SOURCE"] = f"InvalidSource{i}"
+                    simple_data.data["SOURCE"][row_idx] = f"InvalidSource{i}"
                 row_idx += 1
 
-        return df
+        return simple_data

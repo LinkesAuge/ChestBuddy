@@ -1,16 +1,15 @@
 """
-Example unit test.
+Example unit tests.
 
-This is a sample unit test to demonstrate the testing structure.
+This file contains example unit tests for the ChestBuddy application.
 """
 
 import pytest
 from tests.data import TestDataFactory
 
 
-@pytest.mark.unit
 class TestExample:
-    """Example test case to demonstrate testing structure."""
+    """Example test class for unit tests."""
 
     def test_data_factory_creates_small_dataset(self):
         """Test that TestDataFactory can create a small dataset."""
@@ -18,11 +17,11 @@ class TestExample:
 
         # Check that data has the expected columns
         for column in TestDataFactory.EXPECTED_COLUMNS:
-            assert column in data.columns
+            assert column in data.data
 
-        # Check that we have rows in the dataset
-        assert len(data) > 0
-        assert len(data) <= TestDataFactory.SMALL_SIZE
+        # Check that data has the expected number of rows
+        first_column = TestDataFactory.EXPECTED_COLUMNS[0]
+        assert len(data.data[first_column]) == 10
 
     def test_data_factory_creates_dataset_with_errors(self):
         """Test that TestDataFactory can create a dataset with errors."""
@@ -30,7 +29,8 @@ class TestExample:
 
         # Check that data has the expected columns
         for column in TestDataFactory.EXPECTED_COLUMNS:
-            assert column in data.columns
+            assert column in data.data
 
-        # Check that we have rows in the dataset
-        assert len(data) == 10
+        # Check that data has the expected number of rows
+        first_column = TestDataFactory.EXPECTED_COLUMNS[0]
+        assert len(data.data[first_column]) == 10

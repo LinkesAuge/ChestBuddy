@@ -12,7 +12,7 @@ import tempfile
 import shutil
 
 import pytest
-from PySide6.QtCore import QObject, Signal, Qt, QTimer, QCoreApplication, QEvent
+from PySide6.QtCore import QObject, Signal, Qt, QTimer, QCoreApplication, QEvent, QEventLoop
 from PySide6.QtWidgets import QWidget, QApplication
 
 
@@ -97,6 +97,43 @@ def wait_until(condition_func: Callable[[], bool], timeout: int = 1000, interval
         QCoreApplication.processEvents()
         remaining -= interval
     return False
+
+
+def wait_for_signal(signal, timeout=1000):
+    """
+    Wait for a signal to be emitted with proper event loop handling.
+
+    Args:
+        signal: The signal to wait for
+        timeout: Maximum wait time in milliseconds
+
+    Returns:
+        dict: Contains 'success' (bool), 'args' (tuple) if signal was emitted
+    """
+    loop = QEventLoop()
+    result = {"success": False}
+
+    # Connect the signal to exit the event loop
+    def on_signal(*args):
+        result["success"] = True
+        result["args"] = args
+        loop.quit()
+
+    connection = signal.connect(on_signal)
+
+    # Set a timeout to exit the event loop
+    timer = QTimer()
+    timer.setSingleShot(True)
+    timer.timeout.connect(loop.quit)
+    timer.start(timeout)
+
+    # Run the event loop
+    loop.exec()
+
+    # Clean up
+    QObject.disconnect(connection)
+
+    return result
 
 
 def find_widget_by_type(parent: QWidget, widget_type: Type[T]) -> List[T]:
@@ -193,25 +230,30 @@ class SignalSpy(QObject):
     Spy on Qt signals for testing.
 
     Attributes:
-        signal_name (str): Name of the signal
+        signal_name (str): Name of the signal (if available)
         emitted (List[List[Any]]): List of signal emissions with arguments
         count (int): Number of times the signal was emitted
+        connection: The connection object for cleanup
     """
 
-    def __init__(self, signal: Signal, parent: Optional[QObject] = None):
+    def __init__(self, signal, parent: Optional[QObject] = None):
         """
         Initialize the signal spy.
 
         Args:
-            signal (Signal): Signal to spy on
+            signal: Signal to spy on (PySide6.QtCore.SignalInstance)
             parent (Optional[QObject]): Parent object
         """
         super().__init__(parent)
-        self.signal_name = signal.signal
+        # For PySide6, we don't have a signal.signal attribute
+        # Just store a descriptive name if possible
+        self.signal_name = str(signal)
         self.emitted = []
         self.count = 0
+        self.signal = signal
 
-        signal.connect(self._slot)
+        # Store the connection for later disconnection
+        self.connection = signal.connect(self._slot)
 
     def _slot(self, *args: Any) -> None:
         """
@@ -236,7 +278,38 @@ class SignalSpy(QObject):
         initial_count = self.count
         return wait_until(lambda: self.count > initial_count, timeout)
 
+    def wait_for_emission(self, timeout: int = 1000):
+        """
+        Wait for the signal to be emitted using event loop.
+
+        Args:
+            timeout (int): Maximum time to wait in milliseconds
+
+        Returns:
+            dict: Contains 'success' (bool) and 'args' (if signal was emitted)
+        """
+        return wait_for_signal(self.signal, timeout)
+
     def clear(self) -> None:
         """Clear the emission history."""
         self.emitted.clear()
         self.count = 0
+
+    def disconnect(self) -> None:
+        """Disconnect the signal to prevent leakage."""
+        if hasattr(self, "connection") and self.connection:
+            try:
+                QObject.disconnect(self.connection)
+                self.connection = None
+            except RuntimeError:
+                # Already disconnected or invalid
+                pass
+
+    def __del__(self):
+        """Ensure disconnection when object is deleted."""
+        self.disconnect()
+
+
+def process_events():
+    """Process Qt events to allow signals to be delivered."""
+    QCoreApplication.processEvents()

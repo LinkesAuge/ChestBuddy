@@ -6,7 +6,7 @@ This is a sample UI test to demonstrate testing PySide6 components.
 
 import pytest
 from PySide6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
-from PySide6.QtCore import Signal, Slot
+from PySide6.QtCore import Signal, Slot, Qt
 from tests.utils.helpers import SignalSpy
 
 
@@ -42,27 +42,25 @@ class ExampleWidget(QWidget):
 class TestExampleWidget:
     """Test case for the example widget."""
 
-    def test_initial_state(self, qtbot):
+    def test_initial_state(self, enhanced_qtbot):
         """Test the initial state of the widget."""
         # Create and add widget to qtbot
-        widget = ExampleWidget()
-        qtbot.addWidget(widget)
+        widget = enhanced_qtbot.add_widget(ExampleWidget())
 
         # Check initial state
         assert widget.label.text() == "Click the button"
         assert widget.button.text() == "Change Text"
 
-    def test_button_click(self, qtbot):
+    def test_button_click(self, enhanced_qtbot):
         """Test button click changes label text."""
         # Create and add widget to qtbot
-        widget = ExampleWidget()
-        qtbot.addWidget(widget)
+        widget = enhanced_qtbot.add_widget(ExampleWidget())
 
-        # Create a signal spy
-        spy = SignalSpy(widget.textChanged)
+        # Create a signal spy with automatic tracking
+        spy = enhanced_qtbot.add_spy(widget.textChanged)
 
         # Click the button
-        qtbot.mouseClick(widget.button, Qt.LeftButton)
+        enhanced_qtbot.click_button(widget.button)
 
         # Check that the label text was updated
         assert widget.label.text() == "Button was clicked!"
@@ -73,11 +71,10 @@ class TestExampleWidget:
 
     def test_with_enhanced_qtbot(self, enhanced_qtbot):
         """Test using the enhanced qtbot fixture."""
-        # Create widget
-        widget = ExampleWidget()
-        enhanced_qtbot.add_widget(widget)
+        # Create widget with tracking
+        widget = enhanced_qtbot.add_widget(ExampleWidget())
 
-        # Click the button
+        # Click the button with enhanced method
         enhanced_qtbot.click_button(widget.button)
 
         # Check that the label text was updated
