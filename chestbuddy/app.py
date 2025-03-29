@@ -94,11 +94,18 @@ class ChestBuddyApp(QObject):
 
             # Create services
             try:
+                # Create services
                 self._csv_service = CSVService()
+
+                # Create DataManager with the correct arguments
+                self._data_manager = DataManager(self._data_model, self._csv_service)
+
                 self._validation_service = ValidationService(self._data_model)
                 self._correction_service = CorrectionService(self._data_model)
                 self._chart_service = ChartService(self._data_model)
-                self._data_manager = DataManager(self._data_model, self._csv_service)
+
+                # Register services with ServiceLocator
+                ServiceLocator.register("validation_service", self._validation_service)
 
                 # Initialize DataManager with config_manager
                 self._data_manager._config = self._config_manager

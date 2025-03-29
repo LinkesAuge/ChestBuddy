@@ -6,7 +6,7 @@ Description: View for managing validation lists with import/export functionality
 
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict
 
 from PySide6.QtWidgets import (
     QWidget,
@@ -23,15 +23,18 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QGridLayout,
     QCheckBox,
+    QTabWidget,
 )
 from PySide6.QtCore import Qt, Signal, QSize
-from PySide6.QtGui import QAction
+from PySide6.QtGui import QAction, QIcon
 
 from chestbuddy.ui.views.validation_list_view import ValidationListView
 from chestbuddy.core.models.validation_list_model import ValidationListModel
 from chestbuddy.core.services.validation_service import ValidationService
 from chestbuddy.ui.utils.icon_provider import IconProvider
 from chestbuddy.ui.resources.style import Colors
+import pandas as pd  # Add pandas import
+from chestbuddy.utils.service_locator import ServiceLocator  # Added import
 
 logger = logging.getLogger(__name__)
 
@@ -44,18 +47,33 @@ class ValidationTabView(QWidget):
         validation_changed (Signal): Signal emitted when validation status changes
     """
 
-    validation_changed = Signal()
+    validation_changed = Signal(object)  # Signal emitted with validation status DataFrame
 
-    def __init__(self, validation_service: ValidationService, parent: Optional[QWidget] = None):
+    def __init__(
+        self,
+        parent: Optional[QWidget] = None,
+        validation_service: Optional[ValidationService] = None,
+    ) -> None:
         """
         Initialize the validation tab view.
 
         Args:
-            validation_service (ValidationService): Service for validation
             parent (Optional[QWidget]): Parent widget
+            validation_service (Optional[ValidationService]): Service for validation
         """
         super().__init__(parent)
+        self.setObjectName("validation_tab")
+
+        # Store validation service or get from ServiceLocator
         self._validation_service = validation_service
+        if self._validation_service is None:
+            try:
+                self._validation_service = ServiceLocator.get("validation_service")
+                logger.info("Retrieved ValidationService from ServiceLocator")
+            except KeyError:
+                logger.error("ValidationService not found in ServiceLocator")
+                self._display_service_error()
+
         self._setup_ui()
         self._connect_signals()
         logger.info("Initialized ValidationTabView")
@@ -414,45 +432,76 @@ class ValidationTabView(QWidget):
 
     def _connect_signals(self) -> None:
         """Connect signals and slots."""
-        # Connect toolbar actions
+        # Connect signals from validation service
+        if hasattr(self._validation_service, "validation_changed"):
+            # Disconnect existing connections first to prevent duplicates
+            try:
+                self._validation_service.validation_changed.disconnect(self._on_validation_changed)
+                logger.debug("Disconnected existing validation_changed signal.")
+            except (TypeError, RuntimeError):
+                logger.debug("No existing validation_changed signal to disconnect.")
+
+            # Connect the signal
+            self._validation_service.validation_changed.connect(self._on_validation_changed)
+            logger.debug("Connected validation_changed signal to _on_validation_changed.")
+        else:
+            logger.warning("ValidationService has no validation_changed signal.")
+
+        # Connect button actions
         self._validate_action.triggered.connect(self._on_validate_clicked)
 
-        # Connect preferences checkboxes
-        self._case_sensitive_checkbox.toggled.connect(self._on_case_sensitive_toggled)
-        self._validate_on_import_checkbox.toggled.connect(self._on_validate_on_import_toggled)
+        # Connect checkbox signals
+        self._case_sensitive_checkbox.stateChanged.connect(self._update_validation_preference)
+        self._validate_on_import_checkbox.stateChanged.connect(self._update_validation_preference)
 
-        # Define section names with normalized format (underscores instead of spaces)
-        sections = ["players", "chest_types", "sources"]
-
-        # Connect list actions for each section
-        for section in sections:
-            # Get widgets
-            add_button = getattr(self, f"_{section}_add")
-            remove_button = getattr(self, f"_{section}_remove")
-            import_button = getattr(self, f"_{section}_import")
-            export_button = getattr(self, f"_{section}_export")
-            list_view = getattr(self, f"_{section}_list")
-
-            # Connect actions
-            add_button.clicked.connect(lambda checked=False, s=section: self._on_add_clicked(s))
-            remove_button.clicked.connect(
-                lambda checked=False, s=section: self._on_remove_clicked(s)
-            )
-            import_button.clicked.connect(
-                lambda checked=False, s=section: self._on_list_import_clicked(s)
-            )
-            export_button.clicked.connect(
-                lambda checked=False, s=section: self._on_list_export_clicked(s)
-            )
-
-            # Connect list view model signals
+        # Connect signals for each list view
+        for list_view in self.findChildren(ValidationListView):
+            # Call model() method to get the actual model object
             model = list_view.model()
-            if model:
-                model.entries_changed.connect(self._on_entries_changed)
+            if model and hasattr(model, "entries_changed"):
+                # ValidationListModel uses a custom signal called 'entries_changed'
+                # instead of standard Qt model signals
+                model.entries_changed.connect(self._update_list_view_status)
+                logger.debug(f"Connected entries_changed signal for {list_view.objectName()}")
+            else:
+                logger.warning(
+                    f"ValidationListView {list_view.objectName()} has no model or missing expected signal"
+                )
 
-            # Connect status signal if available
-            if hasattr(list_view, "status_changed"):
-                list_view.status_changed.connect(self._on_status_changed)
+    def _on_validation_changed(self, status_df: pd.DataFrame) -> None:
+        """
+        Slot to handle validation changes.
+
+        Args:
+            status_df (pd.DataFrame): The DataFrame containing validation status.
+        """
+        logger.info(f"Received validation_changed signal with status shape: {status_df.shape}")
+        # Potentially update UI elements based on the validation status here.
+        # For now, just log the reception.
+        self._set_status_message("Validation status updated.")
+        # Emit our own signal if needed by parent components
+        self.validation_changed.emit(status_df)
+
+    def _update_validation_preference(self) -> None:
+        """Update validation preferences in the service based on checkbox states."""
+        prefs = {
+            "case_sensitive": self._case_sensitive_checkbox.isChecked(),
+            "validate_on_import": self._validate_on_import_checkbox.isChecked(),
+        }
+        self._validation_service.set_validation_preferences(prefs)
+        logger.info(f"Validation preferences updated: {prefs}")
+        self._set_status_message("Validation preferences updated.")
+
+    def _update_list_view_status(self) -> None:
+        """Update status based on changes in any validation list view."""
+        # Check if any list has unsaved changes
+        has_unsaved = any(
+            lv.model.has_unsaved_changes() for lv in self.findChildren(ValidationListView)
+        )
+        if has_unsaved:
+            self._set_status_message("Unsaved changes in validation lists.")
+        else:
+            self._set_status_message("Ready")
 
     def _on_validate_clicked(self) -> None:
         """Handle validate button click."""
@@ -474,7 +523,7 @@ class ValidationTabView(QWidget):
                 self._set_status_message("Validation complete: No issues found")
 
             # Emit signal to notify about validation change
-            self.validation_changed.emit()
+            self.validation_changed.emit(results)
             logger.info("Validation completed")
 
         except Exception as e:
@@ -526,7 +575,9 @@ class ValidationTabView(QWidget):
 
     def _on_entries_changed(self) -> None:
         """Handle changes to validation list entries."""
-        self.validation_changed.emit()
+        # Create an empty DataFrame for the signal
+        empty_df = pd.DataFrame()
+        self.validation_changed.emit(empty_df)
         self._update_validation_stats()  # Update validation statistics when entries change
 
     def _on_status_changed(self, message: str = "") -> None:
@@ -629,3 +680,12 @@ class ValidationTabView(QWidget):
         prefs["validate_on_import"] = checked
         self._validation_service.set_validation_preferences(prefs)
         logger.info(f"Validate on import set to: {checked}")
+
+    def _display_service_error(self) -> None:
+        """Display an error message when the validation service is not available."""
+        msg_box = QMessageBox()
+        msg_box.setIcon(QMessageBox.Critical)
+        msg_box.setWindowTitle("Service Error")
+        msg_box.setText("Validation service is not available.")
+        msg_box.setStandardButtons(QMessageBox.Ok)
+        msg_box.exec()

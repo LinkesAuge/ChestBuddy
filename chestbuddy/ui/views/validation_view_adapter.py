@@ -11,6 +11,7 @@ from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtWidgets import QWidget, QVBoxLayout
 import logging
 from typing import Any, Dict, Optional
+import pandas as pd
 
 from chestbuddy.core.models import ChestDataModel
 from chestbuddy.core.services import ValidationService
@@ -71,7 +72,7 @@ class ValidationViewAdapter(BaseView):
         self._is_updating = False  # Flag to prevent recursive updates
 
         # Create the underlying ValidationTabView
-        self._validation_tab = ValidationTabView(validation_service)
+        self._validation_tab = ValidationTabView(validation_service=validation_service)
 
         # Initialize the base view
         super().__init__(
@@ -118,18 +119,26 @@ class ValidationViewAdapter(BaseView):
         # Connect header action buttons
         self.header_action_clicked.connect(self._on_action_clicked)
 
-        # Connect validation tab signals
-        self._validation_tab.validation_changed.connect(self._on_validation_changed)
-
         # Connect to data model if available
         if hasattr(self._data_model, "data_changed") and hasattr(self, "request_update"):
             try:
+                # Connect data_changed signal
                 self._signal_manager.connect(
                     self._data_model, "data_changed", self, "request_update"
                 )
                 logger.debug(
                     "Connected data_model.data_changed to ValidationViewAdapter.request_update"
                 )
+
+                # ADD NEW CONNECTION: Connect validation_changed signal from the data model
+                if hasattr(self._data_model, "validation_changed"):
+                    self._signal_manager.connect(
+                        self._data_model, "validation_changed", self, "_on_validation_changed"
+                    )
+                    logger.debug(
+                        "Connected data_model.validation_changed to ValidationViewAdapter._on_validation_changed"
+                    )
+
             except Exception as e:
                 logger.error(f"Error connecting data model signals: {e}")
 
@@ -138,11 +147,15 @@ class ValidationViewAdapter(BaseView):
         # Remove all header action buttons as requested
         pass
 
-    @Slot()
-    def _on_validation_changed(self):
-        """Handle validation status changes."""
-        logger.debug("Validation status changed")
-        self.validation_changed.emit()
+    @Slot(object)  # Use object initially, can refine type hint if needed
+    def _on_validation_changed(self, validation_status: Optional[pd.DataFrame] = None):
+        """Handle validation status changes from the data model."""
+        logger.debug(
+            f"ValidationViewAdapter received validation_changed signal. Status DF provided: {validation_status is not None}"
+        )
+        # Optional: Add logic here to update self._validation_tab based on validation_status
+        # Re-emit the adapter's own signal, passing the data along
+        self.validation_changed.emit(validation_status)
 
     def _update_view_content(self, data=None) -> None:
         """

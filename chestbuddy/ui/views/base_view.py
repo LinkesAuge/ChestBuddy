@@ -249,7 +249,13 @@ class BaseView(QWidget):
 
         # Connect the button to emit the header_action_clicked signal with the action ID
         self._signal_manager.safe_connect(
-            button, "clicked", lambda: self.header_action_clicked.emit(name), None, True
+            sender=button,
+            signal_name="clicked",
+            receiver=self,  # Provide self as the receiver context for the lambda
+            slot_name_or_callable=lambda: self.header_action_clicked.emit(
+                name
+            ),  # Pass lambda as the callable slot
+            safe_disconnect_first=True,  # Keep True for now
         )
 
         return button

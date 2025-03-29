@@ -540,7 +540,7 @@ class MainWindow(QMainWindow):
         self._views["Dashboard"] = dashboard_view
 
         # Create Data view
-        data_view = DataViewAdapter(self._data_model)
+        data_view = DataViewAdapter(data_model=self._data_model)
         data_view.export_requested.connect(self._save_file_as)
 
         # Set up the data view controller with the view
@@ -550,21 +550,27 @@ class MainWindow(QMainWindow):
         self._views["Data"] = data_view
 
         # Create Validation view
-        validation_view = ValidationViewAdapter(self._data_model, self._validation_service)
+        validation_view = ValidationViewAdapter(
+            data_model=self._data_model, validation_service=self._validation_service
+        )
         # Set up the validation view to use the data view controller
         validation_view.set_controller(self._data_view_controller)
         self._content_stack.addWidget(validation_view)
         self._views["Validation"] = validation_view
 
         # Create Correction view
-        correction_view = CorrectionViewAdapter(self._data_model, self._correction_service)
+        correction_view = CorrectionViewAdapter(
+            data_model=self._data_model, correction_service=self._correction_service
+        )
         # Set up the correction view to use the data view controller
         correction_view.set_controller(self._data_view_controller)
         self._content_stack.addWidget(correction_view)
         self._views["Correction"] = correction_view
 
         # Create Analysis/Charts view
-        chart_view = ChartViewAdapter(self._data_model, self._chart_service)
+        chart_view = ChartViewAdapter(
+            data_model=self._data_model, chart_service=self._chart_service
+        )
         # Set up the chart view to use the data view controller
         chart_view.set_data_view_controller(self._data_view_controller)
         self._content_stack.addWidget(chart_view)
@@ -950,18 +956,41 @@ class MainWindow(QMainWindow):
             self._is_data_changing = False
 
     @Slot(object)
-    def _on_validation_changed(self, validation_status: Any) -> None:
+    def _on_validation_changed(self, validation_status: Optional[pd.DataFrame] = None) -> None:
         """
-        Handle validation status changes.
+        Handle changes in validation status from the DataManager or other sources.
 
         Args:
-            validation_status: The new validation status.
+            validation_status (Optional[pd.DataFrame]): DataFrame with validation status, if provided.
         """
-        if not validation_status.empty:
-            issue_count = len(validation_status)
-            self._status_bar.set_status(f"Found {issue_count} validation issues")
-        else:
-            self._status_bar.set_status("Validation completed: No issues found")
+        # Update UI elements that depend on validation status
+        # e.g., update status bar, enable/disable actions
+        try:
+            if validation_status is not None and not validation_status.empty:
+                issue_count = sum(
+                    1 for idx, row in validation_status.iterrows() if not row.get("STATUS", True)
+                )
+                message = (
+                    f"Validation complete: {issue_count} issues found"
+                    if issue_count > 0
+                    else "Validation complete: No issues found"
+                )
+                # Use UIStateController to update status
+                if self._ui_state_controller:
+                    self._ui_state_controller.handle_validation_results(
+                        validation_status.to_dict("index")
+                    )  # Pass results
+            else:
+                message = "Validation status cleared or unavailable"
+                # Reset validation state in UI controller
+                if self._ui_state_controller:
+                    self._ui_state_controller.update_validation_state(reset=True)
+
+            # Log the update
+            logger.debug(f"MainWindow handling validation change: {message}")
+
+        except Exception as e:
+            logger.error(f"Error in MainWindow._on_validation_changed: {e}")
 
     @Slot(object)
     def _on_correction_applied(self, correction_status: Any) -> None:

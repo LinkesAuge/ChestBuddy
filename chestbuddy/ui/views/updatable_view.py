@@ -23,6 +23,9 @@ import logging
 from chestbuddy.ui.interfaces import IUpdatable
 from chestbuddy.ui.views.base_view import BaseView
 from chestbuddy.ui.utils import get_update_manager
+from chestbuddy.ui.utils.update_manager import UpdateManager
+from chestbuddy.utils.signal_manager import SignalManager
+# from chestbuddy.utils.debug import Debugger  # Module doesn't exist, commenting out
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +47,9 @@ class UpdatableView(BaseView):
     # Define signals as class attributes
     update_requested = Signal()
     update_completed = Signal()
+
+    # Class variable to cache the update manager instance
+    _cached_update_manager: Optional[UpdateManager] = None
 
     def __init__(self, title: str, parent: Optional[QWidget] = None, debug_mode: bool = False):
         """
@@ -344,13 +350,27 @@ class UpdatableView(BaseView):
         Args:
             debounce_ms: Debounce interval in milliseconds
         """
+        update_manager = None
         try:
-            update_manager = get_update_manager()
-            update_manager.schedule_update(self, debounce_ms)
-            logger.debug(f"{self.__class__.__name__} scheduled for update")
+            # Try to use cached instance first
+            if UpdatableView._cached_update_manager is None:
+                UpdatableView._cached_update_manager = get_update_manager()
+            update_manager = UpdatableView._cached_update_manager
+
+            if update_manager:
+                update_manager.schedule_update(self, debounce_ms)
+                logger.debug(f"{self.__class__.__name__} scheduled for update")
+            else:
+                # This case should ideally not happen if registration is correct
+                logger.error(f"UpdateManager could not be retrieved for {self.__class__.__name__}")
+                logger.debug(f"Falling back to direct update for {self.__class__.__name__}")
+                self.update()
+
         except Exception as e:
-            logger.error(f'Error scheduling update for {self.__class__.__name__}: "{e}"')
-            # Fall back to direct update if UpdateManager is not available
+            logger.error(
+                f'Error scheduling update for {self.__class__.__name__}: "{e}" - UpdateManager available: {update_manager is not None}'
+            )
+            # Fall back to direct update if UpdateManager retrieval or scheduling fails
             logger.debug(f"Falling back to direct update for {self.__class__.__name__}")
             self.update()
 

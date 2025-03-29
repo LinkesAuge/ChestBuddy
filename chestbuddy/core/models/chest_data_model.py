@@ -46,7 +46,7 @@ class ChestDataModel(QObject):
 
     # Define signals
     data_changed = Signal(object)  # Will emit the current DataState
-    validation_changed = Signal()
+    validation_changed = Signal(object)  # Will emit the validation status DataFrame
     correction_applied = Signal()
     data_cleared = Signal()
 
@@ -752,7 +752,11 @@ class ChestDataModel(QObject):
             status_df: The new validation status DataFrame.
         """
         self._validation_status = status_df.copy()
-        self.validation_changed.emit()
+        # Emit signal with the updated status DataFrame
+        logger.debug(
+            f"Emitting validation_changed with status_df shape: {self._validation_status.shape}"
+        )
+        self.validation_changed.emit(self._validation_status)
 
     def get_correction_status(self) -> pd.DataFrame:
         """

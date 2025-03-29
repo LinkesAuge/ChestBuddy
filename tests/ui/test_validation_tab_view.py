@@ -76,7 +76,7 @@ def validation_service(tmp_path):
 @pytest.fixture
 def validation_tab_view(app, validation_service):
     """Create a ValidationTabView instance for testing."""
-    view = ValidationTabView(validation_service)
+    view = ValidationTabView(validation_service=validation_service)
     view.resize(800, 600)  # Set a reasonable size
     view.show()
     QTest.qWaitForWindowExposed(view)

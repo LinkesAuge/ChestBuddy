@@ -63,135 +63,119 @@ class ValidationStatusDelegate(QStyledItemDelegate):
 
     def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex) -> None:
         """
-        Paint the cell with validation status indication.
+        Custom paint method to apply validation status styling.
 
         Args:
-            painter: Painter to use for drawing
-            option: Style options for the item
-            index: Model index of the item to paint
+            painter: The QPainter instance
+            option: The style options for the item
+            index: The model index of the item being painted
         """
-        # Critical: Don't apply custom painting when item is being edited
-        if option.state & QStyle.State_Editing:
-            # Let the standard implementation handle painting during editing
+        # Log entry
+        # self.logger.debug(f"Paint called for cell [{index.row()},{index.column()}] Value: {repr(index.data())}")
+
+        # Use default painting if index is invalid
+        if not index.isValid():
             super().paint(painter, option, index)
             return
 
-        # Get cell-specific validation status from model data (Qt.UserRole + 1)
-        validation_status = index.data(Qt.ItemDataRole.UserRole + 1)
+        # Get cell-specific invalid status (True if invalid, False otherwise)
+        is_cell_invalid = index.data(Qt.ItemDataRole.UserRole + 1)
+        if not isinstance(is_cell_invalid, bool):
+            # self.logger.debug(f"Cell [{index.row()},{index.column()}] UserRole+1 data is not bool: {is_cell_invalid}")
+            is_cell_invalid = False  # Default to not invalid if data is missing or not boolean
 
-        # If no validation status is set, use standard styling (let Qt handle it)
-        if validation_status is None:
-            super().paint(painter, option, index)
-            return
-
-        # From here on, we know we have a specific validation status to apply
-
-        # Save painter state to restore later
-        painter.save()
-
-        # Get the text content to determine if this is a status column
+        # Get model and column name
         model = index.model()
         if model is None:
+            # self.logger.debug(f"Paint skipped for cell [{index.row()},{index.column()}] - model is None")
             super().paint(painter, option, index)
-            painter.restore()
             return
-
-        # Get column header name
-        column_name = None
-        try:
-            column_name = model.headerData(index.column(), Qt.Horizontal)
-        except Exception as e:
-            self.logger.debug(f"Could not get column header: {e}")
-
-        # Check if this is the status column
-        is_status_column = column_name == self.STATUS_COLUMN
-
-        # Check if this is a validatable column
+        column_name = model.headerData(index.column(), Qt.Horizontal)
         is_validatable_column = column_name in self.VALIDATABLE_COLUMNS
 
-        # Get correction status from model data (Qt.UserRole + 2)
-        correction_status = index.data(Qt.ItemDataRole.UserRole + 2)
+        # Get row's overall validation status from the STATUS column
+        row_status_text = "Unknown"
+        status_col_index = -1
+        for col in range(model.columnCount()):
+            if model.headerData(col, Qt.Horizontal) == self.STATUS_COLUMN:
+                status_col_index = col
+                break
+        if status_col_index != -1:
+            status_index = model.index(index.row(), status_col_index)
+            row_status_text = status_index.data(Qt.DisplayRole)
+            if row_status_text is None:
+                row_status_text = "Unknown"
+        else:
+            # self.logger.debug(f"Paint for cell [{index.row()},{index.column()}] - STATUS column not found")
+            pass  # row_status_text remains "Unknown"
 
-        # Store the original options to use for drawing
+        # Log statuses found
+        # self.logger.debug(f"Paint cell [{index.row()},{index.column()}]: cell_invalid={is_cell_invalid}, row_status='{row_status_text}', is_validatable={is_validatable_column}")
+
+        # Save painter state
+        painter.save()
+
+        # Store original options
         opt = QStyleOptionViewItem(option)
+        opt.state &= ~QStyle.State_HasFocus  # Disable focus rectangle
 
-        # Disable the focus rectangle - we'll use our own visual cues
-        opt.state &= ~QStyle.State_HasFocus
-
-        # If the item is selected, let the style handle it
+        # Handle selection separately
         if option.state & QStyle.State_Selected:
+            # self.logger.debug(f"Paint cell [{index.row()},{index.column()}]: Selected, using default paint")
             painter.restore()
             super().paint(painter, option, index)
             return
 
-        # Create a priority-based styling system:
-        # INVALID cells take highest priority (especially in validatable columns)
-        # Status column is styled based on text value
-        # Row-level invalids are styled with lighter backgrounds
+        # Determine background color based on cell and row status
+        background_color = None
+        border_color = None
+        border_width = 1
 
-        # Apply styling based on validation status
-        if validation_status == ValidationStatus.INVALID and is_validatable_column:
-            # This is a specifically invalid cell in a validatable column
-            # It should stand out clearly from other cells
-            value = index.data(Qt.DisplayRole)
-            # Use repr() for safe Unicode handling
-            safe_value = repr(value) if value is not None else "None"
+        if is_cell_invalid and is_validatable_column:
+            # Highest priority: Specifically invalid cell in a validatable column
+            background_color = self.INVALID_COLOR
+            border_color = self.INVALID_BORDER_COLOR
+            border_width = 2
+            # Log specific invalid cell detection
             self.logger.debug(
-                f"Painting invalid cell [{index.row()},{index.column()}], col={column_name}, value={safe_value}"
+                f"Painting specifically invalid cell [{index.row()},{index.column()}], col={column_name}, value={repr(index.data())}"
             )
+        elif row_status_text == "Invalid":
+            # Cell is in an invalid row, but not specifically invalid itself
+            background_color = self.INVALID_ROW_COLOR
+            # self.logger.debug(f"Painting cell [{index.row()},{index.column()}] as INVALID_ROW")
+        elif row_status_text == "Valid":
+            # Cell is valid and in a valid row
+            background_color = self.VALID_COLOR
+            # self.logger.debug(f"Painting cell [{index.row()},{index.column()}] as VALID")
+        elif row_status_text == "Not validated":
+            # Cell is in a row that hasn't been validated
+            background_color = self.NOT_VALIDATED_COLOR
+            # self.logger.debug(f"Painting cell [{index.row()},{index.column()}] as NOT_VALIDATED")
+        # else: Status is Unknown or cell is in STATUS column - use default background (None)
 
-            # Draw with deep crimson background
-            painter.fillRect(opt.rect, self.INVALID_COLOR)
+        # Apply background if determined
+        if background_color:
+            painter.fillRect(opt.rect, background_color)
+            # self.logger.debug(f"Applied background {background_color} to cell [{index.row()},{index.column()}]")
 
-            # Draw a more visible border to make invalid cells stand out
+        # Apply border if determined
+        if border_color:
             pen = painter.pen()
-            pen.setColor(self.INVALID_BORDER_COLOR)
-            pen.setWidth(2)  # Thicker border
+            pen.setColor(border_color)
+            pen.setWidth(border_width)
             painter.setPen(pen)
-
-            # Draw the border - inset slightly to ensure it's visible
-            border_rect = opt.rect.adjusted(0, 0, -1, -1)
+            border_rect = opt.rect.adjusted(
+                0, 0, -border_width, -border_width
+            )  # Adjust for pen width
             painter.drawRect(border_rect)
 
-        # Else if this is the status column, paint based on the text value
-        elif is_status_column:
-            # Get the display text
-            text = index.data(Qt.DisplayRole)
-
-            if text == "Valid":
-                # Use light green for valid status
-                painter.fillRect(opt.rect, self.VALID_COLOR)
-            elif text == "Invalid":
-                # Paint with error background
-                painter.fillRect(opt.rect, self.INVALID_COLOR)
-            elif text == "Not validated":
-                # Light gray for not validated
-                painter.fillRect(opt.rect, self.NOT_VALIDATED_COLOR)
-        # Apply styling for all other cases - only if there's a validation status
-        elif validation_status == ValidationStatus.INVALID_ROW:
-            # This is just a cell in an invalid row (but not the specific invalid cell)
-            # Use a subtle background to indicate this is in an invalid row
-            painter.fillRect(opt.rect, self.INVALID_ROW_COLOR)
-        elif validation_status == ValidationStatus.WARNING:
-            # Draw with warning highlighting
-            painter.fillRect(opt.rect, self.WARNING_COLOR)
-        elif validation_status == ValidationStatus.VALID:
-            # Use light green for valid status
-            painter.fillRect(opt.rect, self.VALID_COLOR)
-        elif validation_status == ValidationStatus.NOT_VALIDATED:
-            # Light gray for not validated
-            painter.fillRect(opt.rect, self.NOT_VALIDATED_COLOR)
-        # If no validation status (None), don't apply any special styling
-
-        # Restore painter state before calling the parent paint method
+        # Restore painter before drawing text
         painter.restore()
 
-        # Use a new painter state for the text drawing to ensure it's not affected by our previous painter
+        # Draw text using standard delegate paint
         painter.save()
-
-        # Draw the text content using the standard delegate's paint method
         super().paint(painter, opt, index)
-
         painter.restore()
 
     def updateEditorGeometry(self, editor, option, index):

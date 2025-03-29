@@ -305,7 +305,7 @@ class DataViewAdapter(UpdatableView):
         try:
             if hasattr(self._data_model, "data_changed"):
                 self._signal_manager.safe_connect(
-                    self._data_model, "data_changed", self, "_on_data_changed", True
+                    self._data_model, "data_changed", self, "_on_data_changed"
                 )
 
             # Connect to validation_changed signal for validation updates
@@ -550,11 +550,32 @@ class DataViewAdapter(UpdatableView):
                 self._data_model, "data_changed", self, "request_update"
             )
 
-    def _on_validation_changed(self):
-        """Handle validation status changes in the data model."""
+    def _on_validation_changed(self, validation_status=None):
+        """
+        Handle validation status changes in the data model.
+
+        Args:
+            validation_status (pd.DataFrame, optional): The validation status DataFrame.
+                If None, will try to get it from the data_model.
+        """
+        logger.debug(
+            f"DataViewAdapter: _on_validation_changed called with status: {validation_status}"
+        )
+
+        # If no validation_status is provided, try to get it from the data model
+        if validation_status is None and hasattr(self._data_model, "get_validation_status"):
+            try:
+                validation_status = self._data_model.get_validation_status()
+                logger.debug(
+                    f"Retrieved validation status from model: shape {validation_status.shape if validation_status is not None else 'None'}"
+                )
+            except Exception as e:
+                logger.error(f"Error getting validation status from model: {e}")
+
         # Make sure to update the underlying DataView with validation changes
         if hasattr(self._data_view, "_on_validation_changed"):
-            self._data_view._on_validation_changed()
+            logger.debug("Forwarding validation status to DataView")
+            self._data_view._on_validation_changed(validation_status)
 
         # Request update from the UpdateManager
         self.request_update()
