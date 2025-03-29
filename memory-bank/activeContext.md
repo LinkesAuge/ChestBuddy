@@ -97,6 +97,12 @@ We are currently working on three main areas:
 
 ## Recent Changes
 
+- Fixed signal connection issues related to validation by ensuring the `validation_changed` signal correctly emits the validation status DataFrame:
+  - Modified the `validation_changed` signal in `ValidationTabView` from `Signal()` to `Signal(object)` to correctly pass the validation status DataFrame
+  - Updated the `_on_entries_changed` method in `ValidationTabView` to create and emit an empty DataFrame instead of emitting without parameters
+  - Ensured proper signal connections between the `ValidationService` and `ValidationTabView`
+  - Fixed initialization issues by adding a ServiceLocator fallback in the `ValidationTabView` to retrieve the `ValidationService` if not provided in the constructor
+  - Added error handling to display a message when the `ValidationService` is not available
 - Fixed table row coloring issue by optimizing the validation status update process to only apply validation status to cells with actual errors
 - Eliminated thousands of unnecessary cell validation checks that were causing excessive log messages and UI update operations
 - Designed a comprehensive optimization plan for table validation using a `ValidationStateTracker` class to precisely track invalid cells

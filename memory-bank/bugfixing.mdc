@@ -1281,3 +1281,120 @@ Fixed. Validation list import now replaces all existing entries with the importe
   ```
 - **Status**: Fixed, application now starts properly and the validation tab view works correctly.
 
+## Validation Signal Flow Bug Fix
+
+**Date Fixed:** March 29, 2024
+
+### Issue Description
+A TypeError was occurring when the `validation_changed` signal was emitted because the signal was defined without parameters (`Signal()`) but the receiving slot expected a DataFrame parameter (`_on_validation_changed(self, status_df: pd.DataFrame)`). This caused validation results to not be correctly displayed in the UI.
+
+### Root Causes
+1. Signal mismatch: The `validation_changed` signal was defined without parameters but handlers expected a DataFrame
+2. Inconsistent signal connection: The ValidationService `validation_changed` signal wasn't properly connected to the UI components
+3. Incorrect initialization of services in app.py: CSVService and DataManager were initialized with incorrect parameters
+4. Missing fallback for ValidationService in ValidationTabView when not directly provided
+
+### Resolution Steps
+1. Modified the `validation_changed` signal definition in ValidationTabView:
+   ```python
+   # Before
+   validation_changed = Signal()
+   
+   # After
+   validation_changed = Signal(object)  # Signal emitted with validation status DataFrame
+   ```
+
+2. Updated the `_on_entries_changed` method in ValidationTabView to emit an empty DataFrame:
+   ```python
+   def _on_entries_changed(self) -> None:
+       """Handle changes to validation list entries."""
+       # Create an empty DataFrame for the signal
+       empty_df = pd.DataFrame()
+       self.validation_changed.emit(empty_df)
+       self._update_validation_stats()
+   ```
+
+3. Fixed the CSVService initialization in app.py:
+   ```python
+   # Before 
+   self._csv_service = CSVService(self._data_model, self._error_controller)
+   
+   # After
+   self._csv_service = CSVService()
+   ```
+
+4. Fixed the DataManager initialization:
+   ```python
+   # Before
+   self._data_manager = DataManager(self._data_model, self._csv_service, self._error_controller)
+   
+   # After
+   self._data_manager = DataManager(self._data_model, self._csv_service)
+   ```
+
+5. Enhanced the ValidationTabView initialization to use ServiceLocator as a fallback:
+   ```python
+   def __init__(
+       self,
+       parent: Optional[QWidget] = None,
+       validation_service: Optional[ValidationService] = None,
+   ) -> None:
+       """Initialize the validation tab view."""
+       super().__init__(parent)
+       self.setObjectName("validation_tab")
+
+       # Store validation service or get from ServiceLocator
+       self._validation_service = validation_service
+       if self._validation_service is None:
+           try:
+               self._validation_service = ServiceLocator.get("validation_service")
+               logger.info("Retrieved ValidationService from ServiceLocator")
+           except KeyError:
+               logger.error("ValidationService not found in ServiceLocator")
+               self._display_service_error()
+   ```
+
+6. Added error handling to display a message when the ValidationService is not available:
+   ```python
+   def _display_service_error(self) -> None:
+       """Display an error message when the validation service is not available."""
+       msg_box = QMessageBox()
+       msg_box.setIcon(QMessageBox.Critical)
+       msg_box.setWindowTitle("Service Error")
+       msg_box.setText("Validation service is not available.")
+       msg_box.setStandardButtons(QMessageBox.Ok)
+       msg_box.exec()
+   ```
+
+7. In the ValidationService, we verified that `_update_validation_status` correctly calls `self._data_model.set_validation_status(status_df)`, which emits the validation_changed signal.
+
+### Validation Data Flow
+Here's how validation data now flows through the application:
+
+1. **ValidationService.validate_data()**
+   - Runs validation checks (players, chest types, sources)
+   - Builds validation_results dictionary
+   - Calls `_update_validation_status(validation_results)`
+
+2. **ValidationService._update_validation_status()**
+   - Creates a DataFrame for validation status
+   - Process each validation rule's results
+   - Updates the validation status in the data model
+   - Calls `self._data_model.set_validation_status(status_df)`
+
+3. **ChestDataModel.set_validation_status()**
+   - Stores the status DataFrame
+   - Emits the `validation_changed` signal with the status DataFrame
+   - Signal signature: `validation_changed = Signal(object)`
+
+4. **ValidationTabView._on_validation_changed()**
+   - Receives the status DataFrame
+   - Updates UI elements based on validation status
+   - Emits its own `validation_changed` signal for parent components
+
+5. **ValidationViewAdapter**
+   - Connects to ValidationTabView's validation_changed signal
+   - Processes validation results for display in the UI
+
+This fix ensures proper data flow from the validation service to the UI components, resolving the TypeError and enabling validation results to be properly displayed in the data table.
+

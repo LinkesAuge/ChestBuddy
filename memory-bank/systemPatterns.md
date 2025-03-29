@@ -479,4 +479,97 @@ The validation system integration represents the final piece of the ChestBuddy a
 
 8. **Testing Infrastructure**: Comprehensive unit, integration, and end-to-end tests for validation functionality.
 
-This integration demonstrates the power and flexibility of the architecture we've established, showing how all components work together to create a cohesive, maintainable system. 
+This integration demonstrates the power and flexibility of the architecture we've established, showing how all components work together to create a cohesive, maintainable system.
+
+## Signal-Slot Patterns
+
+### Data Validation Signal Flow
+
+The ChestBuddy application uses a robust signal-slot mechanism for propagating validation results from the data model to the UI components. This pattern ensures loose coupling between components while maintaining a clear data flow.
+
+#### Validation Signal Chain
+
+1. **ChestDataModel → ValidationService → UI Components**:
+   ```
+   ValidationService.validate_data()
+     ↓
+   ValidationService._update_validation_status()
+     ↓
+   ChestDataModel.set_validation_status()
+     ↓ [emit validation_changed signal]
+   ValidationTabView._on_validation_changed()
+     ↓ [emit validation_changed signal]
+   ValidationViewAdapter and other UI components
+   ```
+
+2. **Signal Definition Best Practices**:
+   - Define signals with explicit parameter types: `Signal(object)` for DataFrames
+   - Document signal parameters in comments and method signatures
+   - Use type hints for signal handler parameters: `def _on_validation_changed(self, status_df: pd.DataFrame)`
+
+3. **Connection Safety Patterns**:
+   - Disconnect signals before reconnecting to prevent duplicate connections
+   - Use try/except to handle disconnection of signals that might not be connected
+   - Log connection and disconnection events for debugging
+   - Add fallback mechanisms for service dependencies (ServiceLocator pattern)
+
+4. **Signal Handling Patterns**:
+   - Create dedicated methods for signal handling with clear naming (_on_X)
+   - Keep signal handlers focused on a single responsibility
+   - Maintain consistent parameter semantics across the connection chain
+   - Emit signals with appropriate parameters, even if empty (DataFrame() instead of no params)
+
+#### Example Signal Flow Code
+
+1. **Signal Definition in ChestDataModel**:
+   ```python
+   # Define the signal with object parameter
+   validation_changed = Signal(object)  # Will emit the validation status DataFrame
+   
+   def set_validation_status(self, status_df: pd.DataFrame) -> None:
+       """Set the validation status DataFrame."""
+       self._validation_status = status_df.copy()
+       # Emit signal with the updated status DataFrame
+       self.validation_changed.emit(self._validation_status)
+   ```
+
+2. **Signal Connection in ValidationService**:
+   ```python
+   def _update_validation_status(self, validation_results: Dict) -> None:
+       """Update validation status in the data model."""
+       # Process validation results
+       status_df = self._create_status_dataframe()
+       # ...process results...
+       
+       # Update the model, which will emit validation_changed
+       self._data_model.set_validation_status(status_df)
+   ```
+
+3. **Signal Handling in ValidationTabView**:
+   ```python
+   def _connect_signals(self) -> None:
+       """Connect signals and slots."""
+       # Connect signals from validation service
+       if hasattr(self._validation_service, "validation_changed"):
+           # Disconnect existing connections first to prevent duplicates
+           try:
+               self._validation_service.validation_changed.disconnect(self._on_validation_changed)
+               logger.debug("Disconnected existing validation_changed signal.")
+           except (TypeError, RuntimeError):
+               logger.debug("No existing validation_changed signal to disconnect.")
+
+           # Connect the signal
+           self._validation_service.validation_changed.connect(self._on_validation_changed)
+           logger.debug("Connected validation_changed signal to _on_validation_changed.")
+       else:
+           logger.warning("ValidationService has no validation_changed signal.")
+   
+   def _on_validation_changed(self, status_df: pd.DataFrame) -> None:
+       """Handle validation changes."""
+       logger.info(f"Received validation_changed signal with status shape: {status_df.shape}")
+       self._set_status_message("Validation status updated.")
+       # Emit our own signal if needed by parent components
+       self.validation_changed.emit(status_df)
+   ```
+
+The validation signal pattern allows for flexible component configuration while maintaining a consistent flow of validation data through the application. This approach ensures that validation results are properly displayed in the UI regardless of which component initiates the validation process. 
