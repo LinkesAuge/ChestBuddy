@@ -372,3 +372,14 @@ class ValidationListModel(QObject):
         """Reset the validation list to its original state from the file."""
         self.entries.clear()
         self._load_entries()
+
+    def has_unsaved_changes(self) -> bool:
+        """
+        Check if there are unsaved changes.
+
+        Returns:
+            bool: True if there are unsaved changes, False otherwise
+        """
+        # For now, we assume changes are saved immediately
+        # This is a placeholder in case we implement a more sophisticated change tracking system
+        return False

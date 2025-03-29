@@ -346,7 +346,7 @@ class ValidationTabView(QWidget):
         layout.addLayout(header_layout)
 
         # Create and add list view with the model first (moved up)
-        list_view = ValidationListView(model)
+        list_view = ValidationListView(model, name=title)
         list_view.setStyleSheet(f"""
             ValidationListView {{
                 background-color: {Colors.BACKGROUND_PRIMARY};
@@ -591,15 +591,15 @@ class ValidationTabView(QWidget):
         self._set_status_message("Validation preferences updated.")
 
     def _update_list_view_status(self) -> None:
-        """Update status based on changes in any validation list view."""
-        # Check if any list has unsaved changes
+        """Update the status bar with the list view status."""
         has_unsaved = any(
-            lv.model.has_unsaved_changes() for lv in self.findChildren(ValidationListView)
+            lv.model().has_unsaved_changes() for lv in self.findChildren(ValidationListView)
         )
+
         if has_unsaved:
-            self._set_status_message("Unsaved changes in validation lists.")
+            self._status_bar.showMessage("Unsaved changes in validation lists")
         else:
-            self._set_status_message("Ready")
+            self._status_bar.showMessage("Ready")
 
     def _on_validate_clicked(self) -> None:
         """Handle validate button click."""

@@ -16,6 +16,7 @@ from chestbuddy.ui.views.validation_preferences_view import ValidationPreference
 from chestbuddy.ui.views.validation_tab_view import ValidationTabView
 from chestbuddy.ui.views.settings_tab_view import SettingsTabView
 from chestbuddy.ui.views.settings_view_adapter import SettingsViewAdapter
+from chestbuddy.ui.views.confirmation_dialog import ConfirmationDialog
 
 __all__ = [
     "BaseView",
@@ -30,4 +31,5 @@ __all__ = [
     "ValidationTabView",
     "SettingsTabView",
     "SettingsViewAdapter",
+    "ConfirmationDialog",
 ]

@@ -18,11 +18,13 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QInputDialog,
     QFileDialog,
+    QDialog,
 )
 from PySide6.QtCore import Qt, Signal, QTimer, QObject
 
 from chestbuddy.core.models.validation_list_model import ValidationListModel
 from chestbuddy.ui.resources.style import Colors
+from chestbuddy.ui.views.confirmation_dialog import ConfirmationDialog
 
 logger = logging.getLogger(__name__)
 
@@ -37,16 +39,28 @@ class ValidationListView(QWidget):
 
     status_changed = Signal(str)
 
-    def __init__(self, model: ValidationListModel, parent: Optional[QWidget] = None):
+    def __init__(
+        self, model: ValidationListModel, name: str = "", parent: Optional[QWidget] = None
+    ):
         """
         Initialize the validation list view.
 
         Args:
             model (ValidationListModel): Model containing validation list data
+            name (str, optional): Name of the validation list. If not provided, it will be extracted from file path
             parent (Optional[QWidget]): Parent widget
         """
         super().__init__(parent)
         self._model = model
+
+        # Extract name from file path if not provided
+        if name:
+            self._name = name
+        else:
+            # Extract list name from file path (remove .txt and use as name)
+            file_name = Path(model.file_path).stem
+            self._name = file_name.replace("_", " ").title()
+
         self._search_timer = QTimer()
         self._search_timer.setSingleShot(True)
         self._search_timer.setInterval(300)  # 300ms debounce
@@ -58,7 +72,9 @@ class ValidationListView(QWidget):
         self._setup_ui()
         self._connect_signals()
         self._populate_list()
-        logger.info(f"Initialized ValidationListView with {self._model.count()} entries")
+        logger.info(
+            f"Initialized ValidationListView '{self._name}' with {self._model.count()} entries"
+        )
 
     def _setup_ui(self) -> None:
         """Set up the user interface."""
@@ -73,6 +89,8 @@ class ValidationListView(QWidget):
         # List widget with improved styling for consistent colors and better item spacing
         self._list_widget = QListWidget()
         self._list_widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        # Enable multiple selection using Ctrl and Shift keys
+        self._list_widget.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         self._list_widget.setStyleSheet(f"""
             QListWidget {{
                 background-color: {Colors.PRIMARY};
@@ -283,11 +301,28 @@ class ValidationListView(QWidget):
         if not items:
             return
 
-        # Confirm deletion
-        msg = "Remove selected entries?" if len(items) > 1 else "Remove selected entry?"
-        if QMessageBox.question(self, "Confirm Remove", msg) == QMessageBox.StandardButton.Yes:
-            for item in items:
-                self._model.remove_entry(item.text())
+        # Create a copy of the entries to remove to avoid issues with items being deleted
+        entries_to_remove = [item.text() for item in items]
+
+        entry_text = "\n".join(entries_to_remove[:10])
+        if len(entries_to_remove) > 10:
+            entry_text += f"\n... and {len(entries_to_remove) - 10} more"
+
+        dialog = ConfirmationDialog(
+            self,
+            title=f"Remove {self._name} Entries",
+            message=f"Are you sure you want to remove these entries?\n\n{entry_text}",
+            ok_text="Remove",
+            cancel_text="Cancel",
+        )
+
+        if dialog.exec() == QDialog.Accepted:
+            # Now work with the copied text entries instead of QListWidgetItems
+            for entry in entries_to_remove:
+                if self._model.remove_entry(entry):
+                    logger.info(f"Removed entry '{entry}' from {self._name}")
+                else:
+                    logger.error(f"Failed to remove entry '{entry}' from {self._name}")
 
     def model(self) -> ValidationListModel:
         """
