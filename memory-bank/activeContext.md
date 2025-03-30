@@ -9,48 +9,35 @@ date: 2024-05-10
 
 ## Current Focus
 
-### Test-Driven Development for Correction Feature
+### Completing the CorrectionView UI Implementation
 
-We're continuing to implement the correction feature following a test-driven development approach. Our recent focus has been on completing the UI components and integrating them with the data view for a seamless user experience.
+We're focusing on completing the CorrectionView UI implementation to match the mockup design. After comparing the current implementation with our mockup in `correction_feature_ui_mockup.html`, we've identified several gaps that need to be addressed:
 
-#### Recently Completed:
-
-- Successfully implemented the BatchCorrectionDialog component, passing all 12 tests
-- Integrated the correction feature with DataView through:
-  - Context menu actions for creating rules from selected cells
-  - Cell highlighting based on correction status
-  - Tooltips showing correction information
-- Enhanced CorrectionController with methods to support data view integration:
-  - get_correction_status() - for cell status information
-  - get_applicable_rules() - for finding applicable rules
-  - apply_rules_to_selection() - for batch correction
-
-#### Key Implementation Fixes:
-- Connected context menu actions to correction dialogs
-- Implemented cell highlighting based on correction status:
-  - Red for invalid cells without correction rules
-  - Orange for invalid cells with correction rules
-  - Green for corrected cells
-- Added tooltips showing original values, corrections, and rule information
-- Connected data view to BatchCorrectionDialog for selected cells
+#### Missing Features:
+- Import/Export buttons in the header
+- Dedicated status bar for CorrectionView
+- Complete rule control buttons (Move Up/Down, Toggle Status)
+- Settings panel with configuration options
+- Context menu for rule actions
 
 #### Current Tasks:
-- Complete end-to-end testing of data view integration
-- Address potential performance issues with cell highlighting
-- Fix CorrectionService apply_correction_to_cell method implementation
-- Resolve view communication mechanism for getting selected cells
+- Implement dedicated QStatusBar for CorrectionView
+- Add Import/Export buttons to header with file dialog integration
+- Create settings panel with configuration checkboxes
+- Complete rule management buttons (Move, Toggle)
+- Improve UI styling to match mockup
 
 #### Next Steps:
-- Create integration tests for the correction feature
-- Optimize performance for large datasets
-- Ensure proper encoding support for all operations
-- Address remaining UI component test failures
+- Add context menu for rule table
+- Implement settings persistence via ConfigManager
+- Enhance filter controls functionality
+- Create unit tests for new UI components
 
 #### Key Decisions:
-- Continue with the test-driven development approach
-- Prioritize visual feedback for correction status through highlighting
-- Use tooltips to provide detailed correction information
-- Implement batch operation capabilities for better user experience
+- Replace MainWindow status bar usage with dedicated status bar
+- Implement file dialog integration for rule import/export
+- Connect settings to ConfigManager for persistence
+- Follow UI component style guidelines from mockup
 
 ### Data View Integration for Correction Feature
 
@@ -82,24 +69,7 @@ We've been implementing the integration between the DataView and the correction 
 - Enhanced CorrectionController with cell status methods
 - Implemented cell highlighting and tooltips in DataView
 - Connected BatchCorrectionDialog with selected cells
-- Updated progress.md with current implementation status
-
-### Next Steps
-
-1. **Performance Optimization**:
-   - Address potential performance issues with large datasets
-   - Implement selective highlighting for better performance
-   - Optimize correction status retrieval
-
-2. **Integration Testing**:
-   - Create comprehensive integration tests
-   - Verify end-to-end functionality
-   - Test edge cases and error handling
-
-3. **UI Refinement**:
-   - Improve tooltip formatting for better readability
-   - Enhance visual feedback for correction operations
-   - Add progress indication for batch operations
+- Identified UI gaps in CorrectionView implementation
 
 ## Implementation Plan
 
@@ -119,11 +89,17 @@ The implementation is divided into phases:
 - Handle rule management operations
 - Create unit tests for controller
 
-### Phase 4: UI Components ✓
+### Phase 4: UI Components (In Progress)
 - Create `CorrectionView` and rule table ✓
 - Implement edit rule dialog ✓
 - Implement batch correction dialog ✓
 - Add progress dialog for feedback ✓
+- Complete CorrectionView UI to match mockup:
+  - Add dedicated status bar
+  - Implement Import/Export buttons
+  - Create settings panel
+  - Complete rule management buttons
+  - Add context menu for rules
 
 ### Phase 5: Data View Integration (In Progress)
 - Add cell highlighting based on status ✓

@@ -570,7 +570,7 @@ def test_import_export():
     # Test code...
 ```
 
-### Phase 4: UI Implementation (Days 7-10)
+### Phase 4: UI Components (Days 7-9)
 
 #### 4.1 CorrectionView
 
@@ -578,305 +578,440 @@ def test_import_export():
 # ui/views/correction_view.py
 class CorrectionView(BaseView):
     """
-    View for correction rule management.
+    Main view for the correction feature.
     
-    Provides UI for managing correction rules and applying corrections.
+    Provides interfaces for:
+    - Managing correction rules
+    - Applying corrections
+    - Visualizing correction results
     """
     
-    # Signals
-    rule_added = Signal(object)  # CorrectionRule
-    rule_updated = Signal(int, object)  # index, CorrectionRule
-    rule_deleted = Signal(int)  # index
-    rule_moved = Signal(int, int)  # from_index, to_index
-    rule_moved_to_top = Signal(int)  # index
-    rule_moved_to_bottom = Signal(int)  # index
-    rule_status_toggled = Signal(int)  # index
-    import_requested = Signal(str, bool)  # file_path, append
-    export_requested = Signal(str, bool)  # file_path, only_enabled
-    apply_corrections_requested = Signal()  # No parameters
-    settings_updated = Signal(dict)  # settings dict
-    
-    def __init__(self, controller, parent=None):
-        """Initialize with controller."""
-        super().__init__("Correction", parent)
-        self._controller = controller
-        self._controller.set_view(self)
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._correction_controller = None
+        self._rule_view = None
+        
         self._setup_ui()
         self._connect_signals()
-        self._populate_view()
         
     def _setup_ui(self):
         """Set up the UI components."""
         # Implementation details...
         
-    def _setup_rule_table(self):
-        """Set up the rule table component."""
+    def set_correction_controller(self, controller):
+        """Set the correction controller."""
         # Implementation details...
         
-    def _setup_controls(self):
-        """Set up the control panel components."""
+    def _initialize_rule_view(self):
+        """Initialize the rule view component."""
         # Implementation details...
         
-    def _setup_status_bar(self):
-        """Set up the status bar components."""
+    def _refresh_view_content(self):
+        """Refresh the view content."""
+        # Implementation details...
+        
+    def _on_action_clicked(self, action_id):
+        """Handle action button clicks."""
+        # Implementation details...
+        
+    def _on_corrections_completed(self, stats):
+        """Handle correction completion."""
+        # Implementation details...
+        
+    def _on_correction_error(self, error_message):
+        """Handle correction errors."""
+        # Implementation details...
+```
+
+#### 4.2 CorrectionRuleView
+
+```python
+# ui/views/correction_rule_view.py
+class CorrectionRuleView(QWidget):
+    """
+    Widget for displaying and managing correction rules.
+    
+    Features:
+    - Rule table with sorting
+    - Filter controls
+    - Rule management buttons
+    - Status bar with rule counts
+    """
+    
+    def __init__(self, controller, parent=None):
+        super().__init__(parent)
+        self._controller = controller
+        self._rules = []
+        
+        self._setup_ui()
+        self._connect_signals()
+        self._update_categories_filter()
+        self._refresh_rule_table()
+        
+    def _setup_ui(self):
+        """Set up the UI components."""
         # Implementation details...
         
     def _connect_signals(self):
         """Connect signals and slots."""
         # Implementation details...
         
-    def _populate_view(self):
-        """Populate the view with initial data."""
+    def _refresh_rule_table(self):
+        """Refresh the rule table with current rules."""
         # Implementation details...
         
-    def _on_add_rule_clicked(self):
-        """Handle add rule button click."""
+    def _update_categories_filter(self):
+        """Update the category filter with available categories."""
         # Implementation details...
         
-    def _on_edit_rule(self, index):
-        """Handle rule editing."""
+    def _update_status_bar(self):
+        """Update the status bar with rule counts."""
         # Implementation details...
         
-    def _on_delete_rule(self, index):
-        """Handle rule deletion."""
+    def _update_button_states(self):
+        """Update button states based on selection."""
         # Implementation details...
         
-    def _on_move_rule_up(self, index):
-        """Handle moving rule up."""
+    def _get_selected_rule_id(self):
+        """Get the ID of the selected rule."""
         # Implementation details...
         
-    def _on_move_rule_down(self, index):
-        """Handle moving rule down."""
+    def _on_filter_changed(self):
+        """Handle filter changes."""
         # Implementation details...
         
-    def _on_move_rule_to_top(self, index):
-        """Handle moving rule to top."""
+    def _on_reset_filters(self):
+        """Reset all filters to default values."""
         # Implementation details...
         
-    def _on_move_rule_to_bottom(self, index):
-        """Handle moving rule to bottom."""
+    def _on_add_rule(self):
+        """Add a new correction rule."""
         # Implementation details...
         
-    def _on_toggle_rule_status(self, index):
-        """Handle toggling rule status."""
+    def _on_edit_rule(self):
+        """Edit the selected correction rule."""
         # Implementation details...
         
-    def _on_import_clicked(self):
-        """Handle import button click."""
+    def _on_delete_rule(self):
+        """Delete the selected correction rule."""
         # Implementation details...
         
-    def _on_export_clicked(self):
-        """Handle export button click."""
+    def _on_move_rule_up(self):
+        """Move the selected rule up."""
         # Implementation details...
         
-    def _on_apply_corrections_clicked(self):
-        """Handle apply corrections button click."""
-        # Implementation details...
-        
-    def _on_setting_changed(self, key, value):
-        """Handle setting change."""
-        # Implementation details...
-        
-    def _on_correction_started(self, operation):
-        """Handle correction started event."""
-        # Implementation details...
-        
-    def _on_correction_progress(self, current, total):
-        """Handle correction progress event."""
-        # Implementation details...
-        
-    def _on_correction_completed(self, results):
-        """Handle correction completed event."""
-        # Implementation details...
-        
-    def _on_correction_error(self, error):
-        """Handle correction error event."""
-        # Implementation details...
-        
-    def update_rule_list(self, rules):
-        """Update the rule table with current rules."""
-        # Implementation details...
-        
-    def update_status_bar(self, message):
-        """Update the status bar with a message."""
-        # Implementation details...
-        
-    def update_statistics(self, total_rules, enabled_rules, disabled_rules):
-        """Update the statistics display."""
+    def _on_move_rule_down(self):
+        """Move the selected rule down."""
         # Implementation details...
 ```
 
-#### 4.2 CorrectionRuleTable
+#### 4.3 Completing CorrectionView UI
 
+To ensure the CorrectionView UI matches the mockup design in `correction_feature_ui_mockup.html`, we need to implement several missing features:
+
+##### Status Bar Implementation
 ```python
-# ui/components/correction_rule_table.py
-class CorrectionRuleTable(QTableView):
-    """
-    Table view for displaying and managing correction rules.
+# ui/views/correction_view.py - updates
+def _setup_ui(self):
+    """Set up the UI components."""
+    super()._setup_ui()
     
-    Provides sorting, filtering, and drag-drop reordering.
-    """
+    # Add dedicated status bar
+    self._status_bar = QStatusBar()
+    self._status_bar.setFixedHeight(24)  # Make it smaller to match mockup
+    self.layout().addWidget(self._status_bar)
     
-    # Signals
-    rule_selected = Signal(int)  # index
-    rule_double_clicked = Signal(int)  # index
-    rule_deleted = Signal(int)  # index
-    rule_moved = Signal(int, int)  # from_index, to_index
-    rule_moved_to_top = Signal(int)  # index
-    rule_moved_to_bottom = Signal(int)  # index
-    rule_status_toggled = Signal(int)  # index
-    
-    def __init__(self, parent=None):
-        """Initialize the table view."""
-        super().__init__(parent)
-        self._setup_ui()
-        self._setup_model()
-        self._setup_context_menu()
+    # Rest of setup...
+
+def _update_status_bar(self):
+    """Update status bar with rule information."""
+    if self._rule_view:
+        total_rules = len(self._correction_controller.get_rules())
+        enabled_rules = len(self._correction_controller.get_rules(status="enabled"))
+        disabled_rules = total_rules - enabled_rules
         
-    def _setup_ui(self):
-        """Set up the UI components."""
-        # Implementation details...
-        
-    def _setup_model(self):
-        """Set up the table model."""
-        # Implementation details...
-        
-    def _setup_context_menu(self):
-        """Set up the context menu."""
-        # Implementation details...
-        
-    def contextMenuEvent(self, event):
-        """Handle context menu events."""
-        # Implementation details...
-        
-    def mousePressEvent(self, event):
-        """Handle mouse press events for drag-drop."""
-        # Implementation details...
-        
-    def mouseMoveEvent(self, event):
-        """Handle mouse move events for drag-drop."""
-        # Implementation details...
-        
-    def mouseReleaseEvent(self, event):
-        """Handle mouse release events for drag-drop."""
-        # Implementation details...
-        
-    def update_rules(self, rules):
-        """Update the table with current rules."""
-        # Implementation details...
-        
-    def get_selected_indices(self):
-        """Get the indices of selected rows."""
-        # Implementation details...
-        
-    def _on_header_clicked(self, logical_index):
-        """Handle header click for sorting."""
-        # Implementation details...
+        self._status_bar.showMessage(
+            f"Total rules: {total_rules} | Enabled: {enabled_rules} | Disabled: {disabled_rules}"
+        )
 ```
 
-#### 4.3 BatchCorrectionDialog
+##### Header Action Buttons
+```python
+# ui/views/correction_view.py - updates
+def _add_action_buttons(self):
+    """Add action buttons to the header."""
+    # Import/Export buttons
+    self.add_header_action("import", "Import")
+    self.add_header_action("export", "Export")
+    self.add_header_action("apply", "Apply Corrections")
+
+def _on_action_clicked(self, action_id):
+    """Handle action button clicks."""
+    if action_id == "apply":
+        self._apply_corrections()
+    elif action_id == "import":
+        self._import_rules()
+    elif action_id == "export":
+        self._export_rules()
+        
+def _import_rules(self):
+    """Import correction rules from file."""
+    if not self._correction_controller:
+        return
+        
+    file_path, _ = QFileDialog.getOpenFileName(
+        self, "Import Correction Rules", "", "CSV Files (*.csv);;All Files (*)"
+    )
+    
+    if file_path:
+        dialog = ImportExportDialog(
+            file_path=file_path, 
+            is_import=True, 
+            parent=self
+        )
+        
+        if dialog.exec():
+            options = dialog.get_options()
+            success = self._correction_controller.import_rules(
+                file_path=options["file_path"],
+                replace_existing=options["replace_existing"]
+            )
+            
+            if success:
+                self._show_status_message("Rules imported successfully")
+            else:
+                self._show_status_message("Error importing rules")
+                
+def _export_rules(self):
+    """Export correction rules to file."""
+    if not self._correction_controller:
+        return
+        
+    file_path, _ = QFileDialog.getSaveFileName(
+        self, "Export Correction Rules", "", "CSV Files (*.csv);;All Files (*)"
+    )
+    
+    if file_path:
+        dialog = ImportExportDialog(
+            file_path=file_path, 
+            is_import=False, 
+            parent=self
+        )
+        
+        if dialog.exec():
+            options = dialog.get_options()
+            success = self._correction_controller.export_rules(
+                file_path=options["file_path"],
+                only_enabled=options["only_enabled"]
+            )
+            
+            if success:
+                self._show_status_message("Rules exported successfully")
+            else:
+                self._show_status_message("Error exporting rules")
+```
+
+##### Settings Panel
+```python
+# ui/views/correction_rule_view.py - updates
+def _setup_ui(self):
+    """Set up the UI components."""
+    # Existing setup code...
+    
+    # Add settings panel
+    self._settings_group = QGroupBox("Settings")
+    settings_layout = QVBoxLayout(self._settings_group)
+    
+    self._auto_correct_checkbox = QCheckBox("Auto-correct after validation")
+    self._correct_invalid_checkbox = QCheckBox("Correct only invalid entries")
+    self._auto_enable_checkbox = QCheckBox("Auto-enable imported rules")
+    self._export_enabled_checkbox = QCheckBox("Export only enabled rules")
+    
+    settings_layout.addWidget(self._auto_correct_checkbox)
+    settings_layout.addWidget(self._correct_invalid_checkbox)
+    settings_layout.addWidget(self._auto_enable_checkbox)
+    settings_layout.addWidget(self._export_enabled_checkbox)
+    
+    self._load_settings()
+    main_layout.addWidget(self._settings_group)
+    
+def _load_settings(self):
+    """Load settings from configuration."""
+    if hasattr(self._controller, "get_config_manager"):
+        config = self._controller.get_config_manager()
+        
+        self._auto_correct_checkbox.setChecked(
+            config.get_bool("corrections", "auto_correct_after_validation", True)
+        )
+        self._correct_invalid_checkbox.setChecked(
+            config.get_bool("corrections", "correct_only_invalid", True)
+        )
+        self._auto_enable_checkbox.setChecked(
+            config.get_bool("corrections", "auto_enable_imported", True)
+        )
+        self._export_enabled_checkbox.setChecked(
+            config.get_bool("corrections", "export_only_enabled", True)
+        )
+        
+def _save_settings(self):
+    """Save settings to configuration."""
+    if hasattr(self._controller, "get_config_manager"):
+        config = self._controller.get_config_manager()
+        
+        config.set_bool(
+            "corrections", "auto_correct_after_validation", 
+            self._auto_correct_checkbox.isChecked()
+        )
+        config.set_bool(
+            "corrections", "correct_only_invalid", 
+            self._correct_invalid_checkbox.isChecked()
+        )
+        config.set_bool(
+            "corrections", "auto_enable_imported", 
+            self._auto_enable_checkbox.isChecked()
+        )
+        config.set_bool(
+            "corrections", "export_only_enabled", 
+            self._export_enabled_checkbox.isChecked()
+        )
+```
+
+##### Complete Rule Control Buttons
+```python
+# ui/views/correction_rule_view.py - updates
+def _setup_rule_controls(self):
+    """Set up rule control buttons."""
+    controls_layout = QHBoxLayout()
+    
+    self._add_button = QPushButton("Add")
+    self._edit_button = QPushButton("Edit")
+    self._delete_button = QPushButton("Delete")
+    self._move_up_button = QPushButton("Move ▲")
+    self._move_down_button = QPushButton("Move ▼")
+    self._move_top_button = QPushButton("Move to Top")
+    self._move_bottom_button = QPushButton("Move to Bottom")
+    self._toggle_status_button = QPushButton("Toggle Status")
+    
+    controls_layout.addWidget(self._add_button)
+    controls_layout.addWidget(self._edit_button)
+    controls_layout.addWidget(self._delete_button)
+    controls_layout.addWidget(self._move_up_button)
+    controls_layout.addWidget(self._move_down_button)
+    controls_layout.addWidget(self._move_top_button)
+    controls_layout.addWidget(self._move_bottom_button)
+    controls_layout.addWidget(self._toggle_status_button)
+    
+    return controls_layout
+
+def _connect_rule_control_signals(self):
+    """Connect signals for rule control buttons."""
+    self._add_button.clicked.connect(self._on_add_rule)
+    self._edit_button.clicked.connect(self._on_edit_rule)
+    self._delete_button.clicked.connect(self._on_delete_rule)
+    self._move_up_button.clicked.connect(self._on_move_rule_up)
+    self._move_down_button.clicked.connect(self._on_move_rule_down)
+    self._move_top_button.clicked.connect(self._on_move_rule_to_top)
+    self._move_bottom_button.clicked.connect(self._on_move_rule_to_bottom)
+    self._toggle_status_button.clicked.connect(self._on_toggle_status)
+```
+
+##### Context Menu for Rules
+```python
+# ui/views/correction_rule_view.py - updates
+def _setup_table(self):
+    """Set up the rule table."""
+    # Existing table setup code...
+    
+    # Add context menu support
+    self._rule_table.setContextMenuPolicy(Qt.CustomContextMenu)
+    self._rule_table.customContextMenuRequested.connect(self._show_context_menu)
+    
+def _show_context_menu(self, position):
+    """Show context menu for rule table."""
+    if not self._rule_table.selectedItems():
+        return
+        
+    menu = QMenu()
+    
+    edit_action = menu.addAction("Edit")
+    delete_action = menu.addAction("Delete")
+    menu.addSeparator()
+    move_up_action = menu.addAction("Move Up")
+    move_down_action = menu.addAction("Move Down")
+    move_top_action = menu.addAction("Move to Top")
+    move_bottom_action = menu.addAction("Move to Bottom")
+    menu.addSeparator()
+    toggle_action = menu.addAction("Enable/Disable")
+    
+    action = menu.exec_(self._rule_table.viewport().mapToGlobal(position))
+    
+    if action == edit_action:
+        self._on_edit_rule()
+    elif action == delete_action:
+        self._on_delete_rule()
+    elif action == move_up_action:
+        self._on_move_rule_up()
+    elif action == move_down_action:
+        self._on_move_rule_down()
+    elif action == move_top_action:
+        self._on_move_rule_to_top()
+    elif action == move_bottom_action:
+        self._on_move_rule_to_bottom()
+    elif action == toggle_action:
+        self._on_toggle_status()
+```
+
+#### 4.4 AddEditRuleDialog
 
 ```python
-# ui/dialogs/batch_correction_dialog.py
-class BatchCorrectionDialog(QDialog):
+# ui/dialogs/add_edit_rule_dialog.py
+class AddEditRuleDialog(QDialog):
     """
-    Dialog for creating multiple correction rules at once.
+    Dialog for adding or editing correction rules.
     
-    Provides a grid interface for batch rule creation.
+    Features:
+    - Input fields for rule properties
+    - Validation of inputs
+    - Category selection
+    - Status toggle
     """
     
-    def __init__(self, selections, validation_service=None, parent=None):
-        """Initialize with selected cells."""
+    def __init__(self, validation_service=None, parent=None, rule=None):
         super().__init__(parent)
-        self._selections = selections
         self._validation_service = validation_service
-        self._rules = []
+        self._rule = rule
+        
         self._setup_ui()
+        self._connect_signals()
+        
+        if rule:
+            self._populate_fields(rule)
+            self.setWindowTitle("Edit Correction Rule")
+        else:
+            self.setWindowTitle("Add Correction Rule")
         
     def _setup_ui(self):
         """Set up the UI components."""
         # Implementation details...
         
-    def _populate_grid(self):
-        """Populate the grid with selected cells."""
+    def _connect_signals(self):
+        """Connect signals and slots."""
         # Implementation details...
         
-    def _setup_category_dropdown(self, row, category):
-        """Set up category dropdown for a grid row."""
+    def _populate_fields(self, rule):
+        """Populate dialog fields with rule data."""
         # Implementation details...
         
-    def _setup_to_value_dropdown(self, row, category):
-        """Set up to-value dropdown for a grid row."""
+    def get_rule(self):
+        """Get the correction rule from dialog data."""
         # Implementation details...
         
-    def _on_category_changed(self, row, category):
-        """Handle category change for a row."""
-        # Implementation details...
-        
-    def _on_add_to_validation_toggled(self, checked):
-        """Handle add-to-validation toggle."""
-        # Implementation details...
-        
-    def _on_enable_all_toggled(self, checked):
-        """Handle enable-all toggle."""
-        # Implementation details...
-        
-    def get_rules(self):
-        """Get the created correction rules."""
-        # Implementation details...
-        
-    def add_to_validation_checked(self):
-        """Check if add-to-validation is enabled."""
-        # Implementation details...
-        
-    def auto_enable_checked(self):
-        """Check if auto-enable is enabled."""
+    def _validate_inputs(self):
+        """Validate user inputs."""
         # Implementation details...
 ```
 
-#### 4.4 ProgressDialog
-
-```python
-# ui/dialogs/correction_progress_dialog.py
-class CorrectionProgressDialog(QDialog):
-    """
-    Dialog for showing correction progress.
-    
-    Provides progress bar, status text, and cancel button.
-    """
-    
-    # Signals
-    cancelled = Signal()  # No parameters
-    
-    def __init__(self, parent=None):
-        """Initialize the dialog."""
-        super().__init__(parent)
-        self.setWindowTitle("Applying Corrections")
-        self.setMinimumWidth(400)
-        self._setup_ui()
-        
-    def _setup_ui(self):
-        """Set up the UI components."""
-        # Implementation details...
-        
-    def update_progress(self, current, total):
-        """Update the progress bar."""
-        # Implementation details...
-        
-    def update_status(self, message):
-        """Update the status message."""
-        # Implementation details...
-        
-    def update_detail(self, message):
-        """Update the detail message."""
-        # Implementation details...
-        
-    def _on_cancel_clicked(self):
-        """Handle cancel button click."""
-        # Implementation details...
-```
-
-### Phase 5: Data View Integration (Days 11-12)
+### Phase 5: Data View Integration (Days 10-11)
 
 #### 5.1 Cell Highlighting
 
@@ -991,7 +1126,7 @@ def _setup_tooltips(self):
             self.parent().setToolTip(tooltip)
 ```
 
-### Phase 6: Testing and Optimization (Days 13-14)
+### Phase 6: Testing and Optimization (Days 12-13)
 
 #### 6.1 Integration Tests
 
@@ -1040,9 +1175,9 @@ def test_dataview_highlighting():
 - **Days 1-2**: Core Data Model Implementation
 - **Days 3-4**: Services Layer Implementation
 - **Days 5-6**: Controller Layer Implementation
-- **Days 7-10**: UI Implementation
-- **Days 11-12**: Data View Integration
-- **Days 13-14**: Testing and Optimization
+- **Days 7-9**: UI Components Implementation
+- **Days 10-11**: Data View Integration
+- **Days 12-13**: Testing and Optimization
 
 ## Testing Strategy
 
