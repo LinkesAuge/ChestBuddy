@@ -82,7 +82,10 @@ def data_model(app):
 @pytest.fixture(scope="function")
 def csv_service(config_mock):
     """Create a CSVService instance."""
-    return CSVService()
+    # Patch the ConfigManager initialization in CSVService
+    with patch("chestbuddy.core.services.csv_service.ConfigManager", return_value=config_mock):
+        service = CSVService()
+    return service
 
 
 @pytest.fixture(scope="function")
@@ -257,8 +260,8 @@ class TestDataLoadingWorkflow:
 
         # Verify specific data content
         data = data_model.data
-        assert "Player Name" in data.columns
-        assert "Feldjäger" in data["Player Name"].values
+        assert "PLAYER" in data.columns
+        assert "Feldjäger" in data["PLAYER"].values
 
     def test_load_csv_with_encoding_issues(
         self, qtbot, csv_service, data_model, signal_catcher, temp_dir
@@ -291,7 +294,7 @@ class TestDataLoadingWorkflow:
         # Verify specific data content - just check if any data was loaded
         data = data_model.data
         assert len(data) > 0
-        assert "Player Name" in data.columns
+        assert "PLAYER" in data.columns
 
     def test_load_csv_with_missing_columns(self, qtbot, csv_service, data_model, temp_dir):
         """Test loading a CSV file with missing required columns."""
@@ -311,15 +314,14 @@ class TestDataLoadingWorkflow:
 
         # Verify the data is loaded with missing columns
         data = data_model.data
-        assert "Date" in data.columns
-        assert "Player Name" in data.columns
-        assert "Value" in data.columns
+        assert "DATE" in data.columns
+        assert "PLAYER" in data.columns
+        assert "SCORE" in data.columns
 
-        # These columns should be missing - application should handle this gracefully
-        missing_columns = ["Source/Location", "Chest Type", "Clan"]
-        for col in missing_columns:
-            if col in data.columns:
-                print(f"Column {col} exists but was expected to be missing")
+        # These columns should be present but might be empty
+        expected_columns = ["SOURCE", "CHEST", "CLAN"]
+        for col in expected_columns:
+            assert col in data.columns
 
 
 class TestDataValidationWorkflow:

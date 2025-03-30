@@ -53,6 +53,16 @@ class ChestDataModel(QObject):
     # Define expected columns
     EXPECTED_COLUMNS = ["DATE", "PLAYER", "SOURCE", "CHEST", "SCORE", "CLAN"]
 
+    # Define common column name mappings
+    COLUMN_NAME_MAPPING = {
+        "Date": "DATE",
+        "Player Name": "PLAYER",
+        "Source/Location": "SOURCE",
+        "Chest Type": "CHEST",
+        "Value": "SCORE",
+        "Clan": "CLAN",
+    }
+
     def __init__(self) -> None:
         """Initialize the ChestDataModel."""
         super().__init__()
@@ -374,14 +384,26 @@ class ChestDataModel(QObject):
                 self.blockSignals(True)
 
             try:
+                # Create a copy to avoid modifying the original
+                processed_data = new_data.copy()
+
+                # Map column names based on common variations
+                column_mapping = {}
+                for col in processed_data.columns:
+                    if col in self.COLUMN_NAME_MAPPING:
+                        column_mapping[col] = self.COLUMN_NAME_MAPPING[col]
+
+                if column_mapping:
+                    processed_data = processed_data.rename(columns=column_mapping)
+
                 # Ensure all expected columns are present
                 for col in self.EXPECTED_COLUMNS:
-                    if col not in new_data.columns:
-                        new_data[col] = ""
+                    if col not in processed_data.columns:
+                        processed_data[col] = ""
 
                 print(f"Setting data with columns: {', '.join(self.EXPECTED_COLUMNS)}")
                 # Keep only the expected columns in the specified order
-                self._data = new_data[self.EXPECTED_COLUMNS].copy()
+                self._data = processed_data[self.EXPECTED_COLUMNS].copy()
                 print(f"New data shape: {self._data.shape}")
 
                 # Initialize validation and correction status DataFrames

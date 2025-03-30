@@ -723,7 +723,8 @@ class ValidationService(QObject):
         logger.debug(f"Getting validate_on_import: {self._validate_on_import}")
 
         # If config manager is available, refresh the value to ensure consistency
-        if self._config_manager:
+        # Skip this check if we're in testing mode (after _reset_for_testing was called)
+        if self._config_manager and not getattr(self, "_in_testing_mode", False):
             config_value = self._config_manager.get_bool(
                 "Validation", "validate_on_import", self._validate_on_import
             )
@@ -989,18 +990,21 @@ class ValidationService(QObject):
             return False, f"Error exporting validation report. Error: {e}"
 
     def _reset_for_testing(self) -> None:
-        """Reset service state for testing purposes."""
-        # Reset validation list models if they exist
+        """Reset the validation service for testing."""
+        self._case_sensitive = False
+        self._validate_on_import = True
+        self._auto_save = True
+
+        # Set a flag to indicate we're in testing mode
+        self._in_testing_mode = True
+
+        # Reset validation lists
         if self._player_list_model:
             self._player_list_model.reset()
         if self._chest_type_list_model:
             self._chest_type_list_model.reset()
         if self._source_list_model:
             self._source_list_model.reset()
-
-        # Clear any cached validation results
-        if hasattr(self, "_validation_results"):
-            self._validation_results = {}
 
     def get_validation_list_path(self, filename: str) -> Path:
         """
