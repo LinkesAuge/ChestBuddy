@@ -289,3 +289,149 @@ self._validation_tab.validation_changed.connect(self._validation_service.validat
 ```
 
 **Result**: Validation status now updates correctly when validation lists change.
+
+## BatchCorrectionDialog and DataView Integration (May 10, 2024)
+
+### FIXED: BatchCorrectionDialog Integration with DataView
+
+**Issue**: BatchCorrectionDialog was not properly integrated with the DataView for getting selected cells.
+
+**Root Cause**: Missing context menu integration and selected cell collection functionality in DataView.
+
+**Fix**:
+1. Added context menu integration in DataView:
+   ```python
+   def _setup_context_menu(self) -> None:
+       # Create context menu
+       self._context_menu = QMenu(self)
+       
+       # Add existing actions...
+       
+       # Add separator before correction actions
+       self._context_menu.addSeparator()
+       
+       # Add correction-related items
+       self._add_correction_rule_action = QAction("Add Correction Rule", self)
+       self._add_correction_rule_action.triggered.connect(self._on_add_correction_rule)
+       self._context_menu.addAction(self._add_correction_rule_action)
+       
+       self._add_batch_correction_action = QAction("Create Batch Correction Rules", self)
+       self._add_batch_correction_action.triggered.connect(self._on_add_batch_correction)
+       self._context_menu.addAction(self._add_batch_correction_action)
+   ```
+
+2. Implemented selected cell collection in DataView:
+   ```python
+   def _get_selected_cells(self):
+       """Get information about selected cells."""
+       selected_cells = []
+       
+       # Get selected indexes from the table view
+       selected_indexes = self._table_view.selectedIndexes()
+       if not selected_indexes:
+           return selected_cells
+           
+       # Process each index...
+       for index in selected_indexes:
+           # Get data and add to selected_cells list...
+           selected_cells.append({
+               "row": source_row,
+               "col": source_column,
+               "value": value,
+               "column_name": column_name
+           })
+       
+       return selected_cells
+   ```
+
+3. Connected BatchCorrectionDialog to use selected cells data in CorrectionRuleView:
+   ```python
+   def _show_batch_correction_dialog(self):
+       """Show the batch correction dialog."""
+       # Get selected cells from DataView
+       selected_cells = []
+       app = QApplication.instance()
+       if hasattr(app, "get_main_window"):
+           main_window = app.get_main_window()
+           if main_window and hasattr(main_window, "get_active_view"):
+               active_view = main_window.get_active_view()
+               if active_view and hasattr(active_view, "_get_selected_cells"):
+                   selected_cells = active_view._get_selected_cells()
+      
+       # Show dialog with selected cells...
+   ```
+
+**Result**: BatchCorrectionDialog now properly works with DataView selected cells, allowing users to create correction rules from selected data.
+
+### IMPLEMENTED: Cell Highlighting for Correction Status
+
+**Issue**: DataView did not provide visual feedback for correction status.
+
+**Fix**:
+1. Added highlighting method in DataView:
+   ```python
+   def _highlight_correction_cells(self):
+       """Highlight cells based on correction status."""
+       # Get correction status from controller
+       correction_status = correction_controller.get_correction_status()
+       
+       # Apply highlighting for different cell types:
+       # - Red for invalid cells without correction rules
+       # - Orange for invalid cells with correction rules
+       # - Green for corrected cells
+   ```
+
+2. Added tooltips to show correction information:
+   ```python
+   def _update_correction_tooltips(self):
+       """Update tooltips with correction information."""
+       # Get tooltips from correction status
+       tooltips = correction_status.get("tooltips", {})
+       
+       # Apply tooltips to cells
+       for (row, col), tooltip in tooltips.items():
+           self._set_cell_tooltip(row, col, tooltip)
+   ```
+
+3. Connected to correction completion signal:
+   ```python
+   def _on_correction_completed(self, stats):
+       """Handle correction completed signal."""
+       # Update highlighting and tooltips
+       self._highlight_correction_cells()
+       self._update_correction_tooltips()
+   ```
+
+**Result**: DataView now shows visual feedback for correction status, making it easier for users to identify corrected cells and cells that need correction.
+
+### ENHANCED: CorrectionController for DataView Integration
+
+**Issue**: CorrectionController lacked methods needed for proper data view integration.
+
+**Fix**:
+1. Added get_correction_status() method to provide correction status information:
+   ```python
+   def get_correction_status(self):
+       """Get correction status for all cells."""
+       # Return dict with:
+       # - invalid_cells: List of (row, col) for invalid cells
+       # - corrected_cells: List of (row, col) for corrected cells
+       # - correctable_cells: List of (row, col) for cells with rules
+       # - tooltips: Dict mapping (row, col) to tooltip text
+   ```
+
+2. Added get_applicable_rules() method to find rules for specific cells:
+   ```python
+   def get_applicable_rules(self, value, column_name=None):
+       """Get rules applicable to a specific value and column."""
+       # Find and return matching rules
+   ```
+
+3. Added apply_rules_to_selection() method for batch correction:
+   ```python
+   def apply_rules_to_selection(self, selection, recursive=True, only_invalid=True):
+       """Apply correction rules to a selection of cells."""
+       # Apply appropriate rules to each selected cell
+   ```
+
+**Result**: CorrectionController now provides all the functionality needed for proper DataView integration, enabling seamless user interaction with the correction feature.

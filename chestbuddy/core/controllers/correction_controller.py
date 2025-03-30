@@ -419,3 +419,236 @@ class CorrectionController(BaseController):
             logger.error(f"Error getting cells with available corrections: {e}")
             self.correction_error.emit(f"Error getting correctable cells: {str(e)}")
             return []
+
+    def get_validation_service(self):
+        """
+        Get the validation service used by the correction service.
+
+        Returns:
+            ValidationService: The validation service
+        """
+        try:
+            if self._correction_service and hasattr(
+                self._correction_service, "get_validation_service"
+            ):
+                return self._correction_service.get_validation_service()
+            return None
+        except Exception as e:
+            logger.error(f"Error getting validation service: {e}")
+            return None
+
+    def get_correction_status(self):
+        """
+        Get correction status for all cells in the data.
+
+        Returns:
+            Dict with keys:
+                - invalid_cells: List of (row, col) tuples for invalid cells
+                - corrected_cells: List of (row, col) tuples for cells already corrected
+                - correctable_cells: List of (row, col) tuples for cells with applicable rules
+                - tooltips: Dict mapping (row, col) to tooltip text
+        """
+        result = {
+            "invalid_cells": [],
+            "corrected_cells": [],
+            "correctable_cells": [],
+            "tooltips": {},
+        }
+
+        try:
+            # Check if services are available
+            if not self._correction_service:
+                logger.warning("Cannot get correction status: Correction service not available")
+                return result
+
+            validation_service = self.get_validation_service()
+            if not validation_service:
+                logger.warning("Cannot get correction status: Validation service not available")
+                return result
+
+            # Get validation status
+            validation_status = validation_service.get_validation_status()
+            if validation_status is None or validation_status.empty:
+                logger.debug("No validation status available")
+                return result
+
+            # Get correction rules
+            rules = self.get_rules(status="enabled")
+
+            # Get data from correction service
+            data = self._correction_service.get_data()
+            if data is None or data.empty:
+                logger.debug("No data available")
+                return result
+
+            # Process each cell
+            for row_idx in range(len(data)):
+                for col_idx in range(len(data.columns)):
+                    value = data.iloc[row_idx, col_idx]
+                    col_name = data.columns[col_idx]
+
+                    # Check if cell is invalid
+                    is_invalid = False
+                    if row_idx in validation_status.index:
+                        if col_name in validation_status.columns:
+                            is_invalid = not validation_status.loc[row_idx, col_name]
+
+                    if is_invalid:
+                        result["invalid_cells"].append((row_idx, col_idx))
+
+                    # Check if cell has applicable rules
+                    applicable_rules = self.get_applicable_rules(value, col_name)
+
+                    if applicable_rules:
+                        result["correctable_cells"].append((row_idx, col_idx))
+
+                        # Create tooltip
+                        tooltip = f"Original: {value}\n"
+                        if len(applicable_rules) == 1:
+                            tooltip += f"Can be corrected to: {applicable_rules[0].to_value}"
+                        else:
+                            tooltip += f"Multiple corrections available: "
+                            tooltip += ", ".join([r.to_value for r in applicable_rules])
+
+                        result["tooltips"][(row_idx, col_idx)] = tooltip
+
+            # Get correction history to identify already corrected cells
+            correction_history = self._correction_service.get_correction_history()
+            for record in correction_history:
+                row_idx = record.get("row")
+                col_idx = record.get("column")
+                if row_idx is not None and col_idx is not None:
+                    result["corrected_cells"].append((row_idx, col_idx))
+
+                    # Update tooltip for corrected cells
+                    tooltip = f"Original: {record.get('old_value')}\n"
+                    tooltip += f"Corrected to: {record.get('new_value')}\n"
+                    tooltip += f"Rule: {record.get('rule_description', 'Unknown')}"
+
+                    result["tooltips"][(row_idx, col_idx)] = tooltip
+
+            logger.debug(
+                f"Correction status: {len(result['invalid_cells'])} invalid, "
+                + f"{len(result['corrected_cells'])} corrected, "
+                + f"{len(result['correctable_cells'])} correctable cells"
+            )
+            return result
+
+        except Exception as e:
+            logger.error(f"Error getting correction status: {e}")
+            self.correction_error.emit(f"Error getting correction status: {str(e)}")
+            return result
+
+    def get_applicable_rules(self, value, column_name=None):
+        """
+        Get rules applicable to a specific value and column.
+
+        Args:
+            value: The cell value to check
+            column_name: Optional column name for category-specific rules
+
+        Returns:
+            List of applicable CorrectionRule objects
+        """
+        applicable_rules = []
+
+        try:
+            # Get all enabled rules
+            rules = self.get_rules(status="enabled")
+
+            # Find applicable rules
+            for rule in rules:
+                if rule.from_value == str(value):
+                    # Check category if specified
+                    if column_name and rule.category:
+                        if rule.category == column_name:
+                            applicable_rules.append(rule)
+                    elif not rule.category:
+                        # General rule with no category
+                        applicable_rules.append(rule)
+
+            return applicable_rules
+
+        except Exception as e:
+            logger.error(f"Error getting applicable rules: {e}")
+            self.correction_error.emit(f"Error getting applicable rules: {str(e)}")
+            return []
+
+    def apply_rules_to_selection(self, selection, recursive=True, only_invalid=True):
+        """
+        Apply correction rules to a selection of cells.
+
+        Args:
+            selection: List of dict with keys row, col, value, column_name
+            recursive: Whether to apply corrections recursively
+            only_invalid: Whether to only correct invalid cells
+
+        Returns:
+            Dict with correction results
+        """
+        # Prepare result structure
+        result = {"corrected_cells": [], "errors": []}
+
+        try:
+            # Check if correction service is available
+            if not self._correction_service:
+                error_msg = "Correction service not available"
+                result["errors"].append(error_msg)
+                self.correction_error.emit(error_msg)
+                return result
+
+            # Signal that correction has started
+            self.correction_started.emit(f"Applying corrections to {len(selection)} selected cells")
+
+            # Apply corrections to each selected cell
+            corrected_count = 0
+            for cell in selection:
+                row = cell.get("row")
+                col = cell.get("col")
+                value = cell.get("value")
+                column_name = cell.get("column_name")
+
+                # Get applicable rules
+                rules = self.get_applicable_rules(value, column_name)
+
+                if not rules:
+                    continue
+
+                # Apply the highest priority rule (first in list)
+                rule = rules[0]
+
+                try:
+                    # Apply the correction
+                    success = self._correction_service.apply_correction_to_cell(
+                        row=row, col=col, rule=rule, recursive=recursive, only_invalid=only_invalid
+                    )
+
+                    if success:
+                        corrected_count += 1
+                        result["corrected_cells"].append(
+                            {"row": row, "col": col, "from": value, "to": rule.to_value}
+                        )
+                except Exception as e:
+                    error_msg = f"Error correcting cell ({row}, {col}): {str(e)}"
+                    result["errors"].append(error_msg)
+                    logger.error(error_msg)
+
+            # Signal completion
+            stats = {"corrected_cells": corrected_count, "errors": len(result["errors"])}
+            self.correction_completed.emit(stats)
+
+            # Refresh the view if available
+            if self._view and hasattr(self._view, "refresh"):
+                self._view.refresh()
+
+            logger.info(
+                f"Applied rules to selection: {corrected_count} cells corrected, {len(result['errors'])} errors"
+            )
+            return result
+
+        except Exception as e:
+            error_msg = f"Error applying rules to selection: {str(e)}"
+            result["errors"].append(error_msg)
+            self.correction_error.emit(error_msg)
+            logger.error(error_msg)
+            return result

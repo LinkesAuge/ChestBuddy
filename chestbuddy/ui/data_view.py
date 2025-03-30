@@ -52,6 +52,8 @@ from chestbuddy.ui.widgets.action_toolbar import ActionToolbar
 from chestbuddy.ui.widgets.action_button import ActionButton
 from chestbuddy.ui.widgets.validation_delegate import ValidationStatusDelegate
 from chestbuddy.core.validation_enums import ValidationStatus
+from chestbuddy.ui.dialogs.add_edit_rule_dialog import AddEditRuleDialog
+from chestbuddy.ui.dialogs.batch_correction_dialog import BatchCorrectionDialog
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -647,6 +649,11 @@ class DataView(QWidget):
         if refresh_button:
             refresh_button.clicked.connect(self._on_refresh_clicked)
             logger.debug("Connected refresh button")
+
+        # Connect to correction signals if available
+        correction_controller = self._get_correction_controller()
+        if correction_controller:
+            correction_controller.correction_completed.connect(self._on_correction_completed)
 
     def _update_view(self) -> None:
         """
@@ -2046,3 +2053,330 @@ class DataView(QWidget):
 
         except Exception as e:
             logger.error(f"Error handling data changed in DataView: {e}")
+
+    def _setup_context_menu(self) -> None:
+        """Set up the context menu for the data table."""
+        # Create context menu
+        self._context_menu = QMenu(self)
+
+        # Add copy action
+        self._copy_action = QAction("Copy", self)
+        self._copy_action.triggered.connect(self._on_copy_to_clipboard)
+        self._context_menu.addAction(self._copy_action)
+
+        # Add copy row action
+        self._copy_row_action = QAction("Copy Row", self)
+        self._copy_row_action.triggered.connect(self._on_copy_row_to_clipboard)
+        self._context_menu.addAction(self._copy_row_action)
+
+        # Add separator before correction actions
+        self._context_menu.addSeparator()
+
+        # Add correction-related items
+        self._add_correction_rule_action = QAction("Add Correction Rule", self)
+        self._add_correction_rule_action.triggered.connect(self._on_add_correction_rule)
+        self._context_menu.addAction(self._add_correction_rule_action)
+
+        self._add_batch_correction_action = QAction("Create Batch Correction Rules", self)
+        self._add_batch_correction_action.triggered.connect(self._on_add_batch_correction)
+        self._context_menu.addAction(self._add_batch_correction_action)
+
+        # Set context menu policy
+        self._table_view.setContextMenuPolicy(Qt.CustomContextMenu)
+        self._table_view.customContextMenuRequested.connect(self._on_context_menu_requested)
+
+    def _get_selected_cells(self):
+        """Get information about selected cells."""
+        selected_cells = []
+
+        # Get selected indexes from the table view
+        selected_indexes = self._table_view.selectedIndexes()
+        if not selected_indexes:
+            return selected_cells
+
+        # Process each selected index
+        for index in selected_indexes:
+            # Skip if it's a header or non-data cell
+            if not index.isValid():
+                continue
+
+            # Get row and column indices
+            row = index.row()
+            column = index.column()
+
+            # Get the model index for the source data (handle proxy model if present)
+            source_index = index
+            source_row = row
+            source_column = column
+            if hasattr(self, "_proxy_model") and self._proxy_model:
+                source_index = self._proxy_model.mapToSource(index)
+                source_row = source_index.row()
+                source_column = source_index.column()
+
+            # Get the value and column name
+            value = self._table_model.data(source_index, Qt.DisplayRole)
+            column_name = self._table_model.headerData(source_column, Qt.Horizontal, Qt.DisplayRole)
+
+            # Add to selected cells list
+            selected_cells.append(
+                {
+                    "row": source_row,
+                    "col": source_column,
+                    "value": value if value else "",
+                    "column_name": column_name if column_name else f"Column {source_column}",
+                }
+            )
+
+        return selected_cells
+
+    def _on_add_correction_rule(self):
+        """Handle add correction rule action."""
+        selected_cells = self._get_selected_cells()
+        if not selected_cells:
+            QMessageBox.warning(self, "Warning", "No cells selected.")
+            return
+
+        # If multiple cells selected, ask whether to create individual rules or batch rules
+        if len(selected_cells) > 1:
+            response = QMessageBox.question(
+                self,
+                "Multiple Cells Selected",
+                "Create individual rules for each cell or use batch correction?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.Yes,
+            )
+
+            if response == QMessageBox.No:
+                # Use batch correction instead
+                self._on_add_batch_correction()
+                return
+
+        # For single cell or if user chose individual rules
+        # Create a rule for the first selected cell
+        cell = selected_cells[0]
+        self._show_add_rule_dialog(cell)
+
+    def _show_add_rule_dialog(self, cell_data):
+        """Show dialog to add a correction rule for a cell."""
+        # Get the correction controller
+        correction_controller = self._get_correction_controller()
+        if not correction_controller:
+            QMessageBox.warning(self, "Error", "Correction controller not available.")
+            return
+
+        # Create empty rule with cell data
+        from chestbuddy.core.models.correction_rule import CorrectionRule
+
+        rule = CorrectionRule(
+            from_value=cell_data["value"],
+            to_value="",
+            category=cell_data["column_name"],
+            status="enabled",
+            order=100,
+        )
+
+        # Show the dialog to edit the rule
+        dialog = AddEditRuleDialog(
+            validation_service=correction_controller.get_validation_service(),
+            parent=self,
+            rule=rule,
+        )
+
+        if dialog.exec():
+            rule = dialog.get_rule()
+            correction_controller.add_rule(rule)
+            self._logger.info(f"Added rule: {rule.from_value} -> {rule.to_value}")
+
+            # Refresh data view to show changes
+            self.refresh()
+
+    def _on_add_batch_correction(self):
+        """Handle batch correction action."""
+        selected_cells = self._get_selected_cells()
+        if not selected_cells:
+            QMessageBox.warning(self, "Warning", "No cells selected.")
+            return
+
+        # Open BatchCorrectionDialog with selected cells
+        self._show_batch_correction_dialog(selected_cells)
+
+    def _show_batch_correction_dialog(self, selected_cells):
+        """Show the batch correction dialog."""
+        # Get CorrectionController from the application
+        correction_controller = self._get_correction_controller()
+        if not correction_controller:
+            QMessageBox.warning(self, "Error", "Correction controller not available.")
+            return
+
+        dialog = BatchCorrectionDialog(
+            selected_cells=selected_cells,
+            validation_service=correction_controller.get_validation_service(),
+            parent=self,
+        )
+
+        if dialog.exec():
+            rules = dialog.get_rules()
+            for rule in rules:
+                correction_controller.add_rule(rule)
+            self._logger.info(f"Added {len(rules)} rules from batch correction")
+
+            # Refresh data view to show changes
+            self.refresh()
+
+    def _get_correction_controller(self):
+        """Get the correction controller from the application."""
+        # This is a simplified approach - the actual implementation would depend
+        # on how controllers are managed in the application
+        from chestbuddy.app import ChestBuddyApp
+
+        app = QApplication.instance()
+        if isinstance(app, ChestBuddyApp):
+            return app.get_correction_controller()
+        return None
+
+    def _on_correction_completed(self, stats):
+        """
+        Handle correction completed signal.
+
+        Args:
+            stats: Correction statistics
+        """
+        # Update highlighting and tooltips
+        self._highlight_correction_cells()
+        self._update_correction_tooltips()
+
+        # Refresh the view
+        self.refresh()
+
+        # Log completion
+        self._logger.info(f"Correction completed: {stats}")
+
+    def _highlight_correction_cells(self):
+        """Highlight cells based on correction status."""
+        correction_controller = self._get_correction_controller()
+        if not correction_controller:
+            return
+
+        # Get correction status information
+        correction_status = correction_controller.get_correction_status()
+        if not correction_status:
+            return
+
+        # Prepare color constants
+        invalid_color = QColor(255, 0, 0, 50)  # Red, semi-transparent
+        correctable_color = QColor(255, 165, 0, 50)  # Orange, semi-transparent
+        corrected_color = QColor(0, 255, 0, 50)  # Green, semi-transparent
+
+        # Process cells that need highlighting
+        invalid_cells = correction_status.get("invalid_cells", [])
+        corrected_cells = correction_status.get("corrected_cells", [])
+        correctable_cells = correction_status.get("correctable_cells", [])
+
+        # Start batch updates
+        if hasattr(self, "_table_model") and self._table_model:
+            self._table_model.blockSignals(True)
+
+        try:
+            # Apply highlighting for each cell type
+            for row, col in invalid_cells:
+                if (row, col) in correctable_cells:
+                    # Invalid with correction rule (orange)
+                    self._highlight_cell(row, col, correctable_color)
+                else:
+                    # Invalid without correction rule (red)
+                    self._highlight_cell(row, col, invalid_color)
+
+            for row, col in corrected_cells:
+                # Corrected cells (green)
+                self._highlight_cell(row, col, corrected_color)
+
+            for row, col in correctable_cells:
+                if (row, col) not in invalid_cells and (row, col) not in corrected_cells:
+                    # Correctable but not invalid or corrected (still orange but lighter)
+                    self._highlight_cell(row, col, QColor(255, 165, 0, 30))
+        finally:
+            # End batch updates
+            if hasattr(self, "_table_model") and self._table_model:
+                self._table_model.blockSignals(False)
+
+        # Update the view
+        if hasattr(self, "_table_view") and self._table_view:
+            self._table_view.viewport().update()
+
+        self._logger.debug(f"Applied cell highlighting for correction status")
+
+    def _highlight_cell(self, row, col, color):
+        """
+        Highlight a cell with the specified color.
+
+        Args:
+            row: Source row index
+            col: Source column index
+            color: QColor for highlighting
+        """
+        if not hasattr(self, "_table_model") or not self._table_model:
+            return
+
+        # Map to view indices if needed
+        view_index = None
+        if hasattr(self, "_proxy_model") and self._proxy_model:
+            model_index = self._table_model.index(row, col)
+            view_index = self._proxy_model.mapFromSource(model_index)
+        else:
+            view_index = self._table_model.index(row, col)
+
+        if not view_index or not view_index.isValid():
+            return
+
+        # Apply highlighting color
+        item = self._table_model.itemFromIndex(view_index)
+        if item:
+            item.setData(color, Qt.BackgroundRole)
+
+    def _update_correction_tooltips(self):
+        """Update tooltips with correction information."""
+        correction_controller = self._get_correction_controller()
+        if not correction_controller:
+            return
+
+        # Get correction status information
+        correction_status = correction_controller.get_correction_status()
+        if not correction_status:
+            return
+
+        # Get the tooltips map
+        tooltips = correction_status.get("tooltips", {})
+
+        # Apply tooltips to cells
+        for (row, col), tooltip in tooltips.items():
+            self._set_cell_tooltip(row, col, tooltip)
+
+        self._logger.debug(f"Updated tooltips for {len(tooltips)} cells")
+
+    def _set_cell_tooltip(self, row, col, tooltip):
+        """
+        Set tooltip for a cell.
+
+        Args:
+            row: Source row index
+            col: Source column index
+            tooltip: Tooltip text
+        """
+        if not hasattr(self, "_table_model") or not self._table_model:
+            return
+
+        # Map to view indices if needed
+        view_index = None
+        if hasattr(self, "_proxy_model") and self._proxy_model:
+            model_index = self._table_model.index(row, col)
+            view_index = self._proxy_model.mapFromSource(model_index)
+        else:
+            view_index = self._table_model.index(row, col)
+
+        if not view_index or not view_index.isValid():
+            return
+
+        # Apply tooltip
+        item = self._table_model.itemFromIndex(view_index)
+        if item:
+            item.setToolTip(tooltip)

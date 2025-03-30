@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
     QSplitter,
     QAbstractItemView,
     QStatusBar,
+    QApplication,
 )
 
 from chestbuddy.core.controllers.correction_controller import CorrectionController
@@ -545,7 +546,21 @@ class CorrectionRuleView(QWidget):
 
     def _show_batch_correction_dialog(self):
         """Show the batch correction dialog."""
-        selected_cells = []  # This would come from the data view
+        # This would typically come from the data view
+        # For now, we'll use an empty list since we're not integrating with the data view here
+        selected_cells = []
+
+        # Get the selected cells from the application's DataView
+        # This is a simplified approach - the actual implementation would depend
+        # on how the DataView is accessed in the application
+        app = QApplication.instance()
+        if hasattr(app, "get_main_window"):
+            main_window = app.get_main_window()
+            if main_window and hasattr(main_window, "get_active_view"):
+                active_view = main_window.get_active_view()
+                if active_view and hasattr(active_view, "_get_selected_cells"):
+                    selected_cells = active_view._get_selected_cells()
+                    self._logger.debug(f"Got {len(selected_cells)} selected cells from data view")
 
         dialog = BatchCorrectionDialog(
             selected_cells=selected_cells,
@@ -560,6 +575,11 @@ class CorrectionRuleView(QWidget):
             self._logger.info(f"Added {len(rules)} rules from batch correction")
             self._refresh_rule_table()
             self._update_categories_filter()
+
+            # Apply the rules to selected cells
+            if selected_cells and hasattr(self._controller, "apply_rules_to_selection"):
+                self._controller.apply_rules_to_selection(selected_cells)
+                self._logger.info("Applied correction rules to selected cells")
 
     def _show_import_export_dialog(self, export_mode=False):
         """Show the import/export dialog."""
