@@ -1,742 +1,369 @@
 """
-CorrectionService module.
+CorrectionService for applying correction rules to data.
 
-This module provides the CorrectionService class for correcting issues in chest data.
+This service applies correction rules to data using a two-pass algorithm:
+1. First pass applies general category rules to all columns
+2. Second pass applies column-specific rules
+
+The service also supports selective correction of only invalid cells.
 """
 
-import logging
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union, Any, Callable
-
+from typing import Dict, List, Tuple, Any, Optional
 import pandas as pd
 import numpy as np
+from copy import deepcopy
 
-from chestbuddy.core.models.chest_data_model import ChestDataModel
-
-# Set up logger
-logger = logging.getLogger(__name__)
+from chestbuddy.core.models.correction_rule import CorrectionRule
+from chestbuddy.core.models.correction_rule_manager import CorrectionRuleManager
+from chestbuddy.core.validation_enums import ValidationStatus
 
 
 class CorrectionService:
     """
-    Service for correcting issues in chest data.
+    Service for applying correction rules to data.
 
-    The CorrectionService is responsible for applying corrections to
-    chest data based on validation results, providing automated and
-    semi-automated correction strategies.
+    The service applies rules using a two-pass algorithm, first applying general rules
+    and then column-specific rules. It can selectively apply corrections to only
+    invalid cells or all matching cells.
 
-    Implementation Notes:
-        - Provides methods for common corrections (missing values, outliers, etc.)
-        - Tracks correction history for audit purposes
-        - Works with the ChestDataModel to update data and correction statuses
+    Attributes:
+        _rule_manager (CorrectionRuleManager): Manager for correction rules
+        _data_model: Data model containing the data to be corrected
+        _validation_service: Service for validating data cells
+        _case_sensitive (bool): Whether to apply case-sensitive matching
+        _correction_history (List[Dict]): History of applied corrections
     """
 
-    def __init__(self, data_model: ChestDataModel) -> None:
+    def __init__(self, rule_manager, data_model, validation_service, case_sensitive=True):
         """
         Initialize the CorrectionService.
 
         Args:
-            data_model: The ChestDataModel instance to apply corrections to.
+            rule_manager (CorrectionRuleManager): Manager for correction rules
+            data_model: Data model containing the data to be corrected
+            validation_service: Service for validating data cells
+            case_sensitive (bool): Whether to apply case-sensitive matching
         """
+        self._rule_manager = rule_manager
         self._data_model = data_model
-        self._correction_strategies = {}
+        self._validation_service = validation_service
+        self._case_sensitive = case_sensitive
         self._correction_history = []
-        self._initialize_default_strategies()
 
-    def _initialize_default_strategies(self) -> None:
-        """Initialize the default correction strategies."""
-        # Add default correction strategies
-        self.add_correction_strategy("fill_missing_mean", self._fill_missing_mean)
-        self.add_correction_strategy("fill_missing_median", self._fill_missing_median)
-        self.add_correction_strategy("fill_missing_mode", self._fill_missing_mode)
-        self.add_correction_strategy("fill_missing_constant", self._fill_missing_constant)
-        self.add_correction_strategy("remove_duplicates", self._remove_duplicates)
-        self.add_correction_strategy("fix_outliers_mean", self._fix_outliers_mean)
-        self.add_correction_strategy("fix_outliers_median", self._fix_outliers_median)
-        self.add_correction_strategy("fix_outliers_winsorize", self._fix_outliers_winsorize)
+        # For mapping column names to rule categories
+        self._category_mapping = {"Player": "player", "ChestType": "chest_type", "Source": "source"}
 
-    def add_correction_strategy(self, strategy_name: str, strategy_function: Callable) -> None:
+    def apply_corrections(self, only_invalid: bool = False) -> Dict[str, int]:
         """
-        Add a custom correction strategy.
+        Apply all enabled correction rules to the data.
+
+        Uses a two-pass algorithm:
+        1. First pass applies general category rules to all columns
+        2. Second pass applies column-specific rules to their respective columns
 
         Args:
-            strategy_name: The name of the strategy.
-            strategy_function: The function that implements the strategy.
-        """
-        self._correction_strategies[strategy_name] = strategy_function
-
-    def remove_correction_strategy(self, strategy_name: str) -> bool:
-        """
-        Remove a correction strategy.
-
-        Args:
-            strategy_name: The name of the strategy to remove.
+            only_invalid (bool): If True, only apply corrections to cells marked as invalid
 
         Returns:
-            True if the strategy was removed, False if it didn't exist.
+            Dict[str, int]: Statistics about the corrections applied
         """
-        if strategy_name in self._correction_strategies:
-            del self._correction_strategies[strategy_name]
-            return True
-        return False
+        data = self._data_model.get_data()
+        if data is None or data.empty:
+            return {
+                "total_corrections": 0,
+                "corrected_rows": 0,
+                "corrected_cells": 0,
+            }
 
-    def apply_correction(
-        self,
-        strategy_name: str,
-        column: Optional[str] = None,
-        rows: Optional[List[int]] = None,
-        **strategy_args,
-    ) -> Tuple[bool, Optional[str]]:
-        """
-        Apply a correction strategy to the data.
+        # Make a copy of the data to apply corrections
+        corrected_data = data.copy()
 
-        Args:
-            strategy_name: The name of the correction strategy to apply.
-            column: Optional column name to apply the correction to.
-            rows: Optional list of row indices to apply the correction to.
-            **strategy_args: Additional arguments to pass to the strategy function.
+        # Get all enabled rules, prioritized (general rules first, then column-specific)
+        prioritized_rules = self._rule_manager.get_prioritized_rules()
 
-        Returns:
-            A tuple containing:
-                - True if the correction was applied successfully, False otherwise.
-                - An error message, or None if the operation was successful.
-        """
-        if self._data_model.is_empty:
-            error_msg = "Cannot apply correction to empty data."
-            logger.warning(error_msg)
-            return False, error_msg
+        # First get all rules that match
+        all_potential_corrections = []
 
-        if strategy_name not in self._correction_strategies:
-            error_msg = f"Correction strategy '{strategy_name}' not found."
-            logger.warning(error_msg)
-            return False, error_msg
+        # First pass: Plan all general rule corrections
+        general_corrections = []
+        for rule in prioritized_rules:
+            if rule.status != "enabled":
+                continue
 
-        try:
-            # Get the strategy function
-            strategy_function = self._correction_strategies[strategy_name]
+            if rule.category == "general":
+                corrections = self._apply_rule_to_data(corrected_data, rule, only_invalid)
+                general_corrections.extend(corrections)
 
-            # Apply the correction
-            result, error = strategy_function(column=column, rows=rows, **strategy_args)
+        # Apply general corrections first
+        # Track statistics
+        total_corrections = 0
+        corrected_rows = set()
+        corrected_cells = set()
 
-            if result:
-                # Record the correction in the history
-                self._record_correction(strategy_name, column, rows, strategy_args)
+        # Apply general corrections
+        for row, col, _, new_value in general_corrections:
+            column_name = corrected_data.columns[col]
+            corrected_data.at[row, column_name] = new_value
+            corrected_rows.add(row)
+            corrected_cells.add((row, col))
+            total_corrections += 1
 
-                # Update the correction status in the data model
-                self._update_correction_status(strategy_name, column, rows)
+        # Second pass: Apply category-specific rules (which will override general rules)
+        for rule in prioritized_rules:
+            if rule.status != "enabled" or rule.category == "general":
+                continue
 
-            return result, error
+            # Apply the rule to the already partially corrected data
+            corrections = self._apply_rule_to_data(corrected_data, rule, only_invalid)
 
-        except Exception as e:
-            error_msg = f"Error applying correction strategy '{strategy_name}': {e}"
-            logger.error(error_msg)
-            return False, error_msg
+            # Apply these corrections
+            for row, col, _, new_value in corrections:
+                column_name = corrected_data.columns[col]
+                corrected_data.at[row, column_name] = new_value
+                corrected_rows.add(row)
+                corrected_cells.add((row, col))
+                total_corrections += 1
 
-    def _record_correction(
-        self,
-        strategy_name: str,
-        column: Optional[str],
-        rows: Optional[List[int]],
-        strategy_args: Dict[str, Any],
-    ) -> None:
-        """
-        Record a correction in the history.
+        # Update the data model with corrected data
+        if total_corrections > 0:
+            self._data_model.update_data(corrected_data)
 
-        Args:
-            strategy_name: The name of the correction strategy.
-            column: The column the correction was applied to, or None if all columns.
-            rows: The row indices the correction was applied to, or None if all rows.
-            strategy_args: Additional arguments passed to the strategy function.
-        """
-        correction_record = {
-            "strategy": strategy_name,
-            "column": column,
-            "rows": rows,
-            "args": strategy_args,
-            "timestamp": pd.Timestamp.now(),
+        # Prepare statistics
+        stats = {
+            "total_corrections": total_corrections,
+            "corrected_rows": len(corrected_rows),
+            "corrected_cells": len(corrected_cells),
         }
 
-        self._correction_history.append(correction_record)
+        return stats
 
-    def _update_correction_status(
-        self, strategy_name: str, column: Optional[str], rows: Optional[List[int]]
-    ) -> None:
+    def apply_single_rule(self, rule: CorrectionRule, only_invalid: bool = False) -> Dict[str, int]:
         """
-        Update the correction status in the data model.
+        Apply a single correction rule to the data.
 
         Args:
-            strategy_name: The name of the correction strategy.
-            column: The column the correction was applied to, or None if all columns.
-            rows: The row indices the correction was applied to, or None if all rows.
-        """
-        # Determine affected rows
-        affected_rows = rows if rows is not None else self._data_model.data.index
-
-        # Update correction status for each affected row
-        for row_idx in affected_rows:
-            status_msg = f"{strategy_name} applied"
-            if column:
-                status_msg += f" to column '{column}'"
-
-            self._data_model.set_correction_status(row_idx, strategy_name, status_msg)
-
-    def get_correction_history(self) -> List[Dict[str, Any]]:
-        """
-        Get the correction history.
+            rule (CorrectionRule): Rule to apply
+            only_invalid (bool): If True, only apply corrections to cells marked as invalid
 
         Returns:
-            A list of correction records, each containing strategy, column,
-            rows, args, and timestamp.
+            Dict[str, int]: Statistics about the corrections applied
         """
-        return self._correction_history
+        data = self._data_model.get_data()
+        if data is None or data.empty:
+            return {
+                "total_corrections": 0,
+                "corrected_rows": 0,
+                "corrected_cells": 0,
+            }
 
-    def export_correction_report(self, file_path: Union[str, Path]) -> Tuple[bool, Optional[str]]:
+        # Make a copy of the data to apply corrections
+        corrected_data = data.copy()
+
+        # Apply the rule to get corrections
+        corrections = self._apply_rule_to_data(corrected_data, rule, only_invalid)
+
+        # Track statistics
+        corrected_rows = set()
+        corrected_cells = set()
+
+        # Apply corrections to the dataframe
+        for row, col, _, new_value in corrections:
+            column_name = corrected_data.columns[col]
+            corrected_data.at[row, column_name] = new_value
+            corrected_rows.add(row)
+            corrected_cells.add((row, col))
+
+        # Update the data model with corrected data
+        if corrections:
+            self._data_model.update_data(corrected_data)
+
+        # Record in history
+        stats = {
+            "total_corrections": len(corrections),
+            "corrected_rows": len(corrected_rows),
+            "corrected_cells": len(corrected_cells),
+        }
+
+        self._correction_history.append({"rule": rule, "stats": stats})
+
+        return stats
+
+    def _apply_rule_to_data(
+        self, data: pd.DataFrame, rule: CorrectionRule, only_invalid: bool
+    ) -> List[Tuple[int, int, Any, Any]]:
         """
-        Export a correction report to a CSV file.
+        Apply a rule to the data and return a list of corrections.
 
         Args:
-            file_path: The path to save the report to.
+            data (pd.DataFrame): Data to apply corrections to
+            rule (CorrectionRule): Rule to apply
+            only_invalid (bool): If True, only apply to invalid cells
 
         Returns:
-            A tuple containing:
-                - True if the operation was successful, False otherwise.
-                - An error message, or None if the operation was successful.
+            List[Tuple[int, int, Any, Any]]: List of corrections as (row, col, old_value, new_value)
         """
-        try:
-            path = Path(file_path)
+        corrections = []
 
-            # Get the correction status
-            correction_status = self._data_model.get_correction_status()
+        # Determine which columns to check based on rule category
+        columns_to_check = []
+        if rule.category == "general":
+            # General rules apply to all columns
+            columns_to_check = list(range(len(data.columns)))
+        else:
+            # Column-specific rules apply only to their respective column
+            for i, col_name in enumerate(data.columns):
+                # Map column names to categories
+                category_name = self._get_category_for_column(col_name)
+                if rule.category == category_name:
+                    columns_to_check.append(i)
 
-            # Create a DataFrame for the report
-            data = self._data_model.data.copy()
+        # Check each cell in the applicable columns
+        for col_idx in columns_to_check:
+            for row_idx in range(len(data)):
+                # Get column name for accessing the cell
+                col_name = data.columns[col_idx]
+                cell_value = data.at[row_idx, col_name]
 
-            # Add correction history as a column
-            data["correction_history"] = data.index.map(
-                lambda idx: "; ".join(
-                    [
-                        f"{strategy}: {msg}"
-                        for strategy, msg in correction_status.get(idx, {}).items()
-                    ]
-                )
-                if idx in correction_status
-                else ""
-            )
+                # Skip empty or NaN values
+                if cell_value is None or (isinstance(cell_value, float) and np.isnan(cell_value)):
+                    continue
 
-            # Write to CSV
-            data.to_csv(path, index=False)
+                # Check if value matches the rule's from_value
+                if self._values_match(str(cell_value), str(rule.from_value)):
+                    # If only applying to invalid cells, check validation status
+                    if only_invalid:
+                        cell_status = self._validation_service.get_validation_status(
+                            row_idx, col_idx
+                        )
+                        if cell_status != ValidationStatus.INVALID:
+                            continue
 
-            return True, None
+                    # Add to corrections list
+                    corrections.append((row_idx, col_idx, cell_value, rule.to_value))
 
-        except Exception as e:
-            logger.error(f"Error exporting correction report: {e}")
-            return False, f"Error exporting correction report. Error: {e}"
+        return corrections
 
-    # ====== Correction Strategy Implementations ======
-
-    def _fill_missing_mean(
-        self, column: Optional[str] = None, rows: Optional[List[int]] = None, **kwargs
-    ) -> Tuple[bool, Optional[str]]:
+    def _values_match(self, value1: str, value2: str) -> bool:
         """
-        Fill missing values with the mean of the column.
+        Check if two values match, respecting case sensitivity setting.
 
         Args:
-            column: The column to apply the correction to.
-            rows: Optional list of row indices to apply the correction to.
-            **kwargs: Additional arguments.
+            value1 (str): First value to compare
+            value2 (str): Second value to compare
 
         Returns:
-            A tuple containing:
-                - True if the correction was applied successfully, False otherwise.
-                - An error message, or None if the operation was successful.
+            bool: True if values match according to case sensitivity rules
         """
-        try:
-            data = self._data_model.data
+        if value1 is None or value2 is None:
+            return value1 is None and value2 is None
 
-            if column is None:
-                error_msg = "Column must be specified for fill_missing_mean strategy."
-                logger.warning(error_msg)
-                return False, error_msg
+        if self._case_sensitive:
+            return value1 == value2
+        else:
+            return value1.lower() == value2.lower()
 
-            if column not in data.columns:
-                error_msg = f"Column '{column}' not found in the data."
-                logger.warning(error_msg)
-                return False, error_msg
-
-            # Calculate mean (only for numeric columns)
-            if not pd.api.types.is_numeric_dtype(data[column]):
-                error_msg = f"Column '{column}' is not numeric, cannot apply mean filling."
-                logger.warning(error_msg)
-                return False, error_msg
-
-            mean_value = data[column].mean()
-
-            # Determine which rows to update
-            if rows is not None:
-                update_mask = data.index.isin(rows) & data[column].isna()
-            else:
-                update_mask = data[column].isna()
-
-            # Create updated data
-            updated_data = data.copy()
-            updated_data.loc[update_mask, column] = mean_value
-
-            # Update the data model
-            self._data_model.update_data(updated_data)
-
-            return True, None
-
-        except Exception as e:
-            error_msg = f"Error applying fill_missing_mean: {e}"
-            logger.error(error_msg)
-            return False, error_msg
-
-    def _fill_missing_median(
-        self, column: Optional[str] = None, rows: Optional[List[int]] = None, **kwargs
-    ) -> Tuple[bool, Optional[str]]:
+    def _get_category_for_column(self, column_name: str) -> str:
         """
-        Fill missing values with the median of the column.
+        Get the rule category corresponding to a column name.
 
         Args:
-            column: The column to apply the correction to.
-            rows: Optional list of row indices to apply the correction to.
-            **kwargs: Additional arguments.
+            column_name (str): The column name
 
         Returns:
-            A tuple containing:
-                - True if the correction was applied successfully, False otherwise.
-                - An error message, or None if the operation was successful.
+            str: The corresponding rule category
         """
-        try:
-            data = self._data_model.data
+        return self._category_mapping.get(column_name, column_name.lower())
 
-            if column is None:
-                error_msg = "Column must be specified for fill_missing_median strategy."
-                logger.warning(error_msg)
-                return False, error_msg
-
-            if column not in data.columns:
-                error_msg = f"Column '{column}' not found in the data."
-                logger.warning(error_msg)
-                return False, error_msg
-
-            # Calculate median (only for numeric columns)
-            if not pd.api.types.is_numeric_dtype(data[column]):
-                error_msg = f"Column '{column}' is not numeric, cannot apply median filling."
-                logger.warning(error_msg)
-                return False, error_msg
-
-            median_value = data[column].median()
-
-            # Determine which rows to update
-            if rows is not None:
-                update_mask = data.index.isin(rows) & data[column].isna()
-            else:
-                update_mask = data[column].isna()
-
-            # Create updated data
-            updated_data = data.copy()
-            updated_data.loc[update_mask, column] = median_value
-
-            # Update the data model
-            self._data_model.update_data(updated_data)
-
-            return True, None
-
-        except Exception as e:
-            error_msg = f"Error applying fill_missing_median: {e}"
-            logger.error(error_msg)
-            return False, error_msg
-
-    def _fill_missing_mode(
-        self, column: Optional[str] = None, rows: Optional[List[int]] = None, **kwargs
-    ) -> Tuple[bool, Optional[str]]:
+    def get_cells_with_available_corrections(self) -> List[Tuple[int, int]]:
         """
-        Fill missing values with the mode (most frequent value) of the column.
+        Get a list of cells that have available corrections.
+
+        Returns:
+            List[Tuple[int, int]]: List of (row, col) tuples for cells with corrections
+        """
+        data = self._data_model.get_data()
+        if data is None or data.empty:
+            return []
+
+        # Get all enabled rules
+        rules = [r for r in self._rule_manager.get_rules() if r.status == "enabled"]
+
+        # If no rules, no corrections available
+        if not rules:
+            return []
+
+        # Track cells with available corrections
+        cells_with_corrections = set()
+
+        # Process each rule
+        for rule in rules:
+            # Apply the rule to get potential corrections (but don't actually apply them)
+            corrections = self._apply_rule_to_data(data, rule, False)
+
+            # Add the affected cells to our set
+            for row, col, _, _ in corrections:
+                cells_with_corrections.add((row, col))
+
+        return list(cells_with_corrections)
+
+    def get_correction_preview(self, rule: CorrectionRule) -> List[Tuple[int, int, Any, Any]]:
+        """
+        Get a preview of the corrections that would be applied by a rule.
 
         Args:
-            column: The column to apply the correction to.
-            rows: Optional list of row indices to apply the correction to.
-            **kwargs: Additional arguments.
+            rule (CorrectionRule): Rule to preview
 
         Returns:
-            A tuple containing:
-                - True if the correction was applied successfully, False otherwise.
-                - An error message, or None if the operation was successful.
+            List[Tuple[int, int, Any, Any]]: List of (row, col, old_value, new_value) tuples
         """
-        try:
-            data = self._data_model.data
+        data = self._data_model.get_data()
+        if data is None or data.empty:
+            return []
 
-            if column is None:
-                error_msg = "Column must be specified for fill_missing_mode strategy."
-                logger.warning(error_msg)
-                return False, error_msg
+        # Apply the rule to get potential corrections
+        return self._apply_rule_to_data(data, rule, False)
 
-            if column not in data.columns:
-                error_msg = f"Column '{column}' not found in the data."
-                logger.warning(error_msg)
-                return False, error_msg
-
-            # Calculate mode
-            mode_result = data[column].mode()
-            if len(mode_result) == 0:
-                error_msg = f"No mode found for column '{column}'."
-                logger.warning(error_msg)
-                return False, error_msg
-
-            mode_value = mode_result[0]  # Take the first mode if there are multiple
-
-            # Determine which rows to update
-            if rows is not None:
-                update_mask = data.index.isin(rows) & data[column].isna()
-            else:
-                update_mask = data[column].isna()
-
-            # Create updated data
-            updated_data = data.copy()
-            updated_data.loc[update_mask, column] = mode_value
-
-            # Update the data model
-            self._data_model.update_data(updated_data)
-
-            return True, None
-
-        except Exception as e:
-            error_msg = f"Error applying fill_missing_mode: {e}"
-            logger.error(error_msg)
-            return False, error_msg
-
-    def _fill_missing_constant(
-        self,
-        column: Optional[str] = None,
-        rows: Optional[List[int]] = None,
-        value: Any = None,
-        **kwargs,
-    ) -> Tuple[bool, Optional[str]]:
+    def create_rule_from_cell(
+        self, row: int, col: int, to_value: Any, use_general_category: bool = False
+    ) -> CorrectionRule:
         """
-        Fill missing values with a constant value.
+        Create a correction rule from a specific cell.
 
         Args:
-            column: The column to apply the correction to.
-            rows: Optional list of row indices to apply the correction to.
-            value: The value to fill missing values with.
-            **kwargs: Additional arguments.
+            row (int): Row index of the cell
+            col (int): Column index of the cell
+            to_value (Any): Value to correct to
+            use_general_category (bool): If True, create a general category rule
 
         Returns:
-            A tuple containing:
-                - True if the correction was applied successfully, False otherwise.
-                - An error message, or None if the operation was successful.
+            CorrectionRule: Created rule
         """
-        try:
-            data = self._data_model.data
+        data = self._data_model.get_data()
 
-            if column is None:
-                error_msg = "Column must be specified for fill_missing_constant strategy."
-                logger.warning(error_msg)
-                return False, error_msg
+        # Get column name and cell value
+        col_name = self._data_model.get_column_name(col)
+        cell_value = data.at[row, col_name]
 
-            if column not in data.columns:
-                error_msg = f"Column '{column}' not found in the data."
-                logger.warning(error_msg)
-                return False, error_msg
+        # Determine category
+        if use_general_category:
+            category = "general"
+        else:
+            category = self._get_category_for_column(col_name)
 
-            if value is None:
-                error_msg = "Value must be specified for fill_missing_constant strategy."
-                logger.warning(error_msg)
-                return False, error_msg
+        # Create the rule
+        return CorrectionRule(
+            to_value=to_value, from_value=cell_value, category=category, status="enabled", order=0
+        )
 
-            # Determine which rows to update
-            if rows is not None:
-                update_mask = data.index.isin(rows) & data[column].isna()
-            else:
-                update_mask = data[column].isna()
-
-            # Create updated data
-            updated_data = data.copy()
-            updated_data.loc[update_mask, column] = value
-
-            # Update the data model
-            self._data_model.update_data(updated_data)
-
-            return True, None
-
-        except Exception as e:
-            error_msg = f"Error applying fill_missing_constant: {e}"
-            logger.error(error_msg)
-            return False, error_msg
-
-    def _remove_duplicates(
-        self, column: Optional[str] = None, rows: Optional[List[int]] = None, **kwargs
-    ) -> Tuple[bool, Optional[str]]:
+    def get_correction_history(self) -> List[Dict]:
         """
-        Remove duplicate rows from the data.
-
-        Args:
-            column: Optional column to consider when identifying duplicates.
-            rows: Optional list of row indices to check for duplicates.
-            **kwargs: Additional arguments.
+        Get the history of applied corrections.
 
         Returns:
-            A tuple containing:
-                - True if the correction was applied successfully, False otherwise.
-                - An error message, or None if the operation was successful.
+            List[Dict]: List of history entries with rule and statistics
         """
-        try:
-            data = self._data_model.data
+        return deepcopy(self._correction_history)
 
-            # Determine which subset of columns to use for duplicate detection
-            subset = [column] if column is not None else None
-
-            # Create a new DataFrame with duplicates removed
-            if rows is not None:
-                # Filter to the specified rows
-                filtered_data = data.loc[data.index.isin(rows)]
-                # Get duplicate indices within the filtered data
-                duplicated = filtered_data.duplicated(subset=subset, keep="first")
-                duplicate_indices = filtered_data.index[duplicated]
-                # Remove the duplicates
-                updated_data = data.drop(duplicate_indices)
-            else:
-                # Get all duplicate indices
-                duplicated = data.duplicated(subset=subset, keep="first")
-                # Create new DataFrame without duplicates
-                updated_data = data[~duplicated]
-
-            # Update the data model
-            self._data_model.update_data(updated_data)
-
-            return True, None
-
-        except Exception as e:
-            error_msg = f"Error applying remove_duplicates: {e}"
-            logger.error(error_msg)
-            return False, error_msg
-
-    def _fix_outliers_mean(
-        self,
-        column: Optional[str] = None,
-        rows: Optional[List[int]] = None,
-        threshold: float = 3.0,
-        **kwargs,
-    ) -> Tuple[bool, Optional[str]]:
-        """
-        Replace outliers with the mean value.
-
-        Args:
-            column: The column to apply the correction to.
-            rows: Optional list of row indices to apply the correction to.
-            threshold: Z-score threshold for identifying outliers (default: 3.0).
-            **kwargs: Additional arguments.
-
-        Returns:
-            A tuple containing:
-                - True if the correction was applied successfully, False otherwise.
-                - An error message, or None if the operation was successful.
-        """
-        try:
-            data = self._data_model.data
-
-            if column is None:
-                error_msg = "Column must be specified for fix_outliers_mean strategy."
-                logger.warning(error_msg)
-                return False, error_msg
-
-            if column not in data.columns:
-                error_msg = f"Column '{column}' not found in the data."
-                logger.warning(error_msg)
-                return False, error_msg
-
-            # Check if column is numeric
-            if not pd.api.types.is_numeric_dtype(data[column]):
-                error_msg = f"Column '{column}' is not numeric, cannot apply outlier correction."
-                logger.warning(error_msg)
-                return False, error_msg
-
-            # Calculate Z-scores
-            mean = data[column].mean()
-            std = data[column].std()
-
-            if std == 0:
-                return True, "No outliers found (standard deviation is zero)."
-
-            z_scores = (data[column] - mean) / std
-
-            # Identify outliers
-            if rows is not None:
-                # Only consider specified rows for outlier correction
-                outlier_mask = data.index.isin(rows) & (abs(z_scores) > threshold)
-            else:
-                outlier_mask = abs(z_scores) > threshold
-
-            if not any(outlier_mask):
-                return True, "No outliers found within the specified threshold."
-
-            # Create updated data
-            updated_data = data.copy()
-            updated_data.loc[outlier_mask, column] = mean
-
-            # Update the data model
-            self._data_model.update_data(updated_data)
-
-            return True, None
-
-        except Exception as e:
-            error_msg = f"Error applying fix_outliers_mean: {e}"
-            logger.error(error_msg)
-            return False, error_msg
-
-    def _fix_outliers_median(
-        self,
-        column: Optional[str] = None,
-        rows: Optional[List[int]] = None,
-        threshold: float = 3.0,
-        **kwargs,
-    ) -> Tuple[bool, Optional[str]]:
-        """
-        Replace outliers with the median value.
-
-        Args:
-            column: The column to apply the correction to.
-            rows: Optional list of row indices to apply the correction to.
-            threshold: Z-score threshold for identifying outliers (default: 3.0).
-            **kwargs: Additional arguments.
-
-        Returns:
-            A tuple containing:
-                - True if the correction was applied successfully, False otherwise.
-                - An error message, or None if the operation was successful.
-        """
-        try:
-            data = self._data_model.data
-
-            if column is None:
-                error_msg = "Column must be specified for fix_outliers_median strategy."
-                logger.warning(error_msg)
-                return False, error_msg
-
-            if column not in data.columns:
-                error_msg = f"Column '{column}' not found in the data."
-                logger.warning(error_msg)
-                return False, error_msg
-
-            # Check if column is numeric
-            if not pd.api.types.is_numeric_dtype(data[column]):
-                error_msg = f"Column '{column}' is not numeric, cannot apply outlier correction."
-                logger.warning(error_msg)
-                return False, error_msg
-
-            # Calculate Z-scores
-            mean = data[column].mean()
-            std = data[column].std()
-            median = data[column].median()
-
-            if std == 0:
-                return True, "No outliers found (standard deviation is zero)."
-
-            z_scores = (data[column] - mean) / std
-
-            # Identify outliers
-            if rows is not None:
-                # Only consider specified rows for outlier correction
-                outlier_mask = data.index.isin(rows) & (abs(z_scores) > threshold)
-            else:
-                outlier_mask = abs(z_scores) > threshold
-
-            if not any(outlier_mask):
-                return True, "No outliers found within the specified threshold."
-
-            # Create updated data
-            updated_data = data.copy()
-            updated_data.loc[outlier_mask, column] = median
-
-            # Update the data model
-            self._data_model.update_data(updated_data)
-
-            return True, None
-
-        except Exception as e:
-            error_msg = f"Error applying fix_outliers_median: {e}"
-            logger.error(error_msg)
-            return False, error_msg
-
-    def _fix_outliers_winsorize(
-        self,
-        column: Optional[str] = None,
-        rows: Optional[List[int]] = None,
-        threshold: float = 3.0,
-        **kwargs,
-    ) -> Tuple[bool, Optional[str]]:
-        """
-        Winsorize outliers (cap extreme values at a threshold).
-
-        Args:
-            column: The column to apply the correction to.
-            rows: Optional list of row indices to apply the correction to.
-            threshold: Z-score threshold for identifying outliers (default: 3.0).
-            **kwargs: Additional arguments.
-
-        Returns:
-            A tuple containing:
-                - True if the correction was applied successfully, False otherwise.
-                - An error message, or None if the operation was successful.
-        """
-        try:
-            data = self._data_model.data
-
-            if column is None:
-                error_msg = "Column must be specified for fix_outliers_winsorize strategy."
-                logger.warning(error_msg)
-                return False, error_msg
-
-            if column not in data.columns:
-                error_msg = f"Column '{column}' not found in the data."
-                logger.warning(error_msg)
-                return False, error_msg
-
-            # Check if column is numeric
-            if not pd.api.types.is_numeric_dtype(data[column]):
-                error_msg = f"Column '{column}' is not numeric, cannot apply outlier correction."
-                logger.warning(error_msg)
-                return False, error_msg
-
-            # Calculate Z-scores
-            mean = data[column].mean()
-            std = data[column].std()
-
-            if std == 0:
-                return True, "No outliers found (standard deviation is zero)."
-
-            z_scores = (data[column] - mean) / std
-
-            # Calculate winsorization bounds
-            lower_bound = mean - threshold * std
-            upper_bound = mean + threshold * std
-
-            # Create updated data
-            updated_data = data.copy()
-
-            # Apply winsorization based on rows filter
-            if rows is not None:
-                # Only consider specified rows for outlier correction
-                rows_mask = updated_data.index.isin(rows)
-                # Apply lower bound to specified rows
-                low_outliers = updated_data.loc[rows_mask, column] < lower_bound
-                updated_data.loc[rows_mask & low_outliers, column] = lower_bound
-                # Apply upper bound to specified rows
-                high_outliers = updated_data.loc[rows_mask, column] > upper_bound
-                updated_data.loc[rows_mask & high_outliers, column] = upper_bound
-            else:
-                # Apply lower bound to all rows
-                updated_data.loc[updated_data[column] < lower_bound, column] = lower_bound
-                # Apply upper bound to all rows
-                updated_data.loc[updated_data[column] > upper_bound, column] = upper_bound
-
-            # Update the data model
-            self._data_model.update_data(updated_data)
-
-            return True, None
-
-        except Exception as e:
-            error_msg = f"Error applying fix_outliers_winsorize: {e}"
-            logger.error(error_msg)
-            return False, error_msg
+    def clear_correction_history(self) -> None:
+        """Clear the correction history."""
+        self._correction_history = []
