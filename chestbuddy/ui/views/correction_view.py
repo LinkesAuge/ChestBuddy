@@ -149,9 +149,8 @@ class CorrectionView(UpdatableView):
 
             # Create the actual CorrectionRuleView with the controller
             self._rule_view = CorrectionRuleView(
-                correction_controller=self._correction_controller,
+                controller=self._correction_controller,
                 parent=self,  # Explicitly set parent to self (CorrectionView)
-                debug_mode=self._debug_mode,
             )
 
             # Add the rule view to layout
@@ -376,9 +375,8 @@ class CorrectionView(UpdatableView):
         if self._rule_view is None and self._correction_controller is not None:
             # Create the rule view with the controller
             self._rule_view = CorrectionRuleView(
-                correction_controller=self._correction_controller,
+                controller=self._correction_controller,
                 parent=self,
-                debug_mode=self._debug_mode,
             )
 
             # Add the rule view to layout
