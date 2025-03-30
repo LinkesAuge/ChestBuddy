@@ -137,7 +137,7 @@ class CorrectionView(UpdatableView):
             # Create the actual CorrectionRuleView with the controller
             self._rule_view = CorrectionRuleView(
                 correction_controller=self._correction_controller,
-                parent=self,
+                parent=self,  # Explicitly set parent to self (CorrectionView)
                 debug_mode=self._debug_mode,
             )
 
@@ -199,15 +199,14 @@ class CorrectionView(UpdatableView):
         Args:
             data: Optional data to use for update (unused in this implementation)
         """
-        # Refresh the rule view
-        if (
-            self._rule_view
-            and hasattr(self._rule_view, "refresh")
-            and callable(getattr(self._rule_view, "refresh", None))
-        ):
-            self._rule_view.refresh()
+        # Update status message
+        self._show_status_message("Updating correction rules...")
 
-        logger.debug("CorrectionView: View content updated")
+        # Refresh the view content
+        self._refresh_view_content()
+
+        # Update status when done
+        self._show_status_message("Correction rules updated")
 
     def _refresh_view_content(self) -> None:
         """Refresh the view content without changing the underlying data."""
@@ -317,19 +316,26 @@ class CorrectionView(UpdatableView):
         self.refresh()
 
     @Slot(object)
-    def _on_corrections_completed(self, stats: Dict[str, Any]) -> None:
+    def _on_corrections_completed(self, stats):
         """
-        Handle corrections completed from the correction controller.
+        Handle completion of corrections from the correction controller.
 
         Args:
-            stats: Statistics about the corrections
+            stats: Statistics about applied corrections
         """
-        # Update UI to show correction results
-        if hasattr(self, "_set_header_status"):
-            affected_rows = stats.get("affected_rows", 0) if isinstance(stats, dict) else 0
-            self._set_header_status(f"Correction complete: {affected_rows} rows affected")
+        # Convert stats to a dict if it's not already
+        affected_rows = stats.get("affected_rows", 0) if isinstance(stats, dict) else 0
 
-        # Refresh the view to show the latest results
+        if affected_rows > 0:
+            self._show_status_message(f"Corrections completed: {affected_rows} rows affected")
+        else:
+            self._show_status_message("Corrections completed: No changes were needed")
+
+        # Refresh data view if needed
+        if hasattr(self._controller, "refresh_data_view"):
+            self._controller.refresh_data_view()
+
+        # Also update this view
         self.refresh()
 
     @Slot(str)
