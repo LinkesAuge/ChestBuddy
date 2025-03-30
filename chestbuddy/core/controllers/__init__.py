@@ -12,3 +12,4 @@ from .view_state_controller import ViewStateController
 from .data_view_controller import DataViewController
 from .error_handling_controller import ErrorHandlingController
 from .ui_state_controller import UIStateController
+from .correction_controller import CorrectionController
