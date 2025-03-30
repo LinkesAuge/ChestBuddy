@@ -358,7 +358,7 @@ class CorrectionController(BaseController):
             self.correction_error.emit(f"Error clearing rules: {str(e)}")
             return False
 
-    def get_rules(self, status=None, category=None):
+    def get_rules(self, status=None, category=None, search_term=None):
         """
         Get all correction rules.
 
@@ -366,6 +366,8 @@ class CorrectionController(BaseController):
             status (str, optional): Filter rules by status (e.g., "enabled", "disabled").
                                    If None, returns all rules.
             category (str, optional): Filter rules by category. If None, returns rules for all categories.
+            search_term (str, optional): Filter rules that contain the search term in 'from_value',
+                                      'to_value', or 'description'. Case-insensitive.
 
         Returns:
             List[CorrectionRule]: List of correction rules
@@ -382,6 +384,24 @@ class CorrectionController(BaseController):
             # Filter by category if specified
             if category is not None:
                 rules = [rule for rule in rules if rule.category == category]
+
+            # Filter by search term if specified
+            if search_term and search_term.strip():
+                search_term = search_term.lower().strip()
+                filtered_rules = []
+                for rule in rules:
+                    # Check if search term is in any of the relevant fields
+                    if (
+                        search_term in rule.from_value.lower()
+                        or search_term in rule.to_value.lower()
+                        or (
+                            hasattr(rule, "description")
+                            and rule.description
+                            and search_term in rule.description.lower()
+                        )
+                    ):
+                        filtered_rules.append(rule)
+                rules = filtered_rules
 
             return rules
         except Exception as e:
