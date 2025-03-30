@@ -38,7 +38,7 @@ class CorrectionController(BaseController):
     correction_started = Signal(str)  # Operation description
     correction_progress = Signal(int, int)  # current, total
     correction_completed = Signal(object)  # Statistics dictionary
-    correction_error = Signal(str)  # Error message
+    correction_error = Signal(str)
 
     def __init__(self, correction_service, rule_manager, config_manager, signal_manager=None):
         """
@@ -89,7 +89,7 @@ class CorrectionController(BaseController):
         self.correction_started.emit("Applying correction rules")
 
         # Create a new worker for the background task
-        self._worker = BackgroundWorker(self._apply_corrections_task, only_invalid=only_invalid)
+        self._worker = BackgroundWorker()
 
         # Connect signals
         self._worker.started.connect(lambda: logger.debug("Correction task started"))
@@ -97,8 +97,8 @@ class CorrectionController(BaseController):
         self._worker.finished.connect(self._on_corrections_completed)
         self._worker.error.connect(self._on_corrections_error)
 
-        # Start the task
-        self._worker.start()
+        # Start the task with the proper function and parameters
+        self._worker.run_task(self._apply_corrections_task, only_invalid=only_invalid)
 
         logger.info(f"Started applying corrections (only_invalid={only_invalid})")
 
@@ -184,27 +184,98 @@ class CorrectionController(BaseController):
             self._worker_thread = None
             logger.debug("Correction worker cleaned up")
 
-    def add_rule(self, rule):
+    def save_rules(self):
         """
-        Add a new correction rule.
-
-        Args:
-            rule (CorrectionRule): The rule to add
+        Save correction rules to configuration.
 
         Returns:
             bool: Success status
         """
         try:
-            result = self._rule_manager.add_rule(rule)
-
-            # Update view if available
-            if result and self._view and hasattr(self._view, "update_rule_list"):
-                self._view.update_rule_list()
-
-            logger.info(f"Added rule: {rule}")
-            return result
+            # Delegate to rule manager
+            self._rule_manager.save_rules()
+            logger.info("Correction rules saved successfully")
+            return True
         except Exception as e:
-            logger.error(f"Error adding rule: {e}")
+            logger.error(f"Error saving correction rules: {e}")
+            self.correction_error.emit(f"Error saving rules: {str(e)}")
+            return False
+
+    def load_rules(self):
+        """
+        Load correction rules from configuration.
+
+        Returns:
+            bool: Success status
+        """
+        try:
+            # Delegate to rule manager
+            self._rule_manager.load_rules()
+            logger.info("Correction rules loaded successfully")
+            return True
+        except Exception as e:
+            logger.error(f"Error loading correction rules: {e}")
+            self.correction_error.emit(f"Error loading rules: {str(e)}")
+            return False
+
+    def export_rules(self, file_path):
+        """
+        Export correction rules to a file.
+
+        Args:
+            file_path (str): Path to export file
+
+        Returns:
+            bool: Success status
+        """
+        try:
+            # Delegate to rule manager
+            self._rule_manager.export_rules(file_path)
+            logger.info(f"Correction rules exported to {file_path}")
+            return True
+        except Exception as e:
+            logger.error(f"Error exporting correction rules: {e}")
+            self.correction_error.emit(f"Error exporting rules: {str(e)}")
+            return False
+
+    def import_rules(self, file_path, replace=False):
+        """
+        Import correction rules from a file.
+
+        Args:
+            file_path (str): Path to import file
+            replace (bool): Whether to replace existing rules
+
+        Returns:
+            bool: Success status
+        """
+        try:
+            # Delegate to rule manager
+            self._rule_manager.import_rules(file_path, replace=replace)
+            logger.info(f"Correction rules imported from {file_path}")
+            return True
+        except Exception as e:
+            logger.error(f"Error importing correction rules: {e}")
+            self.correction_error.emit(f"Error importing rules: {str(e)}")
+            return False
+
+    def add_rule(self, rule):
+        """
+        Add a new correction rule.
+
+        Args:
+            rule (CorrectionRule): Rule to add
+
+        Returns:
+            bool: Success status
+        """
+        try:
+            # Add rule to manager
+            self._rule_manager.add_rule(rule)
+            logger.info(f"Added correction rule: {rule}")
+            return True
+        except Exception as e:
+            logger.error(f"Error adding correction rule: {e}")
             self.correction_error.emit(f"Error adding rule: {str(e)}")
             return False
 
@@ -213,178 +284,92 @@ class CorrectionController(BaseController):
         Update an existing rule.
 
         Args:
-            index (int): The index of the rule to update
-            rule (CorrectionRule): The updated rule
+            index (int): Index of rule to update
+            rule (CorrectionRule): Updated rule
 
         Returns:
             bool: Success status
         """
         try:
-            result = self._rule_manager.update_rule(index, rule)
-
-            # Update view if available
-            if result and self._view and hasattr(self._view, "update_rule_list"):
-                self._view.update_rule_list()
-
-            logger.info(f"Updated rule at index {index}: {rule}")
-            return result
+            # Update rule in manager
+            self._rule_manager.update_rule(index, rule)
+            logger.info(f"Updated correction rule at index {index}: {rule}")
+            return True
         except Exception as e:
-            logger.error(f"Error updating rule: {e}")
+            logger.error(f"Error updating correction rule: {e}")
             self.correction_error.emit(f"Error updating rule: {str(e)}")
             return False
 
     def delete_rule(self, index):
         """
-        Delete a rule.
+        Delete a correction rule.
 
         Args:
-            index (int): The index of the rule to delete
+            index (int): Index of rule to delete
 
         Returns:
             bool: Success status
         """
         try:
-            result = self._rule_manager.delete_rule(index)
+            # Get the rule for logging
+            rule = self._rule_manager.get_rule(index)
 
-            # Update view if available
-            if result and self._view and hasattr(self._view, "update_rule_list"):
-                self._view.update_rule_list()
-
-            logger.info(f"Deleted rule at index {index}")
-            return result
+            # Delete rule from manager
+            self._rule_manager.delete_rule(index)
+            logger.info(f"Deleted correction rule at index {index}: {rule}")
+            return True
         except Exception as e:
-            logger.error(f"Error deleting rule: {e}")
+            logger.error(f"Error deleting correction rule: {e}")
             self.correction_error.emit(f"Error deleting rule: {str(e)}")
             return False
 
-    def reorder_rule(self, from_index, to_index):
+    def clear_rules(self):
         """
-        Change rule order.
-
-        Args:
-            from_index (int): The current index of the rule
-            to_index (int): The target index for the rule
+        Delete all correction rules.
 
         Returns:
             bool: Success status
         """
         try:
-            result = self._rule_manager.move_rule(from_index, to_index)
-
-            # Update view if available
-            if result and self._view and hasattr(self._view, "update_rule_list"):
-                self._view.update_rule_list()
-
-            logger.info(f"Moved rule from index {from_index} to {to_index}")
-            return result is not None and True
+            # Clear rules in manager
+            self._rule_manager.clear_rules()
+            logger.info("Cleared all correction rules")
+            return True
         except Exception as e:
-            logger.error(f"Error reordering rule: {e}")
-            self.correction_error.emit(f"Error reordering rule: {str(e)}")
+            logger.error(f"Error clearing correction rules: {e}")
+            self.correction_error.emit(f"Error clearing rules: {str(e)}")
             return False
 
-    def move_rule_to_top(self, index):
+    def get_rules(self):
         """
-        Move rule to top of category.
-
-        Args:
-            index (int): The index of the rule to move
+        Get all correction rules.
 
         Returns:
-            bool: Success status
+            List[CorrectionRule]: List of correction rules
         """
         try:
-            result = self._rule_manager.move_rule_to_top(index)
-
-            # Update view if available
-            if result and self._view and hasattr(self._view, "update_rule_list"):
-                self._view.update_rule_list()
-
-            logger.info(f"Moved rule at index {index} to top")
-            return result is not None and True
+            return self._rule_manager.get_rules()
         except Exception as e:
-            logger.error(f"Error moving rule to top: {e}")
-            self.correction_error.emit(f"Error moving rule to top: {str(e)}")
-            return False
-
-    def move_rule_to_bottom(self, index):
-        """
-        Move rule to bottom of category.
-
-        Args:
-            index (int): The index of the rule to move
-
-        Returns:
-            bool: Success status
-        """
-        try:
-            result = self._rule_manager.move_rule_to_bottom(index)
-
-            # Update view if available
-            if result and self._view and hasattr(self._view, "update_rule_list"):
-                self._view.update_rule_list()
-
-            logger.info(f"Moved rule at index {index} to bottom")
-            return result is not None and True
-        except Exception as e:
-            logger.error(f"Error moving rule to bottom: {e}")
-            self.correction_error.emit(f"Error moving rule to bottom: {str(e)}")
-            return False
-
-    def toggle_rule_status(self, index):
-        """
-        Toggle a rule's enabled/disabled status.
-
-        Args:
-            index (int): The index of the rule to toggle
-
-        Returns:
-            bool: Success status
-        """
-        try:
-            result = self._rule_manager.toggle_rule_status(index)
-
-            # Update view if available
-            if result and self._view and hasattr(self._view, "update_rule_list"):
-                self._view.update_rule_list()
-
-            logger.info(f"Toggled status for rule at index {index}")
-            return result is not None and True
-        except Exception as e:
-            logger.error(f"Error toggling rule status: {e}")
-            self.correction_error.emit(f"Error toggling rule status: {str(e)}")
-            return False
-
-    def get_rules(self, category=None, status=None):
-        """
-        Get rules with optional filtering.
-
-        Args:
-            category (str, optional): Filter by rule category
-            status (str, optional): Filter by rule status
-
-        Returns:
-            List[CorrectionRule]: List of rules matching the filters
-        """
-        try:
-            return self._rule_manager.get_rules(category=category, status=status)
-        except Exception as e:
-            logger.error(f"Error getting rules: {e}")
+            logger.error(f"Error getting correction rules: {e}")
             self.correction_error.emit(f"Error getting rules: {str(e)}")
             return []
 
-    def get_prioritized_rules(self):
+    def get_rule(self, index):
         """
-        Get rules sorted for application priority.
+        Get a specific correction rule.
+
+        Args:
+            index (int): Index of rule to get
 
         Returns:
-            List[CorrectionRule]: Prioritized list of rules
+            CorrectionRule: The correction rule
         """
         try:
-            return self._rule_manager.get_prioritized_rules()
+            return self._rule_manager.get_rule(index)
         except Exception as e:
-            logger.error(f"Error getting prioritized rules: {e}")
-            self.correction_error.emit(f"Error getting prioritized rules: {str(e)}")
-            return []
+            logger.error(f"Error getting correction rule: {e}")
+            self.correction_error.emit(f"Error getting rule: {str(e)}")
+            return None
 
     def apply_single_rule(self, rule, only_invalid=False):
         """
@@ -431,67 +416,3 @@ class CorrectionController(BaseController):
             logger.error(f"Error getting cells with available corrections: {e}")
             self.correction_error.emit(f"Error getting correctable cells: {str(e)}")
             return []
-
-    def get_correction_preview(self, rule):
-        """
-        Get preview of corrections that would be applied by a rule.
-
-        Args:
-            rule (CorrectionRule): The rule to preview
-
-        Returns:
-            List[Tuple[int, int, str, str]]: List of (row, column, old_value, new_value) tuples
-        """
-        try:
-            return self._correction_service.get_correction_preview(rule)
-        except Exception as e:
-            logger.error(f"Error getting correction preview: {e}")
-            self.correction_error.emit(f"Error getting correction preview: {str(e)}")
-            return []
-
-    def import_rules(self, file_path, replace_existing=False):
-        """
-        Import correction rules from a file.
-
-        Args:
-            file_path (str): Path to the rules file
-            replace_existing (bool): Whether to replace existing rules
-
-        Returns:
-            bool: Success status
-        """
-        try:
-            result = self._rule_manager.load_rules(
-                file_path=file_path, replace_existing=replace_existing
-            )
-
-            # Update view if available
-            if self._view and hasattr(self._view, "update_rule_list"):
-                self._view.update_rule_list()
-
-            logger.info(f"Imported rules from {file_path} (replace_existing={replace_existing})")
-            return result
-        except Exception as e:
-            logger.error(f"Error importing rules: {e}")
-            self.correction_error.emit(f"Error importing rules: {str(e)}")
-            return False
-
-    def export_rules(self, file_path, only_enabled=False):
-        """
-        Export correction rules to a file.
-
-        Args:
-            file_path (str): Path to save the rules
-            only_enabled (bool): Whether to export only enabled rules
-
-        Returns:
-            bool: Success status
-        """
-        try:
-            result = self._rule_manager.save_rules(file_path=file_path, only_enabled=only_enabled)
-            logger.info(f"Exported rules to {file_path} (only_enabled={only_enabled})")
-            return result
-        except Exception as e:
-            logger.error(f"Error exporting rules: {e}")
-            self.correction_error.emit(f"Error exporting rules: {str(e)}")
-            return False
