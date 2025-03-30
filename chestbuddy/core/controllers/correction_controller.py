@@ -358,13 +358,14 @@ class CorrectionController(BaseController):
             self.correction_error.emit(f"Error clearing rules: {str(e)}")
             return False
 
-    def get_rules(self, status=None):
+    def get_rules(self, status=None, category=None):
         """
         Get all correction rules.
 
         Args:
             status (str, optional): Filter rules by status (e.g., "enabled", "disabled").
                                    If None, returns all rules.
+            category (str, optional): Filter rules by category. If None, returns rules for all categories.
 
         Returns:
             List[CorrectionRule]: List of correction rules
@@ -374,9 +375,13 @@ class CorrectionController(BaseController):
 
             # Filter by status if specified
             if status == "enabled":
-                return [rule for rule in rules if rule.enabled]
+                rules = [rule for rule in rules if rule.enabled]
             elif status == "disabled":
-                return [rule for rule in rules if not rule.enabled]
+                rules = [rule for rule in rules if not rule.enabled]
+
+            # Filter by category if specified
+            if category is not None:
+                rules = [rule for rule in rules if rule.category == category]
 
             return rules
         except Exception as e:

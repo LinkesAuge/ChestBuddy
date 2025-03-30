@@ -205,17 +205,29 @@ class CorrectionView(UpdatableView):
         self.add_header_action("history", "View History")
         self.add_header_action("refresh", "Refresh")
 
-    def _update_view_content(self) -> None:
-        """Update the view content based on data from the controllers."""
-        self._show_status_message("Updating correction rules...")
-        if self._correction_controller:
-            self._show_placeholder(False)
-            if not self._rule_view:
-                self._initialize_rule_view()
-            self._refresh_view_content()
-        else:
-            self._show_placeholder(True)
-        self._show_status_message("Correction rules updated")
+    def _update_view_content(self, data=None) -> None:
+        """Update the view content based on data from the controllers.
+
+        Args:
+            data: Optional data to update the view with (ignored in this implementation)
+        """
+        try:
+            self._show_status_message("Updating correction rules...")
+            if self._correction_controller:
+                self._show_placeholder(False)
+                if not self._rule_view:
+                    self._initialize_rule_view()
+                self._refresh_view_content()
+            else:
+                self._show_placeholder(True)
+            self._show_status_message("Correction rules updated")
+        except Exception as e:
+            logger.error(f"Error updating CorrectionView: {e}")
+            # Still try to show a status message even if the update failed
+            try:
+                self._show_status_message(f"Error updating rules: {str(e)}")
+            except Exception:
+                pass
 
     def _show_status_message(self, message: str) -> None:
         """
