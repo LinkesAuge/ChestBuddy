@@ -52,7 +52,6 @@ from chestbuddy.ui.views.base_view import BaseView
 from chestbuddy.ui.views.dashboard_view import DashboardView
 from chestbuddy.ui.views.data_view_adapter import DataViewAdapter
 from chestbuddy.ui.views.validation_view_adapter import ValidationViewAdapter
-from chestbuddy.ui.views.correction_view_adapter import CorrectionViewAdapter
 from chestbuddy.ui.views.chart_view_adapter import ChartViewAdapter
 from chestbuddy.ui.widgets import ProgressDialog, ProgressBar
 from chestbuddy.ui.data_view import DataView
@@ -560,12 +559,27 @@ class MainWindow(QMainWindow):
         self._content_stack.addWidget(validation_view)
         self._views["Validation"] = validation_view
 
-        # Create Correction view
-        correction_view = CorrectionViewAdapter(
+        # Create Correction view - use our new implementation
+        from chestbuddy.ui.views.correction_view import CorrectionView
+        from chestbuddy.core.controllers.correction_controller import CorrectionController
+
+        # Get correction controller from the app
+        app = QApplication.instance()
+        correction_controller = None
+        if hasattr(app, "get_correction_controller"):
+            correction_controller = app.get_correction_controller()
+
+        # Create the new correction view
+        correction_view = CorrectionView(
             data_model=self._data_model, correction_service=self._correction_service
         )
-        # Set up the correction view to use the data view controller
+        # Set up the view to use both controllers
         correction_view.set_controller(self._data_view_controller)
+        if correction_controller:
+            correction_view.set_correction_controller(correction_controller)
+        else:
+            logger.warning("Correction controller not available from app")
+
         self._content_stack.addWidget(correction_view)
         self._views["Correction"] = correction_view
 

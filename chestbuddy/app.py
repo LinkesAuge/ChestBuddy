@@ -32,6 +32,7 @@ from chestbuddy.core.controllers import (
     ErrorHandlingController,
     UIStateController,
 )
+from chestbuddy.core.controllers.correction_controller import CorrectionController
 from chestbuddy.ui.main_window import MainWindow
 from chestbuddy.utils.config import ConfigManager
 from chestbuddy.utils.background_processing import BackgroundWorker
@@ -136,6 +137,20 @@ class ChestBuddyApp(QObject):
                     self._signal_manager,
                     ui_state_controller=self._ui_state_controller,
                 )
+
+                # Initialize CorrectionController
+                try:
+                    self._correction_controller = CorrectionController(
+                        self._correction_service, self._config_manager, self._signal_manager
+                    )
+                    logger.info("CorrectionController initialized")
+                except Exception as e:
+                    logger.error(f"Error initializing CorrectionController: {e}")
+                    self._error_controller.handle_exception(
+                        e, "Error initializing CorrectionController"
+                    )
+                    raise
+
             except Exception as e:
                 logger.error(f"Error initializing controllers: {e}")
                 self._error_controller.handle_exception(e, "Error initializing controllers")
@@ -473,6 +488,15 @@ class ChestBuddyApp(QObject):
     def _on_table_populated(self, rows: int) -> None:
         """Handler for table populated signal."""
         logger.info(f"App: Table populated with {rows} rows")
+
+    def get_correction_controller(self):
+        """
+        Get the correction controller instance.
+
+        Returns:
+            CorrectionController: The correction controller or None if not initialized
+        """
+        return getattr(self, "_correction_controller", None)
 
     def run(self) -> int:
         """
