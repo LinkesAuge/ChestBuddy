@@ -373,37 +373,9 @@ class CorrectionController(BaseController):
             List[CorrectionRule]: List of correction rules
         """
         try:
-            rules = self._rule_manager.get_rules()
-
-            # Filter by status if specified
-            if status == "enabled":
-                rules = [rule for rule in rules if rule.enabled]
-            elif status == "disabled":
-                rules = [rule for rule in rules if not rule.enabled]
-
-            # Filter by category if specified
-            if category is not None:
-                rules = [rule for rule in rules if rule.category == category]
-
-            # Filter by search term if specified
-            if search_term and search_term.strip():
-                search_term = search_term.lower().strip()
-                filtered_rules = []
-                for rule in rules:
-                    # Check if search term is in any of the relevant fields
-                    if (
-                        search_term in rule.from_value.lower()
-                        or search_term in rule.to_value.lower()
-                        or (
-                            hasattr(rule, "description")
-                            and rule.description
-                            and search_term in rule.description.lower()
-                        )
-                    ):
-                        filtered_rules.append(rule)
-                rules = filtered_rules
-
-            return rules
+            return self._rule_manager.get_rules(
+                category=category, status=status, search_term=search_term
+            )
         except Exception as e:
             logger.error(f"Error getting correction rules: {e}")
             self.correction_error.emit(f"Error getting rules: {str(e)}")

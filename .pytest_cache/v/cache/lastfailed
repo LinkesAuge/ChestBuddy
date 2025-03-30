@@ -145,7 +145,6 @@
   "tests/unit/core/controllers/test_correction_controller.py::TestCorrectionController::test_move_rule_to_top": true,
   "tests/unit/core/controllers/test_correction_controller.py::TestCorrectionController::test_move_rule_to_bottom": true,
   "tests/unit/core/controllers/test_correction_controller.py::TestCorrectionController::test_toggle_rule_status": true,
-  "tests/unit/core/controllers/test_correction_controller.py::TestCorrectionController::test_get_rules": true,
   "tests/unit/core/controllers/test_correction_controller.py::TestCorrectionController::test_get_prioritized_rules": true,
   "tests/unit/core/controllers/test_correction_controller.py::TestCorrectionController::test_get_correction_preview": true,
   "tests/unit/core/controllers/test_correction_controller.py::TestCorrectionController::test_import_rules": true,
