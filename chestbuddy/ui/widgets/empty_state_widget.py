@@ -1,28 +1,25 @@
 """
 empty_state_widget.py
 
-Description: A widget for displaying empty state information and actions
+Description: Widget to display an empty state with a message and optional action.
 Usage:
-    empty_widget = EmptyStateWidget(
-        title="No Data Available",
-        message="Import data to get started.",
-        action_text="Import Data",
+    widget = EmptyStateWidget(
+        title="No Data",
+        message="Import data to get started",
+        action_text="Import",
         action_callback=on_import_clicked
     )
-    layout.addWidget(empty_widget)
 """
 
 from typing import Optional, Callable
 
-from PySide6.QtCore import Qt, Signal, QSize
-from PySide6.QtGui import QIcon, QFont, QPixmap
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QIcon, QFont
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
-    QHBoxLayout,
     QLabel,
     QPushButton,
-    QFrame,
     QSizePolicy,
     QSpacerItem,
 )
@@ -32,26 +29,25 @@ from chestbuddy.ui.resources.style import Colors
 
 class EmptyStateWidget(QWidget):
     """
-    A widget for displaying an empty state with a message and optional action.
+    Widget to display an empty state with a message and optional action button.
 
-    Provides a standardized way to show empty states throughout the application
-    with a title, message, and optional action button.
+    This widget provides a standard way to show an empty state in the application,
+    with a title, message, optional icon, and an action button.
 
     Attributes:
         action_clicked (Signal): Signal emitted when the action button is clicked
     """
 
-    # Signal emitted when the action button is clicked
     action_clicked = Signal()
 
     def __init__(
         self,
-        title: str,
-        message: str,
-        action_text: str = "",
-        action_callback: Optional[Callable] = None,
+        title: str = "No content",
+        message: str = "There is no content to display",
         icon: Optional[QIcon] = None,
-        parent=None,
+        action_text: Optional[str] = None,
+        action_callback: Optional[Callable] = None,
+        parent: Optional[QWidget] = None,
     ):
         """
         Initialize a new EmptyStateWidget.
@@ -59,22 +55,22 @@ class EmptyStateWidget(QWidget):
         Args:
             title (str): The title text to display
             message (str): The message text to display
-            action_text (str, optional): Text for the action button, if any
-            action_callback (Callable, optional): Callback function for the action button
             icon (QIcon, optional): Icon to display above the title
-            parent: Parent widget
+            action_text (str, optional): Text for the action button
+            action_callback (callable, optional): Callback function when button is clicked
+            parent (QWidget, optional): Parent widget
         """
         super().__init__(parent)
 
         # Store properties
         self._title = title
         self._message = message
+        self._icon = icon
         self._action_text = action_text
         self._action_callback = action_callback
-        self._icon = icon or QIcon()
         self._action_button = None
 
-        # Set up the UI
+        # Initialize UI
         self._setup_ui()
 
     def _setup_ui(self):
@@ -82,38 +78,38 @@ class EmptyStateWidget(QWidget):
         # Main layout
         main_layout = QVBoxLayout(self)
         main_layout.setAlignment(Qt.AlignCenter)
-        main_layout.setContentsMargins(20, 40, 20, 40)
+        main_layout.setContentsMargins(32, 32, 32, 32)
         main_layout.setSpacing(16)
 
-        # Icon (if provided)
-        if not self._icon.isNull():
-            icon_label = QLabel(self)
-            pixmap = self._icon.pixmap(QSize(64, 64))
-            icon_label.setPixmap(pixmap)
+        # Add some space at the top
+        main_layout.addSpacing(32)
+
+        # Icon if available
+        if self._icon:
+            icon_label = QLabel()
+            icon_label.setPixmap(self._icon.pixmap(64, 64))
             icon_label.setAlignment(Qt.AlignCenter)
             main_layout.addWidget(icon_label)
-            main_layout.addSpacing(8)
+            main_layout.addSpacing(16)
 
         # Title
-        self._title_label = QLabel(self._title, self)
-        title_font = QFont()
+        title_label = QLabel(self._title)
+        title_font = title_label.font()
         title_font.setPointSize(16)
         title_font.setBold(True)
-        self._title_label.setFont(title_font)
-        self._title_label.setAlignment(Qt.AlignCenter)
-        self._title_label.setWordWrap(True)
-        self._title_label.setStyleSheet(f"color: {Colors.TEXT_LIGHT};")
-        main_layout.addWidget(self._title_label)
+        title_label.setFont(title_font)
+        title_label.setAlignment(Qt.AlignCenter)
+        title_label.setWordWrap(True)
+        main_layout.addWidget(title_label)
 
         # Message
-        self._message_label = QLabel(self._message, self)
-        message_font = QFont()
-        message_font.setPointSize(11)
-        self._message_label.setFont(message_font)
-        self._message_label.setAlignment(Qt.AlignCenter)
-        self._message_label.setWordWrap(True)
-        self._message_label.setStyleSheet(f"color: {Colors.TEXT_MUTED};")
-        main_layout.addWidget(self._message_label)
+        message_label = QLabel(self._message)
+        message_font = message_label.font()
+        message_font.setPointSize(12)
+        message_label.setFont(message_font)
+        message_label.setAlignment(Qt.AlignCenter)
+        message_label.setWordWrap(True)
+        main_layout.addWidget(message_label)
 
         # Action button (if text provided)
         if self._action_text:
@@ -130,10 +126,10 @@ class EmptyStateWidget(QWidget):
                     border: none;
                 }}
                 QPushButton:hover {{
-                    background-color: {Colors.ACCENT_HOVER};
+                    background-color: {Colors.SECONDARY};
                 }}
                 QPushButton:pressed {{
-                    background-color: {Colors.ACCENT_ACTIVE};
+                    background-color: {Colors.PRIMARY_DARK};
                 }}
             """)
 
@@ -200,7 +196,6 @@ class EmptyStateWidget(QWidget):
             title (str): The new title text
         """
         self._title = title
-        self._title_label.setText(title)
 
     def set_message(self, message: str):
         """
@@ -210,7 +205,6 @@ class EmptyStateWidget(QWidget):
             message (str): The new message text
         """
         self._message = message
-        self._message_label.setText(message)
 
     def set_action(self, action_text: str, action_callback: Optional[Callable] = None):
         """
@@ -245,10 +239,10 @@ class EmptyStateWidget(QWidget):
                     border: none;
                 }}
                 QPushButton:hover {{
-                    background-color: {Colors.ACCENT_HOVER};
+                    background-color: {Colors.SECONDARY};
                 }}
                 QPushButton:pressed {{
-                    background-color: {Colors.ACCENT_ACTIVE};
+                    background-color: {Colors.PRIMARY_DARK};
                 }}
             """)
 
@@ -261,21 +255,25 @@ class EmptyStateWidget(QWidget):
 
     def set_icon(self, icon: QIcon):
         """
-        Set or change the icon.
+        Set the icon.
 
         Args:
             icon (QIcon): The new icon
         """
         self._icon = icon
+
+        # Refresh the UI to show the new icon
+        # This is simplistic - in a real implementation we would just update the icon label
+        # But for simplicity, we'll just rebuild the UI
         self._refresh_ui()
 
     def _refresh_ui(self):
-        """Rebuild the UI with current properties."""
+        """Rebuild the UI to reflect current properties."""
         # Clear the current layout
         while self.layout().count():
             item = self.layout().takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
 
-        # Set up the UI again
+        # Rebuild the UI
         self._setup_ui()

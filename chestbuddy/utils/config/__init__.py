@@ -6,9 +6,12 @@ This module provides the ConfigManager class for managing application settings.
 
 import configparser
 import json
+import logging
 import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
+
+logger = logging.getLogger(__name__)
 
 
 class ConfigManager:
@@ -68,8 +71,9 @@ class ConfigManager:
         # Set up default configuration
         self._default_config = {
             "General": {
-                "theme": "dark",
-                "language": "en",
+                "theme": "Light",
+                "language": "English",
+                "version": "1.1",  # Update this to current version
             },
             "Files": {
                 "recent_files": "",
@@ -77,8 +81,10 @@ class ConfigManager:
                 "last_export_dir": "",
             },
             "Validation": {
-                "auto_validate": "True",
                 "validation_lists_dir": str(self._config_dir / "validation_lists"),
+                "validate_on_import": "True",
+                "case_sensitive": "False",
+                "auto_save": "True",
             },
             "Correction": {
                 "auto_correct": "True",
@@ -96,9 +102,59 @@ class ConfigManager:
 
         # Load or create the configuration file
         if self._config_file.exists():
-            self._config.read(self._config_file)
+            try:
+                # Try explicitly reading the file to catch any errors
+                with open(self._config_file, "r", encoding="utf-8") as f:
+                    self._config.read_file(f)
+                logger.debug(f"Loaded existing configuration from: {self._config_file}")
+
+                # Check for configuration updates/migrations
+                self._perform_migrations()
+            except Exception as e:
+                # Handle ANY error reading the config file
+                logger.error(f"Error reading configuration file: {e}")
+                logger.warning("Corrupted configuration file detected, using defaults")
+                # Store the fact that we had a corrupted file for validate_config
+                self._file_corrupted = True
+                self._create_default_config()
+            else:
+                self._file_corrupted = False
         else:
             self._create_default_config()
+            self._file_corrupted = False
+            logger.info(f"Created new default configuration at: {self._config_file}")
+
+    def _perform_migrations(self) -> None:
+        """
+        Perform any necessary migrations for older configuration versions.
+        This includes updating settings that have been renamed or adding new default settings.
+        """
+        # Ensure General section with version exists
+        if not self._config.has_section("General"):
+            self._config.add_section("General")
+            self.set("General", "version", "1.1")
+        elif not self._config.has_option("General", "version"):
+            self.set("General", "version", "1.1")
+
+        # Handle migration from auto_validate to validate_on_import
+        if self._config.has_section("Validation") and self._config.has_option(
+            "Validation", "auto_validate"
+        ):
+            auto_validate = self.get_bool("Validation", "auto_validate")
+            # Ensure the Validation section exists
+            if not self._config.has_section("Validation"):
+                self._config.add_section("Validation")
+            # Set the new option
+            self.set("Validation", "validate_on_import", str(auto_validate))
+            # Remove the old option
+            self._config.remove_option("Validation", "auto_validate")
+            logger.info("Migrated 'auto_validate' to 'validate_on_import'")
+
+        # Check if we need to migrate from older versions
+        current_version = self.get("General", "version")
+        if current_version == "1.0":
+            logger.info("Migrating configuration from version 1.0 to 1.1")
+            self.set("General", "version", "1.1")
 
     def _create_default_config(self) -> None:
         """Create the default configuration file."""
@@ -118,8 +174,32 @@ class ConfigManager:
 
     def save(self) -> None:
         """Save the current configuration to the config file."""
-        with open(self._config_file, "w") as config_file:
-            self._config.write(config_file)
+        try:
+            with open(self._config_file, "w") as config_file:
+                self._config.write(config_file)
+            logger.debug(f"Saved configuration to: {self._config_file}")
+        except PermissionError as e:
+            logger.error(f"Permission error saving configuration: {e}")
+            raise
+
+    def load(self) -> None:
+        """Reload the configuration from the file."""
+        try:
+            # Create a new config parser to ensure clean state
+            new_config = configparser.ConfigParser()
+
+            with open(self._config_file, "r", encoding="utf-8") as f:
+                new_config.read_file(f)
+
+            # Replace the current config with the new one
+            self._config = new_config
+            logger.debug(f"Reloaded configuration from: {self._config_file}")
+
+            # Perform any necessary migrations after loading
+            self._perform_migrations()
+        except Exception as e:
+            logger.error(f"Error reading configuration file: {e}")
+            logger.warning("Error loading configuration file, using current values")
 
     def get(self, section: str, option: str, fallback: Any = None) -> str:
         """
@@ -133,7 +213,9 @@ class ConfigManager:
         Returns:
             The configuration value as a string.
         """
-        return self._config.get(section, option, fallback=fallback)
+        result = self._config.get(section, option, fallback=fallback)
+        logger.debug(f"Config get: {section}.{option} = {result}")
+        return result
 
     def get_bool(self, section: str, option: str, fallback: bool = False) -> bool:
         """
@@ -147,7 +229,25 @@ class ConfigManager:
         Returns:
             The configuration value as a boolean.
         """
-        return self._config.getboolean(section, option, fallback=fallback)
+        try:
+            value = self.get(section, option, None)
+            if value is None:
+                return fallback
+
+            # Handle standard boolean values using configparser
+            if value.lower() in ("true", "1", "yes", "y"):
+                return True
+            elif value.lower() in ("false", "0", "no", "n"):
+                return False
+            else:
+                # Fall back to configparser's getboolean for other cases
+                return self._config.getboolean(section, option, fallback=fallback)
+        except ValueError as e:
+            # Handle case where value is not a valid boolean
+            logger.warning(
+                f"Error parsing boolean for {section}.{option}: Not a boolean: {value}. Using fallback: {fallback}"
+            )
+            return fallback
 
     def get_int(self, section: str, option: str, fallback: int = 0) -> int:
         """
@@ -297,3 +397,196 @@ class ConfigManager:
         """
         recent_files = self.get_list("Files", "recent_files")
         return [Path(file) for file in recent_files if Path(file).exists()]
+
+    def get_default_validation_list_path(self, filename: str) -> Path:
+        """
+        Get the path to a default validation list file.
+
+        Args:
+            filename: Name of the validation list file
+
+        Returns:
+            Path: Path to the default validation list file
+        """
+        default_path = Path(__file__).parents[2] / "data" / "validation" / filename
+        logger.debug(f"Default validation list path: {default_path}")
+        return default_path
+
+    def get_validation_list_path(self, filename: str) -> Path:
+        """
+        Get the path to a validation list file.
+
+        This method handles all the logic for resolving validation list paths,
+        including fallbacks and copying default content when needed.
+
+        Args:
+            filename: Name of the validation list file
+
+        Returns:
+            Path: Path to the validation list file
+        """
+        # Get configured validation lists directory
+        validation_dir = self.get("Validation", "validation_lists_dir")
+
+        if validation_dir:
+            config_path = Path(validation_dir) / filename
+
+            # If configured path exists, use it
+            if config_path.exists():
+                logger.debug(f"Using configured validation list path: {config_path}")
+                return config_path
+            else:
+                # If configured path doesn't exist, ensure directory exists
+                config_path.parent.mkdir(parents=True, exist_ok=True)
+                logger.debug(f"Creating empty validation list at configured path: {config_path}")
+                return config_path
+
+        # Fall back to default path if no valid configuration
+        default_path = self.get_default_validation_list_path(filename)
+        logger.warning(f"No configured validation list path, using default: {default_path}")
+        return default_path
+
+    def reset_to_defaults(self, section: Optional[str] = None) -> None:
+        """
+        Reset configuration to default values.
+
+        Args:
+            section: Optional section to reset. If None, resets all sections.
+        """
+        logger.info(
+            f"Resetting configuration to defaults: {'all sections' if section is None else section}"
+        )
+
+        if section is None:
+            # Reset all sections by creating a new config
+            self._config = configparser.ConfigParser()
+            self._create_default_config()
+            # Clear the corrupted flag
+            self._file_corrupted = False
+        else:
+            # Reset only the specified section
+            if self._config.has_section(section):
+                self._config.remove_section(section)
+
+            # Add section and set default values if available
+            self._config.add_section(section)
+            if section in self._default_config:
+                for option, value in self._default_config[section].items():
+                    self._config.set(section, option, str(value))
+
+        # Save changes
+        self.save()
+        logger.info(
+            f"Configuration reset completed for {'all sections' if section is None else section}"
+        )
+
+    def validate_config(self) -> bool:
+        """
+        Validate the configuration file for required sections and options.
+
+        Returns:
+            bool: True if the configuration is valid, False otherwise.
+        """
+        # If we detected a corrupted file during initialization, validation fails
+        if hasattr(self, "_file_corrupted") and self._file_corrupted:
+            logger.warning("Config validation failed due to previously detected corruption")
+            return False
+
+        try:
+            # Check if there is a valid config file
+            if not os.path.exists(self._config_file):
+                logger.warning(f"Configuration file does not exist: {self._config_file}")
+                return False
+
+            # Try to load the config file explicitly to check for corruption
+            test_config = configparser.ConfigParser()
+            try:
+                with open(self._config_file, "r", encoding="utf-8") as f:
+                    test_config.read_file(f)
+            except Exception as e:
+                logger.error(f"Configuration file is corrupt: {e}")
+                self._file_corrupted = True
+                return False
+
+            # Check required sections
+            required_sections = ["General", "Validation", "UI"]
+            for section in required_sections:
+                if not self._config.has_section(section):
+                    logger.warning(f"Missing required section: {section}")
+                    return False
+
+            # Check required options
+            if not self._config.has_option("General", "theme"):
+                logger.warning(f"Missing required option: General.theme")
+                return False
+
+            if not self._config.has_option("Validation", "validate_on_import"):
+                logger.warning(f"Missing required option: Validation.validate_on_import")
+                return False
+
+            return True
+        except Exception as e:
+            logger.error(f"Error validating configuration: {e}")
+            return False
+
+    def export_config(self, file_path: Union[str, Path]) -> None:
+        """
+        Export the configuration to a JSON file.
+
+        Args:
+            file_path: Path to export to
+        """
+        try:
+            # Convert config to dictionary
+            config_dict = {}
+            for section in self._config.sections():
+                config_dict[section] = dict(self._config[section])
+
+            # Write to JSON file
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(config_dict, f, indent=4)
+
+            logger.info(f"Configuration exported to {file_path}")
+        except Exception as e:
+            logger.error(f"Error exporting configuration: {e}")
+            raise
+
+    def import_config(self, file_path: Union[str, Path]) -> None:
+        """
+        Import configuration from a JSON file.
+
+        Args:
+            file_path: Path to import from
+        """
+        try:
+            # Read JSON file
+            with open(file_path, "r", encoding="utf-8") as f:
+                config_dict = json.load(f)
+
+            # Update config
+            for section, options in config_dict.items():
+                if not self._config.has_section(section):
+                    self._config.add_section(section)
+
+                for option, value in options.items():
+                    self._config.set(section, option, value)
+
+            # Save changes
+            self.save()
+            logger.info(f"Configuration imported from {file_path}")
+        except Exception as e:
+            logger.error(f"Error importing configuration: {e}")
+            raise
+
+    def has_option(self, section: str, option: str) -> bool:
+        """
+        Check if an option exists in a section.
+
+        Args:
+            section: The configuration section.
+            option: The configuration option.
+
+        Returns:
+            True if the option exists in the section, False otherwise.
+        """
+        return self._config.has_option(section, option)

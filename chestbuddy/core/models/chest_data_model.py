@@ -17,6 +17,7 @@ from PySide6.QtCore import Signal, QObject
 
 from chestbuddy.core.models.base_model import BaseModel
 from chestbuddy.utils.config import ConfigManager
+from chestbuddy.core.state.data_state import DataState
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -31,20 +32,23 @@ class ChestDataModel(QObject):
     Follows the Observer pattern by emitting signals when the data changes.
 
     Attributes:
-        data_changed (Signal): Signal emitted when the data is changed.
+        data_changed (Signal): Signal emitted when the data is changed, with the current DataState.
         validation_changed (Signal): Signal emitted when validation status changes.
         correction_applied (Signal): Signal emitted when corrections are applied.
+        data_cleared (Signal): Signal emitted when data is cleared.
 
     Implementation Notes:
         - Uses pandas DataFrame as the primary data structure
+        - Tracks data state changes using DataState for efficient UI updates
         - Emits signals to notify observers of changes
         - Provides methods for filtering and manipulating data
     """
 
     # Define signals
-    data_changed = Signal()
-    validation_changed = Signal()
+    data_changed = Signal(object)  # Will emit the current DataState
+    validation_changed = Signal(object)  # Will emit the validation status DataFrame
     correction_applied = Signal()
+    data_cleared = Signal()
 
     # Define expected columns
     EXPECTED_COLUMNS = ["DATE", "PLAYER", "SOURCE", "CHEST", "SCORE", "CLAN"]
@@ -69,6 +73,9 @@ class ChestDataModel(QObject):
         self._current_data_hash = None
         self._update_data_hash()
 
+        # Initialize DataState for efficient change tracking
+        self._data_state = DataState(self._data)
+
         # Track whether signals are already blocked
         self._signals_already_blocked = False
 
@@ -83,33 +90,6 @@ class ChestDataModel(QObject):
         except Exception as e:
             logger.error(f"Error calculating data hash: {str(e)}")
 
-    def set_data_loaded(self, is_loaded: bool) -> None:
-        """
-        Explicitly set the data loaded state and ensure UI updates happen.
-        This method is used to guarantee the UI responds to data availability changes.
-
-        Args:
-            is_loaded: Whether data is loaded
-        """
-        logger.debug(f"ChestDataModel.set_data_loaded({is_loaded}) called")
-
-        # Only emit signal if we're setting to True and there's actual data
-        if is_loaded and not self.is_empty:
-            logger.debug("Data is loaded and not empty, triggering data_changed signal")
-            # Emit data_changed signal to trigger UI updates
-            self.data_changed.emit()
-        elif not is_loaded:
-            # If setting to not loaded, clear the data
-            if not self.is_empty:
-                logger.debug("Setting data not loaded, clearing data")
-                self.clear()
-                self.data_changed.emit()
-
-        # Process events to ensure UI updates happen
-        from PySide6.QtWidgets import QApplication
-
-        QApplication.processEvents()
-
     def _calculate_data_hash(self) -> str:
         """
         Calculate a hash of the current data state.
@@ -120,10 +100,19 @@ class ChestDataModel(QObject):
             str: A hash string representing the current data state
         """
         try:
-            # For performance, we'll use a sample of the data rather than the entire DataFrame
+            # Handle empty dataframe case
             if self._data.empty:
-                return "empty_dataframe"
+                # Instead of just returning a constant string, also include column information
+                # This ensures empty DataFrame with columns != empty DataFrame without columns
+                empty_hash_data = {
+                    "is_empty": True,
+                    "has_columns": len(self._data.columns) > 0,
+                    "columns": list(self._data.columns) if len(self._data.columns) > 0 else [],
+                }
+                json_data = json.dumps(empty_hash_data, sort_keys=True)
+                return hashlib.md5(json_data.encode()).hexdigest()
 
+            # For non-empty dataframes, continue with the existing logic
             # Take a sample of rows (first, middle, last) to represent the data
             row_count = len(self._data)
             sample_indices = [0]
@@ -136,6 +125,7 @@ class ChestDataModel(QObject):
 
             # Create a dictionary with key metadata
             hash_data = {
+                "is_empty": False,
                 "row_count": row_count,
                 "column_count": len(self._data.columns),
                 "columns": list(self._data.columns),
@@ -170,6 +160,12 @@ class ChestDataModel(QObject):
         self._data = pd.DataFrame(columns=self.EXPECTED_COLUMNS)
         self._validation_status = pd.DataFrame()
         self._correction_status = pd.DataFrame()
+
+        # Reset the DataState
+        self._data_state = DataState(self._data)
+
+        # Emit data_cleared signal
+        self.data_cleared.emit()
         self._notify_change()
 
     def _notify_change(self) -> None:
@@ -196,21 +192,23 @@ class ChestDataModel(QObject):
             # Calculate a new hash to detect actual changes
             new_hash = self._calculate_data_hash()
 
-            # Only emit if the data has actually changed
-            if new_hash == self._current_data_hash:
+            # If we had a blank current hash or the hash has changed, emit
+            if self._current_data_hash is None or new_hash != self._current_data_hash:
+                # Update the data hash and time tracking
+                self._current_data_hash = new_hash
+                self._last_emission_time = current_time
+
+                # Update the DataState from the current data
+                self._data_state.update_from_data(self._data)
+
+                # Emit the signal with the DataState
+                print("EMITTING data_changed signal with DataState!!!")
+                logger.debug("Emitting data_changed signal with DataState.")
+                self.data_changed.emit(self._data_state)
+                print("data_changed signal emitted.")
+            else:
                 print("Skipping emission, no actual data change detected.")
                 logger.debug("Skipping emission, no actual data change detected.")
-                return
-
-            # Update the data hash and time tracking
-            self._current_data_hash = new_hash
-            self._last_emission_time = current_time
-
-            # Emit the signal
-            print("EMITTING data_changed signal!!!")
-            logger.debug("Emitting data_changed signal.")
-            self.data_changed.emit()
-            print("data_changed signal emitted.")
 
         except Exception as e:
             print(f"Error emitting data_changed signal: {e}")
@@ -366,24 +364,6 @@ class ChestDataModel(QObject):
             self._updating = True
             print("Set _updating to True")
 
-            # Check if this is an actual data change
-            if not self._data.empty and new_data is not None and not new_data.empty:
-                print("Checking if data has changed with hash")
-                temp_current_hash = self._calculate_data_hash()
-
-                # Calculate what the hash would be with the new data
-                orig_data = self._data
-                self._data = new_data
-                temp_new_hash = self._calculate_data_hash()
-                self._data = orig_data
-
-                # If the hashes match, this is a no-op update - skip it
-                if temp_current_hash == temp_new_hash:
-                    print("Skipping update as data is identical")
-                    logger.debug("Skipping update as data is identical")
-                    self._updating = False
-                    return
-
             # Track if signals were already blocked
             self._signals_already_blocked = self.signalsBlocked()
             print(f"Signals already blocked: {self._signals_already_blocked}")
@@ -416,8 +396,11 @@ class ChestDataModel(QObject):
                 print("Unblocking signals before notifying")
                 self.blockSignals(False)
 
-            # Update the current hash before notifying
-            self._update_data_hash()
+            # Important change: Always clear the current hash to force notification
+            # This ensures that _notify_change will detect a change and emit the signal
+            print("Clearing current hash to force signal emission after update_data")
+            self._current_data_hash = None
+
             print("Calling _notify_change to emit signals")
         except Exception as e:
             # Ensure signals are unblocked on exception
@@ -437,6 +420,16 @@ class ChestDataModel(QObject):
             # Mark update as complete and notify if needed
             self._updating = False
             print("Data update complete, set _updating to False")
+
+    def _calculate_hash_for_empty(self) -> str:
+        """Calculate a hash for an empty DataFrame with the expected columns."""
+        empty_hash_data = {
+            "is_empty": True,
+            "has_columns": True,
+            "columns": self.EXPECTED_COLUMNS,
+        }
+        json_data = json.dumps(empty_hash_data, sort_keys=True)
+        return hashlib.md5(json_data.encode()).hexdigest()
 
     def get_row(self, index: int) -> pd.Series:
         """
@@ -759,7 +752,11 @@ class ChestDataModel(QObject):
             status_df: The new validation status DataFrame.
         """
         self._validation_status = status_df.copy()
-        self.validation_changed.emit()
+        # Emit signal with the updated status DataFrame
+        logger.debug(
+            f"Emitting validation_changed with status_df shape: {self._validation_status.shape}"
+        )
+        self.validation_changed.emit(self._validation_status)
 
     def get_correction_status(self) -> pd.DataFrame:
         """
@@ -849,26 +846,41 @@ class ChestDataModel(QObject):
         Get the validation status for a specific cell.
 
         Args:
-            row_idx: The index of the row.
-            column_name: The name of the column.
+            row_idx: Row index
+            column_name: Column name
 
         Returns:
-            Dictionary with validation status for the cell.
+            Dictionary with validation information:
+                - valid: True if validation passed, False otherwise
+                - reason: Reason for validation failure (if any)
+                - validated: True if this cell has been validated, False if not yet validated
         """
-        if self._validation_status.empty or row_idx >= len(self._validation_status):
-            return {"valid": True}
+        try:
+            # First check if the row index is valid
+            if row_idx < 0 or row_idx >= len(self._data):
+                logger.warning(f"Invalid row index: {row_idx}")
+                return {}
 
-        status_col = f"{column_name}_valid"
-        if status_col in self._validation_status.columns:
-            # Access the value directly without DataFrame operations
-            try:
-                is_valid = self._validation_status.iloc[row_idx][status_col]
-                return {"valid": bool(is_valid)}
-            except Exception as e:
-                logger.error(f"Error getting cell validation status: {e}")
-                return {"valid": True}
+            # Second check if the column name is valid
+            if column_name not in self._data.columns:
+                logger.warning(f"Invalid column name: {column_name}")
+                return {}
 
-        return {"valid": True}
+            # Check if validation status exists
+            if self._validation_status.empty:
+                return {"validated": False}
+
+            # Extract validation status for this cell
+            validation_info = self._validation_status.iloc[row_idx].get(column_name, {})
+
+            # If we have validation info, add the validated flag
+            if validation_info:
+                validation_info["validated"] = True
+
+            return validation_info or {"validated": False}
+        except Exception as e:
+            logger.error(f"Error getting cell validation status: {str(e)}")
+            return {"validated": False}
 
     def get_cell_correction_status(self, row_idx: int, column_name: str) -> Dict[str, Any]:
         """
@@ -1056,3 +1068,26 @@ class ChestDataModel(QObject):
         except Exception as e:
             logger.error(f"Error getting invalid rows: {e}")
             return []
+
+    @property
+    def data_hash(self) -> str:
+        """
+        Get the current data hash.
+
+        Returns:
+            str: A hash string representing the current data state
+        """
+        # Make sure the hash is up to date
+        if self._current_data_hash is None:
+            self._update_data_hash()
+        return self._current_data_hash
+
+    @property
+    def data_state(self) -> DataState:
+        """
+        Get the current data state.
+
+        Returns:
+            The current DataState object
+        """
+        return self._data_state

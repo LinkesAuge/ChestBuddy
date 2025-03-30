@@ -41,19 +41,8 @@ class ProgressDialog(QDialog):
     This dialog can show a progress bar, a label, and an optional cancel button.
     """
 
-    # Import State from ProgressBar for compatibility
-    class State:
-        """The possible states of the progress dialog."""
-
-        NORMAL = 0
-        SUCCESS = 1
-        ERROR = 2
-
     # Signal emitted when user cancels the operation
     canceled = Signal()
-
-    # Signal emitted when user confirms a completed operation
-    confirmed = Signal()
 
     def __init__(
         self,
@@ -86,7 +75,9 @@ class ProgressDialog(QDialog):
         self._show_cancel_button = show_cancel_button
         self._cancel_button_text = cancel_button_text
         self._was_canceled = False
-        self._is_confirm_mode = False  # Track if we're in confirmation mode
+        self._is_fully_initialized = False  # Track when dialog is fully shown
+        self._is_cancelable = show_cancel_button  # Track if dialog is cancelable
+        self._can_be_dismissed = True  # Track if dialog can be dismissed with window close
 
         # Ensure we have references to UI elements
         self._label = None
@@ -121,16 +112,15 @@ class ProgressDialog(QDialog):
 
     def _setup_ui(self) -> None:
         """Set up the UI components."""
-        # Set window flags to be less intrusive
-        # Remove Qt.WindowStaysOnTopHint to avoid forcing dialog to stay on top
-        # Remove FramelessWindowHint to use standard window frame
-        self.setWindowFlags(Qt.Dialog)
-
-        # Default to non-modal to avoid UI blocking issues
-        # This will be overridden by MainWindow if needed
-        self.setWindowModality(Qt.NonModal)
-
+        # Set window flags to make it modal but with a frame so it can be moved
+        self.setWindowFlags(
+            Qt.Dialog | Qt.WindowStaysOnTopHint | Qt.CustomizeWindowHint | Qt.WindowTitleHint
+        )
+        self.setWindowModality(Qt.ApplicationModal)
         self.setFixedSize(420, 250)
+
+        # Prevent the dialog from being closed by escape key or clicking outside
+        self.setAttribute(Qt.WA_DeleteOnClose, False)
 
         # Set the style for the dialog
         self.setStyleSheet(f"""
@@ -232,23 +222,23 @@ class ProgressDialog(QDialog):
 
     def _on_cancel_clicked(self):
         """Handle when the cancel button is clicked."""
-        if self._is_confirm_mode:
-            # In confirm mode, emit confirmed signal and accept to properly end modal state
-            logger.debug("Confirm button clicked in progress dialog")
-            self.confirmed.emit()  # Emit confirmed signal for handling by MainWindow
-            logger.debug("Accepting dialog after confirm button clicked")
-            self.accept()  # Use accept() instead of close() to properly end modal state
-        else:
-            # In cancel mode, emit cancel signal and close
-            logger.debug("Cancel button clicked in progress dialog")
-            self._was_canceled = True
+        logger.debug("Cancel button clicked in progress dialog")
+        self._was_canceled = True
 
-            # Emit the canceled signal for any connected slots
-            self.canceled.emit()
+        # Emit the canceled signal for any connected slots
+        self.canceled.emit()
 
-            # Always reject the dialog when in cancel mode
-            logger.debug("Rejecting dialog after cancel button clicked")
-            self.reject()  # Use reject() instead of close() to properly end modal state
+        # Always close the dialog when the button is clicked
+        # This ensures the button works even if signal connections are broken
+        logger.debug("Directly closing dialog after cancel button clicked")
+
+        # Force dialog close regardless of dismissable setting when cancel button is clicked
+        self._can_be_dismissed = True  # Temporarily allow dismissal
+
+        # Force the dialog to close immediately
+        # Standard close() can be delayed by the Qt event loop, so we use hide() and deleteLater()
+        self.hide()
+        self.deleteLater()
 
     def setValue(self, value: int) -> None:
         """
@@ -366,28 +356,6 @@ class ProgressDialog(QDialog):
             if enabled:
                 self._cancel_button.show()
 
-    def set_confirm_button_style(self):
-        """
-        Set the cancel button to use a green confirmation style.
-        Used when a process is successfully completed and awaiting user confirmation.
-        """
-        if hasattr(self, "_cancel_button") and self._cancel_button:
-            logger.debug("Setting confirm button style (green)")
-            self._is_confirm_mode = True  # Set the flag to indicate confirm mode
-            self._cancel_button.setStyleSheet(f"""
-                QPushButton {{
-                    background-color: #4CAF50;  /* Green color */
-                    color: {Colors.TEXT_LIGHT};
-                    border: none;
-                    padding: 8px 16px;
-                    border-radius: 4px;
-                    font-weight: bold;
-                }}
-                QPushButton:hover {{
-                    background-color: #45a049;  /* Darker green on hover */
-                }}
-            """)
-
     def wasCanceled(self) -> bool:
         """
         Check if the operation was canceled.
@@ -402,96 +370,68 @@ class ProgressDialog(QDialog):
         Set the state of the progress bar.
 
         Args:
-            state: The state to set (use ProgressDialog.State constants)
+            state: The state to set
         """
         logger.debug(f"Setting progress dialog state to: {state}")
 
-        # Reset confirm mode if changing from SUCCESS to another state
-        if (
-            hasattr(self, "_is_confirm_mode")
-            and self._is_confirm_mode
-            and state != self.State.SUCCESS
-        ):
-            logger.debug("Resetting confirm mode to False")
-            self._is_confirm_mode = False
-
-        # First handle the progress bar state if available
-        if hasattr(self, "_progress_bar") and self._progress_bar:
-            # If using custom ProgressBar that accepts setState
+        # Check if this is a custom progress bar
+        if hasattr(self, "_progress_bar"):
+            # For custom progress bar with setState method
             if hasattr(self._progress_bar, "setState"):
-                try:
-                    # Map our state to ProgressBar.State if needed
-                    from chestbuddy.ui.widgets.progress_bar import ProgressBar
+                self._progress_bar.setState(state)
 
-                    if state == self.State.NORMAL:
-                        pb_state = ProgressBar.State.NORMAL
-                    elif state == self.State.SUCCESS:
-                        pb_state = ProgressBar.State.SUCCESS
-                    elif state == self.State.ERROR:
-                        pb_state = ProgressBar.State.ERROR
-                    else:
-                        pb_state = state  # Pass through if not matching
-
-                    # Set the state on the progress bar
-                    self._progress_bar.setState(pb_state)
-                except Exception as e:
-                    logger.error(f"Error setting progress bar state: {e}")
-
-            # For QProgressBar, we can only change style
-            else:
-                try:
-                    if state == self.State.SUCCESS:
-                        self._progress_bar.setStyleSheet("""
-                            QProgressBar {
-                                background-color: #333;
-                                border: 1px solid #444;
-                                border-radius: 5px;
-                                text-align: center;
-                            }
-                            QProgressBar::chunk {
-                                background-color: #4CAF50;
-                                border-radius: 5px;
-                            }
-                        """)
-                    elif state == self.State.ERROR:
-                        self._progress_bar.setStyleSheet("""
-                            QProgressBar {
-                                background-color: #333;
-                                border: 1px solid #444;
-                                border-radius: 5px;
-                                text-align: center;
-                            }
-                            QProgressBar::chunk {
-                                background-color: #F44336;
-                                border-radius: 5px;
-                            }
-                        """)
-                    else:
-                        # Normal state
-                        self._progress_bar.setStyleSheet("")
-                except Exception as e:
-                    logger.error(f"Error setting progress bar style: {e}")
-
-        # Now handle button styling based on state
-        if state == self.State.SUCCESS:
-            # If in success state, also apply confirm button style
-            self.set_confirm_button_style()
-        elif state == self.State.ERROR:
-            # For error state, reset button style to default
+            # Also update the button style based on the state
             if hasattr(self, "_cancel_button") and self._cancel_button:
-                self._cancel_button.setStyleSheet(f"""
-                    QPushButton {{
-                        background-color: {Colors.PRIMARY};
-                        color: {Colors.TEXT_LIGHT};
-                        border: none;
-                        padding: 8px 16px;
-                        border-radius: 4px;
-                        font-weight: bold;
-                    }}
-                    QPushButton:hover {{
-                        background-color: {Colors.ACCENT};
-                    }}
-                """)
+                # Ensure we're using the correct enum by importing if needed
+                from chestbuddy.ui.widgets.progress_bar import ProgressBar
+
+                if state == ProgressBar.State.SUCCESS:
+                    logger.debug("Setting SUCCESS button style")
+                    self._cancel_button.setStyleSheet(f"""
+                        QPushButton {{
+                            background-color: {Colors.SUCCESS};
+                            color: {Colors.TEXT_LIGHT};
+                            border: none;
+                            padding: 8px 16px;
+                            border-radius: 4px;
+                            font-weight: bold;
+                        }}
+                        QPushButton:hover {{
+                            background-color: {Colors.SUCCESS};
+                            opacity: 0.9;
+                        }}
+                    """)
+                elif state == ProgressBar.State.ERROR:
+                    logger.debug("Setting ERROR button style")
+                    self._cancel_button.setStyleSheet(f"""
+                        QPushButton {{
+                            background-color: {Colors.ERROR};
+                            color: {Colors.TEXT_LIGHT};
+                            border: none;
+                            padding: 8px 16px;
+                            border-radius: 4px;
+                            font-weight: bold;
+                        }}
+                        QPushButton:hover {{
+                            background-color: {Colors.ERROR};
+                            opacity: 0.9;
+                        }}
+                    """)
+                else:
+                    # Reset to normal style
+                    self._cancel_button.setStyleSheet(f"""
+                        QPushButton {{
+                            background-color: {Colors.PRIMARY};
+                            color: {Colors.TEXT_LIGHT};
+                            border: none;
+                            padding: 8px 16px;
+                            border-radius: 4px;
+                            font-weight: bold;
+                        }}
+                        QPushButton:hover {{
+                            background-color: {Colors.ACCENT};
+                        }}
+                    """)
 
     def reset(self) -> None:
         """
@@ -529,52 +469,15 @@ class ProgressDialog(QDialog):
             except Exception as e:
                 logger.error(f"Error resetting cancel button: {e}")
 
-    def reset_all_state(self):
+    def show(self) -> None:
         """
-        Reset all dialog state including confirm mode and styling.
-        This ensures the dialog is ready for reuse in a new operation.
+        Show the dialog and mark it as fully initialized.
+        Overridden to prevent premature cancel signal.
         """
-        logger.debug("Resetting all progress dialog state")
-
-        # Reset confirm mode flag
-        self._is_confirm_mode = False
-        self._was_canceled = False
-
-        # Reset progress bar
-        if hasattr(self, "_progress_bar") and self._progress_bar:
-            self.setValue(0)
-
-            # Reset progress bar styling
-            if hasattr(self._progress_bar, "setState"):
-                try:
-                    from chestbuddy.ui.widgets.progress_bar import ProgressBar
-
-                    self._progress_bar.setState(ProgressBar.State.NORMAL)
-                except Exception as e:
-                    logger.error(f"Error resetting progress bar state: {e}")
-            else:
-                self._progress_bar.setStyleSheet("")
-
-        # Reset labels
-        if hasattr(self, "_status_label") and self._status_label:
-            self._status_label.setText("")
-
-        # Reset button styling and text
-        if hasattr(self, "_cancel_button") and self._cancel_button:
-            self._cancel_button.setText("Cancel")
-            self._cancel_button.setStyleSheet(f"""
-                QPushButton {{
-                    background-color: {Colors.PRIMARY};
-                    color: {Colors.TEXT_LIGHT};
-                    border: none;
-                    padding: 8px 16px;
-                    border-radius: 4px;
-                    font-weight: bold;
-                }}
-                QPushButton:hover {{
-                    background-color: {Colors.ACCENT};
-                }}
-            """)
+        result = super().show()
+        # Set initialization flag after super().show() to ensure dialog is truly visible
+        self._is_fully_initialized = True
+        return result
 
     def exec(self) -> int:
         """
@@ -595,11 +498,39 @@ class ProgressDialog(QDialog):
         self.raise_()
         self.activateWindow()
 
+        # Set initialization flag to ensure closeEvent will emit cancel signal if needed
+        self._is_fully_initialized = True
+
         # Process events to ensure UI is responsive
         QApplication.processEvents()
 
         # Call parent exec
         return super().exec()
+
+    def closeEvent(self, event):
+        """
+        Handle the close event.
+
+        Overridden to ensure the canceled signal is emitted when the dialog is closed,
+        which ensures background processes are properly cancelled.
+        """
+        # Check if the dialog can be dismissed via window close
+        # Only apply this check for window close events, not when close() is called directly
+        if not self._can_be_dismissed and self._is_fully_initialized and not self._was_canceled:
+            logger.debug("Dialog close prevented - can only be closed with Cancel/OK button")
+            event.ignore()
+            return
+
+        # Only emit the signal if it hasn't been canceled already AND the dialog was properly shown
+        if not self._was_canceled and self._is_fully_initialized:
+            logger.debug("Dialog closed via window close button, emitting canceled signal")
+            self._was_canceled = True
+            self.canceled.emit()
+        elif not self._is_fully_initialized:
+            logger.debug("Ignoring closeEvent during initialization")
+
+        # Call the parent class's closeEvent if not ignored
+        super().closeEvent(event)
 
     def close(self) -> None:
         """
@@ -608,9 +539,10 @@ class ProgressDialog(QDialog):
         """
         logger.debug("Progress dialog close called")
 
-        # Don't disconnect the cancel button's clicked signal
-        # This is the most critical connection that ensures the dialog can close
-        # Only disconnect other signals if they exist
+        # Make sure the dialog is dismissable before closing
+        # This handles the case where close() is called programmatically
+        old_dismissable = self._can_be_dismissed
+        self._can_be_dismissed = True
 
         # Call parent close to actually close the dialog
         try:
@@ -620,7 +552,36 @@ class ProgressDialog(QDialog):
             logger.error(f"Error closing progress dialog: {e}")
             # Try again with force if normal close fails
             try:
-                self.hide()  # In case close() failed, at least hide the dialog
+                self.hide()  # In case close() fails, at least hide the dialog
+                self.deleteLater()  # Schedule for deletion when event loop is free
                 logger.debug("Forced hide of progress dialog after close failure")
             except:
                 pass
+
+        # Restore original dismissable state if close() failed
+        self._can_be_dismissed = old_dismissable
+
+    def reject(self) -> None:
+        """
+        Handle dialog rejection (Escape key or clicking outside).
+        Overridden to prevent accidental closing of the dialog.
+        """
+        # If dialog has a cancel button and is in a cancelable state, trigger cancel button click
+        # Otherwise, do nothing - prevents dialog from closing via Escape or clicking outside
+        if self._is_cancelable and hasattr(self, "_cancel_button") and self._cancel_button:
+            # Only trigger cancel button if it's enabled
+            if self._cancel_button.isEnabled():
+                self._on_cancel_clicked()
+                return  # Return here as _on_cancel_clicked will handle closing
+        else:
+            # Ignore the reject action - keep dialog open
+            logger.debug("Dialog rejection ignored - dialog kept open")
+
+    def set_dismissable(self, can_dismiss: bool) -> None:
+        """
+        Set whether the dialog can be dismissed via window close.
+
+        Args:
+            can_dismiss: Whether the dialog can be dismissed via window close
+        """
+        self._can_be_dismissed = can_dismiss

@@ -6,8 +6,8 @@ Usage:
     Import this module to access application icons.
 """
 
-from PySide6.QtCore import QDir
-from PySide6.QtGui import QIcon, QPixmap
+from PySide6.QtCore import QDir, Qt, QSize
+from PySide6.QtGui import QIcon, QPixmap, QPainter, QColor
 
 
 class Icons:
@@ -21,53 +21,41 @@ class Icons:
     _ICON_PATH = ":/icons"
 
     # Application icons
-    APP_ICON = ":/icons/app_icon.png"
-    APP_LOGO = ":/icons/app_logo.png"  # Added app_logo for welcome screen
+    APP_ICON = (
+        "chestbuddy/ui/resources/icons/logo_buddy_v1_icon.png"  # Direct path to the logo file
+    )
 
     # Action icons
     OPEN = ":/icons/open.png"
     SAVE = ":/icons/save.png"
     VALIDATE = ":/icons/validate.png"
     CORRECT = ":/icons/correct.png"
-    IMPORT = ":/icons/import.png"
-    EXPORT = ":/icons/export.png"
-    CHECK_CIRCLE = ":/icons/check_circle.png"
-    FOLDER_OPEN = ":/icons/folder_open.png"
-    FILE = ":/icons/file.png"
-    FILE_DOCUMENT = ":/icons/file_document.png"
-    CHART_LINE = ":/icons/chart_line.png"
-    CHART = ":/icons/chart.png"
-    HELP_CIRCLE = ":/icons/help_circle.png"
 
     # Navigation icons
     DASHBOARD = ":/icons/dashboard.png"
     DATA = ":/icons/data.png"
-    ANALYSIS = ":/icons/analysis.png"
-    REPORTS = ":/icons/reports.png"
+    CHART = ":/icons/analysis.png"
+    REPORT = ":/icons/reports.png"
     SETTINGS = ":/icons/settings.png"
     HELP = ":/icons/help.png"
 
-    # UI Control icons
-    CHEVRON_UP = ":/icons/chevron_up.png"
-    CHEVRON_DOWN = ":/icons/chevron_down.png"
-    PLUS = ":/icons/plus.png"
-    MINUS = ":/icons/minus.png"
-    SEARCH = ":/icons/search.png"
-    FILTER = ":/icons/filter.png"
-    CLOSE = ":/icons/close.png"
-
     @staticmethod
-    def get_icon(icon_path):
+    def get_icon(icon_path, color=None):
         """
-        Get an icon by path.
+        Get an icon by path. Optionally apply a color to the icon.
 
         Args:
             icon_path (str): The icon path
+            color (str, optional): Color to apply to the icon. Defaults to None.
 
         Returns:
             QIcon: The icon
         """
-        return QIcon(icon_path)
+        if color is None:
+            return QIcon(icon_path)
+        else:
+            # Convert icon to colored variant
+            return Icons.create_colored_icon(icon_path, color)
 
     @staticmethod
     def get_pixmap(icon_path):
@@ -82,31 +70,43 @@ class Icons:
         """
         return QPixmap(icon_path)
 
+    @staticmethod
+    def create_colored_icon(icon_path, color):
+        """
+        Create a colored version of an icon.
 
-# Import and re-export the IconProvider class
-try:
-    from chestbuddy.ui.resources.icon_provider import IconProvider
-except ImportError:
-    # Define a minimal IconProvider if the module doesn't exist
-    class IconProvider:
-        """Fallback IconProvider class."""
+        Args:
+            icon_path (str): The icon path
+            color (str): The color to apply (as CSS color string)
 
-        @staticmethod
-        def get_icon(name):
-            """Get an icon by name."""
-            if hasattr(Icons, name.upper()):
-                icon_path = getattr(Icons, name.upper())
-                return QIcon(icon_path)
-            return QIcon(name)
+        Returns:
+            QIcon: The colored icon
+        """
+        # Create base pixmap
+        original = QPixmap(icon_path)
+        if original.isNull():
+            return QIcon()  # Return empty icon if original is null
 
-        @staticmethod
-        def get_pixmap(name):
-            """Get a pixmap by name."""
-            if hasattr(Icons, name.upper()):
-                icon_path = getattr(Icons, name.upper())
-                return QPixmap(icon_path)
-            return QPixmap(name)
+        # Create transparent pixmap with the same size
+        colored = QPixmap(original.size())
+        colored.fill(Qt.transparent)
 
+        # Paint the original icon with the specified color
+        painter = QPainter(colored)
+        painter.setCompositionMode(QPainter.CompositionMode_SourceOver)
+        painter.setRenderHint(QPainter.Antialiasing)
 
-# Re-export for backward compatibility
-__all__ = ["Icons", "IconProvider"]
+        # Apply color using CompositionMode_SourceIn
+        if isinstance(color, str):
+            painter.setBrush(QColor(color))
+        else:
+            painter.setBrush(color)
+
+        painter.setPen(Qt.NoPen)
+        painter.drawRect(colored.rect())
+
+        painter.setCompositionMode(QPainter.CompositionMode_DestinationIn)
+        painter.drawPixmap(0, 0, original)
+        painter.end()
+
+        return QIcon(colored)

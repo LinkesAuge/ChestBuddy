@@ -112,8 +112,8 @@ class CSVReadTask(BackgroundTask):
                 if self.is_cancelled:
                     raise InterruptedError("CSV read operation cancelled")
 
-            # Read the CSV file with chunking
-            return csv_service.read_csv_chunked(
+            # Read the CSV file with chunking (using the synchronous version to avoid recursion)
+            return csv_service._read_csv_chunked_internal(
                 file_path=self.file_path,
                 chunk_size=self.chunk_size,
                 encoding=self.encoding,
@@ -255,7 +255,7 @@ class CSVService:
                     # Continue with other detection methods
 
             # Try with auto-detected encoding
-            detected_encoding = self._detect_encoding(path)
+            detected_encoding, confidence = self._detect_encoding(path)
             if detected_encoding:
                 try:
                     logger.debug(f"Using auto-detected encoding: {detected_encoding}")
@@ -423,7 +423,7 @@ class CSVService:
         """
         return FALLBACK_ENCODINGS.copy()
 
-    def _detect_encoding(self, file_path: Path) -> Optional[str]:
+    def _detect_encoding(self, file_path: Path) -> Tuple[Optional[str], float]:
         """
         Detect the encoding of a file using multiple methods.
 
@@ -431,14 +431,16 @@ class CSVService:
             file_path: The path to the file.
 
         Returns:
-            The detected encoding, or None if detection failed.
+            A tuple containing:
+                - The detected encoding, or None if detection failed.
+                - The confidence level (0.0 to 1.0)
         """
         try:
             # First check for BOM
             bom_encoding = self._detect_bom(file_path)
             if bom_encoding:
                 logger.debug(f"BOM detected, encoding: {bom_encoding}")
-                return bom_encoding
+                return bom_encoding, 1.0  # Full confidence for BOM detection
 
             # Read a sample of the file (first 10KB) to detect encoding
             with open(file_path, "rb") as f:
@@ -455,7 +457,8 @@ class CSVService:
                         decoded = raw_data.decode(encoding)
                         if len(decoded) > 0 and not decoded.isascii():
                             logger.debug(f"Successfully decoded with Japanese encoding: {encoding}")
-                            return encoding
+                            return encoding, 0.9  # High confidence for successful decoding
+
                     except UnicodeDecodeError:
                         continue
 
@@ -470,7 +473,7 @@ class CSVService:
 
                 # Only trust high confidence results
                 if confidence > 0.8:
-                    return encoding
+                    return encoding, confidence
 
             # Try chardet as backup
             detection = chardet.detect(raw_data)
@@ -481,16 +484,16 @@ class CSVService:
 
                 # Only trust high confidence results
                 if confidence > 0.7:
-                    return encoding
+                    return encoding, confidence
 
             # If we couldn't detect with high confidence, return None
             # and let the fallback mechanism handle it
             logger.warning("Encoding detection had low confidence, will use fallbacks")
-            return None
+            return None, 0.0
 
         except Exception as e:
             logger.error(f"Error detecting encoding: {e}")
-            return None
+            return None, 0.0
 
     def _detect_bom(self, file_path: Path) -> Optional[str]:
         """
@@ -590,7 +593,9 @@ class CSVService:
             path = Path(file_path)
 
             # Detect encoding first
-            encoding = self._detect_encoding(path) or "utf-8"
+            encoding, confidence = self._detect_encoding(path)
+            if not encoding:
+                encoding = "utf-8"  # Default to UTF-8 if detection fails
 
             # Read a sample of the file
             with open(path, "r", newline="", encoding=encoding) as f:
@@ -691,6 +696,129 @@ class CSVService:
             logger.error(f"Error verifying Japanese content: {e}")
             return False
 
+    def _read_csv_chunked_internal(
+        self,
+        file_path: Union[str, Path],
+        chunk_size: int = 1000,
+        encoding: Optional[str] = None,
+        normalize_text: bool = True,
+        robust_mode: bool = False,
+        progress_callback: Optional[Callable[[int, int], None]] = None,
+    ) -> Tuple[Optional[pd.DataFrame], Optional[str]]:
+        """
+        Internal implementation to read a CSV file in chunks and return the combined DataFrame.
+
+        This is the synchronous implementation that does the actual work.
+
+        Args:
+            file_path: Path to the CSV file
+            chunk_size: Number of rows to read in each chunk
+            encoding: Optional encoding to use (auto-detected if None)
+            normalize_text: Whether to normalize text in the CSV
+            robust_mode: Whether to use robust mode for reading
+            progress_callback: Optional callback function for progress reporting
+
+        Returns:
+            A tuple containing (DataFrame, error_message)
+            On success, DataFrame contains the data and error_message is None
+            On failure, DataFrame is None and error_message contains the error
+        """
+        # Convert file path to Path object
+        file_path = Path(file_path)
+
+        # Check if file exists
+        if not file_path.exists():
+            return None, f"File not found: {file_path}"
+
+        try:
+            # Detect encoding if not provided
+            if encoding is None:
+                encoding, confidence = self._detect_encoding(file_path)
+                logger.info(f"Detected encoding: {encoding} with confidence {confidence:.2f}")
+
+                if not encoding:
+                    encoding = "utf-8"  # Default to UTF-8 if detection fails
+
+            # Get file size for progress tracking
+            file_size = file_path.stat().st_size
+
+            # Initialize variables
+            chunks = []
+            total_rows = 0
+            processed_bytes = 0
+            rows_processed = 0
+
+            # Prepare keyword arguments for read_csv
+            kwargs = {
+                "encoding": encoding,
+                "engine": "python" if robust_mode else "c",
+                "on_bad_lines": "warn" if robust_mode else "error",
+                "low_memory": True,
+                "dtype": object,  # Use object type for all columns initially
+            }
+
+            # Initialize rows estimate based on a quick sample
+            rows_estimate = self._estimate_rows(file_path, encoding)
+
+            # Initial progress report
+            if progress_callback:
+                progress_callback(0, rows_estimate or 1000)  # Use estimate or default
+
+            # Open the file to track reading progress more accurately
+            with open(file_path, "r", encoding=encoding) as f:
+                # Read file in chunks
+                for chunk_index, chunk in enumerate(
+                    pd.read_csv(file_path, chunksize=chunk_size, **kwargs)
+                ):
+                    # Update rows processed
+                    rows_in_chunk = len(chunk)
+                    rows_processed += rows_in_chunk
+
+                    # Normalize text if requested
+                    if normalize_text:
+                        # Apply normalization to string columns
+                        for col in chunk.select_dtypes(include=["object"]).columns:
+                            chunk[col] = chunk[col].apply(
+                                lambda x: self._normalize_text(x) if isinstance(x, str) else x
+                            )
+
+                    # Store chunk
+                    chunks.append(chunk)
+
+                    # Update processed data tracking
+                    curr_pos = f.tell()
+                    processed_bytes = curr_pos
+
+                    # Update total row count
+                    total_rows += rows_in_chunk
+
+                    # Report progress
+                    if progress_callback:
+                        # Use file position for better progress tracking
+                        progress_percent = min(99, int((processed_bytes / file_size) * 100))
+                        if not progress_callback(progress_percent, 100):
+                            # Callback returned False, indicating cancellation
+                            return None, "CSV reading cancelled by progress callback"
+
+            # Final progress report - 100%
+            if progress_callback:
+                progress_callback(100, 100)
+
+            # Combine chunks
+            if chunks:
+                combined_df = pd.concat(chunks, ignore_index=True)
+                return combined_df, None
+
+            return pd.DataFrame(), None  # Empty DataFrame, no error
+
+        except pd.errors.EmptyDataError:
+            # Handle empty file
+            return pd.DataFrame(), None
+
+        except Exception as e:
+            logger.error(f"Error reading CSV: {e}")
+            return None, str(e)
+
     def read_csv_chunked(
         self,
         file_path: Union[str, Path],
@@ -701,227 +829,67 @@ class CSVService:
         progress_callback: Optional[Callable[[int, int], None]] = None,
     ) -> Tuple[Optional[pd.DataFrame], Optional[str]]:
         """
-        Read a CSV file in chunks to handle large files efficiently.
+        Read a CSV file in chunks and return the combined DataFrame.
 
-        Args:
-            file_path: The path to the CSV file.
-            chunk_size: The number of rows to read in each chunk.
-            encoding: Optional encoding to use. If None, auto-detection is used.
-            normalize_text: Whether to normalize text encoding issues.
-            robust_mode: Whether to use robust mode for handling severely corrupted files.
-            progress_callback: Optional callback function for reporting progress.
-                The callback receives current and total row counts and should return
-                True to continue processing or False to cancel.
-
-        Returns:
-            A tuple containing:
-                - The DataFrame containing the CSV data, or None if an error occurred.
-                - An error message, or None if the operation was successful.
-        """
-        import gc  # Import garbage collector for memory management
-
-        logger.info(f"Reading CSV file in chunks: {file_path}, chunk size: {chunk_size}")
-        path = Path(file_path) if isinstance(file_path, str) else file_path
-
-        try:
-            # Check if file exists
-            if not path.exists():
-                return None, f"File not found: {path}"
-
-            # Detect encoding if not provided
-            if not encoding:
-                encoding = self._detect_encoding(path)
-                if encoding:
-                    logger.info(f"Detected encoding: {encoding}")
-
-            # On encoding failure, try a fallback approach
-            if not encoding:
-                logger.warning("Could not detect encoding, trying fallbacks")
-                for fallback_encoding in FALLBACK_ENCODINGS:
-                    try:
-                        # Try to read the first few lines with this encoding
-                        with open(path, "r", encoding=fallback_encoding) as f:
-                            # Read a small sample to verify encoding works
-                            sample = "".join(f.readline() for _ in range(10))
-                            if sample:  # If we could read something, use this encoding
-                                encoding = fallback_encoding
-                                logger.info(f"Using fallback encoding: {encoding}")
-                                break
-                    except UnicodeDecodeError:
-                        continue  # Try next encoding
-                    except Exception as e:
-                        logger.debug(f"Error with fallback encoding {fallback_encoding}: {e}")
-
-            # If we still don't have an encoding, use utf-8 as last resort
-            if not encoding:
-                logger.warning("Using utf-8 as last resort encoding")
-                encoding = "utf-8"
-
-            # First try to get file size and line count for progress reporting
-            try:
-                file_size = path.stat().st_size
-                estimated_lines = 0
-
-                # Try to estimate line count by checking number of newlines in a sample
-                with open(path, "r", encoding=encoding) as f:
-                    # Read a small sample (up to 100KB) of the file
-                    sample_size = min(file_size, 100 * 1024)  # 100KB max
-                    sample = f.read(sample_size)
-                    if sample:
-                        # Count newlines and estimate total based on file size ratio
-                        newlines = sample.count("\n")
-                        if newlines > 0:
-                            # Add 20% buffer to the estimate to avoid progress going backwards
-                            estimated_lines = int((newlines / len(sample)) * file_size * 1.2)
-                        else:
-                            # If no newlines in sample, use fallback estimate
-                            estimated_lines = int(
-                                file_size / 50
-                            )  # Assume average 50 bytes per line
-            except Exception as e:
-                logger.warning(f"Could not estimate line count: {e}")
-                # Use file size as fallback (1 line per 50 bytes is a rough estimate)
-                estimated_lines = int(file_size / 50)
-
-            # Cap estimate at a reasonable value to avoid UI lag with very large estimates
-            estimated_lines = min(estimated_lines, 10000000)  # 10 million max estimate
-
-            # Set up reading in chunks
-            chunks = []
-            total_chunks = 0
-            processed_rows = 0
-
-            # Set up pandas options for memory efficiency
-            pd.options.mode.copy_on_write = True  # Use more memory-efficient copy on write
-
-            # Use a context manager to ensure file is properly closed
-            reader = pd.read_csv(
-                path,
-                encoding=encoding,
-                chunksize=chunk_size,
-                on_bad_lines="warn" if robust_mode else "error",
-                low_memory=True,  # Use less memory
-            )
-
-            with reader:
-                for i, chunk in enumerate(reader):
-                    # Check if we should continue (via progress callback)
-                    if progress_callback:
-                        # Update processed rows
-                        processed_rows += len(chunk)
-
-                        # Call progress callback with current progress
-                        if not progress_callback(processed_rows, estimated_lines):
-                            # If callback returns False, cancel operation
-                            logger.info("CSV reading cancelled by progress callback")
-
-                            # Clean up chunks to free memory
-                            for c in chunks:
-                                del c
-                            chunks = []
-                            gc.collect()
-
-                            return None, "Operation cancelled"
-
-                    # Process the chunk
-                    if normalize_text:
-                        chunk = self._normalize_dataframe_text(chunk)
-
-                    # Add to chunks list
-                    chunks.append(chunk)
-                    total_chunks += 1
-
-                    # Periodically combine chunks to avoid having too many small DataFrames
-                    # This reduces memory fragmentation
-                    if len(chunks) > 10:
-                        # Combine chunks and clear the list
-                        combined = pd.concat(chunks, ignore_index=True)
-
-                        # Clear individual chunks to free memory
-                        for c in chunks:
-                            del c
-                        chunks = [combined]
-
-                        # Explicitly run garbage collection to release memory
-                        gc.collect()
-
-            # No chunks means empty file
-            if not chunks:
-                return pd.DataFrame(), "File was empty"
-
-            # Combine all chunks into a single DataFrame
-            final_df = pd.concat(chunks, ignore_index=True) if len(chunks) > 1 else chunks[0]
-
-            # Clean up chunks to free memory
-            for c in chunks:
-                del c
-            chunks = []
-            gc.collect()
-
-            # Final progress update
-            if progress_callback:
-                progress_callback(len(final_df), len(final_df))
-
-            logger.info(f"Successfully read CSV file with {len(final_df)} rows")
-            return final_df, None
-
-        except pd.errors.ParserError as e:
-            logger.error(f"CSV parsing error: {e}")
-            return None, f"Error parsing CSV: {str(e)}"
-        except pd.errors.EmptyDataError:
-            logger.warning("CSV file is empty")
-            return pd.DataFrame(), "File is empty"
-        except UnicodeDecodeError as e:
-            logger.error(f"Encoding error: {e}")
-            return None, f"Character encoding error: {str(e)}"
-        except PermissionError as e:
-            logger.error(f"Permission error accessing file: {e}")
-            return None, f"Cannot access file (permission denied)"
-        except IOError as e:
-            logger.error(f"I/O error: {e}")
-            return None, f"Error reading file: {str(e)}"
-        except Exception as e:
-            # Get more detailed stack trace for hard-to-debug errors
-            import traceback
-
-            logger.error(f"Unexpected error reading CSV file: {e}")
-            logger.debug(f"Traceback: {traceback.format_exc()}")
-            return None, f"Error reading CSV: {str(e)}"
-        finally:
-            # Ensure we clear any remaining chunks in case of exceptions
-            if "chunks" in locals() and chunks:
-                for c in chunks:
-                    del c
-                gc.collect()
-
-    def read_csv_background(
-        self,
-        file_path: Union[str, Path],
-        progress_callback: Optional[Callable[[int, int], None]] = None,
-        finished_callback: Optional[Callable[[Optional[pd.DataFrame], Optional[str]], None]] = None,
-        chunk_size: int = 1000,
-        encoding: Optional[str] = None,
-        normalize_text: bool = True,
-        robust_mode: bool = False,
-    ) -> BackgroundWorker:
-        """
-        Read a CSV file in a background thread.
-
-        This method creates a background task for reading a CSV file and returns
-        the worker that is executing the task. The caller can connect to signals
-        on the worker or use the provided callback functions.
+        This method reads the file in chunks to avoid memory issues with large files.
+        It supports progress reporting and cancellation.
 
         Args:
             file_path: Path to the CSV file
-            progress_callback: Optional callback for progress updates
-            finished_callback: Optional callback for completion
             chunk_size: Number of rows to read in each chunk
             encoding: Optional encoding to use (auto-detected if None)
             normalize_text: Whether to normalize text in the CSV
             robust_mode: Whether to use robust mode for reading
+            progress_callback: Optional callback function for progress reporting
 
         Returns:
-            The BackgroundWorker instance executing the task
+            A tuple containing (DataFrame, error_message)
+            On success, DataFrame contains the data and error_message is None
+            On failure, DataFrame is None and error_message contains the error
+        """
+        # Ensure we're directly calling the internal implementation that returns a tuple
+        # NOT the async version which returns a worker
+        try:
+            logger.debug(f"read_csv_chunked called for {file_path}")
+            return self._read_csv_chunked_internal(
+                file_path=file_path,
+                chunk_size=chunk_size,
+                encoding=encoding,
+                normalize_text=normalize_text,
+                robust_mode=robust_mode,
+                progress_callback=progress_callback,
+            )
+        except Exception as e:
+            logger.error(f"Error in read_csv_chunked: {str(e)}")
+            return None, str(e)
+
+    def read_csv_chunked_async(
+        self,
+        file_path: Union[str, Path],
+        chunk_size: int = 1000,
+        encoding: Optional[str] = None,
+        normalize_text: bool = True,
+        robust_mode: bool = False,
+        progress_callback: Optional[Callable[[int, int], None]] = None,
+        finished_callback: Optional[Callable[[pd.DataFrame, str], None]] = None,
+    ) -> BackgroundWorker:
+        """
+        Read a CSV file in chunks asynchronously and return a worker to track progress.
+
+        This method creates a background task to read the file and returns a worker
+        object that can be used to track progress and get the result.
+
+        Args:
+            file_path: Path to the CSV file
+            chunk_size: Number of rows to read in each chunk
+            encoding: Optional encoding to use (auto-detected if None)
+            normalize_text: Whether to normalize text in the CSV
+            robust_mode: Whether to use robust mode for reading
+            progress_callback: Optional callback function for progress reporting
+            finished_callback: Optional callback for when reading is complete
+
+        Returns:
+            A BackgroundWorker object that will execute the task
         """
         # Create a task
         task = CSVReadTask(
@@ -949,3 +917,32 @@ class CSVService:
 
         # Return the worker so the caller can connect to signals or cancel
         return worker
+
+    def _estimate_rows(self, file_path: Path, encoding: str) -> int:
+        """
+        Estimate the number of rows in a CSV file by examining a small sample.
+
+        Args:
+            file_path: Path to the CSV file
+            encoding: Encoding to use for reading the file
+
+        Returns:
+            Estimated number of rows
+        """
+        try:
+            # Try to get a rough estimate by reading a small chunk and extrapolating
+            sample = pd.read_csv(file_path, nrows=100, encoding=encoding)
+            if len(sample) == 0:
+                return 0
+
+            # Calculate average row size in bytes
+            file_size = file_path.stat().st_size
+            avg_row_size = file_size / len(sample)
+
+            # Estimate total rows, add 10% margin
+            estimated_rows = int((file_size / avg_row_size) * 1.1)
+            return max(estimated_rows, len(sample))  # At least return the sample size
+
+        except Exception as e:
+            logger.warning(f"Error estimating rows for {file_path}: {e}")
+            return 1000  # Default fallback

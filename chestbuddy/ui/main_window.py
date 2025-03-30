@@ -13,9 +13,7 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Optional, Union, Any, Set, Tuple
 
-import pandas as pd
-
-from PySide6.QtCore import Qt, Signal, Slot, QSettings, QSize, QTimer
+from PySide6.QtCore import Qt, Signal, Slot, QSettings, QSize, QTimer, QObject, QDateTime
 from PySide6.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -31,15 +29,21 @@ from PySide6.QtWidgets import (
     QApplication,
     QStackedWidget,
     QProgressDialog,
+    QToolBar,
 )
-from PySide6.QtGui import QAction, QIcon, QKeySequence
+from PySide6.QtGui import QAction, QIcon, QKeySequence, QCloseEvent
 
-from chestbuddy.core.models.chest_data_model import ChestDataModel
-from chestbuddy.core.services.chart_service import ChartService
-from chestbuddy.core.services.csv_service import CSVService
-from chestbuddy.core.services.validation_service import ValidationService
-from chestbuddy.core.services.correction_service import CorrectionService
-from chestbuddy.ui.resources.style import Colors, apply_application_style
+from chestbuddy.core.models import ChestDataModel
+from chestbuddy.core.services import CSVService, ValidationService, CorrectionService, ChartService
+from chestbuddy.core.controllers import (
+    FileOperationsController,
+    ProgressController,
+    ViewStateController,
+    DataViewController,
+    ErrorHandlingController,
+    UIStateController,
+)
+from chestbuddy.ui.resources.style import Colors
 from chestbuddy.ui.resources.icons import Icons
 from chestbuddy.ui.resources.resource_manager import ResourceManager
 from chestbuddy.ui.widgets.sidebar_navigation import SidebarNavigation, NavigationSection
@@ -50,25 +54,15 @@ from chestbuddy.ui.views.data_view_adapter import DataViewAdapter
 from chestbuddy.ui.views.validation_view_adapter import ValidationViewAdapter
 from chestbuddy.ui.views.correction_view_adapter import CorrectionViewAdapter
 from chestbuddy.ui.views.chart_view_adapter import ChartViewAdapter
-from chestbuddy.ui.views.dashboard_view_adapter import DashboardViewAdapter
 from chestbuddy.ui.widgets import ProgressDialog, ProgressBar
-from chestbuddy.ui.widgets.blockable_progress_dialog import BlockableProgressDialog
-from chestbuddy.ui.views.blockable import BlockableDataView
-from chestbuddy.utils.config import ConfigManager
-from chestbuddy.utils.ui_state import (
-    UIStateManager,
-    BlockableElementMixin,
-    OperationContext,
-    UIOperations,
-    UIElementGroups,
-)
-from chestbuddy.debugging import measure_time, StateSnapshot, install_debug_hooks
+from chestbuddy.ui.data_view import DataView
+import pandas as pd
 
 # Set up logger
 logger = logging.getLogger(__name__)
 
 
-class MainWindow(QMainWindow, BlockableElementMixin):
+class MainWindow(QMainWindow):
     """
     Main window of the ChestBuddy application.
 
@@ -82,10 +76,6 @@ class MainWindow(QMainWindow, BlockableElementMixin):
         validate_data_triggered (): Signal emitted when data validation is triggered.
         apply_corrections_triggered (): Signal emitted when corrections should be applied.
         export_validation_issues_triggered (str): Signal emitted when validation issues export is triggered.
-        import_complete: Signal emitted when an import operation is completed
-        validation_complete: Signal emitted when a validation operation is completed
-        correction_complete: Signal emitted when a correction operation is completed
-        export_complete: Signal emitted when an export operation is completed
 
     Attributes:
         data_model (ChestDataModel): The data model for the application.
@@ -100,7 +90,6 @@ class MainWindow(QMainWindow, BlockableElementMixin):
         - Provides a dashboard view as the main landing page
         - Manages the application's main actions and menus
         - Includes a status bar for application status
-        - Integrates with the UI State Management system for blocking UI during operations
     """
 
     # Signals
@@ -113,10 +102,6 @@ class MainWindow(QMainWindow, BlockableElementMixin):
     validate_data_triggered = Signal()
     apply_corrections_triggered = Signal()
     export_validation_issues_triggered = Signal(str)
-    import_complete = Signal(object)  # ChestDataModel
-    validation_complete = Signal(object)  # ValidationResult
-    correction_complete = Signal(object)  # CorrectionResult
-    export_complete = Signal(bool)  # Success flag
 
     def __init__(
         self,
@@ -125,113 +110,380 @@ class MainWindow(QMainWindow, BlockableElementMixin):
         validation_service: ValidationService,
         correction_service: CorrectionService,
         chart_service: ChartService,
-        data_manager=None,
+        data_manager,
+        file_operations_controller: FileOperationsController,
+        progress_controller: ProgressController,
+        view_state_controller: ViewStateController,
+        data_view_controller: DataViewController,
+        ui_state_controller: UIStateController,
+        config_manager=None,
         parent: Optional[QWidget] = None,
     ) -> None:
         """
-        Initialize the main window.
+        Initialize the MainWindow.
 
         Args:
-            data_model: The data model for the application.
-            csv_service: Service for CSV operations.
-            validation_service: Service for data validation.
-            correction_service: Service for data correction.
-            chart_service: Service for chart generation.
-            data_manager: Optional data manager instance.
-            parent: Optional parent widget.
+            data_model (ChestDataModel): The data model.
+            csv_service (CSVService): The CSV service.
+            validation_service (ValidationService): The validation service.
+            correction_service (CorrectionService): The correction service.
+            chart_service (ChartService): The chart service.
+            data_manager: The data manager.
+            file_operations_controller (FileOperationsController): The file operations controller.
+            progress_controller (ProgressController): The progress controller.
+            view_state_controller (ViewStateController): The view state controller.
+            data_view_controller (DataViewController): The data view controller.
+            ui_state_controller (UIStateController): The UI state controller.
+            config_manager: The configuration manager.
+            parent (Optional[QWidget], optional): Parent widget. Defaults to None.
         """
-        # Initialize QMainWindow
-        QMainWindow.__init__(self, parent)
+        super().__init__(parent)
 
-        # Initialize BlockableElementMixin
-        BlockableElementMixin.__init__(self)
-
-        # Store services
-        self.data_model = data_model
-        self.csv_service = csv_service
-        self.validation_service = validation_service
-        self.correction_service = correction_service
-        self.chart_service = chart_service
+        self._data_model = data_model
+        self._csv_service = csv_service
+        self._validation_service = validation_service
+        self._correction_service = correction_service
+        self._chart_service = chart_service
         self._data_manager = data_manager
+        self._file_controller = file_operations_controller
+        self._progress_controller = progress_controller
+        self._view_state_controller = view_state_controller
+        self._data_view_controller = data_view_controller
+        self._ui_state_controller = ui_state_controller
+        self._config_manager = config_manager
 
-        # Store views
-        self._views: Dict[str, BaseView] = {}
-        self._active_view = None
+        if self._data_manager:
+            logger.debug("MainWindow initialized with data_manager")
+        else:
+            logger.error("MainWindow initialized WITHOUT data_manager")
 
-        # UI State Manager
-        self._ui_state_manager = UIStateManager()
+        # Set window title and icon
+        self.setWindowTitle("ChestBuddy - Chest Data Analysis Tool")
+        self.setWindowIcon(Icons.get_icon(Icons.APP_ICON))
 
-        # Operation context for tracking current operations
-        self._import_operation_context = None
+        # Set window size
+        self.resize(1200, 800)
 
-        # State flags
-        self._loading_state = {}
-        self._progress_dialog = None
-        self._progress_dialog_finalized = False
-        self._file_loading_complete = False
-        self._data_loaded = False
-        self._total_rows_loaded = 0
-        self._total_rows_estimated = 0
-        self._last_progress_current = 0
-
-        # Set up debugging hooks if needed
-        if os.environ.get("DEBUG_UI_STATE", "0") == "1":
-            install_debug_hooks()
-
-        # Recent files list
-        self._recent_files = []
-        self._max_recent_files = 10
-
-        # Set up UI
+        # Initialize UI
         self._init_ui()
-        self._create_views()
+
+        # Create menus
         self._init_menus()
-        self._add_file_toolbar()
+
+        # Connect signals
         self._connect_signals()
+
+        # Load settings
         self._load_settings()
+
+        # Initialize recent files
+        self._recent_files: List[str] = []
         self._load_recent_files()
-        apply_application_style(QApplication.instance())
 
-        # Register with the UI state manager
-        self.register_with_manager(self._ui_state_manager)
+        # State tracking for file loading progress
+        self._loading_state = {
+            "current_file": "",
+            "current_file_index": 0,
+            "processed_files": [],
+            "total_files": 0,  # Will be set by the caller via total_files property
+            "total_rows": 0,
+        }
 
-        # Add to appropriate groups
-        self._ui_state_manager.add_element_to_group(self, UIElementGroups.MAIN_WINDOW)
+        # Data state tracking
+        self._has_data_loaded = False
 
-        logger.debug("MainWindow initialized")
+        # UI state flags to prevent duplicate dialogs
+        self._is_opening_file = False
+        self._is_saving_file = False
+        self._is_handling_import = False
+        self._is_loading_files = False  # New flag to track if files are currently loading
 
-    def _apply_block(self, operation: Any = None) -> None:
-        """Apply block to the main window and all its children."""
-        logger.debug(f"MainWindow: Applying block for operation {operation}")
-        # Original enabled state is saved by the mixin
+        # Update UI
+        self._update_ui()
 
-        # We'll disable the main UI components but not the whole window
-        # to allow dialog interaction
-        if hasattr(self, "_sidebar") and self._sidebar:
-            self._sidebar.setEnabled(False)
+        # Transition to using controllers
+        self._register_with_controllers()
 
-        if hasattr(self, "_content_stack") and self._content_stack:
-            self._content_stack.setEnabled(False)
+    def _register_with_controllers(self):
+        """Register with controllers and connect signals."""
+        # Connect file controller signals to local handlers
+        self._file_controller.file_opened.connect(self._on_file_opened)
+        self._file_controller.file_saved.connect(self._on_file_saved)
+        self._file_controller.recent_files_changed.connect(self._on_recent_files_changed)
 
-        if hasattr(self, "menuBar") and self.menuBar():
-            self.menuBar().setEnabled(False)
+        # Connect to dialog canceled signal to reset import flags
+        if hasattr(self._file_controller, "file_dialog_canceled"):
+            self._file_controller.file_dialog_canceled.connect(self._on_file_dialog_canceled)
 
-    def _apply_unblock(self, operation: Any = None) -> None:
-        """Restore original enabled state when unblocking."""
-        logger.debug(f"MainWindow: Applying unblock for operation {operation}")
+        # Connect data view controller signals
+        self._data_view_controller.filter_applied.connect(self._on_filter_applied)
+        self._data_view_controller.sort_applied.connect(self._on_sort_applied)
+        self._data_view_controller.table_populated.connect(self._on_table_populated)
 
-        # Re-enable main components
-        if hasattr(self, "_sidebar") and self._sidebar:
-            self._sidebar.setEnabled(True)
+        # Connect ui state controller signals
+        self._ui_state_controller.status_message_changed.connect(self._on_status_message_changed)
+        self._ui_state_controller.actions_state_changed.connect(self._on_actions_state_changed)
+        self._ui_state_controller.ui_refresh_needed.connect(self.refresh_ui)
 
-        if hasattr(self, "_content_stack") and self._content_stack:
-            self._content_stack.setEnabled(True)
+        # Connect view import signals to the handler method directly
+        # This uses direct Qt connections instead of SignalManager to fix the startup error
+        for view_name, view in self._views.items():
+            if hasattr(view, "import_requested"):
+                logger.debug(
+                    f"Connecting {view_name}.import_requested to _on_import_requested handler"
+                )
+                # Use direct Qt connection to the handler method that prevents duplicate dialogs
+                view.import_requested.connect(self._on_import_requested)
 
-        if hasattr(self, "menuBar") and self.menuBar():
-            self.menuBar().setEnabled(True)
+    @Slot()
+    def _on_import_requested(self):
+        """
+        Handle import requests from views.
 
-        # Process events to ensure UI updates
-        QApplication.processEvents()
+        This slot is connected to view import_requested signals via SignalManager.
+        It delegates to the FileOperationsController but adds guard logic
+        to prevent duplicate dialogs.
+        """
+        logger.debug(
+            f"_on_import_requested called with flags: _is_handling_import={getattr(self, '_is_handling_import', False)}, _is_loading_files={getattr(self, '_is_loading_files', False)}"
+        )
+
+        # Get current time to implement debounce
+        current_time = QDateTime.currentMSecsSinceEpoch()
+        last_cancel_time = getattr(self, "_last_dialog_cancel_time", 0)
+
+        # Add a debounce period to prevent rapid successive dialog requests (e.g., after cancellation)
+        DEBOUNCE_MS = 500  # 500ms debounce
+        if (current_time - last_cancel_time) < DEBOUNCE_MS:
+            logger.debug(
+                f"Import request too soon after cancellation ({current_time - last_cancel_time}ms), debouncing"
+            )
+            return
+
+        # Check if we're already handling an import to prevent duplicate dialogs
+        if hasattr(self, "_is_handling_import") and self._is_handling_import:
+            logger.debug("Already handling an import request, ignoring duplicate")
+            return
+
+        # Check if we're already loading files to prevent duplicate dialogs
+        if hasattr(self, "_is_loading_files") and self._is_loading_files:
+            logger.debug("Already loading files, ignoring duplicate import request")
+            return
+
+        # Check if we're already showing a progress dialog
+        if (
+            hasattr(self, "_progress_controller")
+            and self._progress_controller.is_progress_showing()
+        ):
+            logger.debug("Progress dialog is showing, ignoring import request")
+            return
+
+        # Set flag to prevent duplicate dialogs
+        self._is_handling_import = True
+        logger.debug(
+            "Handling import request via FileOperationsController - set flag: _is_handling_import=True"
+        )
+
+        # Delegate to file controller - let _on_file_dialog_canceled handle cancellation
+        self._file_controller.open_file(self)
+
+    @Slot(dict)
+    def _on_filter_applied(self, filter_params: Dict) -> None:
+        """
+        Handle when a filter is applied via the controller.
+
+        Args:
+            filter_params (Dict): Filter parameters
+        """
+        if filter_params:
+            logger.info(f"Filter applied: {filter_params}")
+            # Update status bar with filter information
+            column = filter_params.get("column", "")
+            text = filter_params.get("text", "")
+            if column and text:
+                self._status_bar.set_status(f"Filter applied: {column}={text}")
+        else:
+            # Filter was cleared
+            logger.info("Filter cleared")
+            self._status_bar.set_status("Filter cleared")
+
+    @Slot(str, bool)
+    def _on_sort_applied(self, column: str, ascending: bool) -> None:
+        """
+        Handle when sorting is applied via the controller.
+
+        Args:
+            column (str): Column name
+            ascending (bool): Sort direction
+        """
+        direction = "ascending" if ascending else "descending"
+        logger.info(f"Sort applied: {column} ({direction})")
+        self._status_bar.set_status(f"Sorted by {column} ({direction})")
+
+    @Slot(int)
+    def _on_table_populated(self, row_count: int) -> None:
+        """
+        Handle when the table is populated via the controller.
+
+        Args:
+            row_count (int): Number of rows populated
+        """
+        logger.info(f"Table populated with {row_count} rows")
+        self._status_bar.set_status(f"Loaded {row_count} rows")
+
+    @Slot(str)
+    def _on_file_opened(self, file_path: str) -> None:
+        """
+        Handle when a file is opened via the controller.
+
+        Args:
+            file_path (str): Path to the opened file
+        """
+        logger.info(f"File opened: {file_path}")
+
+        # Update status bar
+        self._status_bar.set_status(f"Loaded: {os.path.basename(file_path)}")
+
+        # Update last modified timestamp
+        try:
+            modified_time = os.path.getmtime(file_path)
+            self._status_bar.set_last_modified(modified_time)
+        except Exception as e:
+            logger.error(f"Error getting file modified time: {e}")
+
+    @Slot(str)
+    def _on_file_saved(self, file_path: str) -> None:
+        """
+        Handle when a file is saved via the controller.
+
+        Args:
+            file_path (str): Path to the saved file
+        """
+        logger.info(f"File saved: {file_path}")
+
+        # Update status bar
+        self._status_bar.set_status(f"Saved: {os.path.basename(file_path)}")
+
+        # Update last modified timestamp
+        try:
+            modified_time = os.path.getmtime(file_path)
+            self._status_bar.set_last_modified(modified_time)
+        except Exception as e:
+            logger.error(f"Error getting file modified time: {e}")
+
+    @Slot(list)
+    def _on_recent_files_changed(self, recent_files: List[str]) -> None:
+        """
+        Handle when the recent files list changes via the controller.
+
+        Args:
+            recent_files (List[str]): Updated list of recent files
+        """
+        logger.debug(f"Recent files updated: {len(recent_files)} files")
+
+        # Update local recent files list
+        self._recent_files = recent_files
+
+        # Update the recent files menu
+        self._update_recent_files_menu()
+
+        # Update dashboard
+        dashboard_view = self._views.get("Dashboard")
+        if dashboard_view and isinstance(dashboard_view, DashboardView):
+            dashboard_view.set_recent_files(recent_files)
+
+    @Slot(str)
+    def _on_status_message_changed(self, message: str) -> None:
+        """
+        Handle changes to the status message.
+
+        Args:
+            message: The new status message
+        """
+        if hasattr(self, "_status_bar") and self._status_bar is not None:
+            self._status_bar.set_status(message)
+
+    @Slot(dict)
+    def _on_actions_state_changed(self, action_states: Dict[str, bool]) -> None:
+        """
+        Handle changes to action states.
+
+        Args:
+            action_states: Dictionary mapping action names to boolean states
+        """
+        # Update actions based on their names
+        for action_name, enabled in action_states.items():
+            action = None
+
+            # Map action names to actual action objects
+            if action_name == "save":
+                action = self._save_action
+            elif action_name == "save_as":
+                action = self._save_as_action
+            elif action_name == "export":
+                action = self._export_validation_action
+            elif action_name == "validate":
+                action = self._validate_action
+            elif action_name == "correct":
+                action = self._correct_action
+
+            # Enable/disable the action if found
+            if action is not None:
+                action.setEnabled(enabled)
+
+    @Slot()
+    def _on_file_dialog_canceled(self):
+        """
+        Handle cancellation of file dialog.
+
+        This resets the import handling flag to ensure future import requests work correctly.
+        Also blocks signals temporarily to prevent duplicate dialog requests.
+        """
+        logger.debug(
+            f"_on_file_dialog_canceled called with flags before reset: _is_handling_import={getattr(self, '_is_handling_import', False)}"
+        )
+
+        # Record cancellation time to support debouncing in _on_import_requested
+        self._last_dialog_cancel_time = QDateTime.currentMSecsSinceEpoch()
+
+        # Get all views that might emit import_requested signals
+        dashboard_view = self._views.get("Dashboard")
+        data_view = self._views.get("Data")
+        sidebar = self._sidebar if hasattr(self, "_sidebar") else None
+
+        # Block signals from all possible sources of import requests
+        blocked_widgets = []
+
+        try:
+            # Block signals to prevent new import requests during cleanup
+            for widget in [dashboard_view, data_view, sidebar]:
+                if widget and hasattr(widget, "blockSignals"):
+                    widget.blockSignals(True)
+                    blocked_widgets.append(widget)
+
+            # Also block empty state widgets if they exist
+            if dashboard_view and hasattr(dashboard_view, "_empty_state_widget"):
+                if hasattr(dashboard_view._empty_state_widget, "blockSignals"):
+                    dashboard_view._empty_state_widget.blockSignals(True)
+                    blocked_widgets.append(dashboard_view._empty_state_widget)
+
+            # Reset the import handling flag to ensure future import requests work correctly
+            self._is_handling_import = False
+
+            # Also check if we need to reset any other states
+            if hasattr(self, "_is_loading_files") and self._is_loading_files:
+                logger.debug("Also resetting _is_loading_files flag that was still set")
+                self._is_loading_files = False
+
+            logger.debug("File dialog canceled, reset import handling flag to False")
+        finally:
+            # Process events before re-enabling signals, to avoid queued events triggering another dialog
+            QApplication.processEvents()
+
+            # Re-enable signals
+            for widget in blocked_widgets:
+                if widget and hasattr(widget, "blockSignals"):
+                    widget.blockSignals(False)
 
     def _init_ui(self) -> None:
         """Initialize the user interface."""
@@ -247,6 +499,7 @@ class MainWindow(QMainWindow, BlockableElementMixin):
         # Create sidebar navigation
         self._sidebar = SidebarNavigation()
         self._sidebar.navigation_changed.connect(self._on_navigation_changed)
+        self._sidebar.data_dependent_view_clicked.connect(self._on_data_dependent_view_clicked)
         main_layout.addWidget(self._sidebar)
 
         # Create content stack
@@ -264,14 +517,17 @@ class MainWindow(QMainWindow, BlockableElementMixin):
         # Create views
         self._create_views()
 
-        # Add file toolbar
-        self._add_file_toolbar()
+        # Initialize view state controller with UI components
+        self._view_state_controller.set_ui_components(
+            self._views, self._sidebar, self._content_stack
+        )
+
+        # Connect view state controller signals
+        self._view_state_controller.view_changed.connect(self._on_view_changed)
+        self._view_state_controller.data_state_changed.connect(self._on_data_state_changed)
 
         # Set initial view to Dashboard
-        self._set_active_view("Dashboard")
-
-        # Initialize navigation based on data state
-        self._update_navigation_based_on_data_state()
+        self._view_state_controller.set_active_view("Dashboard")
 
     def _create_views(self) -> None:
         """Create the views for the application."""
@@ -279,40 +535,68 @@ class MainWindow(QMainWindow, BlockableElementMixin):
         self._views: Dict[str, BaseView] = {}
 
         # Create Dashboard view
-        dashboard_view = DashboardViewAdapter(self.data_model)
+        dashboard_view = DashboardView(self._data_model)
         dashboard_view.action_triggered.connect(self._on_dashboard_action)
         dashboard_view.file_selected.connect(self._on_recent_file_selected)
-        dashboard_view.chart_selected.connect(self._on_chart_selected)
-        dashboard_view.data_requested.connect(self._open_file)
         self._content_stack.addWidget(dashboard_view)
         self._views["Dashboard"] = dashboard_view
 
         # Create Data view
-        data_view = DataViewAdapter(self.data_model)
-        data_view.data_requested.connect(self._open_file)
+        data_view = DataViewAdapter(data_model=self._data_model)
+        data_view.export_requested.connect(self._save_file_as)
+
+        # Set up the data view controller with the view
+        self._data_view_controller.set_view(data_view)
+
         self._content_stack.addWidget(data_view)
         self._views["Data"] = data_view
 
         # Create Validation view
-        validation_view = ValidationViewAdapter(self.data_model, self.validation_service)
-        validation_view.data_requested.connect(self._open_file)
+        validation_view = ValidationViewAdapter(
+            data_model=self._data_model, validation_service=self._validation_service
+        )
+        # Set up the validation view to use the data view controller
+        validation_view.set_controller(self._data_view_controller)
         self._content_stack.addWidget(validation_view)
         self._views["Validation"] = validation_view
 
         # Create Correction view
-        correction_view = CorrectionViewAdapter(self.data_model, self.correction_service)
-        correction_view.data_requested.connect(self._open_file)
+        correction_view = CorrectionViewAdapter(
+            data_model=self._data_model, correction_service=self._correction_service
+        )
+        # Set up the correction view to use the data view controller
+        correction_view.set_controller(self._data_view_controller)
         self._content_stack.addWidget(correction_view)
         self._views["Correction"] = correction_view
 
         # Create Analysis/Charts view
-        chart_view = ChartViewAdapter(self.data_model, self.chart_service)
-        chart_view.data_requested.connect(self._open_file)
+        chart_view = ChartViewAdapter(
+            data_model=self._data_model, chart_service=self._chart_service
+        )
+        # Set up the chart view to use the data view controller
+        chart_view.set_data_view_controller(self._data_view_controller)
         self._content_stack.addWidget(chart_view)
         self._views["Charts"] = chart_view
 
+        # Create Settings view
+        from chestbuddy.ui.views import SettingsViewAdapter
+
+        settings_view = SettingsViewAdapter(config_manager=self._config_manager)
+        settings_view.settings_changed.connect(self._on_settings_changed)
+        settings_view.config_reset.connect(self._on_config_reset)
+        settings_view.config_imported.connect(self._on_config_imported)
+        settings_view.config_exported.connect(self._on_config_exported)
+        self._content_stack.addWidget(settings_view)
+        self._views["Settings"] = settings_view
+
+        # Set services in the data view controller
+        self._data_view_controller.set_services(
+            validation_service=self._validation_service, correction_service=self._correction_service
+        )
+        logger.info("Services set in data view controller")
+
         # TODO: Add placeholder views for other sections
-        # For Reports, Settings, Help if needed
+        # For Reports, Help if needed
 
     def _init_menus(self) -> None:
         """Initialize the application menus."""
@@ -370,111 +654,115 @@ class MainWindow(QMainWindow, BlockableElementMixin):
         self._correct_action.triggered.connect(self._correct_data)
         data_menu.addAction(self._correct_action)
 
+        # Export Validation Issues action
+        self._export_validation_action = QAction("Export &Validation Issues...", self)
+        self._export_validation_action.setStatusTip("Export validation issues to a file")
+        self._export_validation_action.triggered.connect(self._export_validation_issues)
+        data_menu.addAction(self._export_validation_action)
+
         # Help menu
         help_menu = self.menuBar().addMenu("&Help")
 
         # About action
-        about_action = QAction("&About", self)
-        about_action.setStatusTip("Show the application's About box")
-        about_action.triggered.connect(self._show_about)
-        help_menu.addAction(about_action)
+        self._about_action = QAction("&About", self)
+        self._about_action.setStatusTip("Show the application's About box")
+        self._about_action.triggered.connect(self._show_about)
+        help_menu.addAction(self._about_action)
 
     def _connect_signals(self) -> None:
         """Connect signals and slots."""
-        # Data manager signals
+        # Connect signals from sidebar navigation
+        self._sidebar.navigation_changed.connect(self._on_navigation_changed)
+        self._sidebar.data_dependent_view_clicked.connect(self._on_data_dependent_view_clicked)
+
+        # Connect signals from data model
+        self._data_model.data_changed.connect(self._on_data_model_changed)
+        self._data_model.validation_changed.connect(self._on_validation_changed)
+        self._data_model.correction_applied.connect(self._on_correction_applied)
+
+        # Connect file menu signals
+        self._open_action.triggered.connect(self._open_file)
+        self._save_action.triggered.connect(self._save_file)
+        self._save_as_action.triggered.connect(self._save_file_as)
+
+        # Connect tools menu signals
+        self._validate_action.triggered.connect(self._validate_data)
+        self._correct_action.triggered.connect(self._correct_data)
+        self._export_validation_action.triggered.connect(self._export_validation_issues)
+
+        # Connect help menu signals
+        self._about_action.triggered.connect(self._show_about)
+
+        # Connect DataManager signals
         self._data_manager.load_started.connect(self._on_load_started)
-        self._data_manager.load_progress.connect(self._on_load_progress)
         self._data_manager.load_finished.connect(self._on_load_finished)
+        self._data_manager.load_progress.connect(self._on_load_progress)
         self._data_manager.load_error.connect(self._on_load_error)
         self._data_manager.load_success.connect(self.refresh_ui)
-        self._data_manager.populate_table_requested.connect(self._on_populate_table_requested)
 
-        # Data model signals
-        self.data_model.data_changed.connect(self._on_data_changed)
-        self.data_model.validation_changed.connect(self._on_validation_changed)
-        self.data_model.correction_applied.connect(self._on_correction_applied)
-
-        # Connect data model signals
-        self.data_model.data_changed.connect(self._on_data_changed)
-        self.data_model.validation_changed.connect(self._on_validation_changed)
-        self.data_model.correction_applied.connect(self._on_correction_applied)
-
-        # Connect data manager signals for progress reporting
-        if self._data_manager:
-            logger.debug("Connecting data_manager signals in MainWindow")
-            self._data_manager.load_started.connect(self._on_load_started)
-            self._data_manager.load_progress.connect(self._on_load_progress)
-            self._data_manager.load_finished.connect(self._on_load_finished)
-            self._data_manager.load_success.connect(lambda msg: self._status_bar.set_status(msg))
-            self._data_manager.load_error.connect(self._on_load_error)
-            logger.debug("All data_manager signals connected successfully")
-        else:
-            logger.warning("No data_manager available, progress signals will not be connected")
+        # Connect data_loaded signal to populate_data_table method
+        # This ensures the table is populated even for subsequent file loads
+        self._data_manager.data_loaded.connect(self._ensure_data_table_populated)
 
     def _load_settings(self) -> None:
         """Load application settings."""
-        config = ConfigManager()
+        settings = QSettings("ChestBuddy", "ChestBuddy")
+        geometry = settings.value("geometry")
+        if geometry:
+            self.restoreGeometry(geometry)
 
-        # Load window geometry
-        self.resize(
-            config.get_int("UI", "window_width", 1024), config.get_int("UI", "window_height", 768)
-        )
-
-        # Load other settings as needed
-        logger.debug("Application settings loaded")
+        # Recent files are now handled by the file controller
+        # No need to load them here
 
     def _save_settings(self) -> None:
         """Save application settings."""
-        config = ConfigManager()
+        settings = QSettings("ChestBuddy", "ChestBuddy")
+        settings.setValue("geometry", self.saveGeometry())
+        settings.sync()
 
-        # Save window geometry
-        config.set("UI", "window_width", self.width())
-        config.set("UI", "window_height", self.height())
-
-        # Save other settings as needed
-        logger.debug("Application settings saved")
+        # Recent files are now handled by the file controller
+        # No need to save them here
 
     def _load_recent_files(self) -> None:
-        """Load recent files from settings."""
-        config = ConfigManager()
-        self._recent_files = [str(p) for p in config.get_recent_files()]
+        """Load the list of recent files."""
+        settings = QSettings("ChestBuddy", "ChestBuddy")
+        self._recent_files = settings.value("recentFiles", [])
+        if not isinstance(self._recent_files, list):
+            self._recent_files = []
         self._update_recent_files_menu()
-        logger.debug(f"Loaded {len(self._recent_files)} recent files")
 
     def _save_recent_files(self) -> None:
-        """Save recent files to settings."""
-        # Using ConfigManager to save recent files
-        # (This is handled automatically by add_recent_file)
-        logger.debug(f"Saved {len(self._recent_files)} recent files")
+        """Save the list of recent files."""
+        settings = QSettings("ChestBuddy", "ChestBuddy")
+        settings.setValue("recentFiles", self._recent_files)
+        settings.sync()
 
     def _add_recent_file(self, file_path: str) -> None:
         """
         Add a file to the recent files list.
 
         Args:
-            file_path: Path to the file to add.
+            file_path: The path of the file to add.
         """
-        # Convert to absolute path if not already
-        file_path = os.path.abspath(file_path)
-
-        # Remove if already in list
+        # Remove if already exists
         if file_path in self._recent_files:
             self._recent_files.remove(file_path)
 
-        # Add to start of list
+        # Add to the beginning of the list
         self._recent_files.insert(0, file_path)
 
-        # Keep only the most recent 10 files
-        self._recent_files = self._recent_files[:10]
+        # Limit to 10 recent files
+        if len(self._recent_files) > 10:
+            self._recent_files = self._recent_files[:10]
 
-        # Update the menu
+        # Update menu and save
         self._update_recent_files_menu()
+        self._save_recent_files()
 
-        # Save to config
-        config = ConfigManager()
-        config.add_recent_file(file_path)
-
-        logger.debug(f"Added {file_path} to recent files")
+        # Update dashboard
+        dashboard_view = self._views.get("Dashboard")
+        if dashboard_view and isinstance(dashboard_view, DashboardView):
+            dashboard_view.set_recent_files(self._recent_files)
 
     def _update_recent_files_menu(self) -> None:
         """Update the recent files menu."""
@@ -494,97 +782,89 @@ class MainWindow(QMainWindow, BlockableElementMixin):
             self._recent_files_menu.addAction(no_files_action)
 
     def _update_ui(self) -> None:
-        """Update UI state based on data availability."""
-        logger.debug(f"Updating UI elements based on data state: data_loaded={self._data_loaded}")
+        """Update UI based on current state."""
+        # Get data model state
+        has_data = self._data_model is not None and not self._data_model.is_empty
 
-        # Update export action
-        if hasattr(self, "_export_action"):
-            self._export_action.setEnabled(self._data_loaded)
-            logger.debug(f"Export action enabled: {self._data_loaded}")
+        # Update data loaded state through UI state controller
+        self._ui_state_controller.update_data_dependent_ui(has_data)
 
-        # Update menu actions that depend on data availability
-        if hasattr(self, "_save_action"):
-            self._save_action.setEnabled(self._data_loaded)
+        # Update dashboard information
+        if "Dashboard" in self._views:
+            dashboard_view = self._views["Dashboard"]
+            dashboard_view.set_recent_files(self._recent_files)
 
-        if hasattr(self, "_save_as_action"):
-            self._save_as_action.setEnabled(self._data_loaded)
+            if has_data:
+                # Update dashboard stats
+                dashboard_view.update_stats(
+                    dataset_rows=len(self._data_model.data),
+                    validation_status="Not Validated"
+                    if self._data_model.get_validation_status().empty
+                    else f"{len(self._data_model.get_validation_status())} issues",
+                    corrections=self._data_model.get_correction_row_count(),
+                    last_import=datetime.now().strftime("%Y-%m-%d %H:%M") if has_data else "Never",
+                )
 
-        if hasattr(self, "_validate_action"):
-            self._validate_action.setEnabled(self._data_loaded)
-
-        if hasattr(self, "_correct_action"):
-            self._correct_action.setEnabled(self._data_loaded)
-
-        if hasattr(self, "_export_validation_action"):
-            self._export_validation_action.setEnabled(self._data_loaded)
-
-        # Update status bar based on data state
+        # Update status bar
         self._update_status_bar()
 
-        # Update all views with data availability
-        self._update_views_data_availability()
+    def _update_data_loaded_state(self, has_data: bool) -> None:
+        """
+        Update UI components based on whether data is loaded.
 
-        # Update navigation based on data state
-        self._update_navigation_based_on_data_state()
+        Args:
+            has_data: Whether data is loaded.
+        """
+        # Delegate to the view state controller
+        self._view_state_controller.update_data_loaded_state(has_data)
 
-        # Process events to ensure UI updates are applied immediately
-        QApplication.processEvents()
+        # Delegate to the UI state controller for action states
+        self._ui_state_controller.update_data_dependent_ui(has_data)
+
+        # Store the data loaded state
+        self._has_data_loaded = has_data
 
     @Slot(str)
     def _set_active_view(self, view_name: str) -> None:
         """
-        Set the active view.
+        Set the active view in the content stack.
 
         Args:
-            view_name: The name of the view to set active
+            view_name (str): The name of the view to activate
         """
-        logger.debug(f"[VIEW_TRANSITION] Setting active view to '{view_name}'")
-
-        # Log current application state
-        current_view = self._content_stack.currentWidget()
-        current_view_name = "unknown"
-        for name, view in self._views.items():
-            if view is current_view:
-                current_view_name = name
-                break
-
-        logger.debug(f"[VIEW_TRANSITION] Current view before transition: '{current_view_name}'")
-        logger.debug(f"[VIEW_TRANSITION] Data loaded state: {self._data_loaded}")
-
-        # Check if view exists
-        if view_name not in self._views:
-            logger.error(f"[VIEW_TRANSITION] View '{view_name}' does not exist!")
-            return
-
-        # Check if the view requires data
-        view = self._views[view_name]
-        requires_data = view.is_data_required()
-        logger.debug(f"[VIEW_TRANSITION] View '{view_name}' requires data: {requires_data}")
-
-        # If the view requires data but no data is loaded, switch to Dashboard view
-        if requires_data and not self._data_loaded:
-            logger.debug(
-                f"[VIEW_TRANSITION] Cannot switch to '{view_name}', no data loaded. Redirecting to Dashboard."
-            )
-            self._content_stack.setCurrentWidget(self._views["Dashboard"])
-            self._sidebar.set_active_item("Dashboard")
-            return
-
-        # Switch to the view and update the sidebar selection
-        logger.debug(f"[VIEW_TRANSITION] Switching to view '{view_name}'")
-        before_visible = view.isVisible()
-        self._content_stack.setCurrentWidget(view)
-        after_visible = view.isVisible()
-
-        logger.debug(
-            f"[VIEW_TRANSITION] View visibility changed: {before_visible} -> {after_visible}"
-        )
-        self._sidebar.set_active_item(view_name)
-
-        # Log completion
-        logger.debug(f"[VIEW_TRANSITION] Active view set to '{view_name}'")
+        # Delegate to the view state controller
+        try:
+            self._view_state_controller.set_active_view(view_name)
+        except Exception as e:
+            logger.error(f"Error setting active view to '{view_name}': {e}")
+            QMessageBox.critical(self, "Error", f"Error switching to {view_name} view: {str(e)}")
 
     # ===== Slots =====
+
+    @Slot(str)
+    def _on_view_changed(self, view_name: str) -> None:
+        """
+        Handle view changed signal from the ViewStateController.
+
+        Args:
+            view_name (str): The name of the active view
+        """
+        # Update UI components based on the new view
+        self._update_ui()
+
+    @Slot(bool)
+    def _on_data_state_changed(self, has_data: bool) -> None:
+        """
+        Handle data state changed signal from the ViewStateController.
+
+        Args:
+            has_data (bool): Whether data is loaded
+        """
+        # Update actions
+        self._save_action.setEnabled(has_data)
+        self._save_as_action.setEnabled(has_data)
+        self._validate_action.setEnabled(has_data)
+        self._correct_action.setEnabled(has_data)
 
     @Slot(str, str)
     def _on_navigation_changed(self, section: str, subsection: Optional[str] = None) -> None:
@@ -597,30 +877,26 @@ class MainWindow(QMainWindow, BlockableElementMixin):
         """
         logger.debug(f"Navigation changed: {section} - {subsection}")
 
-        # If trying to navigate to a disabled section, return
-        if not self._sidebar.is_section_enabled(section):
-            logger.debug(f"Navigation to disabled section {section} prevented")
-            # Restore previous selection
-            if hasattr(self, "_previous_active_section"):
-                self._sidebar.set_active_item(
-                    self._previous_active_section.get("section", "Dashboard"),
-                    self._previous_active_section.get("subsection", ""),
-                )
-            return
-
-        # Store current selection for potential restoration
-        self._previous_active_section = {"section": section, "subsection": subsection}
-
         if subsection:
             # Handle subsections
             if section == "Data":
-                if subsection == "Validate":
-                    self._set_active_view("Validation")
+                if subsection == "Import":
+                    # Check if we're already handling an import to prevent duplicate dialogs
+                    if hasattr(self, "_is_handling_import") and self._is_handling_import:
+                        logger.debug(
+                            "Already handling an import request, ignoring navigation request"
+                        )
+                        return
+                    self._on_import_requested()
+                elif subsection == "Validate":
+                    self._view_state_controller.set_active_view("Validation")
                 elif subsection == "Correct":
-                    self._set_active_view("Correction")
+                    self._view_state_controller.set_active_view("Correction")
+                elif subsection == "Export":
+                    self._save_file_as()
             elif section == "Analysis":
                 if subsection == "Charts":
-                    self._set_active_view("Charts")
+                    self._view_state_controller.set_active_view("Charts")
                 elif subsection == "Tables":
                     # TODO: Handle tables view
                     pass
@@ -630,11 +906,11 @@ class MainWindow(QMainWindow, BlockableElementMixin):
         else:
             # Handle main sections
             if section == "Dashboard":
-                self._set_active_view("Dashboard")
+                self._view_state_controller.set_active_view("Dashboard")
             elif section == "Data":
-                self._set_active_view("Data")
+                self._view_state_controller.set_active_view("Data")
             elif section == "Analysis":
-                self._set_active_view("Charts")
+                self._view_state_controller.set_active_view("Charts")
             elif section == "Reports":
                 # TODO: Handle reports view
                 pass
@@ -654,12 +930,13 @@ class MainWindow(QMainWindow, BlockableElementMixin):
             action: The action name.
         """
         if action == "import":
-            self._open_file()
+            # Use the same method that handles import requests to prevent duplicate dialogs
+            self._on_import_requested()
         elif action == "validate":
             self._validate_data()
-            self._set_active_view("Validation")
+            self._view_state_controller.set_active_view("Validation")
         elif action == "analyze":
-            self._set_active_view("Charts")
+            self._view_state_controller.set_active_view("Charts")
         elif action == "report":
             # TODO: Handle report generation
             pass
@@ -675,32 +952,58 @@ class MainWindow(QMainWindow, BlockableElementMixin):
         self._open_recent_file(file_path)
 
     @Slot()
-    def _on_data_changed(self) -> None:
-        """Handle data change event."""
-        # Update UI elements
-        self._update_ui()
+    def _on_data_model_changed(self) -> None:
+        """Handle data model changes."""
+        # Prevent recursive actions during data changes
+        if hasattr(self, "_is_data_changing") and self._is_data_changing:
+            return
 
-        # Update table population progress
-        self._update_table_population_progress()
+        self._is_data_changing = True
+        try:
+            self._update_ui()
 
-        # Update dashboard
-        dashboard_view = self._views.get("Dashboard")
-        if dashboard_view and isinstance(dashboard_view, DashboardViewAdapter):
-            dashboard_view.on_data_updated()
+            # Update data loaded state
+            has_data = self._data_model is not None and not self._data_model.is_empty
+            self._update_data_loaded_state(has_data)
+        finally:
+            self._is_data_changing = False
 
     @Slot(object)
-    def _on_validation_changed(self, validation_status: Any) -> None:
+    def _on_validation_changed(self, validation_status: Optional[pd.DataFrame] = None) -> None:
         """
-        Handle validation status changes.
+        Handle changes in validation status from the DataManager or other sources.
 
         Args:
-            validation_status: The new validation status.
+            validation_status (Optional[pd.DataFrame]): DataFrame with validation status, if provided.
         """
-        if not validation_status.empty:
-            issue_count = len(validation_status)
-            self._status_bar.set_status(f"Found {issue_count} validation issues")
-        else:
-            self._status_bar.set_status("Validation completed: No issues found")
+        # Update UI elements that depend on validation status
+        # e.g., update status bar, enable/disable actions
+        try:
+            if validation_status is not None and not validation_status.empty:
+                issue_count = sum(
+                    1 for idx, row in validation_status.iterrows() if not row.get("STATUS", True)
+                )
+                message = (
+                    f"Validation complete: {issue_count} issues found"
+                    if issue_count > 0
+                    else "Validation complete: No issues found"
+                )
+                # Use UIStateController to update status
+                if self._ui_state_controller:
+                    self._ui_state_controller.handle_validation_results(
+                        validation_status.to_dict("index")
+                    )  # Pass results
+            else:
+                message = "Validation status cleared or unavailable"
+                # Reset validation state in UI controller
+                if self._ui_state_controller:
+                    self._ui_state_controller.update_validation_state(reset=True)
+
+            # Log the update
+            logger.debug(f"MainWindow handling validation change: {message}")
+
+        except Exception as e:
+            logger.error(f"Error in MainWindow._on_validation_changed: {e}")
 
     @Slot(object)
     def _on_correction_applied(self, correction_status: Any) -> None:
@@ -716,428 +1019,59 @@ class MainWindow(QMainWindow, BlockableElementMixin):
         else:
             self._status_bar.set_status("No corrections were applied")
 
-    @Slot(int, int, str)
-    def _on_load_started(self, current: int, total: int, text: str) -> None:
-        """
-        Handle load started signal from data manager.
+    @Slot()
+    def _on_load_started(self) -> None:
+        """Handle load started signal."""
+        logger.debug("MainWindow._on_load_started called")
 
-        Args:
-            current: Current file index being processed
-            total: Total number of files to process
-            text: Status text to display
-        """
-        logger.info(f"Loading started - {current}/{total}: {text}")
+        # Set the loading flag to prevent duplicate import dialogs
+        self._is_loading_files = True
 
-        # Initialize loading state
-        self._loading_state = {
-            "current_file": "",  # Current file being processed
-            "current_file_index": 0,  # Current file index (1-based)
-            "total_files": total,  # Total number of files
-            "processed_files": [],  # List of processed files
-            "total_rows": 0,  # Total rows in current file
-        }
+        if self._progress_controller:
+            self._progress_controller.start_progress("Loading Data", "Loading data...", True)
+        self._update_ui()
 
-        # Initialize file processing metrics
-        self._total_rows_loaded = 0
-        self._total_rows_estimated = 0
-        self._last_progress_current = 0
-        self._file_sizes = {}
-
-        # Check if import operation is active
-        import_active = False
-        try:
-            import_active = self._ui_state_manager.has_active_operations(UIOperations.IMPORT)
-        except Exception as e:
-            logger.error(f"Error checking if import operation is active: {e}")
-
-        # If import operation is already active and we have a progress dialog, reuse it
-        if import_active and self._progress_dialog is not None:
-            logger.debug("Import operation is active, reusing existing progress dialog")
-            # Just update the progress dialog text if needed
-            if hasattr(self._progress_dialog, "setLabelText"):
-                self._progress_dialog.setLabelText(text)
-            return
-
-        # Close any existing progress dialog before creating a new one
-        self._close_progress_dialog()
-
-        # Ensure the DataView elements are properly registered with the UI state manager
-        try:
-            # Ensure the DataView is registered in the DATA_VIEW group
-            data_view = self._views.get("Data")
-            if data_view and hasattr(data_view, "_data_view"):
-                # Register the data view with the UI state manager if not already
-                if not self._ui_state_manager.is_element_in_group(
-                    data_view._data_view, UIElementGroups.DATA_VIEW
-                ):
-                    logger.debug("Registering DataView with UI state manager")
-                    self._ui_state_manager.register_element(
-                        data_view._data_view, groups=[UIElementGroups.DATA_VIEW]
-                    )
-        except Exception as e:
-            logger.error(f"Error registering DataView with UI state manager: {e}")
-
-        # Make sure any lingering import operation is ended
-        if import_active:
-            logger.warning("Import operation is active but no dialog exists - cleaning up")
-            try:
-                self._ui_state_manager.end_operation(UIOperations.IMPORT)
-            except Exception as e:
-                logger.error(f"Error ending orphaned import operation: {e}")
-
-        # Create and show new progress dialog
-        try:
-            self._progress_dialog = BlockableProgressDialog(
-                "Importing Data", "Cancel", 0, 100, self
-            )
-            self._progress_dialog_finalized = False  # Reset finalized flag
-
-            # Connect cancel action
-            self._progress_dialog.canceled.connect(self._cancel_loading)
-
-            # Define the UI groups that should be blocked during import
-            blocked_groups = [UIElementGroups.DATA_VIEW, UIElementGroups.MAIN_WINDOW]
-
-            # Show the dialog with blocking operation
-            try:
-                # Use show_with_blocking instead of separate show() and start_operation()
-                logger.debug(f"Showing progress dialog with blocking groups: {blocked_groups}")
-                self._progress_dialog.show_with_blocking(UIOperations.IMPORT, blocked_groups)
-
-                # Verify the operation was started correctly
-                if not self._ui_state_manager.is_operation_active(UIOperations.IMPORT):
-                    logger.error(
-                        "Failed to start IMPORT operation - operation not active after dialog shown"
-                    )
-                else:
-                    logger.debug("Progress dialog shown with blocking operation")
-
-            except Exception as e:
-                logger.error(f"Error showing progress dialog with blocking: {e}")
-                # Fallback to regular show if blocking fails
-                self._progress_dialog.show()
-        except Exception as e:
-            logger.error(f"Error creating progress dialog: {e}")
-            self._progress_dialog = None
-
-    def _on_load_finished(self, success: bool, message: str = "") -> None:
+    @Slot(str)
+    def _on_load_finished(self, status_message: str) -> None:
         """
         Handle load finished signal.
 
         Args:
-            success: Whether the loading was successful
-            message: Additional message with details
+            status_message: Status message to display
         """
-        logger.debug(f"Load finished, success={success}, message={message}")
+        logger.debug(f"Load finished signal received: {status_message}")
 
-        # Make sure we have a progress dialog to finalize
-        if not self._progress_dialog:
-            # If dialog doesn't exist, just update UI state without trying to show a dialog
-            logger.warning("Missing progress dialog in _on_load_finished")
-            try:
-                # Update data state based on success
-                self._data_loaded = success and self._check_data_available()
-                self._update_navigation_based_on_data_state()
-                self._update_ui()
+        # Reset the loading flag when file loading completes
+        self._is_loading_files = False
 
-                # End any active import operation if it exists
-                try:
-                    if self._ui_state_manager.has_active_operations(UIOperations.IMPORT):
-                        logger.warning("Import operation active but no dialog - ending operation")
-                        self._ui_state_manager.end_operation(UIOperations.IMPORT)
+        # Reset the handling import flag as well
+        self._is_handling_import = False
 
-                        # Verify operation was actually ended
-                        if self._ui_state_manager.has_active_operations(UIOperations.IMPORT):
-                            logger.error(
-                                "Failed to end import operation - still active after end call"
-                            )
-                except Exception as e:
-                    logger.error(f"Error ending operation when no dialog exists: {e}")
-
-                # Signal completion if needed
-                if success and self._data_loaded:
-                    self.import_complete.emit(self.data_model)
-
-                return
-            except Exception as e:
-                logger.error(f"Error handling missing dialog case: {e}")
-                # Still try to end the operation even if other steps fail
-                try:
-                    if self._ui_state_manager.has_active_operations(UIOperations.IMPORT):
-                        self._ui_state_manager.end_operation(UIOperations.IMPORT)
-                except Exception as e2:
-                    logger.error(f"Error ending operation after initial error: {e2}")
-                return
-
-        try:
-            # Disable further updates - this should be final state
-            self._progress_dialog_finalized = True
-
-            if success:
-                self._finalize_loading(message or "Import completed successfully", None)
+        if self._progress_controller:
+            if "Processing" in status_message:
+                # If we're processing data, update the progress dialog
+                # but don't close it yet
+                self._progress_controller.update_progress(
+                    100,
+                    100,
+                    f"{status_message}...",
+                    None,  # No file path needed for processing stage
+                )
             else:
-                self._finalize_loading(None, message or "Import failed")
+                # Loading is completely finished, close the progress dialog
+                self._progress_controller.close_progress()
 
-            # Ensure UI state is updated based on new data state
-            self._update_navigation_based_on_data_state()
-            self._update_ui()
-
-            # Process events to ensure UI updates
-            QApplication.processEvents()
-
-            # Ensure the progress dialog is properly closed after we've updated UI state
-            self._close_progress_dialog()
-
-            # Verify no import operation is still active
-            try:
-                if self._ui_state_manager.has_active_operations(UIOperations.IMPORT):
-                    logger.error("Import operation still active after _close_progress_dialog")
-                    self._ui_state_manager.end_operation(UIOperations.IMPORT)
-            except Exception as e:
-                logger.error(f"Error verifying operation state after dialog close: {e}")
-
-            # Signal completion if successful
-            if success and self._data_loaded:
-                self.import_complete.emit(self.data_model)
-
-        except Exception as e:
-            logger.error(f"Error in _on_load_finished: {e}")
-
-            # Try to finalize with error
-            try:
-                self._finalize_loading(None, f"Error: {str(e)}")
-            except Exception as inner_e:
-                logger.error(f"Second error in finalize_loading: {inner_e}")
-
-                # Last resort - try to update state directly
-                self._data_loaded = False
-                self._update_navigation_based_on_data_state()
-                self._update_ui()
-
-            # Ensure dialog is closed even if there was an error
-            try:
-                self._close_progress_dialog()
-            except Exception as close_e:
-                logger.error(f"Error closing dialog after exception: {close_e}")
-
-            # Final safety check - ensure import operation is ended
-            try:
-                if self._ui_state_manager.has_active_operations(UIOperations.IMPORT):
-                    logger.warning("Import operation still active after errors - forcing end")
-                    self._ui_state_manager.end_operation(UIOperations.IMPORT)
-
-                    # One last check to make absolutely sure it's ended
-                    if self._ui_state_manager.has_active_operations(UIOperations.IMPORT):
-                        logger.critical(
-                            "Critical failure - couldn't end import operation, direct cleanup needed"
-                        )
-                        # Direct cleanup as last resort
-                        if hasattr(self._ui_state_manager, "_active_operations"):
-                            if UIOperations.IMPORT in self._ui_state_manager._active_operations:
-                                del self._ui_state_manager._active_operations[UIOperations.IMPORT]
-
-            except Exception as op_e:
-                logger.error(f"Final error ending import operation: {op_e}")
-
-    def _check_data_available(self) -> bool:
-        """Check if data is available in the data model.
-
-        Returns:
-            bool: True if data is available, False otherwise
-        """
+        # Set is_finishing_load flag to prevent duplicate dialogs during finalization
         try:
-            if hasattr(self.data_model, "data") and self.data_model.data is not None:
-                return len(self.data_model.data) > 0
-            return False
-        except Exception as e:
-            logger.error(f"Error checking data availability: {e}")
-            return False
+            self._is_finishing_load = True
 
-    def _close_progress_dialog(self) -> None:
-        """
-        Close the progress dialog and clean up any active operations.
-        Ensures the UI state is properly restored.
-        """
-        logger.debug("Closing progress dialog")
+            # Update views
+            self._view_state_controller.update_data_loaded_state(not self._data_model.is_empty)
+        finally:
+            self._is_finishing_load = False
 
-        # Capture dialog reference before setting to None to avoid issues with callbacks
-        dialog = self._progress_dialog
-        self._progress_dialog = None
-        self._progress_dialog_finalized = False  # Reset finalized flag
-
-        try:
-            # Check if import operation is still active
-            import_active = False
-            try:
-                import_active = self._ui_state_manager.has_active_operations(UIOperations.IMPORT)
-                if import_active:
-                    logger.debug("Import operation is still active during dialog close")
-            except Exception as e:
-                logger.error(f"Error checking if import operation is active: {e}")
-                # Assume it might be active if we can't check
-                import_active = True
-
-            # First try to close the dialog if it exists
-            if dialog is not None:
-                try:
-                    # End any active operation associated with the dialog
-                    logger.debug("Calling dialog._end_operation()")
-                    dialog._end_operation()
-                    dialog.close()
-                    logger.debug("Progress dialog closed successfully")
-                except Exception as e:
-                    logger.error(f"Error closing progress dialog: {e}")
-                    # Even if the dialog close fails, we need to ensure the operation is ended
-                    import_active = True
-
-            # Verify the operation is actually ended
-            try:
-                import_active = self._ui_state_manager.has_active_operations(UIOperations.IMPORT)
-            except Exception as e:
-                logger.error(f"Error checking if import operation ended: {e}")
-                import_active = True  # Assume it might still be active
-
-            # Add a final safety check to ensure the operation is ended
-            # This is crucial to prevent the UI from remaining blocked
-            if import_active:
-                logger.warning("Import operation still active after dialog close - forcing end")
-                try:
-                    self._ui_state_manager.end_operation(UIOperations.IMPORT)
-                    logger.debug("Successfully ended import operation")
-
-                    # Double-check the operation was ended
-                    if self._ui_state_manager.has_active_operations(UIOperations.IMPORT):
-                        logger.error("Failed to end import operation!")
-                    else:
-                        logger.debug("Verified import operation is now inactive")
-                except Exception as e:
-                    logger.error(f"Error ending import operation: {e}")
-                    # Last resort - try to end ALL operations to unblock UI
-                    try:
-                        logger.warning("Attempting to end all operations to unblock UI")
-                        active_ops = list(self._ui_state_manager.get_active_operations())
-                        for op in active_ops:
-                            self._ui_state_manager.end_operation(op)
-                    except Exception as e2:
-                        logger.error(f"Critical error ending all operations: {e2}")
-        except Exception as e:
-            logger.error(f"Unexpected error in _close_progress_dialog: {e}")
-            # Last desperate attempt to ensure UI isn't permanently blocked
-            try:
-                if hasattr(self._ui_state_manager, "_active_operations"):
-                    if UIOperations.IMPORT in self._ui_state_manager._active_operations:
-                        logger.critical("Emergency cleanup of IMPORT operation")
-                        del self._ui_state_manager._active_operations[UIOperations.IMPORT]
-            except Exception as e3:
-                logger.error(f"Failed emergency cleanup: {e3}")
-
-    def _perform_final_ui_check(self, delay_ms: int = 500) -> None:
-        """
-        Perform a final check of UI elements after import.
-
-        Note: This method is deprecated and will be removed in future versions.
-        UI blocking/unblocking is now handled by the UI State Management System.
-
-        Args:
-            delay_ms: The delay in milliseconds after which this check is running
-        """
-        logger.debug(
-            f"Final UI check at {delay_ms}ms - deprecated, using UI State Management instead"
-        )
-        # This method is kept for backward compatibility but is no longer needed
-        # as the UI State Management System now handles blocking and unblocking UI elements
-
-    def _capture_snapshot(self, name: str) -> None:
-        """
-        Capture an application state snapshot.
-
-        Args:
-            name: Name for the snapshot
-        """
-        try:
-            snapshot = StateSnapshot(name)
-            snapshot.capture_application_state()
-            self._snapshots[name] = snapshot
-            logger.debug(f"[SNAPSHOT] Captured application state snapshot: {name}")
-        except Exception as e:
-            logger.error(f"[SNAPSHOT_ERROR] Failed to capture snapshot '{name}': {e}")
-
-    def _finalize_loading(self, success_message: str, error_message: str = None) -> None:
-        """
-        Finalize the loading process after completion.
-
-        Args:
-            success_message: The success message to log
-            error_message: The error message to log, if any
-        """
-        logger.debug("[LOAD_FINALIZE] Starting load finalization process")
-
-        # Determine success based on presence of error message
-        success = error_message is None
-
-        # Always set the progress dialog to 100%
-        if self._progress_dialog:
-            self._progress_dialog.setValue(100)
-
-            # Handle errors if there are any
-            if error_message:
-                logger.debug("[LOAD_ERROR] Setting progress dialog to error state")
-                self._progress_dialog.setState(ProgressDialog.State.ERROR)
-                self._progress_dialog.setStatusText(error_message)
-                self._progress_dialog.setCancelButtonText("Close")
-                logger.error(f"[LOAD_FAILED] Loading failed: {error_message}")
-                success = False
-            else:
-                # Otherwise set success state
-                logger.debug("[LOAD_SUCCESS] Setting progress dialog to success state")
-                self._progress_dialog.setState(ProgressDialog.State.SUCCESS)
-                self._progress_dialog.setStatusText(success_message)
-                self._progress_dialog.setCancelButtonText("Confirm")
-                self._progress_dialog.set_confirm_button_style()
-                logger.info(f"[LOAD_COMPLETED] Loading successful: {success_message}")
-                success = True
-
-        # Safely check if there are rows in the data model
-        has_data_rows = self._check_data_available()
-        if has_data_rows:
-            logger.debug(f"[DATA_STATE] Data model has rows")
-        else:
-            logger.warning("[DATA_STATE] Data model has no rows or data is not accessible")
-
-        # Update data loaded flag based on success and data availability
-        previous_data_loaded = self._data_loaded  # Store previous state for comparison
-        self._data_loaded = success and has_data_rows
-        logger.debug(
-            f"[DATA_LOADED_STATE] Previous: {previous_data_loaded}, New: {self._data_loaded}"
-        )
-
-        # Ensure UI elements are updated based on new data state
-        logger.debug("[UI_UPDATE] Triggering UI update based on new data state")
-        self._update_ui()  # Update all UI elements based on data availability
-
-        # Enable navigation based on data state
-        logger.debug("[NAV_UPDATE] Updating navigation based on data state")
-        self._update_navigation_based_on_data_state()
-
-        # Force process events to ensure UI updates are applied
-        QApplication.processEvents()
-
-    def _on_populate_table_requested(self, data: pd.DataFrame) -> None:
-        """
-        Handle request to populate table during data loading.
-        This synchronizes table population with file import.
-
-        Args:
-            data: The data to populate in the table
-        """
-        logger.debug(f"Received request to populate table with {len(data):,} rows")
-
-        # Set file loading complete flag
-        self._file_loading_complete = True
-
-        # The actual table population occurs in the data model and views
-        # No need to show progress dialog for this step anymore
-        # Table population will happen automatically after this method returns
+        # Update UI
+        self._update_ui()
 
     def _on_load_progress(self, file_path: str, current: int, total: int) -> None:
         """
@@ -1148,225 +1082,64 @@ class MainWindow(QMainWindow, BlockableElementMixin):
             current: Current progress value
             total: Total progress value
         """
-        # Ensure progress dialog exists
-        if not hasattr(self, "_progress_dialog") or not self._progress_dialog:
-            return
+        # Progress controller now handles all progress tracking and updates
+        # This method is kept for backward compatibility but delegates to the controller
+        self._progress_controller.update_file_progress(file_path, current, total)
 
-        # If dialog has been finalized, don't update it anymore
-        if self._progress_dialog_finalized:
-            logger.debug("Progress dialog already finalized, ignoring update")
-            return
-
-        try:
-            # Update loading state based on signal type
-            if file_path:
-                # This is a file-specific progress update
-                # If this is a new file, update the file index
-                if file_path != self._loading_state["current_file"]:
-                    # If we're moving to a new file, record the size of the completed file
-                    if self._loading_state["current_file"]:
-                        # Initialize file sizes tracking dictionary if it doesn't exist
-                        if not hasattr(self, "_file_sizes"):
-                            self._file_sizes = {}
-                        # Store the actual size of the completed file
-                        self._file_sizes[self._loading_state["current_file"]] = self._loading_state[
-                            "total_rows"
-                        ]
-
-                    # Add new file to processed files if needed
-                    if file_path not in self._loading_state["processed_files"]:
-                        self._loading_state["current_file_index"] += 1
-                        if file_path not in self._loading_state["processed_files"]:
-                            self._loading_state["processed_files"].append(file_path)
-                    self._loading_state["current_file"] = file_path
-
-                # Update total rows for this file
-                self._loading_state["total_rows"] = max(total, self._loading_state["total_rows"])
-
-                # Track rows across all files
-                if not hasattr(self, "_total_rows_loaded"):
-                    self._total_rows_loaded = 0
-                    self._total_rows_estimated = 0
-                    self._last_progress_current = 0
-                    self._file_sizes = {}
-
-                # Increment total rows loaded by the increase since last update
-                if hasattr(self, "_last_progress_current"):
-                    # Only increment if current is greater than last value (to avoid counting backwards)
-                    if current > self._last_progress_current:
-                        self._total_rows_loaded += current - self._last_progress_current
-                    self._last_progress_current = current
-                else:
-                    self._last_progress_current = current
-
-                # Better row estimation based on known file sizes
-                if hasattr(self, "_file_sizes"):
-                    # Calculate known total from processed files
-                    known_sizes = sum(self._file_sizes.values())
-                    known_files = len(self._file_sizes)
-
-                    # Current file's expected size
-                    current_size = total
-
-                    # Calculate average file size from known files
-                    if known_files > 0:
-                        avg_size = known_sizes / known_files
-                    else:
-                        avg_size = current_size  # Fall back to current file size
-
-                    # Count remaining files
-                    remaining_files = (
-                        self._loading_state["total_files"] - known_files - 1
-                    )  # -1 for current file
-                    if remaining_files < 0:
-                        remaining_files = 0
-
-                    # Estimate total rows across all files
-                    self._total_rows_estimated = (
-                        known_sizes + current_size + (avg_size * remaining_files)
-                    )
-                else:
-                    # Fall back to simpler estimation if we don't have file sizes yet
-                    self._total_rows_estimated = max(
-                        self._total_rows_estimated,
-                        total * len(self._loading_state["processed_files"]),
-                    )
-
-            # Calculate progress percentage safely
-            percentage = min(100, int((current * 100 / total) if total > 0 else 0))
-
-            # Create a consistent progress message
-            filename = (
-                os.path.basename(self._loading_state["current_file"])
-                if self._loading_state["current_file"]
-                else "files"
-            )
-
-            # Standardized progress message format: "File X of Y - Z rows processed"
-            if self._loading_state["total_files"] > 0:
-                # Format file information
-                # Always use total_files directly, not current_file_index
-                total_files = self._loading_state["total_files"]
-                current_file_index = self._loading_state["current_file_index"]
-
-                file_info = f"File {current_file_index} of {total_files}"
-
-                # Add filename
-                file_info += f": {filename}"
-
-                # Format rows with commas for readability
-                if total > 0:
-                    current_formatted = f"{current:,}"
-                    total_formatted = f"{total:,}"
-                    row_info = f"{current_formatted} of {total_formatted} rows"
-
-                    # Create combined message with standardized format
-                    message = f"{file_info} - {row_info}"
-
-                    # Add total rows information as status text
-                    if hasattr(self, "_total_rows_loaded") and self._total_rows_estimated > 0:
-                        total_progress = f"Total: {self._total_rows_loaded:,} of ~{self._total_rows_estimated:,} rows"
-                        self._progress_dialog.setStatusText(total_progress)
-                    else:
-                        self._progress_dialog.setStatusText("")
-                else:
-                    # If we don't have row information yet
-                    message = file_info
-                    self._progress_dialog.setStatusText("")
-            else:
-                # Fallback if we don't have file count yet
-                message = f"Loading {filename}..."
-                if total > 0:
-                    message += f" ({current:,}/{total:,} rows)"
-
-            # Update the dialog
-            self._progress_dialog.setLabelText(message)
-            self._progress_dialog.setValue(percentage)
-
-            # Only make visibility adjustments if the dialog is not already visible
-            # This prevents unnecessary UI updates that can make it appear like a new window
-            if not self._progress_dialog.isVisible():
-                self._progress_dialog.show()
-                self._progress_dialog.raise_()
-                self._progress_dialog.activateWindow()
-
-            # Process events to ensure UI updates, but limit this to avoid excessive refreshing
-            # Only process events if the percentage changes significantly
-            if percentage % 5 == 0 or percentage >= 100:
-                QApplication.processEvents()
-
-        except Exception as e:
-            # Add error handling to prevent crashes
-            logger.error(f"Error updating progress dialog: {e}")
-            # Don't crash the application if there's an error updating the progress
-
-    def _on_load_error(self, error_message: str) -> None:
+    def _on_load_error(self, message: str) -> None:
         """
-        Handle load error signal.
+        Handle errors during the loading process.
 
         Args:
-            error_message: The error message to display
+            message: Error message
         """
-        logger.error(f"Load error: {error_message}")
-        self._status_bar.set_error(error_message)
+        logger.error(f"Load error: {message}")
 
-        # Show error in progress dialog if it exists
-        if self._progress_dialog:
-            self._progress_dialog.setState(ProgressDialog.State.ERROR)
-            self._progress_dialog.setStatusText(error_message)
-            self._progress_dialog.setCancelButtonText("Close")
+        # Progress controller handles updating the progress dialog
+        # We just need to handle UI-specific error handling here
+
+        # Update the UI to reflect the error state
+        self._status_bar.set_status(f"Error: {message}", is_error=True)
+
+        # Reset any file loading state in the UI
 
     def _cancel_loading(self) -> None:
         """Cancel the current loading operation."""
-        logger.debug("Canceling loading operation from MainWindow")
+        logger.info("Canceling loading operation")
 
-        # Cancel the data loading in the data manager
+        # Tell data manager to cancel the current operation
         if self._data_manager:
-            try:
-                logger.debug("Calling data_manager.cancel_loading()")
-                self._data_manager.cancel_loading()
-                logger.debug("data_manager.cancel_loading() called successfully")
-            except Exception as e:
-                logger.error(f"Error canceling loading in data manager: {e}")
-        else:
-            logger.warning("No data_manager available, can't cancel loading")
-
-        # Close the progress dialog if it exists
-        if hasattr(self, "_progress_dialog") and self._progress_dialog:
-            try:
-                logger.debug("Closing progress dialog on cancel")
-                self._progress_dialog.hide()
-                self._progress_dialog.reject()
-                self._progress_dialog = None
-
-                # Process events to ensure UI updates
-                QApplication.processEvents()
-            except Exception as e:
-                logger.error(f"Error closing progress dialog on cancel: {e}")
-
-        # Clear state
-        self._file_loading_complete = False
+            self._data_manager.cancel_loading()
 
     # ===== Actions =====
 
     def _open_file(self) -> None:
         """Open one or more CSV files."""
-        file_paths, _ = QFileDialog.getOpenFileNames(
-            self, "Open CSV Files", "", "CSV Files (*.csv);;All Files (*)"
-        )
+        # Check if we're already handling an import to prevent duplicate dialogs
+        if hasattr(self, "_is_handling_import") and self._is_handling_import:
+            logger.debug("Already handling an import request, ignoring open file")
+            return
 
-        if file_paths:
-            try:
-                for file_path in file_paths:
-                    self._add_recent_file(file_path)
-                    self.file_opened.emit(file_path)
+        # Prevent opening a file dialog if we're already finishing a load operation
+        if hasattr(self, "_is_finishing_load") and self._is_finishing_load:
+            logger.debug("Preventing file dialog during load completion")
+            return
 
-                # Emit signal with all selected files
-                self.load_csv_triggered.emit(file_paths)
-                self._status_bar.set_status(f"Loaded: {len(file_paths)} files")
-            except Exception as e:
-                logger.error(f"Error opening files: {e}")
-                QMessageBox.critical(self, "Error", f"Error opening files: {str(e)}")
+        # Also check if we already have a progress dialog showing
+        if (
+            hasattr(self, "_progress_controller")
+            and self._progress_controller.is_progress_showing()
+        ):
+            logger.debug("Preventing file dialog while progress dialog is visible")
+            return
+
+        # Set flag to prevent duplicate dialogs
+        self._is_handling_import = True
+
+        # Note: This method is directly connected to UI actions like menu items
+        # Import requests from views are now handled by _on_import_requested
+        # which uses the SignalManager to avoid duplicate connections
+        self._file_controller.open_file(self)
 
     def _open_recent_file(self, file_path: str) -> None:
         """
@@ -1375,96 +1148,50 @@ class MainWindow(QMainWindow, BlockableElementMixin):
         Args:
             file_path: The path of the file to open.
         """
-        if not os.path.exists(file_path):
-            QMessageBox.warning(self, "File Not Found", f"The file {file_path} does not exist.")
-            # Remove from recent files
-            if file_path in self._recent_files:
-                self._recent_files.remove(file_path)
-                self._update_recent_files_menu()
-                self._save_recent_files()
-            return
-
-        try:
-            # Add to recent files (will move to top of list)
-            self._add_recent_file(file_path)
-
-            # Emit signals
-            self.file_opened.emit(file_path)
-            self.load_csv_triggered.emit([file_path])
-
-            # Update status
-            self._status_bar.set_status(f"Loaded: {os.path.basename(file_path)}")
-
-            # Update last modified timestamp
-            modified_time = os.path.getmtime(file_path)
-            self._status_bar.set_last_modified(modified_time)
-        except Exception as e:
-            logger.error(f"Error opening file: {e}")
-            QMessageBox.critical(self, "Error", f"Error opening file: {str(e)}")
+        # Delegate to the controller
+        self._file_controller.open_recent_file(file_path)
 
     def _save_file(self) -> None:
         """Save the current file."""
-        if self.data_model.is_empty:
+        if self._data_model.is_empty:
             return
 
-        file_path = self.data_model.file_path
-        if not file_path:
-            self._save_file_as()
-            return
-
-        try:
-            self.csv_service.write_csv(file_path, self.data_model.data)
-            self.file_saved.emit(file_path)
-            self.save_csv_triggered.emit(file_path)
-            self._status_bar.set_status(f"Saved: {os.path.basename(file_path)}")
-
-            # Update last modified timestamp
-            modified_time = os.path.getmtime(file_path)
-            self._status_bar.set_last_modified(modified_time)
-        except Exception as e:
-            logger.error(f"Error saving file: {e}")
-            QMessageBox.critical(self, "Error", f"Error saving file: {str(e)}")
+        # Delegate to the controller
+        self._file_controller.save_file(self)
 
     def _save_file_as(self) -> None:
         """Save the file with a new name."""
-        if self.data_model.is_empty:
+        if self._data_model.is_empty:
             return
 
-        file_path, _ = QFileDialog.getSaveFileName(
-            self, "Save CSV File", "", "CSV Files (*.csv);;All Files (*)"
-        )
+        # Prevent duplicate file dialogs
+        if hasattr(self, "_is_saving_file") and self._is_saving_file:
+            logger.debug("Preventing duplicate file save dialog")
+            return
 
-        if file_path:
-            try:
-                self.csv_service.write_csv(file_path, self.data_model.data)
-                self._add_recent_file(file_path)
-                self.file_saved.emit(file_path)
-                self._status_bar.set_status(f"Saved: {os.path.basename(file_path)}")
+        # Set flag to prevent duplicate dialogs
+        self._is_saving_file = True
 
-                # Update last modified timestamp
-                modified_time = os.path.getmtime(file_path)
-                self._status_bar.set_last_modified(modified_time)
-            except Exception as e:
-                logger.error(f"Error saving file: {e}")
-                QMessageBox.critical(self, "Error", f"Error saving file: {str(e)}")
+        # Delegate to the controller
+        self._file_controller.save_file_as(self)
 
     def _validate_data(self) -> None:
         """Validate the data."""
-        if self.data_model.is_empty:
+        if self._data_model.is_empty:
             return
 
         self.validation_requested.emit()
         self.validate_data_triggered.emit()
-        self._set_active_view("Validation")
+        self._view_state_controller.set_active_view("Validation")
 
     def _correct_data(self) -> None:
         """Apply corrections to the data."""
-        if self.data_model.is_empty:
+        if self._data_model.is_empty:
             return
 
         self.correction_requested.emit()
         self.apply_corrections_triggered.emit()
-        self._set_active_view("Correction")
+        self._view_state_controller.set_active_view("Correction")
 
     def _show_about(self) -> None:
         """Show the About dialog."""
@@ -1481,7 +1208,7 @@ class MainWindow(QMainWindow, BlockableElementMixin):
 
     def _export_validation_issues(self) -> None:
         """Export validation issues to a file."""
-        if self.data_model.is_empty or not self.validation_service.has_validation_results():
+        if self._data_model.is_empty or not self._validation_service.has_validation_results():
             QMessageBox.warning(
                 self, "No validation results", "There are no validation results to export."
             )
@@ -1494,7 +1221,7 @@ class MainWindow(QMainWindow, BlockableElementMixin):
         if file_path:
             try:
                 # Get the issues from the validation service
-                issues = self.validation_service.get_validation_results()
+                issues = self._validation_service.get_validation_results()
                 if hasattr(issues, "to_csv"):
                     issues.to_csv(file_path, index=False)
                     self._status_bar.set_status(
@@ -1529,9 +1256,9 @@ class MainWindow(QMainWindow, BlockableElementMixin):
                 logger.error(f"Error cancelling operations during shutdown: {e}")
 
         # Close progress dialog if it exists
-        if hasattr(self, "_progress_dialog") and self._progress_dialog:
+        if hasattr(self, "_progress_controller") and self._progress_controller:
             try:
-                self._progress_dialog.close()
+                self._progress_controller.close_progress()
             except Exception as e:
                 logger.error(f"Error closing progress dialog during shutdown: {e}")
 
@@ -1545,29 +1272,14 @@ class MainWindow(QMainWindow, BlockableElementMixin):
     def refresh_ui(self) -> None:
         """Refresh all UI components."""
         try:
-            # Skip UI refreshes that might affect the progress dialog if it's been finalized
-            # but is still visible (waiting for user to close it)
-            if (
-                self._progress_dialog_finalized
-                and hasattr(self, "_progress_dialog")
-                and self._progress_dialog
-            ):
-                if self._progress_dialog.isVisible():
-                    logger.debug("Skipping UI refresh while finalized progress dialog is visible")
-                    return
+            # Delegate to the view state controller for active view refreshing
+            self._view_state_controller.refresh_active_view()
 
-            # Refresh the current tab if it exists
-            if hasattr(self, "_content_stack") and self._content_stack is not None:
-                current_index = self._content_stack.currentIndex()
-                current_widget = self._content_stack.widget(current_index)
+            # Use data view controller to refresh data if needed
+            if self._content_stack.currentWidget() == self._views.get("Data"):
+                self._data_view_controller.refresh_data()
 
-                # Call refresh or update method if available
-                if hasattr(current_widget, "refresh"):
-                    current_widget.refresh()
-                elif hasattr(current_widget, "_update_view"):
-                    current_widget._update_view()
-
-            # Update other UI elements as needed (status bar, etc.)
+            # Update status bar (keeping this here as it's UI-specific)
             if hasattr(self, "_status_bar") and self._status_bar is not None:
                 self._update_status_bar()
         except Exception as e:
@@ -1576,161 +1288,141 @@ class MainWindow(QMainWindow, BlockableElementMixin):
             logging.getLogger(__name__).error(f"Error refreshing UI: {e}")
 
     def _update_status_bar(self) -> None:
-        """Update the status bar based on the current data state."""
-        logger.debug(f"Updating status bar, data_loaded={self._data_loaded}")
-
-        try:
-            if self._data_loaded and not self.data_model.is_empty:
+        """Update the status bar with current information."""
+        if hasattr(self, "_data_model") and self._data_model:
+            if not self._data_model.is_empty:
                 # Get row count
-                row_count = len(self.data_model.data)
-                self._status_bar.set_record_count(row_count)
+                row_count = len(self._data_model.data)
 
-                # Get the current file path
-                current_file = (
-                    self.data_model.file_path if hasattr(self.data_model, "file_path") else None
-                )
-                if current_file:
-                    self._status_bar.set_status(f"Loaded: {os.path.basename(current_file)}")
-                else:
-                    self._status_bar.set_status("Data loaded (unsaved)")
+                # Delegate to UI state controller
+                self._ui_state_controller.update_status_message(f"Data loaded: {row_count:,} rows")
             else:
-                # Clear status bar when no data is loaded
-                self._status_bar.clear_all()
-                self._status_bar.set_status("No data loaded")
-        except Exception as e:
-            logger.error(f"Error updating status bar: {e}")
-            # Fallback status
-            self._status_bar.set_status("Status unknown")
+                # Delegate to UI state controller
+                self._ui_state_controller.update_status_message("No data loaded")
+        else:
+            # Delegate to UI state controller
+            self._ui_state_controller.update_status_message("No data model available")
 
-    def _update_table_population_progress(self):
+    @Slot(str, str)
+    def _on_data_dependent_view_clicked(self, section: str, item: str) -> None:
         """
-        Placeholder for table population progress updates.
-        This method exists for backward compatibility but no longer updates the UI.
-        """
-        # No UI updates for table population progress
-        pass
+        Handle when a data-dependent view is clicked while data is not loaded.
 
-    def _update_views_data_availability(self) -> None:
-        """Update all views with the data availability state."""
-        logger.debug(
-            f"[DATA_AVAILABILITY] Updating views data availability. Data loaded: {self._data_loaded}"
+        Args:
+            section (str): The section that was clicked
+            item (str): The item that was clicked (empty for main section)
+        """
+        # Show message to user
+        QMessageBox.information(
+            self,
+            "No Data Loaded",
+            "Please import data first to access this feature.",
+            QMessageBox.Ok,
         )
 
-        # Log state of all views before update
-        for view_name, view in self._views.items():
-            requires_data = view.is_data_required()
-            logger.debug(
-                f"[DATA_AVAILABILITY] Before update: View '{view_name}' requires data: {requires_data}"
-            )
+        # Optionally, we could automatically navigate to the dashboard or show the import dialog
+        # self._set_active_view("Dashboard")
 
-        # Update each view
-        for view_name, view in self._views.items():
-            logger.debug(f"[DATA_AVAILABILITY] Updating view '{view_name}'")
-            view.set_data_available(self._data_loaded)
+    def populate_data_table(self) -> None:
+        """Populate the data table with current data."""
+        # Delegate to the data view controller
+        self._data_view_controller.populate_table()
 
-        logger.debug("[DATA_AVAILABILITY] Views data availability updated")
-
-    def _update_navigation_based_on_data_state(self) -> None:
-        """Update navigation items based on the data loaded state."""
-        logger.debug(f"Updating navigation based on data state: data_loaded={self._data_loaded}")
-
-        # Dashboard is always accessible
-        self._sidebar.set_section_enabled("Dashboard", True)
-
-        # These sections require data to be loaded
-        data_dependent_sections = ["Data", "Analysis", "Reports"]
-        for section in data_dependent_sections:
-            self._sidebar.set_section_enabled(section, self._data_loaded)
-
-        # Settings and Help are always accessible
-        self._sidebar.set_section_enabled("Settings", True)
-        self._sidebar.set_section_enabled("Help", True)
-
-        # If no data is loaded and current view requires data, switch to Dashboard
-        current_view = None
-        for view_name, view in self._views.items():
-            if self._content_stack.currentWidget() == view:
-                current_view = view_name
-                break
-
-        if not self._data_loaded and current_view in ["Data", "Validation", "Correction", "Charts"]:
-            logger.debug(f"No data loaded, switching from {current_view} to Dashboard")
-            self._set_active_view("Dashboard")
-            self._sidebar.set_active_item("Dashboard")
-
-        # Update the data availability state for all views
-        self._update_views_data_availability()
-
-    def _add_file_toolbar(self) -> None:
-        """Create a toolbar for file operations."""
-        file_toolbar = self.addToolBar("File")
-        file_toolbar.setObjectName("file_toolbar")
-
-        # Import action
-        import_action = QAction(Icons.get_icon(Icons.IMPORT), "Import Data", self)
-        import_action.setStatusTip("Import data from CSV files")
-        import_action.triggered.connect(self._open_file)
-        file_toolbar.addAction(import_action)
-
-        # Export action
-        export_action = QAction(Icons.get_icon(Icons.EXPORT), "Export Data", self)
-        export_action.setStatusTip("Export data to CSV file")
-        export_action.triggered.connect(self._save_file_as)
-        export_action.setEnabled(False)  # Disabled until data is loaded
-        self._export_action = export_action  # Store reference for enabling/disabling
-        file_toolbar.addAction(export_action)
-
-    def _clear_data(self) -> None:
-        """Clear the current dataset."""
-        # Update flag
-        self._data_loaded = False
-
-        # Update views
-        self._update_views_data_availability()
-
-        # Update navigation
-        self._update_navigation_based_on_data_state()
-
-        # Update dashboard
-        dashboard_view = self._views.get("Dashboard")
-        if dashboard_view and isinstance(dashboard_view, DashboardViewAdapter):
-            dashboard_view.on_data_cleared()
-
-    @Slot(str)
-    def _on_chart_selected(self, chart_id: str) -> None:
+    def _ensure_data_table_populated(self):
         """
-        Handle chart selection from dashboard.
+        Ensure the data table is populated after data is loaded.
+        This is especially important for subsequent file loads.
+        """
+        logger.info("Data loaded signal received, ensuring data table is populated")
+
+        # Delegate to the data view controller
+        if self._data_view_controller.needs_refresh():
+            logger.info("Data view needs refresh, populating table")
+            self._data_view_controller.populate_table()
+        else:
+            logger.info("Data view doesn't need refresh, skipping table population")
+
+        # As a fallback, try to force population on any data view adapters
+        try:
+            data_view_adapter = self._view_state_controller.get_view("Data")
+            if data_view_adapter and hasattr(data_view_adapter, "populate_table"):
+                logger.info("Forcing population on DataViewAdapter as fallback")
+                data_view_adapter.populate_table()
+        except Exception as e:
+            logger.error(f"Error in fallback table population: {e}")
+
+    # Add handler methods for settings view signals
+    def _on_settings_changed(self, section: str, option: str, value: str) -> None:
+        """
+        Handle settings changed event.
 
         Args:
-            chart_id (str): The chart identifier
+            section (str): Configuration section
+            option (str): Configuration option
+            value (str): New value
         """
-        # Switch to Charts view
-        self._set_active_view("Charts")
+        logger.info(f"Setting changed: [{section}] {option} = {value}")
 
-        # Activate specific chart if needed
-        chart_view = self._views.get("Charts")
-        if chart_view and isinstance(chart_view, ChartViewAdapter):
-            # This requires ChartViewAdapter to have a method to select specific chart
-            # Uncomment and implement if this functionality is needed
-            # chart_view.select_chart(chart_id)
+        # Update status bar
+        self._status_bar.showMessage(f"Setting updated: [{section}] {option}", 3000)
+
+        # Apply certain settings immediately if needed
+        if section == "UI":
+            # UI settings might require immediate application
             pass
+        elif section == "General":
+            # General settings like theme might need application restart
+            if option == "theme":
+                # Show hint that restart is needed for full effect
+                self._show_info_message(
+                    "Theme Change",
+                    "The theme has been changed. Some changes may require an application restart to take full effect.",
+                )
 
-    def _import_data(self, source_type=None) -> None:
+    def _on_config_reset(self, section: str) -> None:
         """
-        Import data from the specified source type.
+        Handle configuration reset event.
 
         Args:
-            source_type: The type of source to import from
+            section (str): The section that was reset, or "all"
         """
-        # Capture state before import
-        self._capture_snapshot("before_import")
+        logger.info(f"Configuration reset: {section}")
 
-        with measure_time("Complete Import Operation", logging.INFO):
-            logger.info(f"[IMPORT] Starting import from {source_type}")
+        # Update status bar
+        self._status_bar.showMessage(f"Settings reset: {section}", 3000)
 
-            # Create and configure progress dialog
-            self._setup_progress_dialog()
+        # Show notification
+        self._show_info_message(
+            "Settings Reset",
+            f"The {'settings' if section == 'all' else section + ' settings'} have been reset to defaults.",
+        )
 
-            # Start the worker thread
-            worker_thread = self._create_import_worker_thread(source_type)
-            worker_thread.start()
+    def _on_config_imported(self, file_path: str) -> None:
+        """
+        Handle configuration import event.
+
+        Args:
+            file_path (str): Path to the imported file
+        """
+        logger.info(f"Configuration imported from: {file_path}")
+
+        # Update status bar
+        self._status_bar.showMessage(f"Settings imported from: {file_path}", 3000)
+
+        # Show notification
+        self._show_info_message(
+            "Settings Imported",
+            f"Settings have been imported from:\n{file_path}\n\nSome changes may require an application restart to take full effect.",
+        )
+
+    def _on_config_exported(self, file_path: str) -> None:
+        """
+        Handle configuration export event.
+
+        Args:
+            file_path (str): Path to the exported file
+        """
+        logger.info(f"Configuration exported to: {file_path}")
+
+        # Update status bar
+        self._status_bar.showMessage(f"Settings exported to: {file_path}", 3000)

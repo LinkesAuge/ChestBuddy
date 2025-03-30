@@ -430,12 +430,12 @@ class ValidationTab(QWidget):
             logger.error(f"Error updating validation tab: {e}")
 
     @Slot(object)
-    def _on_validation_changed(self, validation_status) -> None:
+    def _on_validation_changed(self, validation_status=None) -> None:
         """
         Handle validation changed signal.
 
         Args:
-            validation_status: The validation status.
+            validation_status: The validation status (optional).
         """
         # Update view to reflect validation changes
         self._update_view()

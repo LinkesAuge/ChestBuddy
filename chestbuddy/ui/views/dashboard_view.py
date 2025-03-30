@@ -19,12 +19,10 @@ from PySide6.QtWidgets import (
     QStackedWidget,
 )
 
-from chestbuddy.ui.views.base_view import BaseView
-from chestbuddy.ui.resources.style import Colors
+from chestbuddy.ui.views.updatable_view import UpdatableView
+from chestbuddy.ui.resources.style import Colors, get_card_style
 from chestbuddy.ui.resources.icons import Icons
 from chestbuddy.ui.widgets.empty_state_widget import EmptyStateWidget
-from chestbuddy.ui.widgets.chart_preview import ChartPreview
-from chestbuddy.ui.widgets.stat_card import StatCard
 
 
 class StatsCard(QFrame):
@@ -50,9 +48,7 @@ class StatsCard(QFrame):
         self.setFrameShape(QFrame.StyledPanel)
         self.setStyleSheet(f"""
             StatsCard {{
-                background-color: {Colors.PRIMARY};
-                border-radius: 6px;
-                border: 1px solid {Colors.BORDER};
+                {get_card_style("stats")}
             }}
         """)
 
@@ -110,9 +106,7 @@ class ChartWidget(QFrame):
         self.setFrameShape(QFrame.StyledPanel)
         self.setStyleSheet(f"""
             ChartWidget {{
-                background-color: {Colors.PRIMARY};
-                border-radius: 6px;
-                border: 1px solid {Colors.BORDER};
+                {get_card_style("chart")}
             }}
         """)
 
@@ -128,7 +122,7 @@ class ChartWidget(QFrame):
             font-size: 16px;
             font-weight: 500;
             padding-bottom: 8px;
-            border-bottom: 1px solid {Colors.BORDER};
+            border-bottom: 1px solid {Colors.SECONDARY};
         """)
         self._layout.addWidget(self._title_label)
 
@@ -194,9 +188,7 @@ class QuickActionsWidget(QFrame):
         self.setFrameShape(QFrame.StyledPanel)
         self.setStyleSheet(f"""
             QuickActionsWidget {{
-                background-color: {Colors.PRIMARY};
-                border-radius: 6px;
-                border: 1px solid {Colors.BORDER};
+                {get_card_style("action")}
             }}
         """)
 
@@ -277,9 +269,7 @@ class RecentFilesWidget(QFrame):
         self.setFrameShape(QFrame.StyledPanel)
         self.setStyleSheet(f"""
             RecentFilesWidget {{
-                background-color: {Colors.PRIMARY};
-                border-radius: 6px;
-                border: 1px solid {Colors.BORDER};
+                {get_card_style("list")}
             }}
             
             QPushButton {{
@@ -308,7 +298,7 @@ class RecentFilesWidget(QFrame):
             font-size: 16px;
             font-weight: 500;
             padding-bottom: 8px;
-            border-bottom: 1px solid {Colors.BORDER};
+            border-bottom: 1px solid {Colors.SECONDARY};
         """)
         self._layout.addWidget(self._title_label)
 
@@ -361,16 +351,21 @@ class RecentFilesWidget(QFrame):
             self._file_items.append(button)
 
 
-class DashboardView(BaseView):
+class DashboardView(UpdatableView):
     """
     Dashboard view showing summary information and quick actions.
 
     This is the main landing page of the application.
+
+    Attributes:
+        action_triggered (Signal): Signal emitted when an action is triggered
+        file_selected (Signal): Signal emitted when a file is selected
+        import_requested (Signal): Signal emitted when import is requested
     """
 
     action_triggered = Signal(str)  # action name
     file_selected = Signal(str)  # file path
-    chart_clicked = Signal(str)  # chart id
+    import_requested = Signal()  # request to import data
 
     def __init__(self, data_model=None, parent=None):
         """
@@ -380,42 +375,57 @@ class DashboardView(BaseView):
             data_model: The data model (optional)
             parent (QWidget, optional): The parent widget
         """
-        super().__init__("Dashboard", parent, data_required=False)
+        super().__init__("Dashboard", parent)
         self._data_model = data_model
-        self._data_available = False
-
-        # Create stacked widget for content/empty state
-        self._content_stack = QStackedWidget()
-        self.get_content_layout().addWidget(self._content_stack)
-
-        # Create main content widget
-        self._dash_content = QWidget()
-        self._dash_layout = QVBoxLayout(self._dash_content)
-        self._dash_layout.setContentsMargins(0, 0, 0, 0)
-        self._dash_layout.setSpacing(20)
-        self._content_stack.addWidget(self._dash_content)
-
-        # Create empty state widget
-        self._empty_state = EmptyStateWidget(
-            title="No Data Available",
-            message="Import data to see dashboard insights and statistics.",
-            action_text="Import Data",
-            icon=Icons.get_icon(Icons.IMPORT),
-        )
-        self._empty_state.action_clicked.connect(self._on_import_clicked)
-        self._content_stack.addWidget(self._empty_state)
-
-        # Set default view based on data availability
-        self._content_stack.setCurrentWidget(self._empty_state)
+        self._data_loaded = False
 
         # Create dashboard widgets
-        self._create_dashboard_widgets()
+        self._setup_dashboard()
         self._connect_action_signals()
 
-    def _create_dashboard_widgets(self):
-        """Create the dashboard widgets."""
-        content_layout = self._dash_layout
+        # Set initial state
+        self.set_data_loaded(False)
 
+        # Initial population if we have a data model
+        if self._data_model is not None:
+            self.populate(self._data_model)
+
+    def _setup_dashboard(self):
+        """Set up the dashboard with content and empty state views."""
+        content_layout = self.get_content_layout()
+
+        # Create stacked widget to switch between empty state and content
+        self._stacked_widget = QStackedWidget()
+        content_layout.addWidget(self._stacked_widget)
+
+        # Empty state view
+        self._empty_state_widget = self._create_empty_state_widget()
+        self._stacked_widget.addWidget(self._empty_state_widget)
+
+        # Content view
+        self._content_widget = QWidget()
+        self._content_layout = QVBoxLayout(self._content_widget)
+        self._content_layout.setContentsMargins(0, 0, 0, 0)
+        self._content_layout.setSpacing(20)
+        self._create_dashboard_widgets()
+        self._stacked_widget.addWidget(self._content_widget)
+
+    def _create_empty_state_widget(self):
+        """Create empty state widget for when no data is loaded."""
+        empty_widget = EmptyStateWidget(
+            title="No Data Loaded",
+            message="Import data to see statistics and insights",
+            action_text="Import Data",
+            icon=Icons.get_icon(Icons.OPEN),
+        )
+
+        # Connect action button to import_requested signal
+        empty_widget.action_clicked.connect(self.import_requested.emit)
+
+        return empty_widget
+
+    def _create_dashboard_widgets(self):
+        """Create the dashboard widgets for the data-loaded state."""
         # Stats cards grid
         self._stats_grid = QWidget()
         self._stats_layout = QGridLayout(self._stats_grid)
@@ -423,14 +433,10 @@ class DashboardView(BaseView):
         self._stats_layout.setSpacing(20)
 
         # Create stats cards
-        self._dataset_card = StatCard("Current Dataset", "0 rows", Icons.get_icon(Icons.DATA))
-        self._validation_card = StatCard(
-            "Validation Status", "N/A", Icons.get_icon(Icons.CHECK_CIRCLE)
-        )
-        self._correction_card = StatCard(
-            "Correction Status", "0 corrected", Icons.get_icon(Icons.CORRECT)
-        )
-        self._import_card = StatCard("Last Import", "Never", Icons.get_icon(Icons.IMPORT))
+        self._dataset_card = StatsCard("Current Dataset", "0 rows")
+        self._validation_card = StatsCard("Validation Status", "N/A")
+        self._correction_card = StatsCard("Correction Status", "0 corrected")
+        self._import_card = StatsCard("Last Import", "Never")
 
         # Add to grid
         self._stats_layout.addWidget(self._dataset_card, 0, 0)
@@ -438,7 +444,10 @@ class DashboardView(BaseView):
         self._stats_layout.addWidget(self._correction_card, 0, 2)
         self._stats_layout.addWidget(self._import_card, 0, 3)
 
-        content_layout.addWidget(self._stats_grid)
+        self._content_layout.addWidget(self._stats_grid)
+
+        # Add spacing
+        self._content_layout.addSpacing(20)
 
         # Charts grid (two columns)
         self._charts_grid = QWidget()
@@ -451,21 +460,11 @@ class DashboardView(BaseView):
         self._charts_layout.addWidget(self._recent_files, 0, 0)
 
         # Top players chart
-        self._top_players_chart = ChartPreview(
-            title="Top Players",
-            subtitle="Most frequent players in dataset",
-            icon=Icons.get_icon(Icons.CHART),
-        )
-        self._top_players_chart.clicked.connect(lambda: self.chart_clicked.emit("top_players"))
+        self._top_players_chart = ChartWidget("Top Players")
         self._charts_layout.addWidget(self._top_players_chart, 0, 1)
 
         # Chest sources chart
-        self._chest_sources_chart = ChartPreview(
-            title="Top Chest Sources",
-            subtitle="Most common chest sources",
-            icon=Icons.get_icon(Icons.CHART_LINE),
-        )
-        self._chest_sources_chart.clicked.connect(lambda: self.chart_clicked.emit("chest_sources"))
+        self._chest_sources_chart = ChartWidget("Top Chest Sources")
         self._charts_layout.addWidget(self._chest_sources_chart, 1, 0)
 
         # Quick actions widget
@@ -477,10 +476,10 @@ class DashboardView(BaseView):
 
         self._charts_layout.addWidget(self._quick_actions, 1, 1)
 
-        content_layout.addWidget(self._charts_grid)
+        self._content_layout.addWidget(self._charts_grid)
 
         # Add stretch to push everything to the top
-        content_layout.addStretch()
+        self._content_layout.addStretch()
 
     def _connect_action_signals(self):
         """Connect action signals."""
@@ -490,9 +489,10 @@ class DashboardView(BaseView):
         # Recent files
         self._recent_files.file_selected.connect(self.file_selected)
 
-    def _on_import_clicked(self):
-        """Handle import button click from empty state."""
-        self.action_triggered.emit("import")
+        # Import action from empty state
+        self._empty_state_widget.action_clicked.connect(
+            lambda: self.action_triggered.emit("import")
+        )
 
     def update_stats(
         self, dataset_rows=0, validation_status="N/A", corrections=0, last_import="Never"
@@ -511,8 +511,9 @@ class DashboardView(BaseView):
         self._correction_card.set_value(f"{corrections:,} corrected")
         self._import_card.set_value(last_import)
 
-        # Update data availability state
-        self.set_data_available(dataset_rows > 0)
+        # If we have rows, ensure we're in the data loaded state
+        if dataset_rows > 0:
+            self.set_data_loaded(True)
 
     def set_recent_files(self, files):
         """
@@ -523,41 +524,140 @@ class DashboardView(BaseView):
         """
         self._recent_files.set_files(files)
 
-    def set_data_available(self, available):
+    def set_data_loaded(self, loaded: bool):
         """
-        Set whether data is available for the dashboard.
+        Set whether data is loaded and update the UI accordingly.
 
         Args:
-            available (bool): Whether data is available
+            loaded (bool): Whether data is loaded
         """
-        self._data_available = available
+        self._data_loaded = loaded
 
-        # Show appropriate view based on data availability
-        if available:
-            self._content_stack.setCurrentWidget(self._dash_content)
-        else:
-            self._content_stack.setCurrentWidget(self._empty_state)
+        # Switch between empty state and content views
+        self._stacked_widget.setCurrentIndex(1 if loaded else 0)
 
-    def set_player_chart(self, chart):
+    def refresh(self):
+        """Refresh the dashboard view using the UpdatableView pattern."""
+        super().refresh()
+
+    def _do_update(self, data=None):
         """
-        Set the top players chart.
-
-        Args:
-            chart: The chart to display
-        """
-        if chart:
-            self._top_players_chart.set_chart(chart)
-        else:
-            self._top_players_chart.clear_chart()
-
-    def set_chest_sources_chart(self, chart):
-        """
-        Set the chest sources chart.
+        Update the dashboard with the latest data.
 
         Args:
-            chart: The chart to display
+            data: Optional data to update with (not used currently)
         """
-        if chart:
-            self._chest_sources_chart.set_chart(chart)
+        # Only update if visible
+        if not self.isVisible():
+            return
+
+        # Update dashboard components
+        self._update_recent_file_list()
+        self._update_dashboard_stats()
+
+    def _do_refresh(self):
+        """Refresh the dashboard view (lighter weight than full update)."""
+        # Reuse update logic for now
+        self._update_recent_file_list()
+        self._update_dashboard_stats()
+
+    def _do_populate(self, data=None):
+        """
+        Initial population of the dashboard.
+
+        Args:
+            data: Optional data model to populate from
+        """
+        # Store data model if provided
+        if data is not None and self._data_model is None:
+            self._data_model = data
+
+        # Perform initial update
+        self._update_recent_file_list()
+        self._update_dashboard_stats()
+
+        # Set initial state based on data model
+        if self._data_model is not None:
+            has_data = not self._data_model.is_empty
+            self.set_data_loaded(has_data)
         else:
-            self._chest_sources_chart.clear_chart()
+            self.set_data_loaded(False)
+
+    def _do_reset(self):
+        """Reset the dashboard to its initial state."""
+        # Reset stats cards
+        self.update_stats(0, "N/A", 0, "Never")
+
+        # Clear recent files
+        self.set_recent_files([])
+
+        # Set to empty state
+        self.set_data_loaded(False)
+
+    def schedule_dashboard_update(self, debounce_ms=100):
+        """
+        Schedule a dashboard update with debouncing.
+
+        Args:
+            debounce_ms: Debounce time in milliseconds
+        """
+        self.schedule_update(debounce_ms)
+
+    def _update_recent_file_list(self):
+        """Update the recent file list in the dashboard."""
+        try:
+            # Check if the recent files widget exists and update it
+            if hasattr(self, "_recent_files") and self._recent_files is not None:
+                # If we're connected to the main window, get the recent files
+                parent = self.parent()
+                while parent:
+                    if hasattr(parent, "_recent_files"):
+                        # Update with main window's recent files
+                        self._recent_files.set_files(parent._recent_files)
+                        break
+                    parent = parent.parent()
+        except Exception as e:
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error updating recent file list: {e}")
+
+    def _update_dashboard_stats(self):
+        """Update the dashboard statistics."""
+        try:
+            # Only update stats if we have the data model
+            if hasattr(self, "_data_model") and self._data_model is not None:
+                # Get data from the model
+                has_data = not self._data_model.is_empty
+                if has_data:
+                    # Update dashboard stats with current data
+                    row_count = (
+                        len(self._data_model.data) if hasattr(self._data_model, "data") else 0
+                    )
+                    validation_status = (
+                        "Not Validated"
+                        if self._data_model.get_validation_status().empty
+                        else f"{len(self._data_model.get_validation_status())} issues"
+                    )
+                    corrections = (
+                        self._data_model.get_correction_row_count()
+                        if hasattr(self._data_model, "get_correction_row_count")
+                        else 0
+                    )
+
+                    from datetime import datetime
+
+                    last_import = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+                    # Update the stats cards
+                    self.update_stats(
+                        dataset_rows=row_count,
+                        validation_status=validation_status,
+                        corrections=corrections,
+                        last_import=last_import,
+                    )
+        except Exception as e:
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error updating dashboard stats: {e}")

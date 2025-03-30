@@ -1,5 +1,5 @@
 """
-ChestBuddy test suite package.
+ChestBuddy test package.
 
-This package contains tests for the ChestBuddy application.
+This package contains all the tests for the ChestBuddy application.
 """

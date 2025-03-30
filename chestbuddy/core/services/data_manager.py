@@ -36,6 +36,7 @@ class DataManager(QObject):
         _config: Configuration manager instance
         _worker: Background worker for async operations
         _current_file_path: Track the current file path
+        _result_processed: Flag to prevent processing task results multiple times
 
     Implementation Notes:
         - Manages file loading and saving
@@ -53,10 +54,13 @@ class DataManager(QObject):
     # New signals for progress reporting
     load_progress = Signal(str, int, int)  # file_path, current progress, total
     load_started = Signal()
-    load_finished = Signal(bool, str)  # Include a message parameter
+    load_finished = Signal(str)  # Include a message parameter
 
     # Signal for synchronous table population
-    populate_table_requested = Signal(pd.DataFrame)  # DataFrame to populate in the table
+    populate_table_requested = Signal(pd.DataFrame)
+
+    # New signal to indicate data is loaded and ready for display
+    data_loaded = Signal()
 
     def __init__(self, data_model, csv_service) -> None:
         """
@@ -72,6 +76,7 @@ class DataManager(QObject):
         self._csv_service = csv_service
         self._current_file_path = None  # Track the current file path
         self._current_task = None  # Track the current task for potential cancellation
+        self._result_processed = False  # Track whether we've processed a result
 
         # Initialize config and background worker
         self._config = ConfigManager()
@@ -88,89 +93,86 @@ class DataManager(QObject):
 
     def load_csv(self, file_paths: Union[str, List[str]]) -> None:
         """
-        Load one or more CSV files and update the data model.
+        Load CSV data from one or more files.
 
         Args:
-            file_paths: Path to single CSV file or list of paths
+            file_paths: Path or list of paths to CSV files
         """
-        # Convert single file path to list for consistent handling
+        logger.info(
+            f"DataManager.load_csv called with {file_paths if isinstance(file_paths, str) else len(file_paths)} file(s)"
+        )
+
+        # Reset result processing flag to prevent duplicate processing
+        self._result_processed = False
+
+        # Convert single string path to list
         if isinstance(file_paths, str):
             file_paths = [file_paths]
+            logger.debug(f"Converted single file path to list: {file_paths}")
 
-        if not file_paths:
-            logger.warning("No files provided to load")
+        # Validate file paths
+        if not file_paths or len(file_paths) == 0:
+            logger.warning("No file paths provided to load_csv")
+            self.load_error.emit("No files selected for loading")
             return
 
-        logger.info(f"Loading {len(file_paths)} CSV file(s)")
+        # Store the files to load for progress tracking
+        self._files_to_load = file_paths.copy()
+        logger.debug(f"Set files_to_load with {len(self._files_to_load)} files")
 
-        # Store the most recent file path
-        self._current_file_path = file_paths[0]
+        # Store the first file path as the current file path
+        if file_paths and len(file_paths) > 0:
+            self._current_file_path = file_paths[0]
+            logger.debug(f"Set current_file_path to: {self._current_file_path}")
 
-        # Add files to the list of recent files
-        for file_path in file_paths:
-            self._update_recent_files(file_path)
+        # Signal that loading has started
+        logger.debug("Emitting load_started signal")
+        self.load_started.emit()
 
-        # Temporarily disconnect data_changed signals during import to prevent cascading updates
-        self._data_model.blockSignals(True)
+        # Ensure any previous tasks are cancelled
+        self.cancel_loading()
 
+        # Block signals from data model to prevent multiple updates
+        if not self._data_model.signalsBlocked():
+            logger.debug("Blocking data model signals during load")
+            self._data_model.blockSignals(True)
+        else:
+            logger.debug("Data model signals already blocked")
+
+        # Create the task
         try:
-            # First emit load started signal
-            self.load_started.emit()
-
-            # Get chunk size from config
-            chunk_size = self._config.get_int("Import", "chunk_size", 100)
-
-            # Add safety check for chunk size
-            if chunk_size <= 0:
-                chunk_size = 100  # Use a reasonable default if configuration is invalid
-                logger.warning(f"Invalid chunk size in config, using default: {chunk_size}")
-
-            # Create and configure the task
+            logger.debug(f"Creating MultiCSVLoadTask for {len(file_paths)} files")
             task = MultiCSVLoadTask(
-                file_paths=file_paths,
                 csv_service=self._csv_service,
-                chunk_size=chunk_size,  # Use configured chunk size
+                file_paths=file_paths,
+                chunk_size=100,  # Use smaller chunk size for more granular progress updates
                 normalize_text=True,
                 robust_mode=True,
             )
 
-            # Connect file progress signal with better error handling
-            try:
-                task.file_progress.connect(self._on_file_progress)
-            except Exception as e:
-                logger.error(f"Error connecting file_progress signal: {e}")
-                # Continue even if signal connection fails
+            # Connect progress signals to forward them to the UI
+            task.progress.connect(self._on_load_progress)
+            task.file_progress.connect(self._on_file_progress)
+            task.status_signal.connect(lambda status: logger.debug(f"Task status: {status}"))
 
             # Store the task for potential cancellation
             self._current_task = task
+            logger.debug(f"Stored task reference: {self._current_task}")
 
-            # Check if worker is already running
-            if self._worker.is_running:
-                logger.warning("Worker is already running, cancelling previous task")
-                try:
-                    self._worker.cancel()
-                    # Wait briefly for cancellation
-                    import time
+            # Reset cancellation flag
+            self._cancel_requested = False
+            logger.debug("Reset cancellation flag to False")
 
-                    time.sleep(0.5)
-                except Exception as e:
-                    logger.error(f"Error cancelling previous task: {e}")
-
-            # Execute the task with error handling
-            try:
-                self._worker.execute_task(task)
-            except Exception as e:
-                logger.error(f"Error executing CSV load task: {e}")
-                self._data_model.blockSignals(False)
-                self.load_error.emit(f"Error starting file loading: {str(e)}")
-                self.load_finished.emit(False, f"Error: {str(e)}")
-
+            # Execute the task in the background
+            logger.debug(f"Executing MultiCSVLoadTask")
+            self._worker.execute_task(task)
         except Exception as e:
-            # Ensure signals are unblocked even if an error occurs
-            self._data_model.blockSignals(False)
-            logger.error(f"Error during CSV import: {e}")
-            self.load_error.emit(f"Error loading files: {str(e)}")
-            self.load_finished.emit(False, f"Error: {str(e)}")
+            logger.error(f"Error setting up CSV loading task: {e}", exc_info=True)
+            # Unblock signals if error occurs
+            if self._data_model.signalsBlocked():
+                self._data_model.blockSignals(False)
+            self.load_error.emit(f"Error setting up CSV loading: {str(e)}")
+            self.load_finished.emit(f"Error: {str(e)}")
 
     def cancel_loading(self) -> None:
         """Cancel any ongoing loading operation."""
@@ -178,6 +180,10 @@ class DataManager(QObject):
 
         # Set the cancellation flag
         self._cancel_requested = True
+        logger.debug("Set cancellation flag to True")
+
+        # Reset result processing flag
+        self._result_processed = False
 
         # If there's an active task, try to cancel it
         if self._current_task:
@@ -185,18 +191,32 @@ class DataManager(QObject):
                 logger.debug(f"Cancelling current task: {self._current_task}")
                 # Signal task to cancel
                 self._current_task.cancel()
+                logger.debug("Cancel signal sent to task")
 
                 # Signal progress completion to clean up any UI
-                self.load_finished.emit(False, "Loading cancelled")
+                logger.debug("Emitting load_finished signal for cancellation")
+                self.load_finished.emit("Loading cancelled")
+
+                # Unblock signals on the data model
+                if hasattr(self, "_data_model") and self._data_model:
+                    if self._data_model.signalsBlocked():
+                        logger.debug("Unblocking data model signals")
+                        self._data_model.blockSignals(False)
+                    else:
+                        logger.debug("Data model signals already unblocked")
             except Exception as e:
-                logger.error(f"Error cancelling task: {e}")
+                logger.error(f"Error cancelling task: {e}", exc_info=True)
+        else:
+            logger.debug("No active task to cancel")
 
         # Reset state variables
-        self._current_file_path = None
-        self._cancel_requested = False
-
-        # Clean up the task reference
         self._current_task = None
+        self._cancel_requested = False
+        self._files_to_load = []
+
+        # Clear current file path to avoid confusion
+        if hasattr(self, "_current_file_path"):
+            self._current_file_path = None
 
         logger.debug("Loading operation cancelled successfully")
 
@@ -249,10 +269,7 @@ class DataManager(QObject):
         self._current_task = None
 
         # Emit finished signal with cancellation message
-        self.load_finished.emit(False, "Operation cancelled by user")
-
-        # Emit error signal with cancellation message
-        self.load_error.emit("Operation cancelled by user")
+        self.load_finished.emit("Operation cancelled by user")
 
     def _load_multiple_files(self, file_paths: List[str]) -> Tuple[pd.DataFrame, str]:
         """
@@ -309,89 +326,116 @@ class DataManager(QObject):
             logger.error(f"Error combining DataFrames: {e}")
             return None, f"Error combining files: {str(e)}"
 
-    def _on_csv_load_success(self, result_tuple: Tuple) -> None:
+    def _on_csv_load_success(self, result_tuple: Tuple[pd.DataFrame, str]):
         """
-        Handle successful CSV load.
+        Handle successful CSV load from background thread.
 
         Args:
-            result_tuple: Tuple containing the loaded data and a message
+            result_tuple: Tuple containing (DataFrame, message)
         """
-        # Early returns for invalid results
+        logger.info("DataManager._on_csv_load_success called")
         try:
             # Type check the result tuple
             if not isinstance(result_tuple, tuple) or len(result_tuple) != 2:
                 logger.error(f"Invalid result format from CSV load: {type(result_tuple)}")
                 self.load_error.emit("Invalid result format from CSV service")
                 self._data_model.blockSignals(False)
-                self.load_finished.emit(False, "Invalid result format from CSV service")
+                self.load_finished.emit("Invalid result format from CSV service")
                 return
 
             data, message = result_tuple
+            logger.debug(f"CSV load result message: {message}")
+
+            # Check for cancellation messages to avoid showing error for cancellations
+            if message and isinstance(message, str) and "cancel" in message.lower():
+                logger.info(f"CSV load was cancelled: {message}")
+                self._data_model.blockSignals(False)
+                self.load_finished.emit("Operation cancelled")
+                return
 
             # Validate the DataFrame
             if data is None or not isinstance(data, pd.DataFrame):
                 logger.error(f"CSV load did not return valid DataFrame: {type(data)}")
                 self.load_error.emit(message or "Failed to load CSV data")
                 self._data_model.blockSignals(False)
-                self.load_finished.emit(False, message or "Failed to load CSV data")
+                self.load_finished.emit(message or "Failed to load CSV data")
                 return
 
             if data.empty:
                 logger.warning("CSV load returned empty DataFrame")
                 self.load_error.emit("CSV file is empty")
                 self._data_model.blockSignals(False)
-                self.load_finished.emit(False, "CSV file is empty")
+                self.load_finished.emit("CSV file is empty")
                 return
 
             # Log successful load
             logger.info(f"CSV loaded successfully with {len(data)} rows")
 
             # Store the file path that was successfully loaded
-            if self._current_file_path:
+            if hasattr(self, "_current_file_path") and self._current_file_path:
+                logger.debug(f"Updating recent files with path: {self._current_file_path}")
                 self._update_recent_files(self._current_file_path)
 
-            # Emit success message for file reading completion
-            # This allows the UI to update and the button to be available
-            success_message = f"Successfully read {len(data):,} rows of data from file(s)"
-            self.load_success.emit(success_message)
+            # Complete the file loading phase with a success message
+            success_message = f"Successfully loaded {len(data):,} rows of data"
+            self.load_finished.emit(success_message)
 
-            # Signal completion of file reading phase (allows close button to be available)
-            self.load_finished.emit(True, success_message)
+            try:
+                # Map columns
+                logger.debug("Mapping columns...")
+                mapped_data = self._map_columns(data)
+                logger.debug(f"Mapped columns successfully, DataFrame shape: {mapped_data.shape}")
 
-            # Give the UI a moment to process events before heavy data processing
-            QApplication.processEvents()
+                # Ensure signals are unblocked before updating data model
+                if self._data_model.signalsBlocked():
+                    logger.debug("Unblocking data model signals before update")
+                    self._data_model.blockSignals(False)
 
-            # Map columns
-            mapped_data = self._map_columns(data)
+                # Update the data model with the new data - this will trigger data_changed signal
+                logger.debug("Updating data model with new data")
+                self._data_model.update_data(mapped_data)
 
-            # Update the data model with the new data
-            # This will trigger data_changed signal when blockSignals is set to False
-            self._data_model.update_data(mapped_data)
+                # Force a data_changed signal if not emitted during update_data
+                if not self._data_model.data.empty and self._data_model.signalsBlocked():
+                    logger.debug(
+                        "Data model signals still blocked, unblocking and emitting data_changed"
+                    )
+                    self._data_model.blockSignals(False)
+                    self._data_model.data_changed.emit()
+            except Exception as e:
+                logger.error(f"Error updating data model: {e}", exc_info=True)
+                self.load_error.emit(f"Error updating data model: {str(e)}")
+                # Ensure signals are unblocked
+                if self._data_model.signalsBlocked():
+                    self._data_model.blockSignals(False)
+                return
 
-            # Signal to populate the table synchronously
-            # Note: This no longer triggers a duplicate data_changed signal as we don't emit
-            # the mapped_data again through another channel
-            self.populate_table_requested.emit(mapped_data)
-
-            # Unblock signals after all updates are complete
-            self._data_model.blockSignals(False)
-
-            # Explicitly set a flag that data has been loaded
-            if hasattr(self._data_model, "set_data_loaded"):
-                self._data_model.set_data_loaded(True)
-                logger.debug("Explicitly set data model loaded state to True")
+            # Always emit data_loaded signal regardless of whether it's the first file
+            # This signal indicates that data is loaded and ready for display
+            logger.info("Emitting data_loaded signal")
+            self.data_loaded.emit()
 
             # Clear the current task
             self._current_task = None
 
+            # Always emit final success signal to ensure UI is updated
+            # This is important for subsequent file loads too
+            self.load_success.emit(success_message)
+            logger.info("Emitted load_success signal")
+
         except Exception as e:
             # Ensure signals are unblocked
-            self._data_model.blockSignals(False)
+            if (
+                hasattr(self, "_data_model")
+                and self._data_model
+                and self._data_model.signalsBlocked()
+            ):
+                self._data_model.blockSignals(False)
 
             # Log and emit error
-            logger.error(f"Error in CSV load success handler: {e}")
+            logger.error(f"Error in CSV load success handler: {e}", exc_info=True)
             self.load_error.emit(f"Error processing CSV data: {str(e)}")
-            self.load_finished.emit(False, f"Error: {str(e)}")
+            self.load_finished.emit(f"Error: {str(e)}")
 
     def _update_recent_files(self, file_path: str) -> None:
         """
@@ -558,23 +602,46 @@ class DataManager(QObject):
 
     def _on_background_task_completed(self, task_id: str, result: Any) -> None:
         """
-        Handle background task completion.
+        Handle completion of a background task.
 
         Args:
-            task_id: Identifier of the completed task
-            result: Result of the task
+            task_id (str): ID of the completed task
+            result (Any): Result of the task
         """
-        logger.info(f"Background task completed: {task_id}")
+        logger.debug(f"Background task {task_id} completed with result: {type(result)}")
 
-        if task_id == "save_csv":
-            success, file_path = result
-            if success:
-                self.save_success.emit(file_path)
+        # Skip if we've already processed a result for this task
+        if self._result_processed:
+            logger.debug("Skipping duplicate result processing for this task")
+            return
+
+        # Clear current task reference
+        self._current_task = None
+
+        # Mark as processed to prevent duplicate processing
+        self._result_processed = True
+
+        # Process the result based on task type
+        # If it's a MultiCSVLoadTask, the result will be from the CSV load operation
+        if isinstance(result, tuple) and len(result) == 2:
+            success, data_or_error = result
+            if success and isinstance(data_or_error, pd.DataFrame):
+                # Handle successful CSV load
+                self._on_csv_load_success((data_or_error, None))
             else:
-                self.save_error.emit(f"Error saving file: {file_path}")
-        elif task_id == "load_csv":
-            # Handle load_csv task completion
-            self._on_csv_load_success(result)
+                # Handle CSV load error
+                error_msg = data_or_error if isinstance(data_or_error, str) else str(data_or_error)
+                self._on_csv_load_success((None, error_msg))
+        else:
+            # For other task types or unexpected results
+            logger.warning(f"Unhandled task result: {type(result)} for task {task_id}")
+            # Try to adapt the result format if possible
+            try:
+                self._adapt_task_result(result)
+            except Exception as e:
+                logger.error(f"Error adapting task result: {e}")
+                self.load_error.emit(f"Error processing task result: {str(e)}")
+                self.load_finished.emit(f"Error: {str(e)}")
 
     def _on_background_task_failed(self, task_id: str, error: str) -> None:
         """
@@ -594,7 +661,7 @@ class DataManager(QObject):
             self.load_error.emit(f"Error loading file: {error}")
 
             # Emit finished signal
-            self.load_finished.emit(False, f"Error: {str(error)}")
+            self.load_finished.emit("Error: {str(error)}")
 
             # Clear current task
             self._current_task = None
@@ -613,13 +680,17 @@ class DataManager(QObject):
                 logger.error(f"Error connecting worker.started signal: {e}")
 
             try:
-                self._worker.progress.connect(self._on_load_progress)
+                # Progress signal is already connected in __init__, don't connect again
+                # self._worker.progress.connect(self._on_load_progress)
+                pass
             except Exception as e:
                 logger.error(f"Error connecting worker.progress signal: {e}")
 
             try:
-                # Don't directly connect - use an adapter function
-                self._worker.finished.connect(self._adapt_task_result)
+                # Remove the duplicate connection to worker.finished - we already connect to
+                # task_completed in __init__ which is more specific and eliminates duplicate processing
+                # self._worker.finished.connect(self._adapt_task_result)
+                pass
             except Exception as e:
                 logger.error(f"Error connecting worker.finished signal: {e}")
 
@@ -632,15 +703,14 @@ class DataManager(QObject):
                 logger.error(f"Error connecting worker.error signal: {e}")
 
             try:
-                self._worker.error.connect(
-                    lambda e: self.load_finished.emit(False, f"Error: {str(e)}")
-                )
+                self._worker.error.connect(lambda e: self.load_finished.emit(f"Error: {str(e)}"))
             except Exception as e:
                 logger.error(f"Error connecting worker.error to load_finished signal: {e}")
 
-            # Cancellation handling
+            # Cancellation handling - already connected in __init__, don't connect again
             try:
-                self._worker.cancelled.connect(self._on_load_cancelled)
+                # self._worker.cancelled.connect(self._on_load_cancelled)
+                pass
             except Exception as e:
                 logger.error(f"Error connecting worker.cancelled signal: {e}")
 
@@ -668,6 +738,15 @@ class DataManager(QObject):
 
             # Unpack the tuple
             success, data_or_error = result
+
+            # Special handling for cancellation
+            if not success and isinstance(data_or_error, str) and "cancel" in data_or_error.lower():
+                logger.info(f"Task was cancelled: {data_or_error}")
+                # Don't emit load_error for cancellation, just finish the operation
+                self.load_finished.emit("Operation cancelled")
+                # Unblock signals
+                self._data_model.blockSignals(False)
+                return
 
             if success and isinstance(data_or_error, pd.DataFrame):
                 # Success case - pass DataFrame and empty message

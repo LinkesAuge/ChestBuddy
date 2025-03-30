@@ -12,8 +12,6 @@ from chestbuddy.ui.widgets.progress_bar import ProgressBar
 from chestbuddy.ui.widgets.progress_dialog import ProgressDialog
 from chestbuddy.ui.widgets.sidebar_navigation import SidebarNavigation
 from chestbuddy.ui.widgets.status_bar import StatusBar
-from chestbuddy.ui.widgets.stat_card import StatCard
-from chestbuddy.ui.widgets.chart_preview import ChartPreview
 
 __all__ = [
     "ActionButton",
@@ -24,6 +22,4 @@ __all__ = [
     "ProgressDialog",
     "SidebarNavigation",
     "StatusBar",
-    "StatCard",
-    "ChartPreview",
 ]

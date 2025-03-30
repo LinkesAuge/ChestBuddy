@@ -18,14 +18,6 @@ import pandas as pd
 from PySide6.QtCore import QObject, Signal, Slot, QThread, QRunnable, QThreadPool
 from PySide6.QtWidgets import QApplication
 
-# Import UI State Management components
-from chestbuddy.utils.ui_state import (
-    UIStateManager,
-    OperationContext,
-    UIOperations,
-    UIElementGroups,
-)
-
 # Setup logger
 logger = logging.getLogger(__name__)
 
@@ -159,7 +151,6 @@ class MultiCSVLoadTask(BackgroundTask):
 
         # Initialize progress tracking variables
         self._total_rows_loaded = 0
-        self._total_rows_estimated = 0
         self._current_file_rows = 0
         self._current_file_total_rows = 0
 
@@ -204,15 +195,8 @@ class MultiCSVLoadTask(BackgroundTask):
                     ):
                         current_file_path = str(self.file_paths[self._current_file_index])
 
-                # Calculate progress across all files
-                if self._total_rows_estimated > 0:
-                    # Show progress as loaded rows out of total estimated
-                    total_progress = (
-                        f"{self._total_rows_loaded:,} of {self._total_rows_estimated:,} rows"
-                    )
-                else:
-                    # Fall back to percentage if no row estimate
-                    total_progress = f"{percentage}%"
+                # Show progress as loaded rows
+                total_progress = f"{self._total_rows_loaded:,} rows"
 
                 # Emit progress and status signals within try block to catch Qt errors
                 self.progress.emit(percentage, 100)
@@ -251,11 +235,6 @@ class MultiCSVLoadTask(BackgroundTask):
         # Update current file progress
         self._current_file_rows = current
         self._current_file_total_rows = total
-
-        # Update total progress
-        if self._total_rows_estimated == 0:
-            # If this is the first progress update, initialize total estimate
-            self._total_rows_estimated = total * self._num_files
 
         # Calculate overall progress percentage
         if self._num_files > 0:
@@ -335,6 +314,16 @@ class MultiCSVLoadTask(BackgroundTask):
 
                 # Try to read the file - returns tuple of (dataframe, error_message)
                 result_tuple = self.csv_service.read_csv_chunked(file_path_str, **csv_params)
+
+                # Make sure we got a tuple with exactly 2 elements
+                if not isinstance(result_tuple, tuple) or len(result_tuple) != 2:
+                    logger.error(f"Unexpected result from read_csv_chunked: {type(result_tuple)}")
+                    error_msg = f"Error reading CSV file {file_path_str}: Unexpected result format"
+                    # Clean up and return error
+                    if combined_df is not None:
+                        del combined_df
+                    gc.collect()
+                    return False, error_msg
 
                 # Unpack the tuple
                 file_df, error_msg = result_tuple
@@ -495,20 +484,21 @@ class BackgroundWorker(QObject):
     def __init__(self) -> None:
         """Initialize the background worker."""
         super().__init__()
-        self._thread = QThread()
-        self._thread.setObjectName("BackgroundWorkerThread")
-        self._current_task = None
-        self._operation_context = None  # Store the operation context
 
-        # Move worker to thread
+        # Create a new thread for this worker
+        self._thread = QThread()
+        self._thread.setObjectName(f"BackgroundWorker-{id(self)}")
+
+        # Move this worker to the thread
         self.moveToThread(self._thread)
 
         # Connect thread signals
         self._thread.started.connect(self._on_thread_started)
         self._thread.finished.connect(self._on_thread_finished)
 
-        # Get UI state manager
-        self._ui_state_manager = UIStateManager()
+        # Initialize variables
+        self._task = None
+        self._is_running = False
 
     @property
     def is_running(self) -> bool:
@@ -518,30 +508,23 @@ class BackgroundWorker(QObject):
         Returns:
             True if a task is running, False otherwise.
         """
-        return self._thread.isRunning()
+        return self._is_running and self._thread.isRunning()
 
     def execute_task(self, task: BackgroundTask) -> None:
         """
         Execute a background task in a separate thread.
 
         Args:
-            task: The background task to execute.
+            task: The task to execute.
         """
         if self.is_running:
-            logger.warning("Cannot execute task: another task is already running")
+            logger.warning("Cannot execute task: worker is already running")
             return
 
         # Store the task
-        self._current_task = task
+        self._task = task
 
-        # Create operation context to block UI
-        self._operation_context = OperationContext(
-            self._ui_state_manager,
-            UIOperations.BACKGROUND_TASK,
-            groups=[UIElementGroups.MAIN_WINDOW],
-        )
-
-        # Connect signals
+        # Connect task signals
         task.progress.connect(self.progress)
 
         # Start the thread
@@ -549,52 +532,90 @@ class BackgroundWorker(QObject):
 
     def cancel(self) -> None:
         """
-        Cancel the current task.
-
-        This requests cancellation of the current task, but it's up to the
-        task implementation to honor this request by checking is_cancelled.
+        Cancel the current task if one is running.
         """
-        if self._current_task and not self._current_task.is_cancelled:
-            logger.debug("Cancelling background task")
-            self._current_task.cancel()
+        if not self.is_running or self._task is None:
+            logger.warning("Cannot cancel: no task running")
+            return
+
+        # Cancel the task
+        self._task.cancel()
+
+        # Emit cancelled signal
+        self.cancelled.emit()
+
+        # Quit the thread (non-blocking)
+        self._thread.quit()
 
     @Slot()
     def _on_thread_started(self) -> None:
         """Handle thread started event."""
-        # Enter the operation context to block UI
-        if self._operation_context:
-            self._operation_context.__enter__()
+        if self._task is None:
+            logger.error("Thread started but no task is set")
+            self._thread.quit()
+            return
 
-        logger.debug("Background worker thread started")
+        self._is_running = True
         self.started.emit()
 
-        # Execute the task
-        task = self._current_task
-        if task:
-            logger.debug(f"Executing task {task.__class__.__name__}")
-            try:
-                result = task.run()
-                self.finished.emit(result)
-                if hasattr(task, "task_id") and task.task_id:
-                    self.task_completed.emit(task.task_id, result)
-            except Exception as error:
-                logger.error(f"Error executing task: {error}")
-                self.error.emit(error)
-                if hasattr(task, "task_id") and task.task_id:
-                    self.task_failed.emit(task.task_id, error)
-            finally:
-                # Clean up the operation context
-                if self._operation_context:
-                    self._operation_context.__exit__(None, None, None)
-                    self._operation_context = None
+        try:
+            # Execute the task
+            result = self._task.run()
 
-        # Quit the thread
-        self._thread.quit()
+            # Check if thread is still running (might have been stopped during run)
+            if self._is_running:
+                # Emit signals for task completion
+                task_id = getattr(self._task, "task_id", "unknown")
+                logger.debug(f"Task completed: {task_id}")
+                self.finished.emit(result)
+                self.task_completed.emit(task_id, result)
+        except Exception as e:
+            logger.error(f"Error in background task: {e}")
+            traceback.print_exc()
+            self.error.emit(e)
+            # Also emit task_failed with the task ID if available
+            if hasattr(self._task, "task_id"):
+                self.task_failed.emit(self._task.task_id, e)
+            else:
+                self.task_failed.emit("unknown", e)
+        finally:
+            # Clean up thread
+            self._thread.quit()
 
     @Slot()
     def _on_thread_finished(self) -> None:
         """Handle thread finished event."""
-        self._thread.quit()
+        self._is_running = False
+
+        # Disconnect task signals
+        if self._task is not None:
+            try:
+                self._task.progress.disconnect(self.progress)
+
+                # Check for and disconnect any other signals that might be connected
+                if hasattr(self._task, "status_signal") and isinstance(
+                    getattr(self._task, "status_signal", None), Signal
+                ):
+                    try:
+                        # Find and disconnect any connections
+                        receivers = getattr(self._task.status_signal, "_receivers", [])
+                        if receivers:
+                            logger.debug(
+                                f"Disconnecting status_signal signal with {len(receivers)} receivers"
+                            )
+                            self._task.status_signal.disconnect()
+                    except (TypeError, RuntimeError) as e:
+                        logger.debug(f"Error disconnecting status_signal signal: {e}")
+
+            except (TypeError, RuntimeError) as e:
+                # Signal wasn't connected or Qt object deleted
+                logger.debug(f"Error disconnecting signals: {e}")
+
+        # Clear the task reference to allow garbage collection
+        self._task = None
+
+        # Log completion
+        logger.debug("Thread finished and task cleanup completed")
 
     def __del__(self):
         """
@@ -604,10 +625,10 @@ class BackgroundWorker(QObject):
         try:
             # First try to cancel any running task
             try:
-                if hasattr(self, "_current_task") and self._current_task:
-                    self._current_task.cancel()
+                if hasattr(self, "_task") and self._task:
+                    self._task.cancel()
                     logger.debug(
-                        f"Cancelled task during BackgroundWorker cleanup: {self._current_task.__class__.__name__}"
+                        f"Cancelled task during BackgroundWorker cleanup: {self._task.__class__.__name__}"
                     )
             except (RuntimeError, AttributeError, ReferenceError) as e:
                 # Don't raise errors during cleanup - just log them
@@ -645,42 +666,35 @@ class BackgroundWorker(QObject):
         """
         Run a function as a background task.
 
-        This is a convenience method for running a simple function in the background.
+        This is a convenience method that creates a FunctionTask and executes it.
 
         Args:
-            func: The function to run.
-            args: Positional arguments to pass to the function.
-            task_id: Optional ID for the task. If not provided, a random ID will be generated.
-            on_success: Optional callback to call with the result when the task completes.
-            on_error: Optional callback to call with the exception when the task fails.
-            kwargs: Keyword arguments to pass to the function.
+            func: The function to execute
+            *args: Positional arguments for the function
+            task_id: Optional identifier for the task
+            on_success: Optional callback to be called with the result
+            on_error: Optional callback to be called with the error
+            **kwargs: Keyword arguments for the function
+
+        Returns:
+            The created FunctionTask
         """
-        # Create the task
+        # Create a task
         task = FunctionTask(func, args, kwargs, task_id)
 
-        # Connect success callback if provided
+        # Connect success/error callbacks if provided
         if on_success:
-
-            def success_callback(task_id, result):
-                if task_id == task.task_id:
-                    on_success(result)
-
-            self.task_completed.connect(success_callback)
-
-        # Connect error callback if provided
+            self.task_completed.connect(
+                lambda tid, result: on_success(result) if tid == task_id else None
+            )
         if on_error:
+            self.task_failed.connect(lambda tid, error: on_error(error) if tid == task_id else None)
 
-            def error_callback(task_id, error):
-                if task_id == task.task_id:
-                    on_error(error)
+        # Connect task completion/failure signals
+        self.finished.connect(lambda result: self.task_completed.emit(task_id, result))
+        self.error.connect(lambda error: self.task_failed.emit(task_id, error))
 
-            self.task_failed.connect(error_callback)
+        # Execute the task
+        self.execute_task(task)
 
-        # Use operation context to block UI
-        with OperationContext(
-            self._ui_state_manager,
-            UIOperations.BACKGROUND_TASK,
-            groups=[UIElementGroups.MAIN_WINDOW],
-        ):
-            # Execute the task
-            self.execute_task(task)
+        return task
