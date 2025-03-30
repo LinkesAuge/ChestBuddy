@@ -141,9 +141,16 @@ class ChestBuddyApp(QObject):
                 # Initialize CorrectionController
                 try:
                     self._correction_controller = CorrectionController(
-                        self._correction_service, self._config_manager, self._signal_manager
+                        self._correction_service,
+                        self._correction_rule_manager,
+                        self._config_manager,
+                        self._signal_manager,
                     )
                     logger.info("CorrectionController initialized")
+
+                    # Register the correction controller with ServiceLocator
+                    ServiceLocator.register("correction_controller", self._correction_controller)
+                    logger.info("CorrectionController registered with ServiceLocator")
                 except Exception as e:
                     logger.error(f"Error initializing CorrectionController: {e}")
                     self._error_controller.handle_exception(

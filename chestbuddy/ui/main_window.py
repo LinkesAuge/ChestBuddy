@@ -563,9 +563,14 @@ class MainWindow(QMainWindow):
         # Create Correction view - use our new implementation
         from chestbuddy.ui.views.correction_view import CorrectionView
         from chestbuddy.core.controllers.correction_controller import CorrectionController
+        from chestbuddy.utils.service_locator import ServiceLocator
 
         # Get correction controller from the ServiceLocator
-        correction_controller = ServiceLocator.get("correction_controller", None)
+        correction_controller = None
+        if ServiceLocator.has_service("correction_controller"):
+            correction_controller = ServiceLocator.get("correction_controller")
+        else:
+            logger.warning("Correction controller not registered in ServiceLocator")
 
         # Create the new correction view
         correction_view = CorrectionView(
