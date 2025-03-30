@@ -176,7 +176,7 @@ class CorrectionController(BaseController):
         """Clean up background worker resources."""
         if self._worker:
             try:
-                self._worker.stop()
+                self._worker.cancel()
             except Exception as e:
                 logger.error(f"Error stopping worker: {e}")
 
