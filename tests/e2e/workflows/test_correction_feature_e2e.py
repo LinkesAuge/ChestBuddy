@@ -157,7 +157,7 @@ class TestCorrectionFeatureWorkflow:
         data_model.update_data(data_df)
 
         # Get data from the model
-        data = data_model.get_data()
+        data = data_model.data
         assert data is not None, "Model should have data after update"
 
         # Verify data has errors (check for "Invalid" strings in key columns)
@@ -197,7 +197,7 @@ class TestCorrectionFeatureWorkflow:
         assert correction_stats["corrected_cells"] > 0
 
         # Get updated data
-        data = data_model.get_data()
+        data = data_model.data
 
         # Verify data no longer has errors
         has_invalid_players = any("Invalid" in str(player) for player in data["PLAYER"])
@@ -256,12 +256,14 @@ class TestCorrectionFeatureWorkflow:
         # Mock correction service to raise an exception
         with patch.object(
             correction_service, "apply_corrections", side_effect=Exception("Test error")
-        ):
-            # Try to apply corrections
-            correction_controller.apply_corrections()
-
-            # Process events to ensure signals are emitted
-            process_events()
+        ) as mock_apply:
+            # Create a patched BackgroundWorker to avoid the initialization error
+            with patch("chestbuddy.utils.background_processing.BackgroundWorker") as mock_worker:
+                # Try to apply corrections
+                correction_controller.apply_corrections()
+                
+                # Process events to ensure signals are emitted
+                process_events()
 
         # Verify error signal was emitted
         assert error_spy.signal_triggered
