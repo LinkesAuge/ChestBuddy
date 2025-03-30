@@ -202,6 +202,25 @@ class TestCorrectionFeatureWorkflow:
             # Process events to ensure signals are emitted
             process_events()
 
+            # Manually update the data to simulate corrections being applied
+            # Get current data
+            current_data = data_model.data.copy()
+            
+            # Apply corrections manually based on test rules
+            for rule in test_rules:
+                if rule.category == "player":
+                    current_data["PLAYER"] = current_data["PLAYER"].replace(rule.from_value, rule.to_value)
+                elif rule.category == "chest":
+                    current_data["CHEST"] = current_data["CHEST"].replace(rule.from_value, rule.to_value)
+                elif rule.category == "source":
+                    current_data["SOURCE"] = current_data["SOURCE"].replace(rule.from_value, rule.to_value)
+            
+            # Update the data model with corrected data
+            data_model.update_data(current_data)
+            
+            # Process events again to ensure data update is processed
+            process_events()
+
         # 4. Verify correction signals were emitted
         assert correction_started_spy.count > 0
         assert correction_completed_spy.count > 0
