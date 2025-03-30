@@ -80,3 +80,15 @@
    - **Root Cause**: Expected keys missing in the dictionary
    - **Status**: To be investigated
    - **Fix Plan**: Verify model serialization/deserialization logic
+
+### BackgroundWorker API Issues (May 7, 2024)
+
+1. **Issue**: CorrectionController tests failing with BackgroundWorker API mismatch
+   - **Error**: `AssertionError: Expected 'start' to have been called once. Called 0 times` in test_apply_corrections
+   - **Error**: `AssertionError: Expected 'stop' to have been called once. Called 0 times` in test_worker_cleanup
+   - **Root Cause**: BackgroundWorker class was missing expected `start()` and `stop()` methods that were expected by the tests
+   - **Status**: Fixed
+   - **Fix**: 
+     - Added `start()` method to BackgroundWorker (primarily for API compatibility)
+     - Added `stop()` method as an alias for the existing `cancel()` method
+     - Updated CorrectionController to use these methods correctly

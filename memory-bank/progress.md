@@ -59,6 +59,12 @@ We've categorized the test failures into four main groups:
    - Made test_filter_controls more resilient by directly calling methods
    - Updated button tests to focus on functionality existence
 
+4. **CorrectionController Tests**
+   - Fixed test_apply_corrections by adding start() method to BackgroundWorker
+   - Fixed test_worker_cleanup by adding stop() method as an alias for cancel()
+   - Improved API compatibility between BackgroundWorker and CorrectionController
+   - Ensured consistent method naming across worker implementation
+
 ### In Progress Test Fixes
 
 1. **Remaining Dialog Tests**

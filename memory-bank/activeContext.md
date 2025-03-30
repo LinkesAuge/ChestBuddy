@@ -23,6 +23,11 @@ We are currently focused on improving test coverage and fixing test failures acr
   - Utilized direct method calls instead of simulating Qt events
   - Enhanced test reliability by avoiding timing issues with signal-slot connections
 
+- Fixed BackgroundWorker API for CorrectionController tests:
+  - Added missing start() and stop() methods to BackgroundWorker
+  - Updated CorrectionController to use the correct API methods
+  - Fixed two failing tests related to background processing
+
 ### Current Tasks
 
 1. **Continuing Test Fixes**:
