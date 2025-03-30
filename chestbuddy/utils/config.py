@@ -324,7 +324,13 @@ class ConfigManager:
             Path: Configuration value as Path
         """
         path_str = self.get(section, option, fallback)
-        path = Path(path_str)
+
+        # Get application root directory for resolving relative paths
+        app_root = Path(__file__).parent.parent.parent
+
+        # Resolve path - if it's already absolute, Path will keep it that way
+        # If it's relative, it will be relative to the app root
+        path = app_root / path_str
 
         # Create directory if requested
         if create_if_missing and path_str:
@@ -342,16 +348,36 @@ class ConfigManager:
         Args:
             section: Configuration section
             option: Configuration option
-            value: Path to set
+            value: Path to set (will be stored as relative path if possible)
             create_if_missing: Create directory if it doesn't exist
         """
         path = Path(value)
+
+        # Get application root directory
+        app_root = Path(__file__).parent.parent.parent
+
+        # Try to make the path relative to the app root
+        try:
+            # Use relative_to to convert absolute paths to relative paths when possible
+            if path.is_absolute():
+                try:
+                    # This will only work if the path is under the app_root
+                    relative_path = path.relative_to(app_root)
+                    path = relative_path
+                except ValueError:
+                    # If it's not under app_root, keep it absolute
+                    pass
+        except Exception as e:
+            logger.warning(f"Could not convert path to relative: {e}")
+
         self.set(section, option, str(path))
 
         # Create directory if requested
         if create_if_missing:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            logger.debug(f"Created directory: {path.parent}")
+            # Use the original path for directory creation
+            orig_path = Path(value)
+            orig_path.parent.mkdir(parents=True, exist_ok=True)
+            logger.debug(f"Created directory: {orig_path.parent}")
 
     def add_recent_file(self, file_path: str) -> None:
         """
@@ -364,7 +390,25 @@ class ConfigManager:
         recent_files = self.get_list("Files", "recent_files", [])
 
         # Convert to Path for platform independence
-        normalized_path = str(Path(file_path))
+        path = Path(file_path)
+
+        # Get application root directory
+        app_root = Path(__file__).parent.parent.parent
+
+        # Try to make the path relative to the app root
+        try:
+            if path.is_absolute():
+                try:
+                    # This will only work if the path is under the app_root
+                    relative_path = path.relative_to(app_root)
+                    path = relative_path
+                except ValueError:
+                    # If it's not under app_root, keep it absolute
+                    pass
+        except Exception as e:
+            logger.warning(f"Could not convert path to relative: {e}")
+
+        normalized_path = str(path)
 
         # Remove the file if it's already in the list
         if normalized_path in recent_files:
@@ -395,11 +439,28 @@ class ConfigManager:
         # Get all recent files
         all_files = self.get_list("Files", "recent_files", [])
 
-        # Filter out files that don't exist
-        existing_files = [f for f in all_files if os.path.exists(f)]
+        # Get application root directory
+        app_root = Path(__file__).parent.parent.parent
 
-        # Return up to max_files
-        return existing_files[:max_files]
+        # Convert paths and filter out files that don't exist
+        existing_files = []
+        for file_str in all_files:
+            # Create path object
+            file_path = Path(file_str)
+
+            # If it's a relative path, resolve it against app_root
+            if not file_path.is_absolute():
+                file_path = app_root / file_path
+
+            # Check if file exists
+            if file_path.exists():
+                existing_files.append(str(file_path))
+
+            # Only collect up to max_files
+            if len(existing_files) >= max_files:
+                break
+
+        return existing_files
 
     def reset_to_defaults(self, section: Optional[str] = None) -> None:
         """
@@ -502,14 +563,17 @@ class ConfigManager:
         if not list_name.endswith(".txt"):
             list_name = f"{list_name}.txt"
 
-        # User validation lists directory
-        user_validation_dir = Path(self._config_dir) / "validation_lists"
-        user_validation_dir.mkdir(parents=True, exist_ok=True)
+        # Get application root directory
+        app_root = Path(__file__).parent.parent.parent
 
-        # User list path
-        user_list_path = user_validation_dir / list_name
+        # Create validation lists directory within the application
+        validation_dir = app_root / "chestbuddy" / "validation_lists"
+        validation_dir.mkdir(parents=True, exist_ok=True)
 
-        return user_list_path
+        # List path
+        list_path = validation_dir / list_name
+
+        return list_path
 
     def export_config(self, file_path: Union[str, Path]) -> None:
         """

@@ -40,6 +40,7 @@ from chestbuddy.ui.resources.resource_manager import ResourceManager
 from chestbuddy.utils.signal_manager import SignalManager
 from chestbuddy.utils.service_locator import ServiceLocator
 from chestbuddy.ui.utils.update_manager import UpdateManager
+from chestbuddy.core.models.correction_rule_manager import CorrectionRuleManager
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -101,7 +102,13 @@ class ChestBuddyApp(QObject):
                 self._data_manager = DataManager(self._data_model, self._csv_service)
 
                 self._validation_service = ValidationService(self._data_model, self._config_manager)
-                self._correction_service = CorrectionService(self._data_model)
+
+                # Initialize CorrectionRuleManager and CorrectionService with all required parameters
+                self._correction_rule_manager = CorrectionRuleManager()
+                self._correction_service = CorrectionService(
+                    self._correction_rule_manager, self._data_model, self._validation_service
+                )
+
                 self._chart_service = ChartService(self._data_model)
 
                 # Register services with ServiceLocator
@@ -172,9 +179,11 @@ class ChestBuddyApp(QObject):
     def _setup_logging(self) -> None:
         """Set up logging for the application."""
         try:
-            # Create logs directory if it doesn't exist
-            log_dir = Path("logs")
-            log_dir.mkdir(exist_ok=True)
+            # Get application base directory (directory containing app.py)
+            base_dir = Path(__file__).parent
+            # Create logs directory in chestbuddy/logs
+            log_dir = base_dir / "logs"
+            log_dir.mkdir(exist_ok=True, parents=True)
 
             # Set up file handler with UTF-8 encoding
             log_file = log_dir / "chestbuddy.log"
@@ -201,7 +210,7 @@ class ChestBuddyApp(QObject):
             root_logger.addHandler(file_handler)
             root_logger.addHandler(console_handler)
 
-            logger.info("Logging initialized with UTF-8 support")
+            logger.info(f"Logging initialized with UTF-8 support in {log_file}")
         except Exception as e:
             print(f"Error setting up logging: {e}")
             # Continue without logging
