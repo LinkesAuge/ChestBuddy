@@ -144,6 +144,8 @@ class ChestBuddyApp(QObject):
             # Initialize UpdateManager and register with ServiceLocator
             try:
                 self._update_manager = UpdateManager()
+                # Register with class name and string name for compatibility
+                ServiceLocator.register(UpdateManager, self._update_manager)
                 ServiceLocator.register("update_manager", self._update_manager)
                 logger.info("UpdateManager initialized and registered with ServiceLocator")
             except Exception as e:

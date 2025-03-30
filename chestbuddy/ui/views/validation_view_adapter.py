@@ -332,3 +332,13 @@ class ValidationViewAdapter(BaseView):
         """
         # Update view based on status data
         logger.debug(f"Updating validation view with status: {status}")
+
+    def refresh(self):
+        """
+        Refresh the view content.
+
+        This method is called by other components when the view needs to be updated.
+        It delegates to _refresh_view_content for the actual refresh operation.
+        """
+        logger.debug("ValidationViewAdapter.refresh called")
+        self._refresh_view_content()

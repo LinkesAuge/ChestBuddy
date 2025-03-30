@@ -26,10 +26,15 @@ def get_update_manager() -> UpdateManager:
         KeyError: If UpdateManager is not registered with ServiceLocator
     """
     try:
+        # Try by class name first (preferred method)
         return ServiceLocator.get(UpdateManager)
-    except KeyError as e:
-        logger.error(f"UpdateManager not found in ServiceLocator: {e}")
-        raise
+    except Exception:
+        try:
+            # Fall back to string name
+            return ServiceLocator.get("update_manager")
+        except KeyError as e:
+            logger.error(f"UpdateManager not found in ServiceLocator: {e}")
+            raise
 
 
 __all__ = ["IconProvider", "UpdateManager", "get_update_manager"]
