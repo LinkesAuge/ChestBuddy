@@ -193,11 +193,11 @@ class TestCorrectionFeatureWorkflow:
             process_events()
 
         # 4. Verify correction signals were emitted
-        assert correction_started_spy.signal_triggered
-        assert correction_completed_spy.signal_triggered
+        assert correction_started_spy.was_triggered
+        assert correction_completed_spy.was_triggered
 
         # Get the statistics from the completion signal
-        correction_stats = correction_completed_spy.args[0]
+        correction_stats = correction_completed_spy.all_args[0][0]
 
         # Verify corrections were applied
         assert correction_stats["total_corrections"] > 0
@@ -281,10 +281,10 @@ class TestCorrectionFeatureWorkflow:
                 process_events()
 
         # Verify error signal was emitted
-        assert error_spy.signal_triggered
+        assert error_spy.was_triggered
 
         # Verify error message
-        error_message = error_spy.args[0]
+        error_message = error_spy.all_args[0][0]
         assert "error" in error_message.lower()
 
 
