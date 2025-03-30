@@ -11,7 +11,20 @@ import logging
 from typing import Optional, Dict, Any
 
 from PySide6.QtCore import Qt, Signal, Slot
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel
+from PySide6.QtWidgets import (
+    QWidget,
+    QVBoxLayout,
+    QLabel,
+    QHBoxLayout,
+    QTableWidget,
+    QTableWidgetItem,
+    QHeaderView,
+    QGroupBox,
+    QCheckBox,
+    QComboBox,
+    QLineEdit,
+    QPushButton,
+)
 
 from chestbuddy.core.models import ChestDataModel
 from chestbuddy.core.services import CorrectionService
@@ -221,21 +234,99 @@ class CorrectionView(UpdatableView):
     def _show_placeholder(self, show: bool) -> None:
         """
         Show or hide the placeholder message when correction controller is not available.
+        When showing, display a complete UI mockup based on our correction feature design.
 
         Args:
             show (bool): Whether to show the placeholder
         """
         if not self._rule_view_placeholder and show:
-            # Create placeholder if needed
+            # Create a comprehensive placeholder with the complete UI structure
             self._rule_view_placeholder = QWidget()
             placeholder_layout = QVBoxLayout(self._rule_view_placeholder)
-            placeholder_label = QLabel(
-                "No correction controller available. Please initialize the controller first."
+            placeholder_layout.setContentsMargins(10, 10, 10, 10)
+            placeholder_layout.setSpacing(10)
+
+            # 1. Filter Controls Section
+            filter_group = QWidget()
+            filter_layout = QHBoxLayout(filter_group)
+            filter_layout.setContentsMargins(0, 0, 0, 0)
+
+            filter_layout.addWidget(QLabel("Category:"))
+            filter_layout.addWidget(
+                self._create_disabled_combobox(["All", "general", "player", "chest_type", "source"])
             )
-            placeholder_label.setAlignment(Qt.AlignCenter)
-            placeholder_layout.addWidget(placeholder_label)
+
+            filter_layout.addWidget(QLabel("Status:"))
+            filter_layout.addWidget(self._create_disabled_combobox(["All", "enabled", "disabled"]))
+
+            filter_layout.addWidget(QLabel("Search:"))
+            search_box = self._create_disabled_line_edit()
+            filter_layout.addWidget(search_box)
+
+            placeholder_layout.addWidget(filter_group)
+
+            # 2. Rules Table
+            rules_table = QTableWidget(5, 6)  # 5 rows, 6 columns
+            rules_table.setHorizontalHeaderLabels(["Order", "From", "To", "Category", "Status", ""])
+            rules_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+            rules_table.setEnabled(False)
+
+            # Sample data for the table
+            sample_data = [
+                ["1", "Cheist", "Chest", "general", "enabled", "⋮"],
+                ["2", "PLyer", "Player", "player", "enabled", "⋮"],
+                ["3", "Wepon", "Weapon", "chest", "enabled", "⋮"],
+                ["4", "Sorce", "Source", "source", "disabled", "⋮"],
+                ["5", "Chst", "Chest", "general", "enabled", "⋮"],
+            ]
+
+            for row, row_data in enumerate(sample_data):
+                for col, text in enumerate(row_data):
+                    item = QTableWidgetItem(text)
+                    rules_table.setItem(row, col, item)
+
+            placeholder_layout.addWidget(rules_table)
+
+            # 3. Rule Controls
+            controls_group = QWidget()
+            controls_layout = QHBoxLayout(controls_group)
+            controls_layout.setContentsMargins(0, 0, 0, 0)
+
+            for button_text in ["Add", "Edit", "Delete", "Move ▲", "Move ▼", "Toggle Status"]:
+                button = self._create_disabled_button(button_text)
+                controls_layout.addWidget(button)
+
+            placeholder_layout.addWidget(controls_group)
+
+            # 4. Settings Panel
+            settings_group = QGroupBox("Settings Panel")
+            settings_layout = QVBoxLayout(settings_group)
+
+            for setting in [
+                "Auto-correct after validation",
+                "Correct only invalid entries",
+                "Auto-enable imported rules",
+                "Export only enabled rules",
+            ]:
+                checkbox = QCheckBox(setting)
+                checkbox.setEnabled(False)
+                checkbox.setChecked(True)  # Default to checked
+                settings_layout.addWidget(checkbox)
+
+            placeholder_layout.addWidget(settings_group)
+
+            # Add note about controller initialization
+            info_label = QLabel(
+                "This is a preview of the correction rules interface. "
+                "Please initialize the correction controller to enable functionality."
+            )
+            info_label.setStyleSheet("color: #1E3A5F; font-weight: bold;")
+            info_label.setAlignment(Qt.AlignCenter)
+            placeholder_layout.addWidget(info_label)
+
+            # Add the placeholder to the content layout
             self.get_content_layout().addWidget(self._rule_view_placeholder)
-            logger.debug("CorrectionView placeholder shown")
+            logger.debug("CorrectionView comprehensive UI placeholder shown")
         elif self._rule_view_placeholder and not show:
             # Hide placeholder
             self.get_content_layout().removeWidget(self._rule_view_placeholder)
@@ -243,6 +334,27 @@ class CorrectionView(UpdatableView):
             self._rule_view_placeholder.deleteLater()
             self._rule_view_placeholder = None
             logger.debug("CorrectionView placeholder hidden")
+
+    def _create_disabled_combobox(self, items):
+        """Create a disabled combobox with the given items."""
+        combobox = QComboBox()
+        for item in items:
+            combobox.addItem(item)
+        combobox.setEnabled(False)
+        return combobox
+
+    def _create_disabled_line_edit(self):
+        """Create a disabled line edit."""
+        line_edit = QLineEdit()
+        line_edit.setEnabled(False)
+        line_edit.setPlaceholderText("Search terms...")
+        return line_edit
+
+    def _create_disabled_button(self, text):
+        """Create a disabled button with the given text."""
+        button = QPushButton(text)
+        button.setEnabled(False)
+        return button
 
     def _initialize_rule_view(self) -> None:
         """
