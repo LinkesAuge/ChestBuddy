@@ -218,6 +218,58 @@ class CorrectionView(UpdatableView):
         # Log the message as a fallback
         logger.debug(f"CorrectionView status: {message}")
 
+    def _show_placeholder(self, show: bool) -> None:
+        """
+        Show or hide the placeholder message when correction controller is not available.
+
+        Args:
+            show (bool): Whether to show the placeholder
+        """
+        if not self._rule_view_placeholder and show:
+            # Create placeholder if needed
+            self._rule_view_placeholder = QWidget()
+            placeholder_layout = QVBoxLayout(self._rule_view_placeholder)
+            placeholder_label = QLabel(
+                "No correction controller available. Please initialize the controller first."
+            )
+            placeholder_label.setAlignment(Qt.AlignCenter)
+            placeholder_layout.addWidget(placeholder_label)
+            self.get_content_layout().addWidget(self._rule_view_placeholder)
+            logger.debug("CorrectionView placeholder shown")
+        elif self._rule_view_placeholder and not show:
+            # Hide placeholder
+            self.get_content_layout().removeWidget(self._rule_view_placeholder)
+            self._rule_view_placeholder.hide()
+            self._rule_view_placeholder.deleteLater()
+            self._rule_view_placeholder = None
+            logger.debug("CorrectionView placeholder hidden")
+
+    def _initialize_rule_view(self) -> None:
+        """
+        Initialize the correction rule view if it doesn't exist yet.
+        This is called when update_view_content is called and the rule view hasn't been created.
+        """
+        if self._rule_view is None and self._correction_controller is not None:
+            # Create the rule view with the controller
+            self._rule_view = CorrectionRuleView(
+                correction_controller=self._correction_controller,
+                parent=self,
+                debug_mode=self._debug_mode,
+            )
+
+            # Add the rule view to layout
+            self.get_content_layout().addWidget(self._rule_view)
+
+            # Connect the rule view to the correction controller
+            self._rule_view.apply_corrections_requested.connect(
+                self._correction_controller.apply_corrections
+            )
+            self._rule_view.rule_added.connect(self._correction_controller.add_rule)
+            self._rule_view.rule_edited.connect(self._correction_controller.update_rule)
+            self._rule_view.rule_deleted.connect(self._correction_controller.delete_rule)
+
+            logger.debug("CorrectionView: Rule view initialized")
+
     def _refresh_view_content(self) -> None:
         """Refresh the view content without changing the underlying data."""
         # Refresh the rule view
