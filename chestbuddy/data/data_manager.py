@@ -1,4 +1,4 @@
-    def _on_csv_load_success(self, data):
+def _on_csv_load_success(self, data):
         """Handle successful CSV data loading."""
         self.logger.info(f"CSV load completed successfully with {len(data):,} rows")
         
@@ -19,4 +19,4 @@
         self.load_success.emit(final_message)
         
         # Reset the background worker to free memory
-        self._background_worker = None 
+        self._background_worker = None

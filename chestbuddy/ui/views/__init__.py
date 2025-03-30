@@ -1,7 +1,7 @@
 """
-Views package initialization.
+UI Views package.
 
-This module exports the view classes.
+This package contains view components used in the ChestBuddy application.
 """
 
 from chestbuddy.ui.views.base_view import BaseView
