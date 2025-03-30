@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Correction Feature UI Mockup</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1, h2, h3 {
+            color: #1E3A5F;
+        }
+        .mockup-container {
+            margin-bottom: 30px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        .header {
+            background-color: #2C5282;
+            color: white;
+            padding: 10px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .content {
+            padding: 15px;
+        }
+        .filter-controls {
+            background-color: #f5f5f5;
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+            display: flex;
+            gap: 15px;
+        }
+        .table-container {
+            margin-bottom: 15px;
+            overflow-x: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 8px 12px;
+            text-align: left;
+            border: 1px solid #ddd;
+        }
+        th {
+            background-color: #f0f0f0;
+        }
+        .enabled {
+            color: green;
+        }
+        .disabled {
+            color: red;
+        }
+        .controls {
+            background-color: #f5f5f5;
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .settings {
+            background-color: #f5f5f5;
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+        }
+        .status-bar {
+            background-color: #f0f0f0;
+            padding: 8px 15px;
+            border-top: 1px solid #ddd;
+            font-size: 0.9em;
+        }
+        .btn {
+            padding: 6px 12px;
+            background-color: #2C5282;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .btn-primary {
+            background-color: #F0B429;
+        }
+        .btn-sm {
+            padding: 4px 8px;
+            font-size: 0.8em;
+        }
+        .dropdown {
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .search {
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            width: 200px;
+        }
+        .context-menu {
+            width: 200px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .context-menu-item {
+            padding: 8px 12px;
+            border-bottom: 1px solid #eee;
+        }
+        .context-menu-divider {
+            height: 1px;
+            background-color: #ccc;
+            margin: 5px 0;
+        }
+        .dialog {
+            width: 500px;
+            margin: 0 auto;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        .dialog-header {
+            background-color: #2C5282;
+            color: white;
+            padding: 10px 15px;
+            font-weight: bold;
+        }
+        .dialog-content {
+            padding: 15px;
+        }
+        .dialog-footer {
+            padding: 10px 15px;
+            background-color: #f5f5f5;
+            border-top: 1px solid #ddd;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .form-check {
+            margin-bottom: 10px;
+        }
+        .data-grid {
+            margin-bottom: 15px;
+        }
+        .invalid-cell {
+            background-color: #FFCCCC;
+        }
+        .correctable-cell {
+            background-color: #FFAA00;
+        }
+        .corrected-cell {
+            background-color: #CCFFCC;
+        }
+        .correctable-not-invalid-cell {
+            background-color: #E6CCFF;
+        }
+        .progress-container {
+            margin: 15px 0;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #f0f0f0;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .progress {
+            height: 100%;
+            background-color: #F0B429;
+            width: 43%;
+        }
+        .color-legend {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 15px;
+            display: inline-block;
+        }
+        .color-dot {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        .red-dot {
+            background-color: #FFCCCC;
+        }
+        .orange-dot {
+            background-color: #FFAA00;
+        }
+        .green-dot {
+            background-color: #CCFFCC;
+        }
+        .purple-dot {
+            background-color: #E6CCFF;
+        }
+        .tooltip {
+            position: absolute;
+            background-color: #333;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            max-width: 300px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Correction Feature UI Mockup</h1>
+
+    <h2>1. Correction View</h2>
+    <p>The main Correction View is designed to manage correction rules and apply them to data.</p>
+
+    <div class="mockup-container">
+        <div class="header">
+            <h3>Correction Rules</h3>
+            <div>
+                <button class="btn">Import</button>
+                <button class="btn">Export</button>
+                <button class="btn btn-primary">Apply</button>
+            </div>
+        </div>
+        <div class="content">
+            <div class="filter-controls">
+                <div>
+                    <label for="category-filter">Category:</label>
+                    <select id="category-filter" class="dropdown">
+                        <option>All</option>
+                        <option>general</option>
+                        <option>player</option>
+                        <option>chest_type</option>
+                        <option>source</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="status-filter">Status:</label>
+                    <select id="status-filter" class="dropdown">
+                        <option>All</option>
+                        <option>enabled</option>
+                        <option>disabled</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="search-filter">Search:</label>
+                    <input type="text" id="search-filter" class="search">
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Order</th>
+                            <th>From</th>
+                            <th>To</th>
+                            <th>Category</th>
+                            <th>Status</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>1</td>
+                            <td>"Cheist"</td>
+                            <td>"Chest"</td>
+                            <td>general</td>
+                            <td class="enabled">enabled</td>
+                            <td>⋮</td>
+                        </tr>
+                        <tr>
+                            <td>2</td>
+                            <td>"PLyer"</td>
+                            <td>"Player"</td>
+                            <td>player</td>
+                            <td class="enabled">enabled</td>
+                            <td>⋮</td>
+                        </tr>
+                        <tr>
+                            <td>3</td>
+                            <td>"Wepon"</td>
+                            <td>"Weapon"</td>
+                            <td>chest</td>
+                            <td class="enabled">enabled</td>
+                            <td>⋮</td>
+                        </tr>
+                        <tr>
+                            <td>4</td>
+                            <td>"Sorce"</td>
+                            <td>"Source"</td>
+                            <td>source</td>
+                            <td class="disabled">disabled</td>
+                            <td>⋮</td>
+                        </tr>
+                        <tr>
+                            <td>5</td>
+                            <td>"Chst"</td>
+                            <td>"Chest"</td>
+                            <td>general</td>
+                            <td class="enabled">enabled</td>
+                            <td>⋮</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="controls">
+                <button class="btn">Add</button>
+                <button class="btn">Edit</button>
+                <button class="btn">Delete</button>
+                <button class="btn">Move ▲</button>
+                <button class="btn">Move ▼</button>
+                <button class="btn">Move to Top</button>
+                <button class="btn">Move to Bottom</button>
+                <button class="btn">Toggle Status</button>
+            </div>
+
+            <div class="settings">
+                <div class="form-check">
+                    <input type="checkbox" id="auto-correct" checked>
+                    <label for="auto-correct">Auto-correct after validation</label>
+                </div>
+                <div class="form-check">
+                    <input type="checkbox" id="correct-invalid" checked>
+                    <label for="correct-invalid">Correct only invalid entries</label>
+                </div>
+                <div class="form-check">
+                    <input type="checkbox" id="auto-enable" checked>
+                    <label for="auto-enable">Auto-enable imported rules</label>
+                </div>
+                <div class="form-check">
+                    <input type="checkbox" id="export-enabled" checked>
+                    <label for="export-enabled">Export only enabled rules</label>
+                </div>
+            </div>
+        </div>
+        <div class="status-bar">
+            Total rules: 5 | Enabled: 4 | Disabled: 1
+        </div>
+    </div>
+
+    <h3>Context Menu for Rules Table</h3>
+    <div class="context-menu">
+        <div class="context-menu-item">Edit</div>
+        <div class="context-menu-item">Delete</div>
+        <div class="context-menu-divider"></div>
+        <div class="context-menu-item">Move Up</div>
+        <div class="context-menu-item">Move Down</div>
+        <div class="context-menu-item">Move to Top</div>
+        <div class="context-menu-item">Move to Bottom</div>
+        <div class="context-menu-divider"></div>
+        <div class="context-menu-item">Enable/Disable</div>
+    </div>
+
+    <h2>2. Add/Edit Rule Dialog</h2>
+    <div class="dialog">
+        <div class="dialog-header">
+            Add/Edit Correction Rule
+        </div>
+        <div class="dialog-content">
+            <div class="form-group">
+                <label for="from-value">From value:</label>
+                <input type="text" id="from-value">
+            </div>
+            <div class="form-group">
+                <label for="to-value">To value:</label>
+                <input type="text" id="to-value">
+            </div>
+            <div class="form-group">
+                <label for="category">Category:</label>
+                <select id="category">
+                    <option>Select Category</option>
+                    <option>general</option>
+                    <option>player</option>
+                    <option>chest_type</option>
+                    <option>source</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Status:</label>
+                <div>
+                    <input type="radio" id="enabled" name="status" checked>
+                    <label for="enabled">Enabled</label>
+                    <input type="radio" id="disabled" name="status" style="margin-left: 15px;">
+                    <label for="disabled">Disabled</label>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="order">Order:</label>
+                <input type="number" id="order" value="0" style="width: 100px;">
+            </div>
+            <div class="form-check" style="margin-top: 20px;">
+                <input type="checkbox" id="add-to-validation">
+                <label for="add-to-validation">Add to Validation List</label>
+            </div>
+        </div>
+        <div class="dialog-footer">
+            <button class="btn">Cancel</button>
+            <button class="btn btn-primary">Save</button>
+        </div>
+    </div>
+
+    <h2>3. Batch Correction Dialog</h2>
+    <div class="dialog" style="width: 700px;">
+        <div class="dialog-header">
+            Batch Correction Rules
+        </div>
+        <div class="dialog-content">
+            <p>Selected values to correct:</p>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Original Value</th>
+                            <th>Column</th>
+                            <th>Correct To</th>
+                            <th>Category</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>"Plyer"</td>
+                            <td>player</td>
+                            <td>
+                                <select class="dropdown">
+                                    <option></option>
+                                    <option>Player</option>
+                                </select>
+                            </td>
+                            <td>
+                                <select class="dropdown">
+                                    <option selected>player</option>
+                                    <option>general</option>
+                                </select>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>"Chest tipe"</td>
+                            <td>chest_type</td>
+                            <td>
+                                <select class="dropdown">
+                                    <option></option>
+                                    <option>Chest type</option>
+                                </select>
+                            </td>
+                            <td>
+                                <select class="dropdown">
+                                    <option selected>chest_type</option>
+                                    <option>general</option>
+                                </select>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>"sorce"</td>
+                            <td>source</td>
+                            <td>
+                                <select class="dropdown">
+                                    <option></option>
+                                    <option>Source</option>
+                                </select>
+                            </td>
+                            <td>
+                                <select class="dropdown">
+                                    <option selected>source</option>
+                                    <option>general</option>
+                                </select>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>"shiel"</td>
+                            <td>chest_type</td>
+                            <td>
+                                <select class="dropdown">
+                                    <option></option>
+                                    <option>Shield</option>
+                                </select>
+                            </td>
+                            <td>
+                                <select class="dropdown">
+                                    <option selected>chest_type</option>
+                                    <option>general</option>
+                                </select>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div style="margin-top: 20px;">
+                <p>Global options:</p>
+                <div class="form-check">
+                    <input type="checkbox" id="auto-enable-all" checked>
+                    <label for="auto-enable-all">Auto-enable all rules</label>
+                </div>
+                <div class="form-check">
+                    <input type="checkbox" id="add-to-validation-all" checked>
+                    <label for="add-to-validation-all">Add new values to validation lists</label>
+                </div>
+            </div>
+        </div>
+        <div class="dialog-footer">
+            <button class="btn">Cancel</button>
+            <button class="btn btn-primary">Create Rules</button>
+        </div>
+    </div>
+
+    <h2>4. Progress Dialog</h2>
+    <div class="dialog">
+        <div class="dialog-header">
+            Applying Corrections
+        </div>
+        <div class="dialog-content">
+            <p>Status: Processing rule 2 of 5...</p>
+            <div class="progress-container">
+                <div class="progress-bar">
+                    <div class="progress"></div>
+                </div>
+            </div>
+            <p>Details: Correcting "PLyer" to "Player"</p>
+        </div>
+        <div class="dialog-footer">
+            <button class="btn">Cancel</button>
+        </div>
+    </div>
+
+    <h2>5. Data View Integration</h2>
+    <p>The data view will show color-coded highlighting for cells:</p>
+
+    <div class="mockup-container">
+        <div class="header">
+            <h3>Data View</h3>
+        </div>
+        <div class="content">
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th></th>
+                            <th>Player</th>
+                            <th>Chest Type</th>
+                            <th>Source</th>
+                            <th>...</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Row 1</td>
+                            <td>Player</td>
+                            <td>Weapon</td>
+                            <td>Dungeon</td>
+                            <td>...</td>
+                        </tr>
+                        <tr>
+                            <td>Row 2</td>
+                            <td>Player</td>
+                            <td>Shield</td>
+                            <td class="correctable-not-invalid-cell">Sorce</td>
+                            <td>...</td>
+                        </tr>
+                        <tr>
+                            <td>Row 3</td>
+                            <td class="correctable-cell">PLyer</td>
+                            <td>Weapon</td>
+                            <td>Cave</td>
+                            <td>...</td>
+                        </tr>
+                        <tr>
+                            <td>Row 4</td>
+                            <td>John</td>
+                            <td class="invalid-cell">Chest tipe</td>
+                            <td>Source</td>
+                            <td>...</td>
+                        </tr>
+                        <tr>
+                            <td>Row 5</td>
+                            <td>Player</td>
+                            <td>Shield</td>
+                            <td>Source</td>
+                            <td>...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="color-legend">
+                <p><b>Color Legend:</b></p>
+                <div><span class="color-dot red-dot"></span> Red: Invalid</div>
+                <div><span class="color-dot orange-dot"></span> Orange: Invalid (correctable)</div>
+                <div><span class="color-dot green-dot"></span> Green: Corrected</div>
+                <div><span class="color-dot purple-dot"></span> Purple: Correctable</div>
+            </div>
+        </div>
+    </div>
+
+    <h3>Data View Context Menu</h3>
+    <div class="context-menu">
+        <div class="context-menu-item">Copy</div>
+        <div class="context-menu-item">Paste</div>
+        <div class="context-menu-divider"></div>
+        <div class="context-menu-item">Add Correction Rule</div>
+        <div class="context-menu-item">Create Batch Correction Rules</div>
+        <div class="context-menu-divider"></div>
+        <div class="context-menu-item">Validate Selection</div>
+    </div>
+
+    <h2>6. Tooltips</h2>
+    <p>Examples of tooltips that will appear when hovering over cells:</p>
+
+    <div style="margin-bottom: 30px;">
+        <p><b>For invalid cells with correction rule:</b></p>
+        <div class="tooltip">
+            Invalid: "PLyer"<br>
+            Can be corrected to: "Player"
+        </div>
+    </div>
+
+    <div style="margin-bottom: 30px;">
+        <p><b>For corrected cells:</b></p>
+        <div class="tooltip">
+            Corrected from "Sorce" to "Source"
+        </div>
+    </div>
+
+    <div style="margin-bottom: 30px;">
+        <p><b>For correctable cells (not invalid):</b></p>
+        <div class="tooltip">
+            Can be corrected from "Sorce" to "Source"
+        </div>
+    </div>
+
+    <h2>7. Import/Export Dialog</h2>
+    <div class="dialog">
+        <div class="dialog-header">
+            Import Correction Rules
+        </div>
+        <div class="dialog-content">
+            <div class="form-group">
+                <label for="file-path">File:</label>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="file-path" value="/path/to/rules.csv" style="flex: 1;">
+                    <button class="btn">...</button>
+                </div>
+            </div>
+
+            <div style="margin-top: 20px;">
+                <p><b>Options:</b></p>
+                <div class="form-check">
+                    <input type="radio" id="replace" name="import-mode">
+                    <label for="replace">Replace existing rules</label>
+                </div>
+                <div class="form-check">
+                    <input type="radio" id="append" name="import-mode" checked>
+                    <label for="append">Append to existing rules</label>
+                </div>
+                <div class="form-check" style="margin-top: 15px;">
+                    <input type="checkbox" id="auto-enable-import" checked>
+                    <label for="auto-enable-import">Auto-enable imported rules</label>
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-top: 15px;">
+                <label for="encoding">Encoding:</label>
+                <select id="encoding" style="width: 200px;">
+                    <option>UTF-8</option>
+                    <option>Latin-1</option>
+                    <option>Windows-1252</option>
+                </select>
+            </div>
+        </div>
+        <div class="dialog-footer">
+            <button class="btn">Cancel</button>
+            <button class="btn btn-primary">Import</button>
+        </div>
+    </div>
+</body>
+</html> 
