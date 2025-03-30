@@ -192,21 +192,31 @@ class CorrectionView(UpdatableView):
         self.add_header_action("history", "View History")
         self.add_header_action("refresh", "Refresh")
 
-    def _update_view_content(self, data=None) -> None:
+    def _update_view_content(self) -> None:
+        """Update the view content based on data from the controllers."""
+        self._show_status_message("Updating correction rules...")
+        if self._correction_controller:
+            self._show_placeholder(False)
+            if not self._rule_view:
+                self._initialize_rule_view()
+            self._refresh_view_content()
+        else:
+            self._show_placeholder(True)
+        self._show_status_message("Correction rules updated")
+
+    def _show_status_message(self, message: str) -> None:
         """
-        Update the view content with current data.
+        Display a status message for the view.
 
         Args:
-            data: Optional data to use for update (unused in this implementation)
+            message (str): The message to display
         """
-        # Update status message
-        self._show_status_message("Updating correction rules...")
-
-        # Refresh the view content
-        self._refresh_view_content()
-
-        # Update status when done
-        self._show_status_message("Correction rules updated")
+        if hasattr(self, "statusBar") and callable(self.statusBar):
+            status_bar = self.statusBar()
+            if status_bar:
+                status_bar.showMessage(message, 3000)  # Show for 3 seconds
+        # Log the message as a fallback
+        logger.debug(f"CorrectionView status: {message}")
 
     def _refresh_view_content(self) -> None:
         """Refresh the view content without changing the underlying data."""
