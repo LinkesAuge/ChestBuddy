@@ -75,12 +75,14 @@ class CorrectionController(BaseController):
         self._view = view
         logger.debug("CorrectionController: View set")
 
-    def apply_corrections(self, only_invalid=False):
+    def apply_corrections(self, only_invalid=False, recursive=True, selected_only=False):
         """
         Apply corrections in a background thread.
 
         Args:
             only_invalid (bool): If True, only apply corrections to invalid cells
+            recursive (bool): If True, apply corrections recursively
+            selected_only (bool): If True, only apply to selected cells
         """
         # Clean up any existing worker
         self._cleanup_worker()
@@ -98,19 +100,30 @@ class CorrectionController(BaseController):
         self._worker.error.connect(self._on_corrections_error)
 
         # Start the task with the proper function and parameters
-        self._worker.run_task(self._apply_corrections_task, only_invalid=only_invalid)
+        self._worker.run_task(
+            self._apply_corrections_task,
+            only_invalid=only_invalid,
+            recursive=recursive,
+            selected_only=selected_only,
+        )
 
         # Start the worker (this starts the background thread)
         self._worker.start()
 
-        logger.info(f"Started applying corrections (only_invalid={only_invalid})")
+        logger.info(
+            f"Started applying corrections (only_invalid={only_invalid}, recursive={recursive}, selected_only={selected_only})"
+        )
 
-    def _apply_corrections_task(self, only_invalid=False, progress_callback=None):
+    def _apply_corrections_task(
+        self, only_invalid=False, recursive=True, selected_only=False, progress_callback=None
+    ):
         """
         Background task for applying corrections.
 
         Args:
             only_invalid (bool): If True, only apply corrections to invalid cells
+            recursive (bool): If True, apply corrections recursively
+            selected_only (bool): If True, only apply to selected cells
             progress_callback (callable): Function to report progress
 
         Returns:
@@ -121,7 +134,9 @@ class CorrectionController(BaseController):
             progress_callback(0, 100)
 
         # Apply corrections
-        correction_stats = self._correction_service.apply_corrections(only_invalid=only_invalid)
+        correction_stats = self._correction_service.apply_corrections(
+            only_invalid=only_invalid, recursive=recursive, selected_only=selected_only
+        )
 
         # Report final progress
         if progress_callback:
@@ -343,15 +358,27 @@ class CorrectionController(BaseController):
             self.correction_error.emit(f"Error clearing rules: {str(e)}")
             return False
 
-    def get_rules(self):
+    def get_rules(self, status=None):
         """
         Get all correction rules.
+
+        Args:
+            status (str, optional): Filter rules by status (e.g., "enabled", "disabled").
+                                   If None, returns all rules.
 
         Returns:
             List[CorrectionRule]: List of correction rules
         """
         try:
-            return self._rule_manager.get_rules()
+            rules = self._rule_manager.get_rules()
+
+            # Filter by status if specified
+            if status == "enabled":
+                return [rule for rule in rules if rule.enabled]
+            elif status == "disabled":
+                return [rule for rule in rules if not rule.enabled]
+
+            return rules
         except Exception as e:
             logger.error(f"Error getting correction rules: {e}")
             self.correction_error.emit(f"Error getting rules: {str(e)}")
