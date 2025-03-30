@@ -179,27 +179,18 @@ class TestCorrectionFeatureWorkflow:
         # 3. Apply corrections
         # Create a patched task that mimics the background worker
         with patch("chestbuddy.utils.background_processing.BackgroundWorker") as mock_worker_class:
-            # Create a mock worker that accepts the function and kwargs
+            # Create a mock worker instance
             mock_worker = MagicMock()
             mock_worker_class.return_value = mock_worker
             
-            # Patch the _update_correction_status method
-            with patch.object(correction_service, "_update_correction_status", return_value=None):
-                # Apply the corrections
-                correction_controller.apply_corrections()
-                
-                # Mock the behavior of the worker executing the task
-                # Extract the task function that was passed to the worker
-                task_func = mock_worker_class.call_args[0][0]
-                
-                # Call the task function directly
-                result = task_func(only_invalid=False)
-                
-                # Simulate the worker completing and emitting signals
-                correction_controller._on_corrections_completed(result)
-                
-                # Process events to ensure signals are emitted
-                process_events()
+            # Mock the run_task method
+            mock_worker.run_task.side_effect = lambda func, *args, **kwargs: func(*args, **kwargs)
+            
+            # Apply the corrections
+            correction_controller.apply_corrections()
+            
+            # Process events to ensure signals are emitted
+            process_events()
 
         # 4. Verify correction signals were emitted
         assert correction_started_spy.signal_triggered
@@ -276,18 +267,15 @@ class TestCorrectionFeatureWorkflow:
         ) as mock_apply:
             # Create a patched BackgroundWorker to avoid the initialization error
             with patch("chestbuddy.utils.background_processing.BackgroundWorker") as mock_worker_class:
-                # Create a mock worker that accepts the function and kwargs
+                # Create a mock worker instance
                 mock_worker = MagicMock()
                 mock_worker_class.return_value = mock_worker
                 
+                # Mock the run_task method to raise an exception
+                mock_worker.run_task.side_effect = lambda func, *args, **kwargs: correction_controller._on_corrections_error("Error during correction: Test error")
+                
                 # Try to apply corrections
                 correction_controller.apply_corrections()
-                
-                # Extract the task function that was passed to the worker
-                task_func = mock_worker_class.call_args[0][0]
-                
-                # Manually trigger the error handling
-                correction_controller._on_corrections_error("Error during correction: Test error")
                 
                 # Process events to ensure signals are emitted
                 process_events()
