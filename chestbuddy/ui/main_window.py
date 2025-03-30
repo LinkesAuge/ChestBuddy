@@ -56,6 +56,7 @@ from chestbuddy.ui.views.chart_view_adapter import ChartViewAdapter
 from chestbuddy.ui.widgets import ProgressDialog, ProgressBar
 from chestbuddy.ui.data_view import DataView
 import pandas as pd
+from chestbuddy.utils.service_locator import ServiceLocator
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -563,11 +564,8 @@ class MainWindow(QMainWindow):
         from chestbuddy.ui.views.correction_view import CorrectionView
         from chestbuddy.core.controllers.correction_controller import CorrectionController
 
-        # Get correction controller from the app
-        app = QApplication.instance()
-        correction_controller = None
-        if hasattr(app, "get_correction_controller"):
-            correction_controller = app.get_correction_controller()
+        # Get correction controller from the ServiceLocator
+        correction_controller = ServiceLocator.get("correction_controller", None)
 
         # Create the new correction view
         correction_view = CorrectionView(
