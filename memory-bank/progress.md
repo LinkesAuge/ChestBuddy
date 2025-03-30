@@ -1,13 +1,74 @@
 ---
 title: Progress Tracking - ChestBuddy Application
-date: 2024-03-29
+date: 2024-04-21
 ---
 
 # ChestBuddy Progress
 
-## Current Phase: Configuration System Enhancement
+## Current Phase: Correction Feature Refactoring
 
-This phase focuses on improving the configuration management system to ensure settings persistence, validation, and user-friendly interaction.
+This phase focuses on implementing a more targeted, mapping-based approach for data corrections, replacing the existing general correction strategies with a precise system for mapping incorrect values to their correct equivalents.
+
+### Completed Tasks
+
+1. **Core Data Model Implementation**
+   - Implemented `CorrectionRule` model class with support for:
+     - Different categories (player, chest_type, source, general)
+     - Rule status management (enabled/disabled)
+     - Rule prioritization with order attribute
+     - Serialization/deserialization for CSV storage
+     - Equality comparison for testing
+   - Implemented `CorrectionRuleManager` with:
+     - CRUD operations for rules
+     - CSV loading/saving with proper encoding
+     - Rule filtering by category, status, etc.
+     - Rule prioritization logic
+   - Created comprehensive unit tests:
+     - 10 tests for `CorrectionRule` covering all functionality
+     - 20 tests for `CorrectionRuleManager` including edge cases
+     - All tests passing successfully
+
+2. **Services Layer Implementation**
+   - Implemented `CorrectionService` class with:
+     - Two-pass correction algorithm (general rules first, then category-specific)
+     - Support for applying corrections to all cells or only invalid cells
+     - Methods for previewing corrections before applying
+     - Correction history tracking
+     - Case sensitivity options for matching
+     - Integration with data model and validation service
+   - Created comprehensive unit tests:
+     - 17 tests covering all functionality and edge cases
+     - Includes tests for initialization, rule application, previews, and history
+     - All tests passing successfully
+
+### In Progress
+
+1. **Controller Layer Development**
+   - Designing the `CorrectionController` following test-driven development approach
+   - Planning integration with UI components
+   - Implementing background processing for performance
+   - Developing event-based communication
+
+### Next Steps
+
+1. Complete the `CorrectionController` implementation
+2. Create UI components for rule management
+3. Integrate the correction feature with the existing data view
+4. Implement performance optimizations for large datasets
+
+### Implementation Approach
+
+We are following a strict test-driven development approach for this feature:
+1. First creating comprehensive tests for each component
+2. Implementing the components to pass the tests
+3. Integrating with existing systems
+4. Validating the integrated functionality
+
+This approach helps ensure robust, well-designed components that work correctly and handle edge cases appropriately.
+
+## Previous Phase: Configuration System Enhancement [COMPLETED]
+
+This phase focused on improving the configuration management system to ensure settings persistence, validation, and user-friendly interaction.
 
 ### Completed Tasks
 
@@ -67,41 +128,6 @@ This phase focuses on improving the configuration management system to ensure se
    - Ensured consistent styling with application's dark theme and gold highlights
    - Improved user experience by providing a single interface for bulk operations
    - Updated views initialization to include the new dialog component
-
-### In Progress
-
-1. **Testing and refinement of configuration system**
-   - ✅ Created comprehensive test plan with 35+ test cases across 7 categories
-   - ✅ Implemented detailed unit tests for ConfigManager enhancements:
-     - Boolean value handling with extensive parametrized tests
-     - Error recovery for corrupted or missing config files
-     - Configuration migration from older formats
-     - Performance testing with large configurations
-   - ✅ Enhanced ConfigManager.get_bool() to support additional boolean formats (Y/N)
-   - ✅ Implemented ValidationService integration tests:
-     - Testing configuration loading during service initialization
-     - Verifying preference updates properly propagate to configuration
-     - Testing case sensitivity and auto-save behaviors
-     - Created dedicated test script for running these tests
-   - ✅ Fixed integration test issues:
-     - Added proper path resolution tests for validation lists
-     - Fixed test failures in ConfigManager import/export tests
-     - Properly skipped UI-dependent tests that couldn't be run in CI environment
-     - Created a versatile test runner with command-line options
-   - Planning manual test scenarios following the test plan
-
-2. **Addressing non-critical issues**
-   - Monitoring for signal connection issues in application logs
-   - Looking into UpdateManager service registration warnings
-   - Investigating Unicode encoding errors in logging system
-
-### Next Steps
-
-1. Create test scripts/utilities for manual testing
-2. Perform manual testing according to the test plan
-3. Document test results and address any issues found
-4. Update documentation for the configuration system components
-5. Consider improvements to the settings UI based on testing feedback
 
 ## Previous Phase: UI Performance Optimization [COMPLETED]
 
