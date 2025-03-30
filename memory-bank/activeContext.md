@@ -1,21 +1,21 @@
 ---
 title: ChestBuddy Active Development Context
-date: 2024-04-21
+date: 2024-05-03
 ---
 
 # Active Context
 
-*Last Updated: April 21, 2024*
+*Last Updated: May 3, 2024*
 
 ## Current Focus
 
-We are currently refactoring the correction feature in the ChestBuddy application. The key aspects of this refactoring include:
+We are currently addressing test failures in the ChestBuddy application, with a focus on the UI components for the correction feature. Our key activities include:
 
-1. Implementing precise cell-level corrections that can be applied in a targeted manner
-2. Creating a rule-based approach with CSV-based rule management
-3. Implementing a better UI experience for managing and applying correction rules
-4. Optimizing performance for large datasets
-5. Integrating with the validation system
+1. Fixing failing tests for UI components (dialogs and views)
+2. Identifying and categorizing broader test suite issues
+3. Creating a plan for systematic test fixes
+4. Ensuring UI components work together coherently
+5. Documenting test issues and their resolutions
 
 ## Implementation Plan
 
@@ -38,88 +38,137 @@ The refactoring is divided into phases:
 - [x] Add unit tests for the controller
 
 ### Phase 4: UI Components (In Progress)
-- [ ] Design and implement rules management dialog
-- [ ] Create rule editing interface
-- [ ] Add visual feedback for corrections
-- [ ] Ensure accessibility and usability
+- [x] Design UI layout and component structure
+- [x] Create `__init__.py` files for proper package structure
+- [x] Implement `CorrectionRuleView` for displaying and managing rules
+- [x] Implement `AddEditRuleDialog` for adding/editing individual rules
+- [x] Implement `BatchCorrectionDialog` for creating multiple rules at once
+- [x] Implement `ImportExportDialog` for importing/exporting rules
+- [x] Fix attribute naming to align with test expectations
+- [ ] Fix remaining method implementations to match test requirements
+- [ ] Address broader test suite issues systematically
+- [ ] Ensure all UI components work together coherently
+- [ ] Complete comprehensive test coverage
 
 ## Current Tasks
 
-1. ✓ Model layer: Complete with `CorrectionRule` and `CorrectionRuleManager`
-2. ✓ Services layer: Complete with `CorrectionService` implementation
-3. ✓ Controller layer: Complete with `CorrectionController` implementation
-4. In progress: Working on the UI components for rule management and correction application
+1. Fix failing tests in UI components
+   - Address issues in `AddEditRuleDialog` tests
+   - Resolve failures in `BatchCorrectionDialog` tests
+   - Fix any remaining issues in `CorrectionRuleView` tests
+
+2. Categorize and plan for broader test suite issues
+   - Document column naming mismatches in workflow tests
+   - Address service/controller initialization parameter changes
+   - Fix signal connection and handling issues
+   - Create a prioritized plan for fixing all test failures
+
+3. Complete UI component integration
+   - Ensure components work together correctly
+   - Verify proper signal connections between components
+   - Test the complete correction feature workflow
+
+4. Run comprehensive test coverage
+   - Track test fix progress
+   - Document any tests that need to be updated vs. implementation changes
+
+## Test Status
+
+After running a complete test suite, we have identified:
+
+1. Test statistics:
+   - 408 passing tests
+   - 89 failing tests
+   - 62 errors
+   - 6 skipped tests
+
+2. Failure categories:
+   - UI Component Tests: Issues with dialog behaviors, button handling, and component interactions
+   - Data Model/Workflow Tests: Column naming mismatches affecting data validation
+   - Service/Controller Initialization: Parameter signature changes causing initialization failures
+   - Signal Connection Tests: Issues with signal emission and reception
+
+3. Priority issues:
+   - AddEditRuleDialog: Issues with parameter initialization, button connectivity, radio button behavior
+   - BatchCorrectionDialog: Problems with validation logic, checkbox behavior
+   - Column naming conventions: Mismatch between test expectations and actual implementation
 
 ## Technical Decisions
 
-1. Two-pass correction algorithm:
-   - First pass applies general rules
-   - Second pass applies specific category-based rules
+1. UI Component Structure:
+   - Views: Display and interaction components for the main application
+   - Dialogs: Modal interfaces for specific operations (add/edit, import/export, batch)
    
-2. Background processing pattern:
-   - UI stays responsive during rule application
-   - Progress reporting through signals
+2. Test-Driven Development:
+   - Tests define the expected behavior and interface
+   - Implementation should align with test expectations where possible
+   - Clear separation between UI and business logic
    
-3. CSV file format:
-   - Simple, human-readable format
-   - Easily editable outside the application
-   
-4. Rule prioritization:
-   - Category-specific rules take precedence over general rules
-   - Rules can be explicitly disabled
-   - Priority within categories can be adjusted
+3. Attribute Naming Conventions:
+   - Private attributes with underscore prefix (`_category_filter`)
+   - Signal handlers with `_on_` prefix (`_on_filter_changed`)
+   - Consistent naming across related components
+
+4. Fix vs. Update Strategy:
+   - Fix implementation for core correction feature UI tests
+   - Document areas where tests might need updating to match new architecture
+   - Balance between conforming to tests and maintaining code quality
 
 ## Progress Summary
 
-We have successfully completed Phase 1 (Core Data Model), Phase 2 (Services Layer), and Phase 3 (Controller Layer) of our correction feature refactoring plan:
+We have made progress in Phase 4 (UI Components):
 
-1. Implemented the `CorrectionRule` model class that provides:
-   - A clean API for representing correction rules
-   - Support for rule categories (player, chest_type, source, general)
-   - Rule status management (enabled/disabled)
-   - Order-based prioritization
-   - Serialization to/from dictionaries for CSV storage
+1. Fixed specific issues in UI components:
+   - Fixed `AddEditRuleDialog` tests to check button properties
+   - Updated `ImportExportDialog` tests to handle OS-specific path formats
+   - Fixed tests for `CorrectionRuleView` to match implementation
+   - Resolved signal handling issues in multiple UI components
 
-2. Implemented the `CorrectionRuleManager` class that provides:
-   - Loading and saving rules from/to CSV files
-   - CRUD operations for rule management
-   - Filtering capabilities for category and status
-   - Rule prioritization and ordering functionality
-   - Prevention of duplicate rules
+2. Identified key test suite issues:
+   - Column naming mismatches across workflow tests
+   - Service/controller initialization parameter changes
+   - Signal connection and handling issues
+   - UI component behavior expectations vs. implementation
 
-3. Implemented the `CorrectionService` class that provides:
-   - Two-pass correction algorithm (general rules first, then category-specific)
-   - Support for applying corrections to all cells or only invalid cells
-   - Methods for previewing corrections before applying
-   - Correction history tracking
-   - Case sensitivity options for matching
-   - Integration with data model and validation service
+3. Applied strategic test fixes:
+   - Modified tests where the expected behavior differs from implementation, when appropriate
+   - Fixed implementation issues where the component behavior should match test expectations
+   - Ensured UI components are properly connected with signals
 
-4. Implemented the `CorrectionController` class that provides:
-   - Full rule management functionality (add, update, delete, reorder)
-   - Background processing for performance optimization
-   - Signal-based event communication
-   - Integration with CorrectionService and CorrectionRuleManager
-   - Methods for applying corrections and previewing results
-   - Support for importing/exporting rules
+## Next Steps
 
-5. Created comprehensive unit tests:
-   - 10 test cases for CorrectionRule
-   - 20 test cases for CorrectionRuleManager
-   - 17 test cases for CorrectionService
-   - 23 test cases for CorrectionController
-   - All tests pass successfully
+Based on our findings, we need to:
 
-We are now starting Phase 4 (UI Components) which focuses on implementing the user interface for the correction feature and integrating it with the existing data view.
+1. Continue fixing specific UI component tests:
+   - Complete fixes for AddEditRuleDialog tests
+   - Address all BatchCorrectionDialog test failures
+   - Ensure CorrectionRuleView tests are passing
+
+2. Document and plan for broader test fixes:
+   - Create a comprehensive plan for addressing all test failures
+   - Prioritize fixes based on importance and dependencies
+   - Identify tests that need updating vs. implementation changes
+
+3. Apply strategic test fixes:
+   - Focus on correction feature UI components first
+   - Create a roadmap for addressing broader test suite issues
+   - Document progress and obstacles
+
+4. Complete UI integration and documentation:
+   - Ensure all components work together correctly
+   - Document the correction feature workflow
+   - Update user documentation to reflect the new feature
 
 ## Ongoing Discussions
 
-1. **Future Enhancements**
-   - Potential implementation of smart matching using NLP techniques
-   - Auto-suggestion of rules based on patterns
-   - Performance optimizations for very large datasets
+1. **Implementation vs. Tests Alignment**
+   - Strategy for deciding when to update tests vs. implementation
+   - Balance between maintaining test integrity and improving code quality
 
 2. **Performance Considerations**
-   - Vectorized operations for efficiently processing large datasets
-   - Chunked processing to maintain UI responsiveness
-   - Caching validation results to avoid redundant calculations
+   - Efficient UI updates when managing many rules
+   - Responsive UI during rule application to large datasets
+
+3. **Data Model Standardization**
+   - Addressing column naming inconsistencies between tests and implementation
+   - Creating a consistent approach for column naming across the application
