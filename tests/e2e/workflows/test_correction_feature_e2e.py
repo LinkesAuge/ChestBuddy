@@ -2,7 +2,7 @@
 test_correction_feature_e2e.py
 
 End-to-end test for the data correction feature, testing the complete workflow from
-loading data with errors, defining correction rules, applying corrections, and 
+loading data with errors, defining correction rules, applying corrections, and
 exporting the corrected data.
 """
 
@@ -69,11 +69,9 @@ class TestCorrectionFeatureWorkflow:
     @pytest.fixture
     def sample_data_with_errors(self):
         """Create data with specific errors for correction testing."""
-        return TestDataFactory.create_data_with_specific_errors({
-            "player": 3,
-            "chest": 2,
-            "source": 2
-        })
+        return TestDataFactory.create_data_with_specific_errors(
+            {"player": 3, "chest": 2, "source": 2}
+        )
 
     @pytest.fixture
     def test_rules(self):
@@ -83,62 +81,63 @@ class TestCorrectionFeatureWorkflow:
                 from_value="InvalidPlayer0",
                 to_value="Player1",
                 category="player",
-                description="Fix invalid player name",
                 status="enabled"
             ),
             CorrectionRule(
                 from_value="InvalidPlayer1",
                 to_value="Player2",
                 category="player",
-                description="Fix another invalid player name",
                 status="enabled"
             ),
             CorrectionRule(
                 from_value="InvalidPlayer2",
                 to_value="Player3",
                 category="player",
-                description="Fix third invalid player name",
                 status="enabled"
             ),
             CorrectionRule(
                 from_value="InvalidChest0",
                 to_value="Chest1",
                 category="chest",
-                description="Fix invalid chest name",
                 status="enabled"
             ),
             CorrectionRule(
                 from_value="InvalidChest1",
                 to_value="Chest2",
                 category="chest",
-                description="Fix another invalid chest name",
                 status="enabled"
             ),
             CorrectionRule(
                 from_value="InvalidSource0",
                 to_value="Source1",
                 category="source",
-                description="Fix invalid source name",
                 status="enabled"
             ),
             CorrectionRule(
                 from_value="InvalidSource1",
                 to_value="Source2",
                 category="source",
-                description="Fix another invalid source name",
                 status="enabled"
             ),
         ]
         return rules
 
-    def test_complete_correction_workflow(self, qtbot, enhanced_qtbot, 
-                                         data_model, validation_service, 
-                                         rule_manager, correction_service, 
-                                         correction_controller, sample_data_with_errors,
-                                         test_rules, temp_data_dir):
+    def test_complete_correction_workflow(
+        self,
+        qtbot,
+        enhanced_qtbot,
+        data_model,
+        validation_service,
+        rule_manager,
+        correction_service,
+        correction_controller,
+        sample_data_with_errors,
+        test_rules,
+        temp_data_dir,
+    ):
         """
         Test the complete correction workflow from loading data to exporting corrected data.
-        
+
         This test:
         1. Loads data with errors
         2. Adds correction rules
@@ -149,90 +148,99 @@ class TestCorrectionFeatureWorkflow:
         """
         # Add signal spies
         correction_started_spy = enhanced_qtbot.add_spy(correction_controller.correction_started)
-        correction_completed_spy = enhanced_qtbot.add_spy(correction_controller.correction_completed)
-        
+        correction_completed_spy = enhanced_qtbot.add_spy(
+            correction_controller.correction_completed
+        )
+
         # 1. Load data with errors into the model
-        data_model.update_data(sample_data_with_errors.data)
-        
+        data_df = pd.DataFrame(sample_data_with_errors.data)
+        data_model.update_data(data_df)
+
         # Get data from the model
         data = data_model.get_data()
         assert data is not None, "Model should have data after update"
-        
+
         # Verify data has errors (check for "Invalid" strings in key columns)
         has_invalid_players = any("Invalid" in str(player) for player in data["PLAYER"])
         has_invalid_chests = any("Invalid" in str(chest) for chest in data["CHEST"])
         has_invalid_sources = any("Invalid" in str(source) for source in data["SOURCE"])
-        
+
         assert has_invalid_players, "Test data should contain invalid player names"
         assert has_invalid_chests, "Test data should contain invalid chest names"
         assert has_invalid_sources, "Test data should contain invalid source names"
-        
+
         # 2. Add correction rules
         for rule in test_rules:
             rule_manager.add_rule(rule)
-        
+
         # Verify rules were added
         assert len(rule_manager.get_rules()) == len(test_rules)
-        
+
         # 3. Apply corrections
         with patch.object(correction_service, "_update_correction_status", return_value=None):
             # Apply the corrections
             correction_controller.apply_corrections()
-            
+
             # Process events to ensure signals are emitted
             process_events()
-            
+
         # 4. Verify correction signals were emitted
         assert correction_started_spy.signal_triggered
         assert correction_completed_spy.signal_triggered
-        
+
         # Get the statistics from the completion signal
         correction_stats = correction_completed_spy.args[0]
-        
+
         # Verify corrections were applied
         assert correction_stats["total_corrections"] > 0
         assert correction_stats["corrected_rows"] > 0
         assert correction_stats["corrected_cells"] > 0
-        
+
         # Get updated data
         data = data_model.get_data()
-        
+
         # Verify data no longer has errors
         has_invalid_players = any("Invalid" in str(player) for player in data["PLAYER"])
         has_invalid_chests = any("Invalid" in str(chest) for chest in data["CHEST"])
         has_invalid_sources = any("Invalid" in str(source) for source in data["SOURCE"])
-        
+
         assert not has_invalid_players, "Player names should be corrected"
         assert not has_invalid_chests, "Chest names should be corrected"
         assert not has_invalid_sources, "Source names should be corrected"
-        
+
         # 5. Export the corrected data
         export_path = temp_data_dir / "corrected_data.csv"
-        
+
         # Use pandas to export the data
         data.to_csv(export_path, index=False)
-        
+
         # 6. Verify the exported data
         assert export_path.exists(), "Export file should exist"
-        
+
         # Read back the exported data
         exported_data = pd.read_csv(export_path)
-        
+
         # Verify exported data does not have errors
         has_invalid_players = any("Invalid" in str(player) for player in exported_data["PLAYER"])
         has_invalid_chests = any("Invalid" in str(chest) for chest in exported_data["CHEST"])
         has_invalid_sources = any("Invalid" in str(source) for source in exported_data["SOURCE"])
-        
+
         assert not has_invalid_players, "Exported data should not have invalid player names"
         assert not has_invalid_chests, "Exported data should not have invalid chest names"
         assert not has_invalid_sources, "Exported data should not have invalid source names"
 
-    def test_correction_error_handling(self, qtbot, enhanced_qtbot, 
-                                      data_model, correction_service, 
-                                      correction_controller, sample_data_with_errors):
+    def test_correction_error_handling(
+        self,
+        qtbot,
+        enhanced_qtbot,
+        data_model,
+        correction_service,
+        correction_controller,
+        sample_data_with_errors,
+    ):
         """
         Test error handling in the correction workflow.
-        
+
         This test:
         1. Sets up correction service to fail
         2. Attempts to apply corrections
@@ -240,24 +248,28 @@ class TestCorrectionFeatureWorkflow:
         """
         # Add signal spy for error signal
         error_spy = enhanced_qtbot.add_spy(correction_controller.correction_error)
-        
+
         # Load data
-        data_model.update_data(sample_data_with_errors.data)
-        
+        data_df = pd.DataFrame(sample_data_with_errors.data)
+        data_model.update_data(data_df)
+
         # Mock correction service to raise an exception
-        with patch.object(correction_service, "apply_corrections", side_effect=Exception("Test error")):
+        with patch.object(
+            correction_service, "apply_corrections", side_effect=Exception("Test error")
+        ):
             # Try to apply corrections
             correction_controller.apply_corrections()
-            
+
             # Process events to ensure signals are emitted
             process_events()
-        
+
         # Verify error signal was emitted
         assert error_spy.signal_triggered
-        
+
         # Verify error message
         error_message = error_spy.args[0]
         assert "error" in error_message.lower()
+
 
 if __name__ == "__main__":
     pytest.main(["-xvs", __file__])
