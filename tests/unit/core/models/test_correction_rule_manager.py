@@ -321,3 +321,39 @@ class TestCorrectionRuleManager:
 
         # Verify that to_csv was called
         assert mock_dataframe.to_csv.called
+
+    def test_get_rules_by_search_term(self, sample_rules):
+        """Test getting rules filtered by search term."""
+        manager = CorrectionRuleManager()
+        for rule in sample_rules:
+            manager.add_rule(rule)
+
+        # Add a rule with a specific term in description
+        search_rule = CorrectionRule("SearchResult", "SearchTerm", "general", "enabled", 5)
+        search_rule.description = "This is a searchable description"
+        manager.add_rule(search_rule)
+
+        # Test search in from_value
+        result = manager.get_rules(search_term="Search")
+        assert len(result) == 1
+        assert result[0].to_value == "SearchResult"
+
+        # Test search in to_value
+        result = manager.get_rules(search_term="Term")
+        assert len(result) == 1
+        assert result[0].from_value == "SearchTerm"
+
+        # Test search in description
+        result = manager.get_rules(search_term="searchable")
+        assert len(result) == 1
+        assert "searchable" in result[0].description.lower()
+
+        # Test combining search with category and status
+        player_rule = CorrectionRule("PlayerSearch", "PlayerTarget", "player", "enabled", 6)
+        manager.add_rule(player_rule)
+
+        result = manager.get_rules(category="player", status="enabled", search_term="Search")
+        assert len(result) == 1
+        assert result[0].to_value == "PlayerSearch"
+        assert result[0].category == "player"
+        assert result[0].status == "enabled"

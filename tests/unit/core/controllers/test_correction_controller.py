@@ -289,11 +289,27 @@ class TestCorrectionController:
 
     def test_get_rules(self, controller, mock_rule_manager):
         """Test getting rules."""
-        # Get the rules
+        # Test with category and status parameters
         rules = controller.get_rules(category="player", status="enabled")
 
         # Verify the rule manager was called with the correct parameters
-        mock_rule_manager.get_rules.assert_called_once_with(category="player", status="enabled")
+        mock_rule_manager.get_rules.assert_called_once_with(
+            category="player", status="enabled", search_term=None
+        )
+
+        # Verify the result
+        assert rules == mock_rule_manager.get_rules.return_value
+
+        # Reset the mock
+        mock_rule_manager.reset_mock()
+
+        # Test with category, status, and search_term parameters
+        rules = controller.get_rules(category="player", status="enabled", search_term="test")
+
+        # Verify the rule manager was called with all parameters including search_term
+        mock_rule_manager.get_rules.assert_called_once_with(
+            category="player", status="enabled", search_term="test"
+        )
 
         # Verify the result
         assert rules == mock_rule_manager.get_rules.return_value

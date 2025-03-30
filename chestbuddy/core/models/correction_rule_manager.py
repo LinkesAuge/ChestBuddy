@@ -164,7 +164,10 @@ class CorrectionRuleManager:
             raise IndexError(f"Rule index out of range: {index}")
 
     def get_rules(
-        self, category: Optional[str] = None, status: Optional[str] = None
+        self,
+        category: Optional[str] = None,
+        status: Optional[str] = None,
+        search_term: Optional[str] = None,
     ) -> List[CorrectionRule]:
         """
         Get rules with optional filtering.
@@ -172,6 +175,8 @@ class CorrectionRuleManager:
         Args:
             category: Filter by rule category (player, chest_type, etc.)
             status: Filter by rule status (enabled, disabled)
+            search_term: Filter rules that contain the search term in 'from_value',
+                         'to_value', or 'description'. Case-insensitive.
 
         Returns:
             List[CorrectionRule]: Filtered rules
@@ -183,6 +188,18 @@ class CorrectionRuleManager:
 
         if status:
             result = [rule for rule in result if rule.status == status]
+
+        if search_term:
+            search_term = search_term.lower()
+            result = [
+                rule
+                for rule in result
+                if (
+                    (rule.from_value and search_term in rule.from_value.lower())
+                    or (rule.to_value and search_term in rule.to_value.lower())
+                    or (rule.description and search_term in rule.description.lower())
+                )
+            ]
 
         return result
 
