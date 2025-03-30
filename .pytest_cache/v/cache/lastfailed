@@ -137,5 +137,18 @@
   "tests/ui/views/test_settings_tab_view.py::test_setting_change_signal": true,
   "tests/ui/views/test_settings_tab_view.py::test_export_import_signals": true,
   "tests/ui/views/test_settings_tab_view.py::test_reset_signals": true,
-  "tests/ui/views/test_settings_tab_view.py::test_refresh": true
+  "tests/ui/views/test_settings_tab_view.py::test_refresh": true,
+  "tests/unit/core/controllers/test_correction_controller.py::TestCorrectionController::test_add_rule": true,
+  "tests/unit/core/controllers/test_correction_controller.py::TestCorrectionController::test_update_rule": true,
+  "tests/unit/core/controllers/test_correction_controller.py::TestCorrectionController::test_delete_rule": true,
+  "tests/unit/core/controllers/test_correction_controller.py::TestCorrectionController::test_reorder_rule": true,
+  "tests/unit/core/controllers/test_correction_controller.py::TestCorrectionController::test_move_rule_to_top": true,
+  "tests/unit/core/controllers/test_correction_controller.py::TestCorrectionController::test_move_rule_to_bottom": true,
+  "tests/unit/core/controllers/test_correction_controller.py::TestCorrectionController::test_toggle_rule_status": true,
+  "tests/unit/core/controllers/test_correction_controller.py::TestCorrectionController::test_get_rules": true,
+  "tests/unit/core/controllers/test_correction_controller.py::TestCorrectionController::test_get_prioritized_rules": true,
+  "tests/unit/core/controllers/test_correction_controller.py::TestCorrectionController::test_get_correction_preview": true,
+  "tests/unit/core/controllers/test_correction_controller.py::TestCorrectionController::test_import_rules": true,
+  "tests/unit/core/controllers/test_correction_controller.py::TestCorrectionController::test_export_rules": true,
+  "tests/unit/ui/views/test_correction_rule_view.py::TestCorrectionRuleView::test_apply_corrections": true
 }

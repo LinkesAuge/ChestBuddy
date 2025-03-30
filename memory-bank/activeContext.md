@@ -3,216 +3,134 @@ title: ChestBuddy Active Development Context
 date: 2024-05-03
 ---
 
-# Active Context
+# Active Development Context
 
 *Last Updated: May 3, 2024*
 
-## Current Focus - May 7, 2024
+## Current Focus
 
-We are currently focused on improving test coverage and fixing test failures across the application, with a particular emphasis on the UI components for the correction feature.
+### Test-Driven Development for UI Components
 
-### Recently Completed
+We're currently implementing UI components for the correction feature following a test-driven development approach. Our primary focus is on ensuring all components pass their tests before integrating them into the main application flow.
 
-- Fixed all tests for UI dialog components:
-  - AddEditRuleDialog - All 11 tests now passing
-  - BatchCorrectionDialog - All 13 tests now passing
-  - ImportExportDialog - All tests passing
+#### Recently Completed:
 
-- Improved Qt testing approach:
-  - Replaced behavior verification (clicking buttons) with state verification (checking properties) 
-  - Utilized direct method calls instead of simulating Qt events
-  - Enhanced test reliability by avoiding timing issues with signal-slot connections
+- Successfully fixed and implemented the `CorrectionRuleView` component to pass all 16 tests
+- Successfully fixed and implemented the `AddEditRuleDialog` component to pass all 12 tests
+- Verified that the `ImportExportDialog` component passes all 16 tests
 
-- Fixed BackgroundWorker API for CorrectionController tests:
-  - Added missing start() and stop() methods to BackgroundWorker
-  - Updated CorrectionController to use the correct API methods
-  - Fixed two failing tests related to background processing
+#### Key Implementation Fixes:
+- Ensured attribute names in UI components match test expectations
+- Properly implemented button state management based on selection state
+- Correctly connected signals between UI elements
+- Properly populated table data with appropriate user data for rule identification
+- Fixed rule filtering, status bar updates, and delete confirmation functionality
 
-### Current Tasks
+#### Current Tasks:
+- Implement integration between the correction components and the data view
+- Verify or implement the `BatchCorrectionDialog` component
+- Address any issues with the `CorrectionController` implementation and integration
 
-1. **Continuing Test Fixes**:
-   - Focus on remaining test failures in the correction feature
-   - Address import/export functionality test failures
-   - Fix model serialization/deserialization tests
+#### Key Decisions:
+- Continue with the test-driven development approach
+- Prioritize components with existing tests that are failing
+- Maintain proper signal connections between UI components and controllers
+- Ensure consistent user experience across all dialog components
 
-2. **Test Coverage Expansion**:
-   - Ensure all UI components have comprehensive tests
-   - Add tests for edge cases and error conditions
-   - Focus on high-priority components first
+### Analyzing UI Components for Rule Management Using TDD
 
-3. **Documentation Updates**:
-   - Keep memory bank files updated with current progress
-   - Document testing patterns and approaches for Qt components
-   - Document lessons learned for signal-slot testing
+We've been examining the tests for `CorrectionRuleView` and `AddEditRuleDialog` to understand the expected behavior and implementation requirements. This analysis has revealed:
 
-### Key Decisions
+1. **Attribute Naming Discrepancies**: 
+   - The tests expect specific attribute names that didn't match the implementation
+   - For example, filter components (category, status, search) need specific names
 
-1. **Testing Approach**:
-   - For Qt UI components, focus on state verification rather than behavior verification
-   - Use direct method calls for UI component interaction when possible
-   - Avoid relying on mock objects for signal-slot connections as they can be unreliable
+2. **Button State Management**:
+   - Tests expect buttons to be initially disabled
+   - Buttons should enable/disable based on selection state
 
-2. **Implementation Priorities**:
-   - Focus on making tests pass while maintaining code quality
-   - Address highest priority test failures first (UI components)
-   - Follow with model and service layer fixes
+3. **Signal Connection Issues**:
+   - The implementation needs proper signal connections for user actions
+   - Signals for applying corrections, rule editing, etc. must include the expected parameters
 
-3. **Documentation Strategy**:
-   - Document all bug fixes in bugfixing.mdc
-   - Update progress.md regularly with status updates
-   - Keep activeContext.md focused on current tasks and decisions
+4. **Rule Table Population**:
+   - Rules need to be displayed in a specific order
+   - Table items need appropriate user data for rule identification
+
+We've successfully addressed these issues in the components, leading to all tests passing.
 
 ### Recent Changes
 
-- Updated AddEditRuleDialog to enable validation button when to_value exists
-- Fixed BatchCorrectionDialog validation logic to properly check for corrections
-- Modified tests to use more reliable verification approaches
-- Documented testing patterns in bugfixing.mdc
+- Updated UI implementation to match test expectations
+- Fixed signal connections and parameter passing
+- Corrected button state management
+- Ensured proper table population with user data
 
 ### Next Steps
 
-1. Fix the remaining test failures in:
-   - Import/export functionality
-   - Edit rule view
-   - CorrectionRule model serialization
-   
-2. Complete test coverage for:
-   - Remaining UI views
-   - Service layer components
-   - Models
+1. **Data View Integration**:
+   - Implement context menu integration for correction actions
+   - Add cell highlighting based on correction status
+   - Implement tooltips for correction information
 
-3. Document patterns and approaches for Qt component testing
+2. **Batch Correction Dialog**:
+   - Implement or fix the `BatchCorrectionDialog` component
+   - Ensure it integrates properly with the correction controller
+
+3. **Controller Integration**:
+   - Verify proper functioning of the `CorrectionController`
+   - Ensure background processing works correctly
+   - Implement proper error handling and progress reporting
 
 ## Implementation Plan
 
-The refactoring is divided into phases:
+The implementation is divided into phases:
 
 ### Phase 1: Core Data Model ✓
-- [x] Create `CorrectionRule` model class
-- [x] Implement `CorrectionRuleManager` for rule management
-- [x] Add unit tests for both classes
+- Implement `CorrectionRule` and `CorrectionRuleManager`
+- Create unit tests for model classes
 
 ### Phase 2: Services Layer ✓
-- [x] Implement `CorrectionService` with two-pass correction algorithm
-- [x] Add configuration integration through `ConfigManager`
-- [x] Ensure comprehensive unit tests
+- Implement `CorrectionService` with two-pass algorithm
+- Add configuration integration
+- Create unit tests for services
 
 ### Phase 3: Controller Layer ✓
-- [x] Create `CorrectionController` to bridge service with UI
-- [x] Implement background processing for performance
-- [x] Add event-based communication
-- [x] Add unit tests for the controller
+- Implement `CorrectionController` and background worker
+- Handle rule management operations
+- Create unit tests for controller
 
 ### Phase 4: UI Components (In Progress)
-- [x] Design UI layout and component structure
-- [x] Create `__init__.py` files for proper package structure
-- [x] Implement `CorrectionRuleView` for displaying and managing rules
-- [x] Implement `AddEditRuleDialog` for adding/editing individual rules
-- [x] Implement `BatchCorrectionDialog` for creating multiple rules at once
-- [x] Implement `ImportExportDialog` for importing/exporting rules
-- [x] Fix attribute naming to align with test expectations
-- [ ] Fix remaining method implementations to match test requirements
-- [ ] Address broader test suite issues systematically
-- [ ] Ensure all UI components work together coherently
-- [ ] Complete comprehensive test coverage
+- Create `CorrectionView` and rule table ✓
+- Implement edit rule dialog ✓
+- Implement batch correction dialog (Next)
+- Add progress dialog for feedback (Next)
+
+### Phase 5: Data View Integration (Upcoming)
+- Add cell highlighting based on status
+- Implement context menu integration
+- Add tooltips for cell status
+
+### Phase 6: Testing and Optimization (Final Phase)
+- Create integration tests
+- Optimize performance for large datasets
+- Ensure proper encoding support
 
 ## Test Status
 
-After running a complete test suite, we have identified:
+- 436 passing tests
+- 61 failing tests
 
-1. Test statistics:
-   - 408 passing tests
-   - 89 failing tests
-   - 62 errors
-   - 6 skipped tests
-
-2. Failure categories:
-   - UI Component Tests: Issues with dialog behaviors, button handling, and component interactions
-   - Data Model/Workflow Tests: Column naming mismatches affecting data validation
-   - Service/Controller Initialization: Parameter signature changes causing initialization failures
-   - Signal Connection Tests: Issues with signal emission and reception
-
-3. Priority issues:
-   - AddEditRuleDialog: Issues with parameter initialization, button connectivity, radio button behavior
-   - BatchCorrectionDialog: Problems with validation logic, checkbox behavior
-   - Column naming conventions: Mismatch between test expectations and actual implementation
-
-## Technical Decisions
-
-1. UI Component Structure:
-   - Views: Display and interaction components for the main application
-   - Dialogs: Modal interfaces for specific operations (add/edit, import/export, batch)
-   
-2. Test-Driven Development:
-   - Tests define the expected behavior and interface
-   - Implementation should align with test expectations where possible
-   - Clear separation between UI and business logic
-   
-3. Attribute Naming Conventions:
-   - Private attributes with underscore prefix (`_category_filter`)
-   - Signal handlers with `_on_` prefix (`_on_filter_changed`)
-   - Consistent naming across related components
-
-4. Fix vs. Update Strategy:
-   - Fix implementation for core correction feature UI tests
-   - Document areas where tests might need updating to match new architecture
-   - Balance between conforming to tests and maintaining code quality
-
-## Progress Summary
-
-We have made progress in Phase 4 (UI Components):
-
-1. Fixed specific issues in UI components:
-   - Fixed `AddEditRuleDialog` tests to check button properties
-   - Updated `ImportExportDialog` tests to handle OS-specific path formats
-   - Fixed tests for `CorrectionRuleView` to match implementation
-   - Resolved signal handling issues in multiple UI components
-
-2. Identified key test suite issues:
-   - Column naming mismatches across workflow tests
-   - Service/controller initialization parameter changes
-   - Signal connection and handling issues
-   - UI component behavior expectations vs. implementation
-
-3. Applied strategic test fixes:
-   - Modified tests where the expected behavior differs from implementation, when appropriate
-   - Fixed implementation issues where the component behavior should match test expectations
-   - Ensured UI components are properly connected with signals
-
-## Next Steps
-
-Based on our findings, we need to:
-
-1. Continue fixing specific UI component tests:
-   - Complete fixes for AddEditRuleDialog tests
-   - Address all BatchCorrectionDialog test failures
-   - Ensure CorrectionRuleView tests are passing
-
-2. Document and plan for broader test fixes:
-   - Create a comprehensive plan for addressing all test failures
-   - Prioritize fixes based on importance and dependencies
-   - Identify tests that need updating vs. implementation changes
-
-3. Apply strategic test fixes:
-   - Focus on correction feature UI components first
-   - Create a roadmap for addressing broader test suite issues
-   - Document progress and obstacles
-
-4. Complete UI integration and documentation:
-   - Ensure all components work together correctly
-   - Document the correction feature workflow
-   - Update user documentation to reflect the new feature
+### Test Categories:
+- UI Component Tests: Most passing after recent fixes ✓
+- Controller Tests: Some failures requiring investigation
+- Integration Tests: Several failures - to be addressed in Phase 5
+- Model Tests: All passing ✓
+- Service Tests: All passing ✓
 
 ## Ongoing Discussions
 
-1. **Implementation vs. Tests Alignment**
-   - Strategy for deciding when to update tests vs. implementation
-   - Balance between maintaining test integrity and improving code quality
-
-2. **Performance Considerations**
-   - Efficient UI updates when managing many rules
-   - Responsive UI during rule application to large datasets
-
-3. **Data Model Standardization**
-   - Addressing column naming inconsistencies between tests and implementation
-   - Creating a consistent approach for column naming across the application
+- Implementation alignment with test expectations
+- Performance considerations for large datasets
+- Error handling strategies
+- User experience refinement

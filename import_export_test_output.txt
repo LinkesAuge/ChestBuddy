@@ -1,0 +1,27 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.9, pytest-8.3.5, pluggy-1.5.0 -- D:\Projekte\ChestBuddy\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+PySide6 6.8.2.1 -- Qt runtime 6.8.2 -- Qt compiled 6.8.2
+rootdir: D:\Projekte\ChestBuddy
+configfile: pytest.ini
+plugins: cov-6.0.0, mock-3.14.0, qt-4.4.0
+collecting ... collected 16 items
+
+tests/unit/ui/dialogs/test_import_export_dialog.py::TestImportExportDialog::test_import_initialization PASSED [  6%]
+tests/unit/ui/dialogs/test_import_export_dialog.py::TestImportExportDialog::test_export_initialization PASSED [ 12%]
+tests/unit/ui/dialogs/test_import_export_dialog.py::TestImportExportDialog::test_browse_button_import PASSED [ 18%]
+tests/unit/ui/dialogs/test_import_export_dialog.py::TestImportExportDialog::test_browse_button_export PASSED [ 25%]
+tests/unit/ui/dialogs/test_import_export_dialog.py::TestImportExportDialog::test_format_change PASSED [ 31%]
+tests/unit/ui/dialogs/test_import_export_dialog.py::TestImportExportDialog::test_get_file_path PASSED [ 37%]
+tests/unit/ui/dialogs/test_import_export_dialog.py::TestImportExportDialog::test_get_format PASSED [ 43%]
+tests/unit/ui/dialogs/test_import_export_dialog.py::TestImportExportDialog::test_accept_rejects_with_no_file_path PASSED [ 50%]
+tests/unit/ui/dialogs/test_import_export_dialog.py::TestImportExportDialog::test_accept_with_valid_file_path PASSED [ 56%]
+tests/unit/ui/dialogs/test_import_export_dialog.py::TestImportExportDialog::test_cancel_button PASSED [ 62%]
+tests/unit/ui/dialogs/test_import_export_dialog.py::TestImportExportDialog::test_import_button PASSED [ 68%]
+tests/unit/ui/dialogs/test_import_export_dialog.py::TestImportExportDialog::test_export_button PASSED [ 75%]
+tests/unit/ui/dialogs/test_import_export_dialog.py::TestImportExportDialog::test_validate_file_path PASSED [ 81%]
+tests/unit/ui/dialogs/test_import_export_dialog.py::TestImportExportDialog::test_path_with_incorrect_extension_import PASSED [ 87%]
+tests/unit/ui/dialogs/test_import_export_dialog.py::TestImportExportDialog::test_update_extension PASSED [ 93%]
+tests/unit/ui/dialogs/test_import_export_dialog.py::TestImportExportDialog::test_dialog_size PASSED [100%]
+
+============================= 16 passed in 4.29s ==============================
