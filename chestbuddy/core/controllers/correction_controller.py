@@ -89,7 +89,7 @@ class CorrectionController(BaseController):
         self.correction_started.emit("Applying correction rules")
 
         # Create a new worker for the background task
-        self._worker = BackgroundWorker(self._apply_corrections_task, only_invalid=only_invalid)
+        self._worker = BackgroundWorker()
 
         # Connect signals
         self._worker.started.connect(lambda: logger.debug("Correction task started"))
@@ -97,7 +97,10 @@ class CorrectionController(BaseController):
         self._worker.finished.connect(self._on_corrections_completed)
         self._worker.error.connect(self._on_corrections_error)
 
-        # Start the task
+        # Start the task with the proper function and parameters
+        self._worker.run_task(self._apply_corrections_task, only_invalid=only_invalid)
+
+        # Start the worker (this starts the background thread)
         self._worker.start()
 
         logger.info(f"Started applying corrections (only_invalid={only_invalid})")

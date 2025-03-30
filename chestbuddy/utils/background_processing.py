@@ -547,6 +547,23 @@ class BackgroundWorker(QObject):
         # Quit the thread (non-blocking)
         self._thread.quit()
 
+    def stop(self) -> None:
+        """
+        Stop the current task if one is running.
+        This is an alias for cancel() to maintain API compatibility.
+        """
+        self.cancel()
+
+    def start(self) -> None:
+        """
+        Start the worker.
+        This method exists for API compatibility; the actual starting is
+        handled in execute_task() or run_task().
+        """
+        # The thread is already started in execute_task or run_task,
+        # so this method just exists to maintain API compatibility
+        logger.debug("BackgroundWorker.start() called")
+
     @Slot()
     def _on_thread_started(self) -> None:
         """Handle thread started event."""
