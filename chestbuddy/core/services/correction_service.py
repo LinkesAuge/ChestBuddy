@@ -67,7 +67,7 @@ class CorrectionService:
         Returns:
             Dict[str, int]: Statistics about the corrections applied
         """
-        data = self._data_model.get_data()
+        data = self._data_model.data
         if data is None or data.empty:
             return {
                 "total_corrections": 0,
@@ -108,15 +108,15 @@ class CorrectionService:
             corrected_cells.add((row, col))
             total_corrections += 1
 
-        # Second pass: Apply category-specific rules (which will override general rules)
+        # Second pass: Apply category-specific rules
         for rule in prioritized_rules:
             if rule.status != "enabled" or rule.category == "general":
                 continue
 
-            # Apply the rule to the already partially corrected data
+            # Get corrections for this rule
             corrections = self._apply_rule_to_data(corrected_data, rule, only_invalid)
 
-            # Apply these corrections
+            # Apply corrections
             for row, col, _, new_value in corrections:
                 column_name = corrected_data.columns[col]
                 corrected_data.at[row, column_name] = new_value
@@ -128,12 +128,14 @@ class CorrectionService:
         if total_corrections > 0:
             self._data_model.update_data(corrected_data)
 
-        # Prepare statistics
+        # Record in history
         stats = {
             "total_corrections": total_corrections,
             "corrected_rows": len(corrected_rows),
             "corrected_cells": len(corrected_cells),
         }
+
+        self._correction_history.append({"stats": stats})
 
         return stats
 
@@ -148,7 +150,7 @@ class CorrectionService:
         Returns:
             Dict[str, int]: Statistics about the corrections applied
         """
-        data = self._data_model.get_data()
+        data = self._data_model.data
         if data is None or data.empty:
             return {
                 "total_corrections": 0,
@@ -192,30 +194,31 @@ class CorrectionService:
         self, data: pd.DataFrame, rule: CorrectionRule, only_invalid: bool
     ) -> List[Tuple[int, int, Any, Any]]:
         """
-        Apply a rule to the data and return a list of corrections.
+        Apply a rule to data and return corrections.
 
         Args:
-            data (pd.DataFrame): Data to apply corrections to
+            data (pd.DataFrame): Data to check against the rule
             rule (CorrectionRule): Rule to apply
-            only_invalid (bool): If True, only apply to invalid cells
+            only_invalid (bool): Whether to only consider invalid cells
 
         Returns:
-            List[Tuple[int, int, Any, Any]]: List of corrections as (row, col, old_value, new_value)
+            List[Tuple[int, int, Any, Any]]: List of (row, col, old_value, new_value) tuples
         """
         corrections = []
 
-        # Determine which columns to check based on rule category
+        # First, determine which columns to check
         columns_to_check = []
+
         if rule.category == "general":
-            # General rules apply to all columns
+            # For general rules, check all columns
             columns_to_check = list(range(len(data.columns)))
         else:
-            # Column-specific rules apply only to their respective column
-            for i, col_name in enumerate(data.columns):
-                # Map column names to categories
-                category_name = self._get_category_for_column(col_name)
-                if rule.category == category_name:
-                    columns_to_check.append(i)
+            # For category-specific rules, check only matching columns
+            for col_idx, col_name in enumerate(data.columns):
+                # Get category for this column
+                col_category = self._category_mapping.get(col_name, "").lower()
+                if col_category == rule.category.lower():
+                    columns_to_check.append(col_idx)
 
         # Check each cell in the applicable columns
         for col_idx in columns_to_check:
@@ -262,53 +265,83 @@ class CorrectionService:
         else:
             return value1.lower() == value2.lower()
 
-    def _get_category_for_column(self, column_name: str) -> str:
+    def get_correction_history(self) -> List[Dict]:
         """
-        Get the rule category corresponding to a column name.
-
-        Args:
-            column_name (str): The column name
+        Get the history of applied corrections.
 
         Returns:
-            str: The corresponding rule category
+            List[Dict]: History of corrections
         """
-        return self._category_mapping.get(column_name, column_name.lower())
+        return self._correction_history
+
+    def set_case_sensitive(self, case_sensitive: bool) -> None:
+        """
+        Set whether correction matching should be case-sensitive.
+
+        Args:
+            case_sensitive (bool): Whether to use case-sensitive matching
+        """
+        self._case_sensitive = case_sensitive
+
+    def get_case_sensitive(self) -> bool:
+        """
+        Get whether correction matching is case-sensitive.
+
+        Returns:
+            bool: Whether correction matching is case-sensitive
+        """
+        return self._case_sensitive
 
     def get_cells_with_available_corrections(self) -> List[Tuple[int, int]]:
         """
-        Get a list of cells that have available corrections.
+        Get list of cells that have available corrections.
 
         Returns:
             List[Tuple[int, int]]: List of (row, col) tuples for cells with corrections
         """
-        data = self._data_model.get_data()
+        data = self._data_model.data
         if data is None or data.empty:
             return []
 
         # Get all enabled rules
         rules = [r for r in self._rule_manager.get_rules() if r.status == "enabled"]
-
-        # If no rules, no corrections available
         if not rules:
             return []
 
-        # Track cells with available corrections
-        cells_with_corrections = set()
+        # Check all cells for potential corrections
+        correctable_cells = set()
 
-        # Process each rule
-        for rule in rules:
-            # Apply the rule to get potential corrections (but don't actually apply them)
-            corrections = self._apply_rule_to_data(data, rule, False)
+        for col_idx, col_name in enumerate(data.columns):
+            col_category = self._category_mapping.get(col_name, "").lower()
 
-            # Add the affected cells to our set
-            for row, col, _, _ in corrections:
-                cells_with_corrections.add((row, col))
+            # Get rules applicable to this column
+            applicable_rules = [
+                r for r in rules if r.category.lower() == col_category or r.category == "general"
+            ]
 
-        return list(cells_with_corrections)
+            # Skip if no applicable rules
+            if not applicable_rules:
+                continue
+
+            # Check each cell in this column
+            for row_idx in range(len(data)):
+                cell_value = data.at[row_idx, col_name]
+
+                # Skip empty or NaN values
+                if cell_value is None or (isinstance(cell_value, float) and np.isnan(cell_value)):
+                    continue
+
+                # Check if any rule matches this cell
+                for rule in applicable_rules:
+                    if self._values_match(str(cell_value), str(rule.from_value)):
+                        correctable_cells.add((row_idx, col_idx))
+                        break
+
+        return list(correctable_cells)
 
     def get_correction_preview(self, rule: CorrectionRule) -> List[Tuple[int, int, Any, Any]]:
         """
-        Get a preview of the corrections that would be applied by a rule.
+        Get preview of corrections that would be applied by a rule.
 
         Args:
             rule (CorrectionRule): Rule to preview
@@ -316,53 +349,39 @@ class CorrectionService:
         Returns:
             List[Tuple[int, int, Any, Any]]: List of (row, col, old_value, new_value) tuples
         """
-        data = self._data_model.get_data()
+        data = self._data_model.data
         if data is None or data.empty:
             return []
 
-        # Apply the rule to get potential corrections
+        # Apply the rule (without modifying data)
         return self._apply_rule_to_data(data, rule, False)
 
-    def create_rule_from_cell(
-        self, row: int, col: int, to_value: Any, use_general_category: bool = False
-    ) -> CorrectionRule:
+    def create_correction_rule_from_cell(self, row: int, col: int) -> CorrectionRule:
         """
-        Create a correction rule from a specific cell.
+        Create a correction rule from a cell's value.
 
         Args:
-            row (int): Row index of the cell
-            col (int): Column index of the cell
-            to_value (Any): Value to correct to
-            use_general_category (bool): If True, create a general category rule
+            row (int): Row index
+            col (int): Column index
 
         Returns:
             CorrectionRule: Created rule
         """
-        data = self._data_model.get_data()
+        data = self._data_model.data
 
         # Get column name and cell value
-        col_name = self._data_model.get_column_name(col)
+        col_name = data.columns[col]
         cell_value = data.at[row, col_name]
 
-        # Determine category
-        if use_general_category:
-            category = "general"
-        else:
-            category = self._get_category_for_column(col_name)
+        # Determine category from column name
+        category = self._category_mapping.get(col_name, "general").lower()
 
-        # Create the rule
-        return CorrectionRule(
-            to_value=to_value, from_value=cell_value, category=category, status="enabled", order=0
+        # Create rule (from_value=current value, to_value needs to be set by user)
+        rule = CorrectionRule(
+            from_value=str(cell_value), to_value="", category=category, status="enabled"
         )
 
-    def get_correction_history(self) -> List[Dict]:
-        """
-        Get the history of applied corrections.
-
-        Returns:
-            List[Dict]: List of history entries with rule and statistics
-        """
-        return deepcopy(self._correction_history)
+        return rule
 
     def clear_correction_history(self) -> None:
         """Clear the correction history."""
