@@ -634,88 +634,128 @@ We're updating our testing approach to match the new architecture:
 # Active Context
 
 ## Current Focus
-We are modernizing the UI architecture from a tab-based interface to a view-based approach. This involves:
 
-1. Refactoring the `MainWindow` to use a view-based approach rather than tabs
-2. Creating dedicated view controllers to manage state and navigation
-3. Updating tests to work with the new architecture
-4. Implementing the new ChartView approach throughout the application
+We are modernizing the UI architecture from a tab-based to a view-based approach. This involves updating existing components to use the new architecture and refactoring tests to match.
+
+The current focus is on updating the MainWindow tests to align with the new view-based architecture.
 
 ## Status
 
-### What's Working
-- ChartView implementation is complete and working well
-- MainWindow has been updated to use ChartView directly 
-- ChartView unit tests have been fixed and are now passing
-- First phase of MainWindow test updates created
+- ChartView implementation complete ✅
+- MainWindow updated to use ChartView directly ✅
+- ChartView unit tests fixed and passing ✅
+- MainWindow test update Phase 1 complete ✅
+  - Example test file created
+  - Utility script for analyzing tests
+  - Patterns for mocking view controllers
+- MainWindow test update Phase 2 complete ✅
+  - File operations tests updated
+  - Data loading/saving tests updated
+  - Menu interaction tests updated
 
-### What Needs Work
-- Several MainWindow tests still need to be updated due to changes in menu structure and file operations
-- ValidationTabView needs tests updated
-- Corrections and other views need test updates
-- Need to fix signal disconnection warnings
+- MainWindow test update Phase 3 in progress ⏳
+  - View interaction tests implemented ✅
+  - Controller interaction tests implemented ✅
+  - Helper script for running tests created ✅
+  - Signal handling tests pending
+  - Proper cleanup to prevent signal disconnection warnings pending
 
 ## Next Steps
-1. **Complete MainWindow Test Updates - Phase 1 ✓**
-   - Created example test file showing how to update tab-based tests to view-based architecture
-   - Created utility script for analyzing and updating tests
-   - Implemented patterns for properly mocking view controllers in tests
-   - Added tests for navigation, actions, and state updates
-   - Identified key issues with controller method names and menu structure
 
-2. **Address Phase 1 Findings ✓**
-   - Fixed controller method names in examples (`open_file` instead of `open_files`)
-   - Updated menu text assertions to match actual UI (`&Open...` instead of `&Open`)
-   - Documented signal disconnection warnings and planned fixes
-   - Created improved test patterns for view switching and navigation
+1. Complete MainWindow test update Phase 3
+   - Add tests for signal dispatching between controllers
+   - Fix signal disconnection warnings during test teardown
+   - Create integration tests for controller chains
+   - Update remaining dialog interaction tests
 
-3. **Complete MainWindow Test Updates - Phase 2 ✓**  
-   - Updated tests for file operations using the file_operations_controller
-     - Fixed method name references (open_file vs open_files)
-     - Added proper mock resets to prevent false positives
-     - Added tests for file dialog cancellation handling
-   - Updated tests for data loading/saving
-     - Added tests for data state changes
-     - Added tests for progress reporting
-     - Added tests for auto-save prompts
-   - Updated tests for menu interactions with correct menu text
-     - Created comprehensive menu existence tests
-     - Added tests for menu item enabling/disabling
-     - Added tests for keyboard shortcuts
+2. ValidationTabView
+   - Create comprehensive tests for ValidationTabView
+   - Ensure test coverage for validation result display
 
-4. **Complete MainWindow Test Updates - Phase 3**
-   - Update tests for view interaction
-   - Update tests for controller interaction
-   - Update tests for signal handling
-   - Implement proper cleanup to prevent signal disconnection warnings
+3. DashboardView
+   - Complete implementation
+   - Create tests for dashboard widgets
 
-5. **Update ValidationTabView Tests**
-   - Create fixtures for ValidationTabView
-   - Update validation tests
-
-6. **Complete DashboardView Implementation**
-   - Create DashboardView
-   - Create tests for DashboardView
-   - Integrate with MainWindow
-
-7. **Replace Legacy Components**
-   - Remove tab widget
-   - Replace with view controllers
-
-8. **Fix Signal Disconnection Warnings**
-   - Ensure all signals are properly disconnected on cleanup
+4. View Signal Management
+   - Improve signal connection/disconnection
+   - Add signal tracking for debugging
 
 ## Recent Changes
-- Refactored MainWindow to use view-based architecture
-- Updated ChartView to integrate directly with MainWindow
-- Created controller classes to manage functionality
-- Updated tests to work with view controllers instead of direct tab access
-- Created example test file and utility script for updating remaining tests
+
+- MainWindow refactored to use view-based architecture instead of tabs
+- ChartView now used directly in MainWindow
+- Tests updated to align with new architecture
+- Utility script created for analyzing and updating MainWindow tests
+
+- New test files created for view interaction and controller interaction testing
+- Comprehensive test coverage for view switching and navigation
+- Test coverage for controller integration and signal handling
+- Helper script created to run controller and view interaction tests
 
 ## Current Challenges
-- Test compatibility with the new architecture
-  - Addressing test failures due to architectural changes
-  - Updating test fixtures to work with the new controllers
-- Signal management
-  - Ensuring signals are properly connected/disconnected
-  - Managing signal chains between controllers and views
+
+- Signal disconnection warnings during test teardown need to be addressed
+- Some controllers lack proper disconnect methods
+- Need to establish consistent pattern for controller lifecycle management in tests
+- Integration testing between controllers is complex due to signal chains
+
+## MainWindow Test Update - Phase 1 (Completed)
+
+### Findings
+- Controller method names needed fixing (e.g., `open_file` vs. `open_files`)
+- Menu text assertions needed updating due to text changes
+- View switching requires using `view_state_controller` instead of direct tab access
+
+### Implementation
+- Created example test file with correct patterns
+- Created utility script for analyzing tests
+- Updated test fixtures with proper controller mocking
+
+## MainWindow Test Update - Phase 2 (Completed)
+
+### Updates Completed
+- File operations tests updated to use the `file_operations_controller`
+  - Fixed method name references (e.g., `open_file` vs. `open_files`)
+  - Added mock resets to prevent false positives
+  - Added tests for file dialog cancellation handling
+- Data loading/saving tests enhanced
+  - Added tests for data state changes
+  - Added tests for progress reporting
+  - Added tests for auto-save prompts
+- Menu interaction tests improved
+  - Added comprehensive menu existence tests
+  - Added enabling/disabling tests for menu items
+  - Added keyboard shortcut tests
+- Improved test patterns for view switching and navigation
+
+## MainWindow Test Update - Phase 3 (In Progress)
+
+### Updates Completed
+- View interaction tests implemented
+  - Created `test_main_window_view_interaction.py` with comprehensive tests
+  - Tested view navigation via sidebar
+  - Tested view navigation via menu actions
+  - Tested view state changes and data-dependent view protection
+  - Tested view history navigation
+- Controller interaction tests implemented
+  - Created `test_main_window_controller_interaction.py` with comprehensive tests
+  - Tested file operation controller integration
+  - Tested progress controller interactions
+  - Tested data view controller signals
+  - Tested controller signal connections
+  - Added tests for controller disconnection during cleanup
+- Test helper script created
+  - Added support for running specific test categories
+  - Added coverage reporting options
+  - Added verbose output options
+
+### Pending Updates
+- Signal handling tests
+  - Tests for signal chains between controllers
+  - Tests for proper signal disconnection
+- Integration tests
+  - Tests for complex interactions between multiple controllers
+  - Tests for state persistence between view changes
+- Dialog interaction tests
+  - Tests for modal dialogs
+  - Tests for non-modal dialogs
