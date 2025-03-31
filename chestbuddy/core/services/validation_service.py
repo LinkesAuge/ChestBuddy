@@ -15,6 +15,8 @@ from PySide6.QtCore import Signal, QObject
 from chestbuddy.core.models.chest_data_model import ChestDataModel
 from chestbuddy.core.models.validation_list_model import ValidationListModel
 from chestbuddy.utils.config import ConfigManager
+from chestbuddy.core.enums.validation_enums import ValidationStatus
+from chestbuddy.core.services.correction_service import CorrectionService
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -69,6 +71,9 @@ class ValidationService(QObject):
         self._validate_on_import = True
         self._auto_save = True
         self._config_manager = config_manager
+
+        # Reference to correction service (will be set externally)
+        self._correction_service = None
 
         # Load settings from configuration if provided
         if config_manager:
@@ -802,58 +807,148 @@ class ValidationService(QObject):
 
     def _update_validation_status(self, validation_results: Dict[str, Dict[int, str]]) -> None:
         """
-        Update the validation status in the data model.
+        Update the validation status based on validation results.
 
         Args:
-            validation_results (Dict[str, Dict[int, str]]): Validation results
+            validation_results: Dictionary of validation rule results
         """
-        if not validation_results:
-            logger.debug("No validation results to update")
-            return
+        try:
+            if self._data_model.data.empty:
+                return
 
-        # Get the current data from the model
-        df = self._data_model.data
+            # Get column names
+            column_names = self._data_model.data.columns.tolist()
 
-        # Create a DataFrame to store validation status
-        # Initialize with default valid status (empty DataFrame)
-        status_df = pd.DataFrame(index=df.index)
+            # Initialize a validation status DataFrame
+            status_df = self._init_validation_status_df()
 
-        # Process each validation rule's results
-        for rule_name, rule_results in validation_results.items():
-            # For each row with validation issues
-            for row_idx, message in rule_results.items():
-                # Skip any invalid indices
-                if row_idx < 0 or row_idx >= len(df):
-                    continue
+            # Add column for overall row status
+            status_df["_row_status"] = ValidationStatus.VALID
 
-                # Add the rule and message to the status DataFrame
-                status_df.loc[row_idx, rule_name] = message
+            # Flag cells as invalid based on validation results
+            for rule_name, issues in validation_results.items():
+                for row_idx, message in issues.items():
+                    if "_row_" in message:
+                        # Mark the entire row as invalid
+                        status_df.at[row_idx, "_row_status"] = ValidationStatus.INVALID_ROW
+                        # Update valid flags for all columns in this row
+                        for col in column_names:
+                            status_df.at[row_idx, f"{col}_valid"] = False
+                            status_df.at[row_idx, f"{col}_status"] = ValidationStatus.INVALID_ROW
+                            status_df.at[row_idx, f"{col}_message"] = message
+                    else:
+                        # Determine which columns are affected
+                        for col in column_names:
+                            if col in message:
+                                status_df.at[row_idx, f"{col}_valid"] = False
+                                status_df.at[row_idx, f"{col}_status"] = ValidationStatus.INVALID
+                                status_df.at[row_idx, f"{col}_message"] = message
+                                # Update row status to indicate at least one issue
+                                if status_df.at[row_idx, "_row_status"] == ValidationStatus.VALID:
+                                    status_df.at[row_idx, "_row_status"] = ValidationStatus.INVALID
 
-                # Mark columns as invalid based on rule type
-                if rule_name == "player_validation":
-                    status_df.loc[row_idx, f"{self.PLAYER_COLUMN}_valid"] = False
-                elif rule_name == "chest_type_validation":
-                    status_df.loc[row_idx, f"{self.CHEST_COLUMN}_valid"] = False
-                elif rule_name == "source_validation":
-                    status_df.loc[row_idx, f"{self.SOURCE_COLUMN}_valid"] = False
-                elif rule_name == "missing_values":
-                    # For missing values, check which columns are mentioned in the message
-                    for col in df.columns:
-                        if col in message:
-                            status_df.loc[row_idx, f"{col}_valid"] = False
+            # Detect and mark correctable entries
+            if self._correction_service is not None:
+                status_df = self._mark_correctable_entries(status_df)
 
-        # Set default values for columns not explicitly set
-        for col in df.columns:
-            col_status = f"{col}_valid"
-            if col_status not in status_df.columns:
-                status_df[col_status] = True
+            # Update the validation status in the data model
+            self._data_model.set_validation_status(status_df)
 
-        # Update the validation status in the data model
-        self._data_model.set_validation_status(status_df)
-        logger.info(f"Updated validation status for {len(validation_results)} rules")
+            # Emit the validation changed signal
+            self.validation_changed.emit(status_df)
 
-        # Emit signal
-        self.validation_changed.emit(status_df)
+        except Exception as e:
+            logger.error(f"Error updating validation status: {e}")
+
+    def _mark_correctable_entries(self, status_df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Mark entries that have available corrections as correctable.
+
+        Args:
+            status_df: Validation status DataFrame
+
+        Returns:
+            Updated validation status DataFrame with correctable entries marked
+        """
+        if self._correction_service is None:
+            logger.warning("No correction service available for marking correctable entries")
+            return status_df
+
+        # Get the data columns
+        if self._data_model.data.empty:
+            return status_df
+
+        column_names = self._data_model.data.columns.tolist()
+
+        # Get cells with available corrections
+        correctable_cells = self.detect_correctable_entries()
+
+        # Mark each correctable cell
+        for row_idx, col_idx in correctable_cells:
+            # Skip if row index or column index is out of bounds
+            if row_idx >= len(status_df) or col_idx >= len(column_names):
+                continue
+
+            col_name = column_names[col_idx]
+
+            # Mark as correctable if it has corrections available
+            # For invalid cells, this indicates they can be fixed
+            # For valid cells, this indicates optional improvement
+            status_df.at[row_idx, f"{col_name}_status"] = ValidationStatus.CORRECTABLE
+
+            # Add an indication that corrections are available
+            current_message = status_df.at[row_idx, f"{col_name}_message"]
+            if pd.notna(current_message) and current_message:
+                status_df.at[row_idx, f"{col_name}_message"] = (
+                    current_message + " (Corrections available)"
+                )
+            else:
+                status_df.at[row_idx, f"{col_name}_message"] = "Corrections available"
+
+        return status_df
+
+    def _init_validation_status_df(self) -> pd.DataFrame:
+        """
+        Initialize a validation status DataFrame.
+
+        Returns:
+            DataFrame with validation status columns for each data column
+        """
+        data_df = self._data_model.data
+        status_df = pd.DataFrame(index=data_df.index)
+
+        # Add validation status columns for each data column
+        for col in data_df.columns:
+            status_df[f"{col}_valid"] = True
+            status_df[f"{col}_status"] = ValidationStatus.VALID
+            status_df[f"{col}_message"] = ""
+
+        return status_df
+
+    def detect_correctable_entries(self) -> List[Tuple[int, int]]:
+        """
+        Detect entries that have available corrections.
+
+        Uses the correction service to find cells with available corrections.
+
+        Returns:
+            List of (row, col) tuples for cells with available corrections
+        """
+        if self._correction_service is None:
+            logger.warning("No correction service available for detecting correctable entries")
+            return []
+
+        return self._correction_service.get_cells_with_available_corrections()
+
+    def set_correction_service(self, correction_service: CorrectionService) -> None:
+        """
+        Set the correction service reference.
+
+        Args:
+            correction_service: The correction service to use for detecting correctable entries
+        """
+        self._correction_service = correction_service
+        logger.info("Correction service reference set in ValidationService")
 
     def get_validation_statistics(self) -> Dict[str, int]:
         """
@@ -936,19 +1031,69 @@ class ValidationService(QObject):
         Get a summary of validation issues.
 
         Returns:
-            A dictionary mapping rule names to the count of issues found.
+            Dictionary with counts of validation issues by type
         """
-        summary = {}
+        try:
+            validation_status = self._data_model.get_validation_status()
+            if validation_status.empty:
+                return {
+                    "total": 0,
+                    "valid": 0,
+                    "invalid": 0,
+                    "warning": 0,
+                    "not_validated": 0,
+                    "invalid_row": 0,
+                    "correctable": 0,
+                }
 
-        # Get the validation status from the data model
-        validation_status = self._data_model.get_validation_status()
+            # Initialize counters
+            valid_count = 0
+            invalid_count = 0
+            warning_count = 0
+            not_validated_count = 0
+            invalid_row_count = 0
+            correctable_count = 0
 
-        # Count issues by rule name
-        for rule_name in self._validation_rules.keys():
-            count = sum(1 for status in validation_status.values() if rule_name in status)
-            summary[rule_name] = count
+            # Count statuses
+            for col in validation_status.columns:
+                if col.endswith("_status"):
+                    for status in validation_status[col]:
+                        if status == ValidationStatus.VALID:
+                            valid_count += 1
+                        elif status == ValidationStatus.INVALID:
+                            invalid_count += 1
+                        elif status == ValidationStatus.WARNING:
+                            warning_count += 1
+                        elif status == ValidationStatus.NOT_VALIDATED:
+                            not_validated_count += 1
+                        elif status == ValidationStatus.INVALID_ROW:
+                            invalid_row_count += 1
+                        elif status == ValidationStatus.CORRECTABLE:
+                            correctable_count += 1
 
-        return summary
+            # Calculate total issues
+            total_issues = invalid_count + warning_count + invalid_row_count + correctable_count
+
+            return {
+                "total": total_issues,
+                "valid": valid_count,
+                "invalid": invalid_count,
+                "warning": warning_count,
+                "not_validated": not_validated_count,
+                "invalid_row": invalid_row_count,
+                "correctable": correctable_count,
+            }
+        except Exception as e:
+            logger.error(f"Error getting validation summary: {e}")
+            return {
+                "total": 0,
+                "valid": 0,
+                "invalid": 0,
+                "warning": 0,
+                "not_validated": 0,
+                "invalid_row": 0,
+                "correctable": 0,
+            }
 
     def export_validation_report(self, file_path: Union[str, Path]) -> Tuple[bool, Optional[str]]:
         """
