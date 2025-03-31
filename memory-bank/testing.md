@@ -227,7 +227,7 @@ def test_ui_update_on_data_change(enhanced_qtbot):
 
 # Qt UI Testing Best Practices
 
-Based on our experience improving the ValidationTabView tests, here are best practices for testing Qt UI components:
+Based on our experience improving the ValidationTabView and CorrectionView tests, here are best practices for testing Qt UI components:
 
 ## Signal Mocking
 
@@ -248,19 +248,114 @@ class MockSignal:
             if callback in self.callbacks:
                 self.callbacks.remove(callback)
         else:
-            self.callbacks = []
+            self.callbacks.clear()
 
     def emit(self, *args):
         for callback in self.callbacks:
             callback(*args)
 ```
 
-Use this class when mocking services or models that emit signals:
+This pattern allows us to:
+1. Avoid access violations when working with Qt signals in tests
+2. Track signal connections and disconnections
+3. Manually trigger signals without Qt's event loop
+4. Test signal handlers directly
+
+## UI Component Patching
+
+For UI components that inherit from Qt classes, we use the following approach to patch methods that may cause issues:
 
 ```python
-mock_service = MagicMock()
-mock_service.validation_changed = MockSignal()
+@pytest.fixture
+def component_view(monkeypatch):
+    # Patch problematic methods
+    monkeypatch.setattr(BaseView, '_setup_ui', MagicMock())
+    monkeypatch.setattr(ComponentView, '_connect_signals', MagicMock())
+    
+    # Create the view with mock dependencies
+    view = ComponentView(mock_model, mock_service)
+    
+    # Add mock attributes that would be created by _setup_ui
+    view._header = MagicMock()
+    view._content_layout = MagicMock()
+    view._status_bar = MagicMock()
+    
+    return view
 ```
+
+## Testing Signal Connections
+
+For testing signal connections between components:
+
+```python
+def test_signal_connections(component_view, mock_controller):
+    # Set controller and check signal connections
+    component_view.set_controller(mock_controller)
+    
+    # Access the signal from the mock and emit it
+    mock_controller.data_changed.emit()
+    
+    # Verify the handler was called if we can directly check
+    component_view.update_view_content.assert_called_once()
+    
+    # Alternative approach using manual signal emission
+    handler = MagicMock()
+    mock_controller.data_changed.connect(handler)
+    mock_controller.data_changed.emit()
+    handler.assert_called_once()
+```
+
+## Complete Component Testing Pattern
+
+A comprehensive pattern for testing UI components:
+
+1. **Mock Signals**: Create mock signals for all emitters
+2. **Mock Controllers**: Create mock controllers with mock signals
+3. **Patch UI Setup**: Patch UI setup methods to avoid Qt component creation
+4. **Mock Attributes**: Add mock attributes that would be created by UI setup
+5. **Test Initialization**: Test component initialization with various parameters
+6. **Test Signal Connections**: Test signal connections are made correctly
+7. **Test Signal Handlers**: Test handlers respond correctly to signals
+8. **Test Error Conditions**: Verify components handle errors gracefully
+
+### Example from CorrectionView Tests
+
+Our CorrectionView tests demonstrate this approach:
+
+```python
+@pytest.fixture
+def correction_view(monkeypatch):
+    """Create a CorrectionView with mocked components."""
+    # Patch methods that would cause issues in tests
+    monkeypatch.setattr(BaseView, '_setup_ui', MagicMock())
+    monkeypatch.setattr(UpdatableView, '_connect_signals', MagicMock())
+    monkeypatch.setattr(CorrectionView, '_add_action_buttons', MagicMock())
+    monkeypatch.setattr(CorrectionView, '_setup_ui', MagicMock())
+    
+    # Create mock signals
+    correction_requested_signal = MockSignal()
+    history_requested_signal = MockSignal()
+    header_action_signal = MockSignal()
+    
+    # Create the view with mock data model and service
+    view = CorrectionView(mock_data_model, mock_correction_service)
+    
+    # Replace real signals with mock signals
+    view.correction_requested = correction_requested_signal
+    view.history_requested = history_requested_signal
+    view.header_action_clicked = header_action_signal
+    
+    # Add mock attributes that would be created by _setup_ui
+    view._header = MagicMock()
+    view._content_layout = MagicMock()
+    view._status_bar = MagicMock()
+    view._rule_view_placeholder = MagicMock()
+    view._signal_manager = MagicMock()
+    
+    return view
+```
+
+These patterns have significantly improved our ability to test Qt UI components reliably and thoroughly, avoiding common issues like access violations and segmentation faults that can occur when testing real Qt signals and UI components.
 
 ## Widget Testing Techniques
 

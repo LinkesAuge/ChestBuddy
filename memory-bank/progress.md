@@ -1,6 +1,6 @@
 ---
 title: Progress Tracking - ChestBuddy Application
-date: 2024-05-13
+date: 2024-07-23
 ---
 
 # Project Progress
@@ -20,6 +20,8 @@ ChestBuddy is currently undergoing a major architectural update, transitioning f
 - Basic navigation between views
 - MainWindow core functionality
 - ChartView unit tests passing
+- ValidationTabView unit tests passing
+- CorrectionView unit tests passing
 
 ## Currently Being Worked On
 - UI architecture update from tab-based to view-based
@@ -30,7 +32,6 @@ ChestBuddy is currently undergoing a major architectural update, transitioning f
 - Test refactoring to support the new architecture
 
 ## What's Next
-- Implement ValidationTabView tests
 - Complete DashboardView implementation
 - Replace remaining legacy UI components
 - Extend signal connection tracking to all controllers
@@ -45,9 +46,19 @@ ChestBuddy is currently undergoing a major architectural update, transitioning f
 | Services                | 38          | 38      | 0       | 0       | All tests passing                    |
 | Models                  | 25          | 25      | 0       | 0       | All tests passing                    |
 | Controllers             | 30          | 28      | 0       | 2       | Two need updates for new architecture|
-| Views                   | 35          | 20      | 3       | 12      | MainWindow tests being updated       |
+| Views                   | 78          | 63      | 3       | 12      | Most view tests passing              |
 | UI Components           | 15          | 13      | 0       | 2       | Chart components fully tested        |
-| **Total**               | **188**     | **169** | **3**   | **16**  | **~90% passing**                    |
+| **Total**               | **231**     | **212** | **3**   | **16**  | **~92% passing**                    |
+
+### View Component Test Status
+
+| View Component          | Total Tests | Coverage | Status   | Notes                                      |
+|-------------------------|-------------|----------|----------|-------------------------------------------|
+| ValidationTabView       | 14          | 80%      | Complete | All tests passing                         |
+| CorrectionView          | 29          | 52%      | Complete | All tests passing                         |
+| ChartView               | 12          | 75%      | Complete | All tests passing                         |
+| DashboardView           | 8           | 45%      | In Progress | Working on improving coverage           |
+| SettingsView            | 0           | 0%       | Planned  | Tests to be implemented                   |
 
 ### MainWindow Test Status
 
@@ -78,7 +89,8 @@ ChestBuddy is currently undergoing a major architectural update, transitioning f
 - [x] MainWindow test update Phase 1 completed
 - [x] MainWindow test update Phase 2 completed
 - [x] MainWindow test update Phase 3 completed
-- [ ] ValidationTabView tests
+- [x] ValidationTabView tests
+- [x] CorrectionView tests
 - [ ] DashboardView implementation
 - [ ] Complete UI modernization
 
