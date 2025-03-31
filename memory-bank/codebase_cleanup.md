@@ -11,23 +11,24 @@ This document records cleanup activities performed on the ChestBuddy codebase to
    - All code now uses `chestbuddy/utils/service_locator.py`
 
 2. **Added Deprecation Warnings to Legacy UI Components**
-   - Added warnings to `chestbuddy/ui/validation_tab.py`
    - Added warnings to `chestbuddy/ui/correction_tab.py`
    - Added warnings to `chestbuddy/ui/chart_tab.py`
    - Marked signal_tracer.py as a debug-only utility
 
+3. **Deleted Legacy Components**
+   - Deleted `chestbuddy/ui/validation_tab.py` as it has been replaced by ValidationTabView
+   - Updated tests in `tests/test_ui_components.py` to use ValidationTabView
+
 ## Future Cleanup Tasks
 
-1. **Remove Legacy UI Components**
+1. **Remove Remaining Legacy UI Components**
    - Once all adapter views are refactored to not depend on legacy components, remove:
-     - `chestbuddy/ui/validation_tab.py`
      - `chestbuddy/ui/correction_tab.py`
      - `chestbuddy/ui/chart_tab.py`
 
 2. **Update Tests**
-   - Update tests to use the new view-based components directly
+   - Update remaining tests to use the new view-based components directly
    - Tests to be updated include:
-     - `tests/test_ui_components.py`
      - `tests/test_main_window.py`
      - `tests/test_chart_tab.py`
      - `tests/test_chart_tab_simple.py`
@@ -36,7 +37,6 @@ This document records cleanup activities performed on the ChestBuddy codebase to
 3. **Refactor Adapter Views**
    - Refactor these adapter views to not depend on the legacy components:
      - `chestbuddy/ui/views/chart_view_adapter.py`
-     - `chestbuddy/ui/views/validation_view_adapter.py`
      - `chestbuddy/ui/views/correction_view_adapter.py`
 
 4. **Organize Debug Utilities**
