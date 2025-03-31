@@ -41,6 +41,9 @@ class CorrectionService:
         _correction_history (List[Dict]): History of applied corrections
     """
 
+    # Maximum recursive iterations to prevent infinite loops
+    MAX_ITERATIONS = 10
+
     def __init__(self, data_model: ChestDataModel, config_manager: Optional[ConfigManager] = None):
         """
         Initialize the CorrectionService.
@@ -71,7 +74,9 @@ class CorrectionService:
             self._case_sensitive = config_manager.get_bool("Corrections", "case_sensitive", False)
             logger.info(f"Loaded correction case_sensitive setting: {self._case_sensitive}")
 
-    def apply_corrections(self, only_invalid: bool = False) -> Dict[str, int]:
+    def apply_corrections(
+        self, only_invalid: bool = False, recursive: bool = False
+    ) -> Dict[str, int]:
         """
         Apply all enabled correction rules to the data.
 
@@ -79,11 +84,15 @@ class CorrectionService:
         1. First pass applies general category rules to all columns
         2. Second pass applies column-specific rules to their respective columns
 
+        When recursive=True, the corrections are applied repeatedly until no more
+        changes occur or until MAX_ITERATIONS is reached.
+
         Args:
             only_invalid (bool): If True, only apply corrections to cells marked as invalid
+            recursive (bool): If True, apply corrections recursively until no more changes
 
         Returns:
-            Dict[str, int]: Statistics about the corrections applied
+            Dict[str, int]: Statistics about the corrections applied, including iterations count
         """
         data = self._data_model.data
         if data is None or data.empty:
@@ -91,66 +100,91 @@ class CorrectionService:
                 "total_corrections": 0,
                 "corrected_rows": 0,
                 "corrected_cells": 0,
+                "iterations": 0,
             }
 
-        # Make a copy of the data to apply corrections
-        corrected_data = data.copy()
-
-        # Get all enabled rules, prioritized (general rules first, then column-specific)
-        prioritized_rules = self._rule_manager.get_prioritized_rules()
-
-        # First get all rules that match
-        all_potential_corrections = []
-
-        # First pass: Plan all general rule corrections
-        general_corrections = []
-        for rule in prioritized_rules:
-            if rule.status != "enabled":
-                continue
-
-            if rule.category == "general":
-                corrections = self._apply_rule_to_data(corrected_data, rule, only_invalid)
-                general_corrections.extend(corrections)
-
-        # Apply general corrections first
-        # Track statistics
+        # Initialize statistics tracking
         total_corrections = 0
         corrected_rows = set()
         corrected_cells = set()
+        iteration = 0
 
-        # Apply general corrections
-        for row, col, _, new_value in general_corrections:
-            column_name = corrected_data.columns[col]
-            corrected_data.at[row, column_name] = new_value
-            corrected_rows.add(row)
-            corrected_cells.add((row, col))
-            total_corrections += 1
+        # Track data changes to detect when to stop recursion
+        previous_data_str = None
 
-        # Second pass: Apply category-specific rules
-        for rule in prioritized_rules:
-            if rule.status != "enabled" or rule.category == "general":
-                continue
+        # Apply corrections iteratively if recursive=True
+        while iteration < self.MAX_ITERATIONS:
+            # Make a copy of the data to apply corrections
+            corrected_data = data.copy()
 
-            # Get corrections for this rule
-            corrections = self._apply_rule_to_data(corrected_data, rule, only_invalid)
+            # Get all enabled rules, prioritized (general rules first, then column-specific)
+            prioritized_rules = self._rule_manager.get_prioritized_rules()
 
-            # Apply corrections
-            for row, col, _, new_value in corrections:
+            # First pass: Apply general rule corrections
+            general_corrections = []
+            for rule in prioritized_rules:
+                if rule.status != "enabled":
+                    continue
+
+                if rule.category == "general":
+                    corrections = self._apply_rule_to_data(corrected_data, rule, only_invalid)
+                    general_corrections.extend(corrections)
+
+            # Apply general corrections first
+            for row, col, _, new_value in general_corrections:
                 column_name = corrected_data.columns[col]
                 corrected_data.at[row, column_name] = new_value
                 corrected_rows.add(row)
                 corrected_cells.add((row, col))
                 total_corrections += 1
 
-        # Update the data model with corrected data
-        if total_corrections > 0:
-            self._data_model.update_data(corrected_data)
+            # Second pass: Apply category-specific rules
+            category_corrections = []
+            for rule in prioritized_rules:
+                if rule.status != "enabled" or rule.category == "general":
+                    continue
+
+                # Get corrections for this rule
+                corrections = self._apply_rule_to_data(corrected_data, rule, only_invalid)
+                category_corrections.extend(corrections)
+
+            # Apply category-specific corrections
+            for row, col, _, new_value in category_corrections:
+                column_name = corrected_data.columns[col]
+                corrected_data.at[row, column_name] = new_value
+                corrected_rows.add(row)
+                corrected_cells.add((row, col))
+                total_corrections += 1
+
+            # Track the number of corrections in this iteration
+            iteration_corrections = len(general_corrections) + len(category_corrections)
+
+            # Update the data model with corrected data
+            if iteration_corrections > 0:
+                self._data_model.update_data(corrected_data)
+                data = corrected_data  # Update data for next iteration
+
+            # Increment iteration counter
+            iteration += 1
+
+            # If no corrections were made in this iteration or we're not in recursive mode, stop
+            if iteration_corrections == 0 or not recursive:
+                break
+
+            # Check if data has changed using string representation
+            current_data_str = str(corrected_data)
+            if previous_data_str == current_data_str:
+                logger.debug("No data changes detected, stopping recursive correction")
+                break
+
+            previous_data_str = current_data_str
 
         # Record in history
         stats = {
             "total_corrections": total_corrections,
             "corrected_rows": len(corrected_rows),
             "corrected_cells": len(corrected_cells),
+            "iterations": iteration,
         }
 
         self._correction_history.append({"stats": stats})
@@ -383,29 +417,56 @@ class CorrectionService:
 
     def get_cells_with_available_corrections(self) -> List[Tuple[int, int]]:
         """
-        Get list of cells that have available corrections.
+        Get cells that have available correction rules and are currently invalid.
 
         Returns:
             List[Tuple[int, int]]: List of (row, col) tuples for cells with corrections
         """
+        # Get data and validation status
         data = self._data_model.data
         if data is None or data.empty:
+            logger.warning("No data available to check for correctable cells")
             return []
 
-        # Get all enabled rules
-        rules = [r for r in self._rule_manager.get_rules() if r.status == "enabled"]
-        if not rules:
+        # Get validation status
+        validation_status = None
+        if self._validation_service:
+            validation_status = self._validation_service.get_validation_status()
+
+        if validation_status is None or validation_status.empty:
+            logger.warning("No validation status available to check for correctable cells")
             return []
+
+        # Get enabled rules
+        rules = self._rule_manager.get_rules(status="enabled")
+        if not rules:
+            logger.debug("No enabled correction rules available")
+            return []
+
+        # Map column indices to validation status column names
+        col_validation_map = {}
+        for col_idx, col_name in enumerate(data.columns):
+            col_validation_map[col_idx] = f"{col_name}_valid"
 
         # Check all cells for potential corrections
         correctable_cells = set()
 
         for col_idx, col_name in enumerate(data.columns):
-            col_category = self._category_mapping.get(col_name, "").lower()
+            # Get validation status column name
+            validation_col = col_validation_map.get(col_idx)
+
+            # Skip if validation status not available for this column
+            if validation_col not in validation_status.columns:
+                continue
+
+            # Get category for this column
+            col_category = self._get_column_category(col_name)
 
             # Get rules applicable to this column
             applicable_rules = [
-                r for r in rules if r.category.lower() == col_category or r.category == "general"
+                r
+                for r in rules
+                if r.category.lower() == col_category or r.category.lower() == "general"
             ]
 
             # Skip if no applicable rules
@@ -414,6 +475,10 @@ class CorrectionService:
 
             # Check each cell in this column
             for row_idx in range(len(data)):
+                # Skip if the cell is not invalid
+                if validation_status.at[row_idx, validation_col] != ValidationStatus.INVALID:
+                    continue
+
                 cell_value = data.at[row_idx, col_name]
 
                 # Skip empty or NaN values
@@ -427,6 +492,18 @@ class CorrectionService:
                         break
 
         return list(correctable_cells)
+
+    def _get_column_category(self, column_name: str) -> str:
+        """
+        Get the category for a column.
+
+        Args:
+            column_name: Column name
+
+        Returns:
+            str: Category for the column
+        """
+        return self._category_mapping.get(column_name.upper(), "general").lower()
 
     def get_correction_preview(self, rule: CorrectionRule) -> List[Tuple[int, int, Any, Any]]:
         """
