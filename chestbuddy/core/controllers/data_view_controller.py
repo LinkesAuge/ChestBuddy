@@ -646,6 +646,28 @@ class DataViewController(BaseController):
             # Highlight invalid rows in the view
             self.highlight_invalid_rows()
 
+            # Check for correctable cells and mark them
+            try:
+                correction_controller = ServiceLocator.get("correction_controller")
+                if correction_controller and hasattr(correction_controller, "_correction_service"):
+                    correction_service = correction_controller._correction_service
+                    if correction_service and hasattr(
+                        correction_service, "check_correctable_status"
+                    ):
+                        num_correctable = correction_service.check_correctable_status()
+                        logger.info(
+                            f"Checked for correctable cells: {num_correctable} cells marked as correctable"
+                        )
+                        # Refresh view again with correctable status
+                        if self._view and hasattr(self._view, "refresh"):
+                            self._view.refresh()
+                else:
+                    logger.warning(
+                        "CorrectionController not available for checking correctable status"
+                    )
+            except Exception as e:
+                logger.error(f"Error checking for correctable cells: {e}")
+
             # Apply auto-correction if enabled
             # Get correction controller from ServiceLocator
             try:

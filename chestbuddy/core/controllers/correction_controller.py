@@ -892,6 +892,16 @@ class CorrectionController(BaseController):
         Returns:
             bool: True if auto-correction was applied, False otherwise
         """
+        # Always check for correctable cells after validation
+        if hasattr(self._correction_service, "check_correctable_status"):
+            try:
+                num_correctable = self._correction_service.check_correctable_status()
+                logger.info(
+                    f"Checked for correctable cells after validation: {num_correctable} cells marked as correctable"
+                )
+            except Exception as e:
+                logger.error(f"Error checking for correctable cells after validation: {e}")
+
         if not self._config_manager:
             return False
 
@@ -919,6 +929,16 @@ class CorrectionController(BaseController):
         Returns:
             bool: True if auto-correction was applied, False otherwise
         """
+        # Always check for correctable cells after import
+        if hasattr(self._correction_service, "check_correctable_status"):
+            try:
+                num_correctable = self._correction_service.check_correctable_status()
+                logger.info(
+                    f"Checked for correctable cells after import: {num_correctable} cells marked as correctable"
+                )
+            except Exception as e:
+                logger.error(f"Error checking for correctable cells after import: {e}")
+
         if not self._config_manager:
             return False
 
