@@ -575,6 +575,8 @@ class CorrectionRuleView(QWidget):
 
     def _on_action_clicked(self, action_id):
         """Handle action button clicks from toolbar or menu."""
+        self._logger.debug(f"Action clicked: {action_id}")
+
         if action_id == "apply":
             only_invalid = self._correct_invalid_only_checkbox.isChecked()
             recursive = self._recursive_checkbox.isChecked()
@@ -585,8 +587,10 @@ class CorrectionRuleView(QWidget):
         elif action_id == "batch":
             self._show_batch_correction_dialog()
         elif action_id == "import":
+            self._logger.info("Import action triggered")
             self._show_import_export_dialog(export_mode=False)
         elif action_id == "export":
+            self._logger.info("Export action triggered")
             self._show_import_export_dialog(export_mode=True)
 
     def _show_batch_correction_dialog(self):
@@ -628,16 +632,20 @@ class CorrectionRuleView(QWidget):
 
     def _show_import_export_dialog(self, export_mode=False):
         """Show the import/export dialog."""
-        dialog = ImportExportDialog(
-            controller=self._controller,
-            parent=self,
-            export_mode=export_mode,
-        )
+        dialog = ImportExportDialog(mode="export" if export_mode else "import", parent=self)
 
         if dialog.exec():
             if export_mode:
-                self._logger.info("Rules exported successfully")
+                file_path = dialog.get_file_path()
+                file_format = dialog.get_format().lower()
+                if file_path:
+                    self._controller.export_rules(file_path)
+                    self._logger.info(f"Rules exported successfully to {file_path}")
             else:
-                self._logger.info("Rules imported successfully")
-                self._refresh_rule_table()
-                self._update_categories_filter()
+                file_path = dialog.get_file_path()
+                file_format = dialog.get_format().lower()
+                if file_path:
+                    self._controller.import_rules(file_path)
+                    self._logger.info(f"Rules imported successfully from {file_path}")
+                    self._refresh_rule_table()
+                    self._update_categories_filter()
