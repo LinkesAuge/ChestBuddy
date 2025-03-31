@@ -1,6 +1,65 @@
 # ChestBuddy Scripts
 
-This directory contains utility scripts for testing, maintenance, and operation of the ChestBuddy application.
+This directory contains utility scripts for development, testing, and maintenance of the ChestBuddy application.
+
+## Available Scripts
+
+### `update_mainwindow_tests.py`
+
+A utility script to help analyze and update MainWindow tests to support the new view-based architecture.
+
+#### Usage
+
+```bash
+# Analyze a test file without making changes
+python scripts/update_mainwindow_tests.py --analyze tests/ui/test_mainwindow.py
+
+# Analyze all test files in a directory
+python scripts/update_mainwindow_tests.py --analyze tests/ui/
+
+# Update a test file with necessary changes
+python scripts/update_mainwindow_tests.py --update tests/ui/test_mainwindow.py
+
+# Update all test files in a directory
+python scripts/update_mainwindow_tests.py --update tests/ui/
+```
+
+#### Features
+
+- Detects and analyzes test methods that need updates for the new view-based architecture
+- Identifies test methods that use tab references which need to be updated
+- Identifies controller methods that need to be used in tests
+- Automatically adds necessary fixtures for controllers
+- Updates main_window fixture to include controller dependencies
+- Marks tests as skipped with a reason if they need major updates
+- Fixes common issues like method name inconsistencies and menu text changes
+- Adds required imports
+- Creates backups of original files before making changes
+
+#### Report Example
+
+```
+Found 42 test methods:
+
+File Operations (Total: 8):
+  - test_open_file (line 158) - Issues: Uses 'open_files' instead of 'open_file'
+  - test_save_file (line 172)
+  - test_export_csv (line 185)
+  - ...
+
+Menu Actions (Total: 12):
+  - test_open_action (line 201) - Issues: Menu text may need update: '&Open' to '&Open...'
+  - test_save_action (line 215)
+  - ...
+
+View Navigation (Total: 6):
+  - test_switch_to_tab (line 230) - Issues: Uses tab references instead of views
+  - ...
+
+Needed Controllers:
+  - file_operations_controller
+  - view_state_controller
+```
 
 ## Testing Scripts
 

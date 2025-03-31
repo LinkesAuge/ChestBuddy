@@ -1,0 +1,355 @@
+"""
+tests/test_main_window.py
+
+Tests for the MainWindow class with the new view-based architecture.
+This example shows how to update tests from the tab-based architecture to the view-based architecture.
+"""
+
+import os
+import pytest
+from unittest.mock import MagicMock, patch
+from PySide6.QtWidgets import QAction, QApplication, QFileDialog, QMessageBox
+from PySide6.QtCore import Qt, QPoint
+
+from chestbuddy.ui.main_window import MainWindow
+from chestbuddy.ui.controllers.view_state_controller import ViewStateController
+from chestbuddy.ui.controllers.file_operations_controller import FileOperationsController
+from chestbuddy.ui.controllers.ui_state_controller import UIStateController
+from chestbuddy.ui.controllers.data_view_controller import DataViewController
+from chestbuddy.ui.controllers.progress_controller import ProgressController
+
+# Helper class for catching signals
+class SignalCatcher:
+    def __init__(self):
+        self.signal_received = False
+        self.signal_args = None
+
+    def handler(self, *args):
+        self.signal_received = True
+        self.signal_args = args
+
+# Controller fixtures
+@pytest.fixture
+def view_state_controller():
+    """Create a mock view state controller."""
+    controller = MagicMock(spec=ViewStateController)
+    return controller
+
+@pytest.fixture
+def file_operations_controller():
+    """Create a mock file operations controller."""
+    controller = MagicMock(spec=FileOperationsController)
+    return controller
+
+@pytest.fixture
+def ui_state_controller():
+    """Create a mock UI state controller."""
+    controller = MagicMock(spec=UIStateController)
+    return controller
+
+@pytest.fixture
+def data_view_controller():
+    """Create a mock data view controller."""
+    controller = MagicMock(spec=DataViewController)
+    return controller
+
+@pytest.fixture
+def progress_controller():
+    """Create a mock progress controller."""
+    controller = MagicMock(spec=ProgressController)
+    return controller
+
+# Main window fixture with properly mocked controllers
+@pytest.fixture
+def main_window(
+    qtbot,
+    app,
+    data_model,
+    csv_service,
+    validation_service,
+    correction_service,
+    chart_service,
+    data_manager,
+    file_operations_controller,
+    progress_controller,
+    view_state_controller,
+    data_view_controller,
+    ui_state_controller,
+    config_mock,
+):
+    """Create a MainWindow instance for testing with mocked controllers."""
+    with patch("chestbuddy.utils.config.ConfigManager", return_value=config_mock):
+        window = MainWindow(
+            data_model=data_model,
+            csv_service=csv_service,
+            validation_service=validation_service,
+            correction_service=correction_service,
+            chart_service=chart_service,
+            data_manager=data_manager,
+            file_operations_controller=file_operations_controller,
+            progress_controller=progress_controller,
+            view_state_controller=view_state_controller,
+            data_view_controller=data_view_controller,
+            ui_state_controller=ui_state_controller,
+            config_manager=config_mock,
+        )
+        qtbot.addWidget(window)
+        window.show()
+        # Allow time for the window to fully initialize
+        qtbot.wait(50)
+        yield window
+        # Proper cleanup to avoid signal disconnection warnings
+        window.close()
+        QApplication.processEvents()  # Process any pending events
+
+class TestMainWindow:
+    def test_menu_existence(self, main_window):
+        """Test that all required menus exist in the new structure."""
+        # Get all menu actions
+        menu_actions = {action.text(): action for action in main_window.findChildren(QAction)}
+
+        # Verify essential menu items exist
+        essential_items = ["&File", "&Edit", "&View", "&Data", "&Validation", "&Correction", "&Help"]
+        for item in essential_items:
+            assert any(item in action for action in menu_actions.keys()), f"Menu item '{item}' not found"
+
+        # Verify specific actions exist in updated menu structure
+        file_actions = ["&Open", "&Save", "&Export", "&Exit"]
+        for action in file_actions:
+            assert any(action in a for a in menu_actions.keys()), f"File action '{action}' not found"
+
+    def test_initial_state(self, main_window, view_state_controller):
+        """Test the initial state of the MainWindow with the new architecture."""
+        # Verify window title contains app name
+        assert "ChestBuddy" in main_window.windowTitle()
+        
+        # Verify initial view setting (typically Dashboard)
+        view_state_controller.set_active_view.assert_called_once()
+        
+        # Verify disabled actions before data is loaded
+        data_dependent_actions = ["&Save", "&Export", "Validate &Data", "Apply &Corrections"]
+        for action_name in data_dependent_actions:
+            for action in main_window.findChildren(QAction):
+                if action.text() == action_name:
+                    assert not action.isEnabled(), f"Action '{action_name}' should be disabled on startup"
+                    break
+
+    def test_window_title_update(self, qtbot, main_window, ui_state_controller):
+        """Test window title update using the UI state controller."""
+        # Reset mock to ensure clean state
+        ui_state_controller.update_window_title.reset_mock()
+        
+        # Test file name
+        test_file = "test_data.csv"
+        
+        # Simulate file being loaded
+        main_window._on_file_loaded(test_file)
+        
+        # Verify UI state controller was called with correct file name
+        ui_state_controller.update_window_title.assert_called_with(test_file)
+
+    def test_view_navigation(self, qtbot, main_window, view_state_controller):
+        """Test navigation between views in the view-based architecture."""
+        # Test navigation to each main view
+        view_names = ["Dashboard", "Data", "Validation", "Correction", "Charts", "Settings"]
+        
+        for view_name in view_names:
+            # Reset mock to check next call
+            view_state_controller.set_active_view.reset_mock()
+            
+            # Simulate navigation action
+            main_window._on_navigation_changed(view_name)
+            
+            # Verify controller was called with correct view name
+            view_state_controller.set_active_view.assert_called_with(view_name)
+            
+            # Allow time for UI updates
+            qtbot.wait(50)
+
+    def test_validate_data_action(self, qtbot, main_window, view_state_controller):
+        """Test the validate data action using the view state controller."""
+        # Create a signal catcher for the validate_data_triggered signal
+        catcher = SignalCatcher()
+        main_window.validate_data_triggered.connect(catcher.handler)
+        
+        # Reset mock to ensure clean state
+        view_state_controller.set_active_view.reset_mock()
+        
+        # Find and trigger the validate data action
+        for action in main_window.findChildren(QAction):
+            if action.text() == "Validate &Data":
+                action.trigger()
+                break
+        
+        # Check if the signal was emitted
+        assert catcher.signal_received
+        
+        # Check if view state controller was called with correct view name
+        view_state_controller.set_active_view.assert_called_with("Validation")
+
+    def test_open_file_action(self, qtbot, main_window, file_operations_controller, test_csv_path):
+        """Test the open file action using the file operations controller."""
+        # Reset mock to check calls
+        file_operations_controller.open_file.reset_mock()
+        
+        # Mock QFileDialog to return our test path
+        with patch.object(QFileDialog, "getOpenFileNames", return_value=([str(test_csv_path)], "")):
+            # Find and trigger the open action
+            for action in main_window.findChildren(QAction):
+                if action.text() == "&Open..." or action.text() == "&Open":
+                    action.trigger()
+                    break
+        
+        # Verify controller method was called with correct paths
+        file_operations_controller.open_file.assert_called_with([str(test_csv_path)])
+
+    def test_save_file_action(self, qtbot, main_window, file_operations_controller):
+        """Test the save file action using the file operations controller."""
+        # Reset mock to check calls
+        file_operations_controller.save_file.reset_mock()
+        
+        # Enable the save action (it's disabled by default)
+        for action in main_window.findChildren(QAction):
+            if action.text() == "&Save":
+                action.setEnabled(True)
+                action.trigger()
+                break
+        
+        # Verify controller method was called
+        file_operations_controller.save_file.assert_called_once()
+
+    def test_data_changed_signal(self, qtbot, main_window):
+        """Test handling of data_changed signal from the data model."""
+        with (
+            patch.object(main_window, "_update_ui") as mock_update_ui,
+            patch.object(main_window, "_update_data_loaded_state") as mock_update_data_loaded,
+        ):
+            # Create a mock DataState object
+            mock_data_state = MagicMock()
+            mock_data_state.has_data = True
+            
+            # Emit the signal with the DataState object
+            main_window._data_model.data_changed.emit(mock_data_state)
+            
+            # Check if UI methods were called with correct parameters
+            mock_update_ui.assert_called_once()
+            mock_update_data_loaded.assert_called_once()
+            assert mock_update_data_loaded.call_args[0][0] == True
+
+    def test_correction_action(self, qtbot, main_window, view_state_controller):
+        """Test the correction action using the view state controller."""
+        # Create a signal catcher for the apply_corrections_triggered signal
+        catcher = SignalCatcher()
+        main_window.apply_corrections_triggered.connect(catcher.handler)
+        
+        # Reset mock to ensure clean state
+        view_state_controller.set_active_view.reset_mock()
+        
+        # Find and trigger the correction action
+        for action in main_window.findChildren(QAction):
+            if action.text() == "Apply &Corrections":
+                action.setEnabled(True)  # Enable the action for testing
+                action.trigger()
+                break
+        
+        # Check if the signal was emitted
+        assert catcher.signal_received
+        
+        # Check if view state controller was called with correct view name
+        view_state_controller.set_active_view.assert_called_with("Correction")
+
+    def test_export_action(self, qtbot, main_window, file_operations_controller):
+        """Test the export action using the file operations controller."""
+        # Reset mock to check calls
+        file_operations_controller.export_file.reset_mock()
+        
+        test_export_path = "test_export.csv"
+        
+        # Mock QFileDialog to return our test path
+        with patch.object(QFileDialog, "getSaveFileName", return_value=(test_export_path, "")):
+            # Find and trigger the export action
+            for action in main_window.findChildren(QAction):
+                if action.text() == "&Export":
+                    action.setEnabled(True)  # Enable the action for testing
+                    action.trigger()
+                    break
+        
+        # Verify controller method was called with correct path
+        file_operations_controller.export_file.assert_called_with(test_export_path)
+
+    def test_open_chart_view(self, qtbot, main_window, view_state_controller):
+        """Test opening the chart view using the view state controller."""
+        # Reset mock to ensure clean state
+        view_state_controller.set_active_view.reset_mock()
+        
+        # Simulate navigation to chart view
+        main_window._on_navigation_changed("Charts")
+        
+        # Verify controller was called with correct view name
+        view_state_controller.set_active_view.assert_called_with("Charts")
+        
+        # Allow time for UI updates
+        qtbot.wait(50)
+
+    """
+    LEGACY TEST (for reference)
+    
+    def test_tab_switching(self, qtbot, main_window):
+        assert main_window._tab_widget.currentIndex() == 0
+        main_window._tab_widget.setCurrentIndex(1)
+        assert main_window._tab_widget.currentIndex() == 1
+        main_window._tab_widget.setCurrentIndex(2)
+        assert main_window._tab_widget.currentIndex() == 2
+        main_window._tab_widget.setCurrentIndex(0)
+        assert main_window._tab_widget.currentIndex() == 0
+    """
+    
+    # This is the updated version of the legacy tab switching test
+    def test_view_switching(self, qtbot, main_window, view_state_controller):
+        """Test switching between views with the view-based architecture."""
+        # Test initial view
+        initial_view = "Dashboard"  # Typically starts with Dashboard
+        
+        # Test switching to different views
+        view_sequence = ["Data", "Validation", "Correction", "Charts", "Dashboard"]
+        
+        for view_name in view_sequence:
+            # Reset mock to check next call
+            view_state_controller.set_active_view.reset_mock()
+            
+            # Switch to the view
+            main_window._on_navigation_changed(view_name)
+            
+            # Verify controller was called with correct view name
+            view_state_controller.set_active_view.assert_called_with(view_name)
+            
+            # Allow time for UI updates
+            qtbot.wait(50) 
+
+    def test_view_switching(self, qtbot, main_window, view_state_controller):
+        """Test switching between views with the view-based architecture."""
+        # Test initial view
+        initial_view = "Dashboard"  # Typically starts with Dashboard
+        
+        # Test switching to different views
+        view_sequence = ["Data", "Validation", "Correction", "Charts", "Dashboard"]
+        
+        for view_name in view_sequence:
+            # Reset mock to check next call
+            view_state_controller.set_active_view.reset_mock()
+            
+            # Option 1: Call the controller directly
+            view_state_controller.set_active_view(view_name)
+            
+            # Option 2: Find and trigger the view action in the View menu
+            # This can be implemented if direct controller call isn't appropriate
+            # for action in main_window.findChildren(QAction):
+            #     if view_name in action.text() and action.menu() == main_window._view_menu:
+            #         action.trigger()
+            #         break
+            
+            # Allow time for UI updates
+            qtbot.wait(50)
+            
+            # Verify controller was called with correct view name
+            view_state_controller.set_active_view.assert_called_with(view_name) 

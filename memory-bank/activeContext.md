@@ -289,20 +289,433 @@ We're working on migrating the application from tab-based interfaces to the new 
 
 ## Current Focus
 
-### UI Architecture Modernization
-Currently we're working on updating the UI architecture to use the new base views instead of legacy tabs. 
+The primary focus is updating and modernizing the UI architecture of the application. We are transitioning from a tab-based interface to a more modern view-based architecture.
 
-Status:
-- ✅ ChartView implementation complete
-- ✅ MainWindow updated to use ChartView directly
-- ✅ ChartView unit tests fixed and passing
-- 🔄 MainWindow tests being updated to work with the new architecture
-  - ✅ Fixed basic initialization tests
-  - ✅ Updated view switching tests to work with view-based architecture
-  - ❌ Other MainWindow tests still need updates
+### Status
 
-Next steps:
-1. Continue updating MainWindow tests to work with the new architecture
-2. Create comprehensive tests for ValidationTabView
-3. Complete implementation of DashboardView
-4. Replace all legacy tab components with their modern view counterparts
+1. **ChartView Implementation**: Complete
+   - Successfully created a separate ChartView component
+   - MainWindow now uses ChartView directly rather than embedding it in a tab
+   - All ChartView unit tests have been fixed and are passing
+
+2. **MainWindow Updates**: In Progress
+   - Updated to use the new view-based approach
+   - Several tests still need updates due to changes in menu structure and file operations
+   - Navigation sidebar has been integrated
+
+3. **ValidationTabView**: In Progress
+   - Initial implementation complete
+   - Tests being developed
+   - Some signal/slot connections need refinement
+
+4. **CorrectionView**: Planned
+   - Design finalized
+   - Implementation planned after ValidationTabView is complete
+
+### Next Steps
+
+1. **Testing**:
+   - Update remaining MainWindow tests to work with new architecture - Test update plan created
+   - Create comprehensive ValidationTabView tests
+   - Plan CorrectionView tests
+
+2. **Implementation**:
+   - Complete ValidationTabView signal handling
+   - Implement CorrectionView
+   - Replace all legacy tab components with view components
+
+3. **Bug Fixes**:
+   - Fix signal disconnection warnings during application close
+   - Address C++ object deletion issues with data model in tests
+   - Update menu structure tests
+
+### Recent Changes
+
+1. **Architecture**:
+   - Refactored MainWindow to use view components instead of tabs
+   - Created separate ChartView component with full functionality
+   - Updated navigation system to switch between views
+
+2. **Testing**:
+   - Fixed ChartView tests to work with new component structure
+   - Updated test fixtures to handle view components
+   - Added signal testing improvements
+   - Created comprehensive test update plan for MainWindow tests
+
+3. **UI/UX**:
+   - Improved navigation sidebar visuals
+   - Enhanced status bar feedback
+   - Updated menu structure to reflect new architecture
+
+### Current Challenges
+
+1. **Test Compatibility**:
+   - Many tests were designed for the old tab-based architecture
+   - Need to update tests to match new component structure without changing test intent
+   - Signal testing is more complex with the new architecture
+   - Created test update plan to address systematically
+
+2. **Signal Management**:
+   - Signal disconnection warnings during application close
+   - Need to improve signal/slot connection management
+   - Some signals not properly disconnected when views are destroyed
+
+3. **View Lifecycle**:
+   - Ensuring proper initialization and cleanup of view components
+   - Managing shared resources between views
+   - Coordinating view transitions
+
+---
+
+## MainWindow Tests Update Plan
+
+To address the testing challenges with the new view-based architecture, we've created a comprehensive test update plan that outlines how to update the MainWindow tests. The plan is stored in `memory-bank/test_update_plan.md` and includes:
+
+1. **Understanding the Architectural Changes**:
+   - From tab-based to view-based
+   - Controller-based coordination
+   - Signal flow changes
+   - Menu structure updates
+
+2. **Test Update Strategy**:
+   - Categorizing tests by update complexity
+   - Controller call verification patterns
+   - Signal verification patterns
+   - Component initialization considerations
+
+3. **Implementation Plan**:
+   - Phase 1: Basic test fixes
+   - Phase 2: Core functionality tests
+   - Phase 3: Advanced tests
+   - Phase 4: Final review
+
+4. **Specific Test Examples**:
+   - Menu action tests
+   - View navigation tests
+   - File operation tests
+   - UI state tests
+   - Signal handling tests
+
+This plan will guide the updates to all MainWindow tests to align with the new architecture.
+
+---
+
+## Technical Decisions
+
+### View-Based Architecture
+
+**Decision**: Replace tab-based interface with dedicated view components.
+
+**Rationale**:
+- Improved separation of concerns
+- Better testability of individual components
+- More modern UI approach
+- Easier to add new views or rearrange existing ones
+
+**Implementation**:
+- Each view is a self-contained QWidget subclass
+- MainWindow manages view switching and coordination
+- Views communicate through signals/slots and view controllers
+- Common functionality extracted to base classes or utility functions
+
+### Signal/Slot Architecture
+
+We're reinforcing our commitment to a signal/slot architecture for component communication:
+
+1. **View Components**:
+   - Emit signals when user actions occur
+   - Provide slots for external actions to affect the view
+   - Do not directly call methods on other components
+
+2. **Controllers**:
+   - Connect signals from views to appropriate handlers
+   - Coordinate between models and views
+   - Manage application state
+
+3. **Services**:
+   - Provide business logic implementation
+   - Emit signals when state changes
+   - Accept calls from controllers to perform operations
+
+### Testing Strategy
+
+We're updating our testing approach to match the new architecture:
+
+1. **Component Tests**:
+   - Test each view component in isolation
+   - Mock dependencies (models, services)
+   - Verify signals are emitted correctly
+   - Verify UI updates in response to external signals
+
+2. **Integration Tests**:
+   - Test interactions between components
+   - Verify correct signal propagation
+   - Test data flow through the system
+
+3. **Signal Testing**:
+   - Use qtbot.waitSignal for asynchronous operations
+   - Test signal emissions with correct parameters
+   - Test signal chains (when one signal triggers another)
+   
+4. **Controller-Based Testing**:
+   - Test through controller interfaces rather than direct UI inspection
+   - Verify controller methods are called with correct parameters
+   - Focus on behavior rather than implementation details
+
+---
+
+## UI State
+
+### Current Components
+
+1. **MainWindow**:
+   - Acts as the container for all views
+   - Manages menu actions
+   - Handles file operations
+   - Manages application state
+
+2. **ChartView**:
+   - Displays data visualizations
+   - Allows switching between chart types
+   - Provides customization options
+   - Handles user interactions with charts
+
+3. **ValidationTabView**:
+   - Manages validation rules
+   - Displays validation results
+   - Allows editing/creation of validation rules
+   - Provides data filtering based on validation status
+
+4. **DashboardView**:
+   - Displays summary information
+   - Shows recent activity
+   - Provides quick access to common tasks
+
+### Planned Components
+
+1. **CorrectionView**:
+   - Manages correction rules
+   - Displays correction results
+   - Allows editing/creation of correction rules
+   - Provides data transformation functionality
+
+2. **SettingsView**:
+   - Manages application settings
+   - Provides configuration options
+   - Handles import/export of settings
+
+3. **ReportView**:
+   - Generates reports from data
+   - Provides report templates
+   - Allows customization of reports
+   - Handles export to various formats
+
+---
+
+## Data Architecture
+
+### Core Models
+
+1. **ChestDataModel**:
+   - Central data structure for application
+   - Stores imported data
+   - Provides access to data through Qt's Model/View framework
+   - Handles data updates and notifications
+
+2. **ValidationListModel**:
+   - Stores validation rules
+   - Provides access to validation lists
+   - Handles validation rule updates
+
+3. **ValidationResultModel**:
+   - Stores validation results
+   - Maps results to data rows
+   - Provides filtering based on validation status
+
+### Key Services
+
+1. **ValidationService**:
+   - Performs data validation
+   - Manages validation rules
+   - Provides validation results
+
+2. **CorrectionService**:
+   - Applies correction rules to data
+   - Manages correction rule definitions
+   - Handles data transformations
+
+3. **ConfigManager**:
+   - Manages application configuration
+   - Handles settings persistence
+   - Provides access to configuration options
+
+---
+
+## Testing Status
+
+### Passing Tests
+
+1. **ChartView Tests**:
+   - All tests passing
+   - Chart creation tests
+   - Chart type switching tests
+   - Data update tests
+   - User interaction tests
+
+2. **Model Tests**:
+   - Most ChestDataModel tests passing
+   - ValidationListModel tests passing
+   - ValidationResultModel tests passing
+
+3. **Service Tests**:
+   - ValidationService tests passing
+   - ConfigManager tests passing
+   - Most CorrectionService tests passing
+
+### Failing Tests
+
+1. **MainWindow Tests**:
+   - File operation tests failing (updated menu structure)
+   - Tab switching tests failing (no longer using tabs)
+   - View coordination tests need updates
+   - Test update plan created to address these systematically
+
+2. **Integration Tests**:
+   - Some signal chain tests failing
+   - View interaction tests need updates
+
+### New Tests Needed
+
+1. **View Component Tests**:
+   - ValidationTabView tests
+   - CorrectionView tests
+   - SettingsView tests
+
+2. **Controller Tests**:
+   - ViewStateController tests
+   - DataViewController tests
+   - UIStateController tests
+
+---
+
+## Current Bugs/Issues
+
+1. **Signal Disconnection Warnings**:
+   - Warnings when application closes:
+   ```
+   QObject::disconnect: Unexpected null parameter
+   ```
+   - Likely caused by components being destroyed before signals are disconnected
+   - Need to implement proper cleanup in component destructors
+
+2. **C++ Object Deletion Issues**:
+   - Some tests fail with:
+   ```
+   RuntimeError: Internal C++ object (ChestDataModel) already deleted.
+   ```
+   - Need to ensure proper ownership and lifecycle management
+   - Use ParentObject pattern more consistently
+
+3. **Menu Structure Tests**:
+   - Tests expecting old menu structure
+   - Need to update tests to match new menu organization
+   - Some actions moved to view-specific menus
+
+4. **File Operation Changes**:
+   - File operations now handled by FileOperationsController
+   - Tests directly calling MainWindow methods need updates
+   - Need to test controller instead of implementation details
+
+5. **Inconsistent View State**:
+   - Sometimes views don't update when data changes
+   - Need to ensure all views are properly connected to data model signals
+   - Some signal connections missing or incorrect
+
+# Active Context
+
+## Current Focus
+We are modernizing the UI architecture from a tab-based interface to a view-based approach. This involves:
+
+1. Refactoring the `MainWindow` to use a view-based approach rather than tabs
+2. Creating dedicated view controllers to manage state and navigation
+3. Updating tests to work with the new architecture
+4. Implementing the new ChartView approach throughout the application
+
+## Status
+
+### What's Working
+- ChartView implementation is complete and working well
+- MainWindow has been updated to use ChartView directly 
+- ChartView unit tests have been fixed and are now passing
+- First phase of MainWindow test updates created
+
+### What Needs Work
+- Several MainWindow tests still need to be updated due to changes in menu structure and file operations
+- ValidationTabView needs tests updated
+- Corrections and other views need test updates
+- Need to fix signal disconnection warnings
+
+## Next Steps
+1. **Complete MainWindow Test Updates - Phase 1 ✓**
+   - Created example test file showing how to update tab-based tests to view-based architecture
+   - Created utility script for analyzing and updating tests
+   - Implemented patterns for properly mocking view controllers in tests
+   - Added tests for navigation, actions, and state updates
+   - Identified key issues with controller method names and menu structure
+
+2. **Address Phase 1 Findings ✓**
+   - Fixed controller method names in examples (`open_file` instead of `open_files`)
+   - Updated menu text assertions to match actual UI (`&Open...` instead of `&Open`)
+   - Documented signal disconnection warnings and planned fixes
+   - Created improved test patterns for view switching and navigation
+
+3. **Complete MainWindow Test Updates - Phase 2 ✓**  
+   - Updated tests for file operations using the file_operations_controller
+     - Fixed method name references (open_file vs open_files)
+     - Added proper mock resets to prevent false positives
+     - Added tests for file dialog cancellation handling
+   - Updated tests for data loading/saving
+     - Added tests for data state changes
+     - Added tests for progress reporting
+     - Added tests for auto-save prompts
+   - Updated tests for menu interactions with correct menu text
+     - Created comprehensive menu existence tests
+     - Added tests for menu item enabling/disabling
+     - Added tests for keyboard shortcuts
+
+4. **Complete MainWindow Test Updates - Phase 3**
+   - Update tests for view interaction
+   - Update tests for controller interaction
+   - Update tests for signal handling
+   - Implement proper cleanup to prevent signal disconnection warnings
+
+5. **Update ValidationTabView Tests**
+   - Create fixtures for ValidationTabView
+   - Update validation tests
+
+6. **Complete DashboardView Implementation**
+   - Create DashboardView
+   - Create tests for DashboardView
+   - Integrate with MainWindow
+
+7. **Replace Legacy Components**
+   - Remove tab widget
+   - Replace with view controllers
+
+8. **Fix Signal Disconnection Warnings**
+   - Ensure all signals are properly disconnected on cleanup
+
+## Recent Changes
+- Refactored MainWindow to use view-based architecture
+- Updated ChartView to integrate directly with MainWindow
+- Created controller classes to manage functionality
+- Updated tests to work with view controllers instead of direct tab access
+- Created example test file and utility script for updating remaining tests
+
+## Current Challenges
+- Test compatibility with the new architecture
+  - Addressing test failures due to architectural changes
+  - Updating test fixtures to work with the new controllers
+- Signal management
+  - Ensuring signals are properly connected/disconnected
+  - Managing signal chains between controllers and views

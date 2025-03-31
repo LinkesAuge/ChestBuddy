@@ -5,11 +5,15 @@ Description: Adapter to integrate the existing CorrectionTab with the new BaseVi
 Usage:
     correction_view = CorrectionViewAdapter(data_model, correction_service)
     main_window.add_view(correction_view)
+
+DEPRECATED: This module is deprecated and will be removed in a future version.
+Use chestbuddy.ui.views.correction_view.CorrectionView instead.
 """
 
 from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtWidgets import QWidget, QVBoxLayout
 import logging
+import warnings
 
 from chestbuddy.core.models import ChestDataModel
 from chestbuddy.core.services import CorrectionService
@@ -20,6 +24,14 @@ from chestbuddy.ui.utils import get_update_manager
 
 # Set up logger
 logger = logging.getLogger(__name__)
+
+# Issue deprecation warning
+warnings.warn(
+    "CorrectionViewAdapter is deprecated and will be removed in a future version. "
+    "Use CorrectionView from chestbuddy.ui.views.correction_view instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 
 class CorrectionViewAdapter(UpdatableView):
@@ -38,6 +50,8 @@ class CorrectionViewAdapter(UpdatableView):
         - Provides the same functionality as CorrectionTab but with the new UI styling
         - Uses DataViewController for correction operations
         - Uses UpdateManager for scheduling updates
+
+    DEPRECATED: This class is deprecated. Use CorrectionView instead.
     """
 
     # Define signals
@@ -60,6 +74,12 @@ class CorrectionViewAdapter(UpdatableView):
             parent (QWidget, optional): The parent widget. Defaults to None.
             debug_mode (bool, optional): Enable debug mode for signal connections. Defaults to False.
         """
+        warnings.warn(
+            "CorrectionViewAdapter is deprecated. Use CorrectionView instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
         # Store references
         self._data_model = data_model
         self._correction_service = correction_service

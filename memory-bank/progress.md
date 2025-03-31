@@ -5,6 +5,167 @@ date: 2024-05-13
 
 # Project Progress
 
+## Overall Status
+
+ChestBuddy is currently undergoing a major architectural update, transitioning from a tab-based UI to a view-based architecture. This modernization makes the codebase more maintainable and extensible.
+
+## What Works
+- Core data model and data handling
+- CSV data import and export
+- Data validation engine
+- Data correction functionality
+- Chart generation and visualization
+- ChartView component fully integrated
+- Configuration management system
+- Basic navigation between views
+- MainWindow core functionality
+- ChartView unit tests passing
+
+## Currently Being Worked On
+- UI architecture update from tab-based to view-based
+- MainWindow test updates (Phase 1 complete ✓, Phase 2 complete ✓, Phase 3 in progress)
+- Test documentation and execution examples
+- Signal management improvements
+- Improved test patterns for controllers
+- Test refactoring to support the new architecture
+
+## What's Next
+- Complete remaining MainWindow test updates (Phase 3)
+- Implement ValidationTabView tests
+- Complete DashboardView implementation
+- Replace remaining legacy UI components
+- Fix signal disconnection warnings
+- Enhance documentation
+
+## Testing Status
+
+| Component               | Total Tests | Passing | Failing | Skipped | Notes                                |
+|-------------------------|-------------|---------|---------|---------|--------------------------------------|
+| Core                    | 45          | 45      | 0       | 0       | All tests passing                    |
+| Services                | 38          | 38      | 0       | 0       | All tests passing                    |
+| Models                  | 25          | 25      | 0       | 0       | All tests passing                    |
+| Controllers             | 30          | 28      | 0       | 2       | Two need updates for new architecture|
+| Views                   | 35          | 20      | 3       | 12      | MainWindow tests being updated       |
+| UI Components           | 15          | 13      | 0       | 2       | Chart components fully tested        |
+| **Total**               | **188**     | **169** | **3**   | **16**  | **~90% passing**                    |
+
+### MainWindow Test Status
+
+| Test Category             | Total | Updated | Pending | Notes                                        |
+|---------------------------|-------|---------|---------|----------------------------------------------|
+| File Operations           | 10    | 10      | 0       | All tests updated and passing                |
+| Menu Interactions         | 12    | 12      | 0       | All tests updated and passing                |
+| View Navigation           | 6     | 6       | 0       | All tests updated and passing                |
+| Data Processing           | 8     | 8       | 0       | All tests updated and passing                |
+| Signal Handling           | 7     | 0       | 7       | Phase 3 work                                 |
+| Dialog Interactions       | 4     | 0       | 4       | Phase 3 work                                 |
+| **Total**                 | **47**| **36**  | **11**  | **~76% updated**                            |
+
+## Known Issues
+- Signal disconnection warnings during test teardown
+- Some legacy UI components still need replacement
+- Controller signal connection/disconnection during test cleanup
+
+## Milestones
+- [x] Core data handling
+- [x] CSV import/export
+- [x] Data validation
+- [x] Data correction
+- [x] Chart visualization
+- [x] ChartView implementation
+- [x] ChartView tests
+- [x] MainWindow test update pattern established
+- [x] MainWindow test update Phase 1 completed
+- [x] MainWindow test update Phase 2 completed
+- [ ] MainWindow test update Phase 3 (in progress)
+- [ ] ValidationTabView tests
+- [ ] DashboardView implementation
+- [ ] Complete UI modernization
+
+## Detailed Feature Status
+
+1. **Core Data Handling**
+   - ChestDataModel provides the core data structure
+   - Data import from CSV files
+   - Data validation with customizable rules
+   - Data correction with rule-based transformations
+   - Data export to CSV
+
+2. **User Interface**
+   - Modern sidebar navigation
+   - View-based architecture (replacing tabs)
+   - Chart visualization with multiple chart types
+   - Data filtering and sorting capabilities
+   - Status bar with contextual information
+
+3. **Service Architecture**
+   - Service-based architecture for business logic
+   - Controller-based architecture for UI coordination
+   - Signal-based communication between components
+   - Dependency injection for testing and flexibility
+
+4. **Controller Enhancements**: Updated methods to handle rules without explicit order values, relying on list position for ordering.
+
+## Testing Status
+
+| Component              | Tests Status                                     |
+|------------------------|--------------------------------------------------|
+| ChartView              | ✅ All tests passing                              |
+| MainWindow             | 🔄 5 passing, 6 failing, 8 skipped               |
+| ValidationTabView      | 🔄 Tests being created                           |
+| CorrectionView         | 🔄 Tests planned                                 |
+| DataModel              | ✅ All tests passing                              |
+| FileOperationsController | ✅ All tests passing                           |
+| ValidationService      | ✅ All tests passing                              |
+
+### Test Summary
+- Total Tests: 565
+- Passing: 448 (79%)
+- Failing: 49 (9%)
+- Errors: 62 (11%)
+- Skipped: 6 (1%)
+
+## Known Issues
+
+1. Signal disconnection warnings during test execution
+2. C++ object deletion issues with data model in tests
+3. Some UI components still use legacy implementation
+4. Menu structure changes not fully reflected in tests
+
+## Implementation Priorities
+
+1. **Fix Critical Bugs**
+   - Address import performance issues with large files
+   - Fix validation rule editing/deletion
+   - Resolve signal disconnection issues
+
+2. **UI Modernization**
+   - Complete view-based architecture migration
+   - Update all menu structures
+   - Implement modern styling
+
+3. **Testing**
+   - Update MainWindow tests to work with new architecture
+   - Create missing tests for ValidationTabView and CorrectionView
+   - Improve test stability and reduce warnings
+
+4. **New Features**
+   - Enhanced chart options
+   - Advanced data filtering
+   - Batch processing
+   - Report generation
+
+## Milestones
+
+- [x] Initial application architecture
+- [x] Basic data import/export
+- [x] Data validation implementation
+- [x] Chart visualization
+- [x] ChartView implementation
+- [ ] Complete view-based architecture migration
+- [ ] Comprehensive test coverage for all components
+- [ ] Advanced data analysis features
+
 ## What works
 
 ### Primary features
@@ -124,14 +285,6 @@ date: 2024-05-13
 3. **UI Improvements**: Added status bar, import/export buttons, and color legend to make the correction interface more intuitive and functional.
 
 4. **Controller Enhancements**: Updated methods to handle rules without explicit order values, relying on list position for ordering.
-
-## Testing Status
-
-- Total Tests: 565
-- Passing: 448 (79%)
-- Failing: 49 (9%)
-- Errors: 62 (11%)
-- Skipped: 6 (1%)
 
 ## Implementation Priorities
 
