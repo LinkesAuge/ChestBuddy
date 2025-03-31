@@ -12,10 +12,17 @@ from typing import Dict, List, Tuple, Any, Optional
 import pandas as pd
 import numpy as np
 from copy import deepcopy
+from datetime import datetime
+import logging
 
 from chestbuddy.core.models.correction_rule import CorrectionRule
 from chestbuddy.core.models.correction_rule_manager import CorrectionRuleManager
-from chestbuddy.core.validation_enums import ValidationStatus
+from chestbuddy.core.enums.validation_enums import ValidationStatus
+from chestbuddy.core.models.chest_data_model import ChestDataModel
+from chestbuddy.utils.config import ConfigManager
+
+# Set up logger
+logger = logging.getLogger(__name__)
 
 
 class CorrectionService:
@@ -34,24 +41,35 @@ class CorrectionService:
         _correction_history (List[Dict]): History of applied corrections
     """
 
-    def __init__(self, rule_manager, data_model, validation_service, case_sensitive=True):
+    def __init__(self, data_model: ChestDataModel, config_manager: Optional[ConfigManager] = None):
         """
         Initialize the CorrectionService.
 
         Args:
-            rule_manager (CorrectionRuleManager): Manager for correction rules
             data_model: Data model containing the data to be corrected
-            validation_service: Service for validating data cells
-            case_sensitive (bool): Whether to apply case-sensitive matching
+            config_manager: Optional configuration manager for settings
         """
-        self._rule_manager = rule_manager
         self._data_model = data_model
-        self._validation_service = validation_service
-        self._case_sensitive = case_sensitive
+        self._config_manager = config_manager
+        self._rule_manager = CorrectionRuleManager(config_manager)
+        self._validation_service = None  # Will be set separately
+        self._case_sensitive = False
         self._correction_history = []
 
-        # For mapping column names to rule categories
-        self._category_mapping = {"Player": "player", "ChestType": "chest_type", "Source": "source"}
+        # Map column names to categories
+        self._category_mapping = {
+            "PLAYER": "player",
+            "CHEST": "chest",
+            "SOURCE": "source",
+            "SCORE": "score",
+            "DATE": "date",
+            "CLAN": "clan",
+        }
+
+        # Load settings from configuration if provided
+        if config_manager:
+            self._case_sensitive = config_manager.get_bool("Corrections", "case_sensitive", False)
+            logger.info(f"Loaded correction case_sensitive setting: {self._case_sensitive}")
 
     def apply_corrections(self, only_invalid: bool = False) -> Dict[str, int]:
         """
@@ -190,11 +208,78 @@ class CorrectionService:
 
         return stats
 
-    def _apply_rule_to_data(
-        self, data: pd.DataFrame, rule: CorrectionRule, only_invalid: bool
+    def apply_rule_to_data(
+        self, rule: CorrectionRule, only_invalid: bool = False, selected_only: List[int] = None
     ) -> List[Tuple[int, int, Any, Any]]:
         """
-        Apply a rule to data and return corrections.
+        Apply a correction rule to the data.
+
+        Args:
+            rule: Rule to apply
+            only_invalid: Whether to only apply to invalid cells
+            selected_only: List of selected row indices to apply to (if None, apply to all rows)
+
+        Returns:
+            List of (row, col, old_value, new_value) tuples representing applied corrections
+        """
+        data = self._data_model.data
+        if data is None or data.empty:
+            return []
+
+        if not rule:
+            logger.warning("No rule specified for correction")
+            return []
+
+        # Get corrections
+        corrections = self._apply_rule_to_data(data, rule, only_invalid)
+
+        # Filter to selected rows if specified
+        if selected_only is not None:
+            selected_set = set(selected_only)
+            corrections = [c for c in corrections if c[0] in selected_set]
+
+        # Apply corrections
+        if corrections:
+            # Track history
+            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            history_entry = {
+                "timestamp": now,
+                "rule": {
+                    "from_value": rule.from_value,
+                    "to_value": rule.to_value,
+                    "category": rule.category,
+                },
+                "corrections": [
+                    {
+                        "row": int(row),
+                        "column": self._data_model.data.columns[col],
+                        "old_value": str(old_val),
+                        "new_value": str(new_val),
+                    }
+                    for row, col, old_val, new_val in corrections
+                ],
+            }
+            self._correction_history.append(history_entry)
+
+            # Apply corrections to data
+            for row, col, _, new_val in corrections:
+                col_name = data.columns[col]
+                self._data_model.update_cell(row, col_name, new_val)
+
+                # Update correction status
+                self._update_correction_status(row, col, new_val)
+
+            # Notify of the change
+            self.corrections_applied.emit(len(corrections))
+            logger.info(f"Applied {len(corrections)} corrections with rule: {rule}")
+
+        return corrections
+
+    def _apply_rule_to_data(
+        self, data: pd.DataFrame, rule: CorrectionRule, only_invalid: bool = False
+    ) -> List[Tuple[int, int, Any, Any]]:
+        """
+        Apply a rule to data without modifying it.
 
         Args:
             data (pd.DataFrame): Data to check against the rule
@@ -238,7 +323,11 @@ class CorrectionService:
                         cell_status = self._validation_service.get_validation_status(
                             row_idx, col_idx
                         )
-                        if cell_status != ValidationStatus.INVALID:
+                        # Apply to invalid or correctable cells
+                        if (
+                            cell_status != ValidationStatus.INVALID
+                            and cell_status != ValidationStatus.CORRECTABLE
+                        ):
                             continue
 
                     # Add to corrections list
