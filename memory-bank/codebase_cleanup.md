@@ -30,6 +30,11 @@ This document records cleanup activities performed on the ChestBuddy codebase to
    - Changed MainWindow to use ChartView directly instead of ChartViewAdapter
    - Fixed imports in `chestbuddy/ui/views/__init__.py` to remove non-existent components
 
+6. **Created Tests for Modern View Components** (2024-05-16)
+   - Created `tests/unit/ui/views/test_chart_view.py` with comprehensive tests
+   - Tests cover all core functionality including initialization, chart creation, export, and controller integration
+   - Maintained test coverage for the same functionality previously tested in ChartTab tests
+
 ## Current Refactoring Status
 
 1. **UI Component Migration Progress**
@@ -41,6 +46,7 @@ This document records cleanup activities performed on the ChestBuddy codebase to
      - ChartView implementation is complete
      - MainWindow now uses ChartView directly
      - ChartViewAdapter still exists but is marked deprecated
+     - Unit tests for ChartView created and passing
 
 2. **Adapter Status**
    - ValidationViewAdapter: Uses ValidationTabView (modern component)
@@ -61,17 +67,18 @@ This document records cleanup activities performed on the ChestBuddy codebase to
      - `chestbuddy/ui/views/chart_view_adapter.py`
 
 2. **Update Tests**
+   - ✓ Created tests for ChartView
    - Update remaining tests to use the new view-based components directly
    - Tests to be updated include:
      - `tests/test_chart_tab.py`
      - `tests/test_chart_tab_simple.py`
      - `tests/test_mainwindow_chart_integration.py`
      - `tests/test_chart_view_adapter.py`
-   - Create new tests for ChartView
    - Completed test updates:
      - `tests/test_main_window.py` - Updated fixtures to support the new MainWindow constructor (2024-05-16)
        - Added mock objects for all required dependencies
        - Updated assertions to focus on core functionality rather than specific UI implementation
+     - `tests/unit/ui/views/test_chart_view.py` - Created comprehensive tests for the new ChartView component (2024-05-16)
 
 3. **Organize Debug Utilities**
    - Move debug-only utilities to a dedicated debug or tools directory
@@ -106,4 +113,5 @@ When refactoring adapter views:
 - ChartView implementation is now complete, following the same pattern as CorrectionView
 - The MainWindow has been updated to use ChartView directly instead of ChartViewAdapter
 - ChartView maintains the same signals as ChartViewAdapter to ensure compatibility
+- Comprehensive tests for ChartView have been created to verify functionality
 - Once all tests are updated to use ChartView directly, both ChartViewAdapter and ChartTab can be removed 
