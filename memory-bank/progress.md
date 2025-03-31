@@ -324,3 +324,30 @@ ChestBuddy is currently undergoing a major architectural update, transitioning f
 ## Current Focus
 
 The current focus is on completing the UI implementation for the correction feature, specifically the enhanced context menu, improved import/export dialog, and batch correction capabilities.
+
+## Testing
+
+### Test Improvements and Coverage
+
+- Implemented comprehensive tests for the new ChartView component
+- Significantly improved ValidationTabView test coverage from 29% to 80%
+  - Created a MockSignal class to simulate Qt signals without access violations
+  - Added tests for initialization, signal connections, validation results handling
+  - Implemented tests for various edge cases like missing models and error handling
+  - Added tests for UI styling, checkbox state changes, and status updates
+- Downgraded PySide6 from 6.8.3 to 6.6.0 to fix compatibility issues with testing
+- Successfully running UI tests with stable Qt signal handling
+- Added detailed documentation of test patterns for future UI component testing
+- Test coverage still needs improvement for most UI components
+- Current overall test coverage is 22%
+
+### Test Execution
+
+- Added pytest-cov integration to monitor coverage metrics
+- Simplified test execution with utility scripts
+- Using pytest-qt for Qt-specific testing functionality
+- Added SignalSpy utility for better signal testing
+
+### Test Categories
+
+#### Unit Tests
