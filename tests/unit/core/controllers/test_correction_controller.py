@@ -77,8 +77,12 @@ def mock_rule_manager():
     manager = MagicMock()
 
     # Setup defaults
-    rule1 = CorrectionRule("Player", "player", "player", "enabled", 0)
-    rule2 = CorrectionRule("Chest", "chest", "chest_type", "enabled", 1)
+    rule1 = CorrectionRule(
+        to_value="player", from_value="Player", category="player", status="enabled"
+    )
+    rule2 = CorrectionRule(
+        to_value="chest", from_value="Chest", category="chest_type", status="enabled"
+    )
 
     manager.get_rules.return_value = [rule1, rule2]
     manager.add_rule.return_value = True
@@ -168,7 +172,9 @@ class TestCorrectionController:
         controller.set_view(mock_view)
 
         # Create a rule to add
-        rule = CorrectionRule("Player", "player", "player", "enabled", 0)
+        rule = CorrectionRule(
+            to_value="player", from_value="Player", category="player", status="enabled"
+        )
 
         # Add the rule
         result = controller.add_rule(rule)
@@ -188,7 +194,9 @@ class TestCorrectionController:
         controller.set_view(mock_view)
 
         # Create a rule to update
-        rule = CorrectionRule("Player", "player", "player", "enabled", 0)
+        rule = CorrectionRule(
+            to_value="player", from_value="Player", category="player", status="enabled"
+        )
 
         # Update the rule
         result = controller.update_rule(1, rule)
