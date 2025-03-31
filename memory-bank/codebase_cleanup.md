@@ -26,6 +26,10 @@ This document records cleanup activities performed on the ChestBuddy codebase to
    - Implemented following the same pattern as CorrectionView
    - Maintained signal compatibility with ChartViewAdapter for smooth transition
 
+5. **Updated MainWindow to Use Modern View Components** (2024-05-16)
+   - Changed MainWindow to use ChartView directly instead of ChartViewAdapter
+   - Fixed imports in `chestbuddy/ui/views/__init__.py` to remove non-existent components
+
 ## Current Refactoring Status
 
 1. **UI Component Migration Progress**
@@ -33,9 +37,9 @@ This document records cleanup activities performed on the ChestBuddy codebase to
    - CorrectionTab → CorrectionView: ✓ Complete
      - MainWindow now uses CorrectionView directly
      - CorrectionViewAdapter still exists but is marked deprecated
-   - ChartTab → ChartView: 🔄 In Progress
+   - ChartTab → ChartView: ✓ Complete
      - ChartView implementation is complete
-     - MainWindow needs to be updated to use ChartView directly
+     - MainWindow now uses ChartView directly
      - ChartViewAdapter still exists but is marked deprecated
 
 2. **Adapter Status**
@@ -45,22 +49,18 @@ This document records cleanup activities performed on the ChestBuddy codebase to
      - Will be removed once all code uses CorrectionView directly
    - ChartViewAdapter: Still uses ChartTab (legacy component)
      - Now marked deprecated with warnings
-     - Will be replaced by ChartView (implementation complete)
+     - Will be removed once all tests are updated to use ChartView directly
 
 ## Future Cleanup Tasks
 
-1. **Update MainWindow to Use ChartView**
-   - Replace imports and initialization of ChartViewAdapter with ChartView
-   - Similar to how CorrectionView is already being used
-
-2. **Remove Remaining Legacy UI Components**
+1. **Remove Remaining Legacy UI Components**
    - Once all adapter views are refactored to not depend on legacy components, remove:
      - `chestbuddy/ui/correction_tab.py`
      - `chestbuddy/ui/chart_tab.py`
      - `chestbuddy/ui/views/correction_view_adapter.py`
      - `chestbuddy/ui/views/chart_view_adapter.py`
 
-3. **Update Tests**
+2. **Update Tests**
    - Update remaining tests to use the new view-based components directly
    - Tests to be updated include:
      - `tests/test_chart_tab.py`
@@ -73,7 +73,7 @@ This document records cleanup activities performed on the ChestBuddy codebase to
        - Added mock objects for all required dependencies
        - Updated assertions to focus on core functionality rather than specific UI implementation
 
-4. **Organize Debug Utilities**
+3. **Organize Debug Utilities**
    - Move debug-only utilities to a dedicated debug or tools directory
    - Consider creating a proper debug module for development tools
 
@@ -104,7 +104,6 @@ When refactoring adapter views:
 ### ChartTab to ChartView
 - ChartViewAdapter currently wraps ChartTab but has been marked as deprecated
 - ChartView implementation is now complete, following the same pattern as CorrectionView
-- The MainWindow still imports and uses ChartViewAdapter
-- Next step is to update MainWindow to use ChartView directly
+- The MainWindow has been updated to use ChartView directly instead of ChartViewAdapter
 - ChartView maintains the same signals as ChartViewAdapter to ensure compatibility
-- Once all code uses ChartView directly, both ChartViewAdapter and ChartTab can be removed 
+- Once all tests are updated to use ChartView directly, both ChartViewAdapter and ChartTab can be removed 

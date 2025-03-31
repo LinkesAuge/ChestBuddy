@@ -52,7 +52,7 @@ from chestbuddy.ui.views.base_view import BaseView
 from chestbuddy.ui.views.dashboard_view import DashboardView
 from chestbuddy.ui.views.data_view_adapter import DataViewAdapter
 from chestbuddy.ui.views.validation_view_adapter import ValidationViewAdapter
-from chestbuddy.ui.views.chart_view_adapter import ChartViewAdapter
+from chestbuddy.ui.views.chart_view import ChartView
 from chestbuddy.ui.widgets import ProgressDialog, ProgressBar
 from chestbuddy.ui.data_view import DataView
 import pandas as pd
@@ -587,11 +587,9 @@ class MainWindow(QMainWindow):
         self._views["Correction"] = correction_view
 
         # Create Analysis/Charts view
-        chart_view = ChartViewAdapter(
-            data_model=self._data_model, chart_service=self._chart_service
-        )
+        chart_view = ChartView(data_model=self._data_model, chart_service=self._chart_service)
         # Set up the chart view to use the data view controller
-        chart_view.set_data_view_controller(self._data_view_controller)
+        chart_view.set_controller(self._data_view_controller)
         self._content_stack.addWidget(chart_view)
         self._views["Charts"] = chart_view
 

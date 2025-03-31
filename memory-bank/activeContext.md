@@ -238,3 +238,45 @@ After implementing the correction feature UI components and data view integratio
 2. View communication strategies
 3. Error handling approaches for correction operations
 4. UX refinements for batch operations
+
+## Active Development Focus
+
+**Last Update:** May 16, 2024
+
+We're working on migrating the application from tab-based interfaces to the new view-based architecture, which provides better separation of concerns and improved component reusability.
+
+### Current Task Focus
+
+- Completing migration from tab-based UI to view-based architecture
+- Cleaning up redundant code and adding deprecation warnings to legacy components
+- Implementing new ChartView component to replace ChartViewAdapter
+
+### Recent Codebase Cleanup
+
+- **May 16, 2024**: Added deprecation warnings to `correction_view_adapter.py` (MainWindow already uses CorrectionView directly)
+- **May 16, 2024**: Added deprecation warnings to `chart_view_adapter.py` and updated MainWindow to use ChartView directly
+- **May 16, 2024**: Fixed imports in views/__init__.py to remove non-existent components
+- **May 15, 2024**: Removed redundant ServiceLocator implementation (deleted `chestbuddy/core/service_locator.py`)
+- **May 15, 2024**: Added deprecation warnings to legacy UI components (CorrectionTab and ChartTab)
+- **May 15, 2024**: Added debugging utility notice to signal_tracer.py
+
+### Next Steps
+
+1. Fix remaining failing tests related to the UI migration
+2. Complete implementation of ChartView with all features from ChartTab
+3. Add comprehensive tests for the new ChartView
+4. Remove deprecated components once all dependencies are addressed
+
+### Development Environment
+
+- Using uv for package management and virtual environment
+- Active Python version: 3.12.9
+- IDE: Cursor
+- PySide6 6.8.2.1 for Qt UI components
+
+### Focus Areas
+
+- UI architecture improvements
+- Test coverage enhancement
+- Code quality and maintainability 
+- Documentation updates
