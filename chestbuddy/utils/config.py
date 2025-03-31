@@ -121,6 +121,10 @@ class ConfigManager:
         self.set("Validation", "case_sensitive", "False")
         self.set("Validation", "validate_on_import", "True")
 
+        # Auto-correction defaults
+        self.set("Correction", "auto_correct_on_validation", "False")
+        self.set("Correction", "auto_correct_on_import", "False")
+
         # UI defaults
         self.set("UI", "window_width", "1024")
         self.set("UI", "window_height", "768")
@@ -623,3 +627,39 @@ class ConfigManager:
         except Exception as e:
             logger.error(f"Error importing configuration: {e}")
             raise
+
+    def get_auto_correct_on_validation(self):
+        """
+        Get whether to automatically apply corrections after validation.
+
+        Returns:
+            bool: True if auto-correction after validation is enabled
+        """
+        return self.get_bool("Correction", "auto_correct_on_validation", False)
+
+    def set_auto_correct_on_validation(self, value):
+        """
+        Set whether to automatically apply corrections after validation.
+
+        Args:
+            value (bool): True to enable auto-correction after validation
+        """
+        self.set("Correction", "auto_correct_on_validation", str(value))
+
+    def get_auto_correct_on_import(self):
+        """
+        Get whether to automatically apply corrections on import.
+
+        Returns:
+            bool: True if auto-correction on import is enabled
+        """
+        return self.get_bool("Correction", "auto_correct_on_import", False)
+
+    def set_auto_correct_on_import(self, value):
+        """
+        Set whether to automatically apply corrections on import.
+
+        Args:
+            value (bool): True to enable auto-correction on import
+        """
+        self.set("Correction", "auto_correct_on_import", str(value))
