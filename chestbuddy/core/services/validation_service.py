@@ -938,9 +938,18 @@ class ValidationService(QObject):
             for rule_name, issues in validation_results.items():
                 logger.debug(f"Rule '{rule_name}' has {len(issues)} issues")
 
+            # Remember cells that we've explicitly marked as invalid
+            explicitly_marked_cells = set()
+
             # Flag cells as invalid based on validation results
             for rule_name, issues in validation_results.items():
                 for row_idx, message in issues.items():
+                    if row_idx < 0:
+                        logger.warning(
+                            f"Skipping negative row index {row_idx} for rule {rule_name}"
+                        )
+                        continue
+
                     if "_row_" in message:
                         # Mark the entire row as invalid
                         status_df.at[row_idx, "_row_status"] = ValidationStatus.INVALID_ROW
@@ -949,13 +958,46 @@ class ValidationService(QObject):
                             status_df.at[row_idx, f"{col}_valid"] = False
                             status_df.at[row_idx, f"{col}_status"] = ValidationStatus.INVALID_ROW
                             status_df.at[row_idx, f"{col}_message"] = message
+                            explicitly_marked_cells.add((row_idx, col))
                     else:
-                        # Determine which columns are affected
+                        # For each column mentioned in the error message, mark it as invalid
+                        affected_column = None
                         for col in column_names:
                             if col in message:
+                                affected_column = col
                                 status_df.at[row_idx, f"{col}_valid"] = False
                                 status_df.at[row_idx, f"{col}_status"] = ValidationStatus.INVALID
                                 status_df.at[row_idx, f"{col}_message"] = message
+                                explicitly_marked_cells.add((row_idx, col))
+
+                                # Update row status to indicate at least one issue
+                                if status_df.at[row_idx, "_row_status"] == ValidationStatus.VALID:
+                                    status_df.at[row_idx, "_row_status"] = ValidationStatus.INVALID
+
+                        # If we didn't find a column in the message but the message is about validation:
+                        if affected_column is None and any(
+                            vterm in message.lower()
+                            for vterm in ["invalid", "not found", "missing"]
+                        ):
+                            # This is likely from a validation rule - find what column it's for
+                            if "player" in rule_name.lower() or "player" in message.lower():
+                                affected_column = "PLAYER"
+                            elif "chest" in rule_name.lower() or "chest" in message.lower():
+                                affected_column = "CHEST"
+                            elif "source" in rule_name.lower() or "source" in message.lower():
+                                affected_column = "SOURCE"
+
+                            if affected_column:
+                                logger.debug(
+                                    f"Inferred affected column {affected_column} for rule {rule_name} with message: {message}"
+                                )
+                                status_df.at[row_idx, f"{affected_column}_valid"] = False
+                                status_df.at[row_idx, f"{affected_column}_status"] = (
+                                    ValidationStatus.INVALID
+                                )
+                                status_df.at[row_idx, f"{affected_column}_message"] = message
+                                explicitly_marked_cells.add((row_idx, affected_column))
+
                                 # Update row status to indicate at least one issue
                                 if status_df.at[row_idx, "_row_status"] == ValidationStatus.VALID:
                                     status_df.at[row_idx, "_row_status"] = ValidationStatus.INVALID
@@ -991,6 +1033,9 @@ class ValidationService(QObject):
                             status_counts["other"] += 1
 
             logger.debug(f"*** VALIDATION: Final status count in status_df: {status_counts} ***")
+            logger.debug(
+                f"*** VALIDATION: Explicitly marked {len(explicitly_marked_cells)} cells as invalid/correctable ***"
+            )
 
             # Log a sample of invalid or correctable rows
             for idx in range(min(5, len(status_df))):

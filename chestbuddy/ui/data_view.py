@@ -1840,16 +1840,8 @@ class DataView(QWidget):
                     # logger.debug(f"Skipping data model row {row_idx} - not in filtered view")
                     continue  # Skip if not in filtered view
 
-                # Determine overall row validity from STATUS column in validation results
-                # Check if STATUS column exists or default to True
-                if self.STATUS_COLUMN in row_data:
-                    is_row_overall_valid = row_data[self.STATUS_COLUMN]
-                else:
-                    # If STATUS column missing, infer from individual validations
-                    is_row_overall_valid = all(
-                        row_data.get(f"{col}_valid", True) for col in validatable_columns
-                    )
-                    # logger.debug(f"Row {row_idx}: STATUS column missing, inferred validity: {is_row_overall_valid}")
+                # Check for row status
+                row_status = row_data.get("_row_status", ValidationStatus.VALID)
 
                 # Check for correctable status
                 has_correctable = False
@@ -1857,27 +1849,42 @@ class DataView(QWidget):
                 for col in validatable_columns:
                     status_key = f"{col}_status"
                     valid_key = f"{col}_valid"
+
+                    # Check if any column has correctable status
                     if (
                         status_key in row_data
                         and row_data[status_key] == ValidationStatus.CORRECTABLE
                     ):
                         has_correctable = True
-                    if valid_key in row_data and not row_data[valid_key]:
+
+                    # Check if any column is invalid (either has invalid status or valid=False)
+                    if (
+                        status_key in row_data and row_data[status_key] == ValidationStatus.INVALID
+                    ) or (valid_key in row_data and row_data[valid_key] == False):
                         has_invalid = True
 
                 # Determine status text based on validation state
+                # Priority: Correctable > Invalid > Valid
                 if has_correctable:
                     status_text = "Correctable"
                     status_text_counts["Correctable"] += 1
-                elif has_invalid or not is_row_overall_valid:
+                elif (
+                    has_invalid
+                    or row_status == ValidationStatus.INVALID
+                    or row_status == ValidationStatus.INVALID_ROW
+                ):
                     status_text = "Invalid"
                     status_text_counts["Invalid"] += 1
+                elif row_status == ValidationStatus.VALID:
+                    status_text = "Valid"
+                    status_text_counts["Valid"] += 1
                 else:
-                    status_text = "Valid" if is_row_overall_valid else "Invalid"
-                    # Handle non-boolean cases if they occur
-                    if not isinstance(is_row_overall_valid, bool):
-                        status_text = str(row_data.get(self.STATUS_COLUMN, "Unknown"))
-                        is_row_overall_valid = False  # Treat non-bool as invalid for row context
+                    # Handle non-standard status values
+                    status_text = (
+                        str(row_status).split(".")[-1]
+                        if hasattr(row_status, "split")
+                        else "Unknown"
+                    )
                     status_text_counts[
                         status_text if status_text in status_text_counts else "Other"
                     ] += 1
@@ -1891,7 +1898,7 @@ class DataView(QWidget):
                 # For detailed logging of a few rows
                 if row_idx < 5:
                     logger.debug(
-                        f"Row {row_idx}: valid={is_row_overall_valid}, has_invalid={has_invalid}, has_correctable={has_correctable}, status_text={status_text}"
+                        f"Row {row_idx}: valid={row_status == ValidationStatus.VALID}, has_invalid={has_invalid}, has_correctable={has_correctable}, status_text={status_text}"
                     )
 
                 # Process each data column in the row
@@ -1905,16 +1912,24 @@ class DataView(QWidget):
                         # logger.debug(f"Item not found at ({filtered_idx}, {col_idx}) for col {column_name}")
                         continue
 
-                    # Determine if this specific cell is invalid
+                    # Determine if this specific cell is invalid based on status or valid flag
                     validation_col_name = f"{column_name}_valid"
                     is_cell_specifically_valid = row_data.get(validation_col_name, True)
-                    is_cell_invalid = not is_cell_specifically_valid
 
                     # Get the specific validation status for this cell
                     status_col_name = f"{column_name}_status"
                     cell_status = row_data.get(status_col_name, ValidationStatus.VALID)
 
+                    # Determine if cell is invalid
+                    is_cell_invalid = (
+                        (not is_cell_specifically_valid)
+                        or (cell_status == ValidationStatus.INVALID)
+                        or (cell_status == ValidationStatus.INVALID_ROW)
+                        or (cell_status == ValidationStatus.CORRECTABLE)
+                    )
+
                     # Store simple boolean status: True if invalid, False otherwise
+                    # This is used by the delegate for basic highlighting
                     target_status = is_cell_invalid
 
                     # Log detailed info for a few cells
@@ -1947,43 +1962,25 @@ class DataView(QWidget):
                                 f"Set cell ({filtered_idx}, {col_idx}) validation status to INVALID"
                             )
 
-            logger.debug(f"Processed {len(validation_status)} rows for highlighting.")
+            # Apply all the status text updates in batch
+            for row, col, text in status_updates:
+                item = self._table_model.item(row, col)
+                if item:
+                    item.setText(text)
+
+            # Unblock signals after batch processing
+            self._table_model.blockSignals(False)
+
+            # Log counts of status text assignments
             logger.debug(
-                f"Updating {len(status_updates)} STATUS column texts with counts: {status_text_counts}"
-            )
-            logger.debug(
-                f"Updating {len(cell_status_updates)} individual cell validation statuses."
+                f"Applied validation status: {status_text_counts['Invalid']} invalid rows, {status_text_counts['Correctable']} correctable rows identified."
             )
 
-            # Now batch update all status cells' text
-            for filtered_idx, status_col, status_text in status_updates:
-                item = self._table_model.item(filtered_idx, status_col)
-                if not item:
-                    item = QStandardItem(status_text)
-                    self._table_model.setItem(filtered_idx, status_col, item)
-                else:
-                    # Only update text if it changed
-                    if item.text() != status_text:
-                        item.setText(status_text)
-                # Clear any potential background role set previously on status cell
-                item.setData(None, Qt.BackgroundRole)
-                # Also clear our custom validation role for the status cell itself
-                item.setData(None, Qt.UserRole + 1)
-                item.setData(None, Qt.UserRole + 2)  # Clear validation status for status cell
+        except Exception as e:
+            logger.error(f"Error highlighting invalid rows: {e}")
+            import traceback
 
-        finally:
-            # Unblock signals after batch updates
-            if hasattr(self, "_table_model") and self._table_model:
-                self._table_model.blockSignals(False)
-
-        # Update the view
-        self._table_view.viewport().update()
-        # Count invalid rows based on the text in the status column now
-        invalid_row_count = sum(1 for _, _, text in status_updates if text == "Invalid")
-        correctable_row_count = sum(1 for _, _, text in status_updates if text == "Correctable")
-        logger.debug(
-            f"Applied validation status: {invalid_row_count} invalid rows, {correctable_row_count} correctable rows identified."
-        )
+            logger.error(traceback.format_exc())
 
     @Slot(object)
     def _on_correction_applied(self, correction_status) -> None:

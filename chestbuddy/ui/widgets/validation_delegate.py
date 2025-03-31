@@ -75,32 +75,33 @@ class ValidationStatusDelegate(QStyledItemDelegate):
             option: The style options for the item
             index: The model index of the item being painted
         """
-        # Log entry
-        # self.logger.debug(f"Paint called for cell [{index.row()},{index.column()}] Value: {repr(index.data())}")
-
         # Use default painting if index is invalid
         if not index.isValid():
             super().paint(painter, option, index)
             return
 
         # Get cell-specific invalid status (True if invalid, False otherwise)
+        # This is stored in Qt.UserRole + 1 by DataView._highlight_invalid_rows
         is_cell_invalid = index.data(Qt.ItemDataRole.UserRole + 1)
         if not isinstance(is_cell_invalid, bool):
             # self.logger.debug(f"Cell [{index.row()},{index.column()}] UserRole+1 data is not bool: {is_cell_invalid}")
             is_cell_invalid = False  # Default to not invalid if data is missing or not boolean
 
-        # Get the validation status from model data if available
+        # Get the validation status enum from model data if available
+        # This is stored in Qt.UserRole + 2 by DataView._highlight_invalid_rows
         validation_status = index.data(Qt.ItemDataRole.UserRole + 2)
-        is_correctable = False
-        if hasattr(ValidationStatus, "CORRECTABLE"):
-            is_correctable = validation_status == ValidationStatus.CORRECTABLE
+
+        # Check for specific validation statuses
+        is_correctable = validation_status == ValidationStatus.CORRECTABLE
+        is_invalid = validation_status == ValidationStatus.INVALID
+        is_invalid_row = validation_status == ValidationStatus.INVALID_ROW
 
         # Get model and column name
         model = index.model()
         if model is None:
-            # self.logger.debug(f"Paint skipped for cell [{index.row()},{index.column()}] - model is None")
             super().paint(painter, option, index)
             return
+
         column_name = model.headerData(index.column(), Qt.Horizontal)
         is_validatable_column = column_name in self.VALIDATABLE_COLUMNS
 
@@ -111,17 +112,12 @@ class ValidationStatusDelegate(QStyledItemDelegate):
             if model.headerData(col, Qt.Horizontal) == self.STATUS_COLUMN:
                 status_col_index = col
                 break
+
         if status_col_index != -1:
             status_index = model.index(index.row(), status_col_index)
             row_status_text = status_index.data(Qt.DisplayRole)
             if row_status_text is None:
                 row_status_text = "Unknown"
-        else:
-            # self.logger.debug(f"Paint for cell [{index.row()},{index.column()}] - STATUS column not found")
-            pass  # row_status_text remains "Unknown"
-
-        # Log statuses found
-        # self.logger.debug(f"Paint cell [{index.row()},{index.column()}]: cell_invalid={is_cell_invalid}, row_status='{row_status_text}', is_validatable={is_validatable_column}")
 
         # Save painter state
         painter.save()
@@ -132,7 +128,6 @@ class ValidationStatusDelegate(QStyledItemDelegate):
 
         # Handle selection separately
         if option.state & QStyle.State_Selected:
-            # self.logger.debug(f"Paint cell [{index.row()},{index.column()}]: Selected, using default paint")
             painter.restore()
             super().paint(painter, option, index)
             return
@@ -142,45 +137,53 @@ class ValidationStatusDelegate(QStyledItemDelegate):
         border_color = None
         border_width = 1
 
-        if is_correctable and is_validatable_column:
-            # Highest priority after invalid: Correctable cell
-            background_color = self.CORRECTABLE_COLOR
-            border_color = self.CORRECTABLE_BORDER_COLOR
-            border_width = 2
-            self.logger.debug(
-                f"Painting correctable cell [{index.row()},{index.column()}], col={column_name}, value={repr(index.data())}"
-            )
-        elif is_cell_invalid and is_validatable_column:
-            # High priority: Specifically invalid cell in a validatable column
-            background_color = self.INVALID_COLOR
-            border_color = self.INVALID_BORDER_COLOR
-            border_width = 2
-            # Log specific invalid cell detection
-            self.logger.debug(
-                f"Painting specifically invalid cell [{index.row()},{index.column()}], col={column_name}, value={repr(index.data())}"
-            )
-        elif row_status_text == "Invalid":
-            # Cell is in an invalid row, but not specifically invalid itself
-            background_color = self.INVALID_ROW_COLOR
-            # self.logger.debug(f"Painting cell [{index.row()},{index.column()}] as INVALID_ROW")
-        elif row_status_text == "Valid":
-            # Cell is valid and in a valid row
-            background_color = self.VALID_COLOR
-            # self.logger.debug(f"Painting cell [{index.row()},{index.column()}] as VALID")
-        elif row_status_text == "Not validated":
-            # Cell is in a row that hasn't been validated
-            background_color = self.NOT_VALIDATED_COLOR
-            # self.logger.debug(f"Painting cell [{index.row()},{index.column()}] as NOT_VALIDATED")
-        elif row_status_text == "Correctable":
-            # Cell is in a row that's correctable
-            background_color = self.CORRECTABLE_COLOR
-            # self.logger.debug(f"Painting cell [{index.row()},{index.column()}] as CORRECTABLE")
-        # else: Status is Unknown or cell is in STATUS column - use default background (None)
+        # Priority in determining cell appearance (highest to lowest):
+        # 1. Specific cell status (CORRECTABLE or INVALID)
+        # 2. Is this cell specifically invalid (from is_cell_invalid flag)
+        # 3. Row status text (Invalid, Correctable, etc.)
+
+        # First check specific validation status for this cell
+        if is_validatable_column:
+            if is_correctable:
+                # Highest priority: Correctable cell
+                background_color = self.CORRECTABLE_COLOR
+                border_color = self.CORRECTABLE_BORDER_COLOR
+                border_width = 2
+                self.logger.debug(
+                    f"Painting correctable cell [{index.row()},{index.column()}], col={column_name}, value={repr(index.data())}"
+                )
+            elif is_invalid or is_invalid_row:
+                # Next priority: Specifically invalid cell
+                background_color = self.INVALID_COLOR
+                border_color = self.INVALID_BORDER_COLOR
+                border_width = 2
+                self.logger.debug(
+                    f"Painting specifically invalid cell [{index.row()},{index.column()}], col={column_name}, value={repr(index.data())}"
+                )
+            elif is_cell_invalid:
+                # Next priority: Cell marked as invalid but without specific status
+                background_color = self.INVALID_COLOR
+                border_color = self.INVALID_BORDER_COLOR
+                border_width = 2
+
+        # If no specific cell status, use row status text
+        if background_color is None:
+            if row_status_text == "Invalid":
+                # Cell is in an invalid row
+                background_color = self.INVALID_ROW_COLOR
+            elif row_status_text == "Correctable":
+                # Cell is in a correctable row
+                background_color = self.CORRECTABLE_COLOR
+            elif row_status_text == "Valid":
+                # Cell is valid and in a valid row
+                background_color = self.VALID_COLOR
+            elif row_status_text == "Not validated":
+                # Cell is in a row that hasn't been validated
+                background_color = self.NOT_VALIDATED_COLOR
 
         # Apply background if determined
         if background_color:
             painter.fillRect(opt.rect, background_color)
-            # self.logger.debug(f"Applied background {background_color} to cell [{index.row()},{index.column()}]")
 
         # Apply border if determined
         if border_color:
