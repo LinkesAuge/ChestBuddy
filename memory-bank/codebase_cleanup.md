@@ -15,6 +15,7 @@ This document records cleanup activities performed on the ChestBuddy codebase to
    - Added warnings to `chestbuddy/ui/chart_tab.py`
    - Marked signal_tracer.py as a debug-only utility
    - Added warnings to `chestbuddy/ui/views/correction_view_adapter.py` (2024-05-16)
+   - Added warnings to `chestbuddy/ui/views/chart_view_adapter.py` (2024-05-16)
 
 3. **Deleted Legacy Components**
    - Deleted `chestbuddy/ui/validation_tab.py` as it has been replaced by ValidationTabView
@@ -28,7 +29,8 @@ This document records cleanup activities performed on the ChestBuddy codebase to
      - MainWindow now uses CorrectionView directly
      - CorrectionViewAdapter still uses CorrectionTab and is marked deprecated
    - ChartTab → ChartView: 🔄 In Progress
-     - ChartViewAdapter still depends on ChartTab
+     - ChartViewAdapter still depends on ChartTab and is marked deprecated
+     - ChartView component needs to be implemented
 
 2. **Adapter Status**
    - ValidationViewAdapter: Uses ValidationTabView (modern component)
@@ -36,6 +38,8 @@ This document records cleanup activities performed on the ChestBuddy codebase to
      - Now marked deprecated with warnings
      - Will be removed once all code uses CorrectionView directly
    - ChartViewAdapter: Still uses ChartTab (legacy component)
+     - Now marked deprecated with warnings
+     - Will be replaced by ChartView in a future release
 
 ## Future Cleanup Tasks
 
@@ -44,6 +48,7 @@ This document records cleanup activities performed on the ChestBuddy codebase to
      - `chestbuddy/ui/correction_tab.py`
      - `chestbuddy/ui/chart_tab.py`
      - `chestbuddy/ui/views/correction_view_adapter.py`
+     - `chestbuddy/ui/views/chart_view_adapter.py`
 
 2. **Update Tests**
    - Update remaining tests to use the new view-based components directly
@@ -60,7 +65,11 @@ This document records cleanup activities performed on the ChestBuddy codebase to
    - Refactor these adapter views to not depend on the legacy components:
      - `chestbuddy/ui/views/chart_view_adapter.py`
 
-4. **Organize Debug Utilities**
+4. **Implement Missing View Components**
+   - Create `ChartView` component to replace `ChartViewAdapter` and `ChartTab`
+   - Follow the same pattern as `CorrectionView`
+
+5. **Organize Debug Utilities**
    - Move debug-only utilities to a dedicated debug or tools directory
    - Consider creating a proper debug module for development tools
 
@@ -86,4 +95,10 @@ When refactoring adapter views:
 - The main application window already uses CorrectionView directly
 - CorrectionViewAdapter was kept for backward compatibility but is now marked deprecated
 - CorrectionView has been designed with the same signals as CorrectionViewAdapter for compatibility
-- Once all code uses CorrectionView directly, both CorrectionViewAdapter and CorrectionTab can be removed 
+- Once all code uses CorrectionView directly, both CorrectionViewAdapter and CorrectionTab can be removed
+
+### ChartTab to ChartView
+- ChartViewAdapter currently wraps ChartTab but has been marked as deprecated
+- A new ChartView component needs to be implemented following the same pattern as CorrectionView
+- The MainWindow still imports and uses ChartViewAdapter
+- Once ChartView is implemented, MainWindow should be updated to use it directly 

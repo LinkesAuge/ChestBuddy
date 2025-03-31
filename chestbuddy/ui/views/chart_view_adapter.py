@@ -6,10 +6,14 @@ Usage:
     chart_view = ChartViewAdapter(data_model, chart_service)
     chart_view.set_data_view_controller(data_view_controller)
     main_window.add_view(chart_view)
+
+DEPRECATED: This module is deprecated and will be replaced in a future version.
+It will be replaced by a ChartView component in a future release.
 """
 
 import time
 import logging
+import warnings
 from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtWidgets import QWidget, QVBoxLayout
 
@@ -22,6 +26,14 @@ from chestbuddy.ui.utils import get_update_manager
 
 # Set up logger
 logger = logging.getLogger(__name__)
+
+# Issue deprecation warning
+warnings.warn(
+    "ChartViewAdapter is deprecated and will be replaced in a future version. "
+    "It will be replaced by a ChartView component in a future release.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 
 class ChartViewAdapter(UpdatableView):
@@ -48,6 +60,8 @@ class ChartViewAdapter(UpdatableView):
         - Uses DataViewController for chart operations when available
         - Falls back to direct data_model/chart_service interaction when controller not available
         - Uses UpdateManager for scheduling updates
+
+    DEPRECATED: This class is deprecated and will be replaced by a ChartView component in a future release.
     """
 
     # Signals
@@ -76,6 +90,12 @@ class ChartViewAdapter(UpdatableView):
             parent (QWidget, optional): The parent widget. Defaults to None.
             debug_mode (bool, optional): Enable debug mode for signal connections. Defaults to False.
         """
+        warnings.warn(
+            "ChartViewAdapter is deprecated and will be replaced by a ChartView component in a future release.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
         # Store references
         self._data_model = data_model
         self._chart_service = chart_service
