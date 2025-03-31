@@ -105,10 +105,17 @@ class ChestBuddyApp(QObject):
                 self._validation_service = ValidationService(self._data_model, self._config_manager)
 
                 # Initialize CorrectionRuleManager and CorrectionService with all required parameters
-                self._correction_rule_manager = CorrectionRuleManager()
+                self._correction_rule_manager = CorrectionRuleManager(self._config_manager)
                 self._correction_service = CorrectionService(
                     self._correction_rule_manager, self._data_model, self._validation_service
                 )
+
+                # Load correction rules
+                try:
+                    self._correction_rule_manager.load_rules()
+                    logger.info("Correction rules loaded during startup")
+                except Exception as e:
+                    logger.warning(f"Error loading correction rules during startup: {e}")
 
                 self._chart_service = ChartService(self._data_model)
 

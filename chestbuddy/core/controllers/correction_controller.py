@@ -278,7 +278,7 @@ class CorrectionController(BaseController):
         """
         try:
             # Delegate to rule manager
-            self._rule_manager.import_rules(file_path, replace=replace)
+            self._rule_manager.import_rules(file_path, replace=replace, save_as_default=True)
             logger.info(f"Correction rules imported from {file_path}")
             return True
         except Exception as e:

@@ -30,6 +30,7 @@ class CorrectionRuleManager:
         _rules (List[CorrectionRule]): List of correction rules
         _config_manager: Optional configuration manager for settings
         _default_rules_path (Path): Default path for saving/loading rules
+        _custom_path (Optional[Path]): Custom path for rules if configured
 
     Implementation Notes:
         - Rules are stored in a plain list for simplicity
@@ -47,20 +48,60 @@ class CorrectionRuleManager:
         """
         self._rules: List[CorrectionRule] = []
         self._config_manager = config_manager
-        self._default_rules_path = Path("data/corrections/correction_rules.csv")
+        self._default_rules_path = Path("data/corrections/default_corrections.csv")
+
+        # If we have a config manager, check for custom path
+        self._custom_path = None
+        if self._config_manager:
+            try:
+                custom_path = self._config_manager.get("Corrections", "rules_file_path", None)
+                if custom_path and Path(custom_path).exists():
+                    self._custom_path = Path(custom_path)
+                    logger.info(f"Using custom corrections file path: {self._custom_path}")
+            except Exception as e:
+                logger.warning(f"Error loading custom corrections path from config: {e}")
+
+    def get_correction_file_path(self):
+        """
+        Get the current correction file path (custom or default).
+
+        Returns:
+            Path: The path to use for correction rules
+        """
+        return self._custom_path if self._custom_path else self._default_rules_path
+
+    def save_custom_path_to_config(self, path):
+        """
+        Save a custom correction file path to configuration.
+
+        Args:
+            path: Path to save
+        """
+        if not self._config_manager:
+            logger.warning("Cannot save custom path: No config manager available")
+            return
+
+        try:
+            str_path = str(path)
+            self._config_manager.set("Corrections", "rules_file_path", str_path)
+            self._custom_path = Path(str_path)
+            logger.info(f"Saved custom corrections path to config: {str_path}")
+        except Exception as e:
+            logger.error(f"Error saving custom corrections path to config: {e}")
 
     def load_rules(self, file_path: Optional[Union[str, Path]] = None) -> None:
         """
         Load rules from CSV file.
 
         Args:
-            file_path: Path to the CSV file, uses default path if None
+            file_path: Path to the CSV file, uses configured path if None
 
         Note:
             Handles nonexistent files gracefully
             Converts DataFrame rows to CorrectionRule objects
+            If no path is specified, uses the custom path (if set) or falls back to default
         """
-        path = Path(file_path) if file_path else self._default_rules_path
+        path = Path(file_path) if file_path else self.get_correction_file_path()
 
         if not path.exists():
             logger.warning(f"Rules file not found: {path}")
@@ -83,9 +124,9 @@ class CorrectionRuleManager:
         Save rules to CSV file.
 
         Args:
-            file_path: Path to the CSV file, uses default path if None
+            file_path: Path to the CSV file, uses configured path if None
         """
-        path = Path(file_path) if file_path else self._default_rules_path
+        path = Path(file_path) if file_path else self.get_correction_file_path()
 
         try:
             # Create directory if it doesn't exist
@@ -310,13 +351,16 @@ class CorrectionRuleManager:
         # Combine with general rules first
         return general_rules + category_rules
 
-    def import_rules(self, file_path: Union[str, Path], replace: bool = False) -> None:
+    def import_rules(
+        self, file_path: Union[str, Path], replace: bool = False, save_as_default: bool = True
+    ) -> None:
         """
         Import rules from a CSV file.
 
         Args:
             file_path: Path to the CSV file
             replace: Whether to replace existing rules or append to them
+            save_as_default: Whether to save this path as the default for future loads
 
         Raises:
             FileNotFoundError: If the file does not exist
@@ -369,6 +413,11 @@ class CorrectionRuleManager:
                     logger.warning(f"Error importing rule: {row}, Error: {e}")
 
             logger.info(f"Imported {imported_count} rules from {path}")
+
+            # After successful import, save path to config if requested
+            if save_as_default and imported_count > 0:
+                self.save_custom_path_to_config(path)
+
             return imported_count
         except Exception as e:
             logger.error(f"Error importing rules from {path}: {e}")
