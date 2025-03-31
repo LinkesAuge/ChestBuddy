@@ -65,3 +65,4 @@ Turtle Chest
 Uncommon Chest of Wealth
 Undead Chest
 Union Chest
+Wooden Chest

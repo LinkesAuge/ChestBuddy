@@ -602,3 +602,30 @@ correction_stats = self._correction_service.apply_corrections(
 ```
 
 **Status**: Fixed. Corrected the mismatch between the controller and service method parameters.
+
+## Validation Visualization Bug Fixed (August 1, 2024)
+
+### FIXED: Validation Status Visualization Not Displaying Invalid Entries
+
+**Issue**: The data view was showing all entries as valid (green) despite validation identifying many invalid entries. The validation tab showed 12,694 issues found, but no cells were highlighted as invalid in the data view.
+
+**Root Cause**: Multiple issues were identified:
+1. The `ValidationService._update_validation_status` method was not correctly setting the validation status enum values for invalid entries
+2. The `DataView._highlight_invalid_rows` method was not properly processing the validation status DataFrame and status values
+3. The `ValidationStatusDelegate.paint` method had issues correctly detecting and visualizing the different validation statuses
+
+**Fix**:
+1. Added comprehensive debug logging to track validation status across the system
+2. Fixed `ValidationService._update_validation_status` to properly set invalid status on all cells found in validation results
+3. Enhanced `DataView._highlight_invalid_rows` to correctly process validation status values and set them as data in the model (Qt.UserRole + 2)
+4. Improved `ValidationStatusDelegate.paint` to better prioritize and display ValidationStatus enum values:
+   - Added clear priority order: CORRECTABLE first, then INVALID, then row status
+   - Enhanced color distinction between different statuses
+   - Added detailed logging for debugging status display
+
+**Result**: The data view now correctly displays all three validation statuses:
+- Valid cells with light green background
+- Invalid cells with deep red background and border
+- Correctable cells with orange background and border
+
+This ensures the visual feedback matches the actual validation results, making it easier for users to identify and fix data issues.
