@@ -309,3 +309,101 @@ class CorrectionRuleManager:
 
         # Combine with general rules first
         return general_rules + category_rules
+
+    def import_rules(self, file_path: Union[str, Path], replace: bool = False) -> None:
+        """
+        Import rules from a CSV file.
+
+        Args:
+            file_path: Path to the CSV file
+            replace: Whether to replace existing rules or append to them
+
+        Raises:
+            FileNotFoundError: If the file does not exist
+            ValueError: If the file format is invalid
+        """
+        path = Path(file_path)
+
+        if not path.exists():
+            logger.error(f"Rules file not found: {path}")
+            raise FileNotFoundError(f"Rules file not found: {path}")
+
+        try:
+            # If replacing, clear existing rules
+            if replace:
+                self._rules = []
+
+            # Read the CSV file
+            df = pd.read_csv(path)
+
+            # Validate columns
+            required_columns = {"From", "To", "Category", "Status"}
+            if not required_columns.issubset(set(df.columns)):
+                # Check if columns are in reverse order (To, From, Category, Status)
+                if "To" in df.columns and "From" in df.columns:
+                    # Rename columns to correct order if needed
+                    df = df.rename(columns={"To": "temp_to", "From": "temp_from"})
+                    df = df.rename(columns={"temp_to": "From", "temp_from": "To"})
+                    logger.warning(f"Adjusted column order in import file: {path}")
+                else:
+                    error_msg = f"CSV file missing required columns. Required: {required_columns}, Found: {set(df.columns)}"
+                    logger.error(error_msg)
+                    raise ValueError(error_msg)
+
+            # Import each rule
+            imported_count = 0
+            for _, row in df.iterrows():
+                try:
+                    # Create rule from row data
+                    rule = CorrectionRule(
+                        from_value=row["From"],
+                        to_value=row["To"],
+                        category=row["Category"],
+                        status=row["Status"].lower() if "Status" in row else "enabled",
+                        order=row.get("Order", 0),
+                    )
+                    # Add the rule
+                    self.add_rule(rule)
+                    imported_count += 1
+                except Exception as e:
+                    logger.warning(f"Error importing rule: {row}, Error: {e}")
+
+            logger.info(f"Imported {imported_count} rules from {path}")
+            return imported_count
+        except Exception as e:
+            logger.error(f"Error importing rules from {path}: {e}")
+            raise
+
+    def export_rules(self, file_path: Union[str, Path], only_enabled: bool = False) -> None:
+        """
+        Export rules to a CSV file.
+
+        Args:
+            file_path: Path to the CSV file
+            only_enabled: Whether to export only enabled rules
+
+        Raises:
+            IOError: If the file cannot be written
+        """
+        path = Path(file_path)
+
+        try:
+            # Create directory if it doesn't exist
+            path.parent.mkdir(parents=True, exist_ok=True)
+
+            # Filter rules if needed
+            rules_to_export = self._rules
+            if only_enabled:
+                rules_to_export = [rule for rule in self._rules if rule.status == "enabled"]
+
+            # Convert rules to DataFrame
+            rules_data = [rule.to_dict() for rule in rules_to_export]
+            df = pd.DataFrame(rules_data)
+
+            # Save to CSV
+            df.to_csv(path, index=False)
+            logger.info(f"Exported {len(rules_to_export)} correction rules to {path}")
+            return len(rules_to_export)
+        except Exception as e:
+            logger.error(f"Error exporting rules to {path}: {e}")
+            raise

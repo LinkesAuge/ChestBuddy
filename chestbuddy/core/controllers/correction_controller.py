@@ -40,7 +40,14 @@ class CorrectionController(BaseController):
     correction_completed = Signal(object)  # Statistics dictionary
     correction_error = Signal(str)
 
-    def __init__(self, correction_service, rule_manager, config_manager, signal_manager=None):
+    def __init__(
+        self,
+        correction_service,
+        rule_manager,
+        config_manager,
+        validation_service=None,
+        signal_manager=None,
+    ):
         """
         Initialize the CorrectionController with required dependencies.
 
@@ -48,12 +55,14 @@ class CorrectionController(BaseController):
             correction_service: Service for applying corrections
             rule_manager: Manager for correction rules
             config_manager: Manager for application configuration
+            validation_service: Service for validation
             signal_manager: Optional manager for signal tracking
         """
         super().__init__(signal_manager)
         self._correction_service = correction_service
         self._rule_manager = rule_manager
         self._config_manager = config_manager
+        self._validation_service = validation_service
         self._view = None
         self._worker = None
         self._worker_thread = None
@@ -451,6 +460,11 @@ class CorrectionController(BaseController):
         Returns:
             ValidationService: The validation service
         """
+        # First try to use the directly stored validation service
+        if self._validation_service:
+            return self._validation_service
+
+        # Fall back to getting from correction service
         try:
             if self._correction_service and hasattr(
                 self._correction_service, "get_validation_service"

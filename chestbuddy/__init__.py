@@ -10,7 +10,6 @@ from pathlib import Path
 import sys
 
 
-# Setup logging
 def setup_logging():
     """Set up logging for the application."""
     # Use logs directory inside the chestbuddy package
@@ -33,9 +32,6 @@ def setup_logging():
 
     logging.info(f"Logging initialized to {log_file}")
 
-
-# Initialize logging
-setup_logging()
 
 # Import core components for easy access
 from chestbuddy.core.models import BaseModel, ChestDataModel

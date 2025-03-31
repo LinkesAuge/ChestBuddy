@@ -144,6 +144,7 @@ class ChestBuddyApp(QObject):
                         self._correction_service,
                         self._correction_rule_manager,
                         self._config_manager,
+                        self._validation_service,
                         self._signal_manager,
                     )
                     logger.info("CorrectionController initialized")
