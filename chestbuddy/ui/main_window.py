@@ -57,6 +57,7 @@ from chestbuddy.ui.widgets import ProgressDialog, ProgressBar
 from chestbuddy.ui.data_view import DataView
 import pandas as pd
 from chestbuddy.utils.service_locator import ServiceLocator
+from chestbuddy.core.services import ConfigManager, ImportService, ExportService, BackupService
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -1441,3 +1442,26 @@ class MainWindow(QMainWindow):
 
         # Update status bar
         self._status_bar.showMessage(f"Settings exported to: {file_path}", 3000)
+
+    def _init_services(self) -> None:
+        """Initialize the application services."""
+        # Load configuration manager
+        self._config_manager = ConfigManager()
+
+        # Initialize data model
+        self._data_model = ChestDataModel()
+
+        # Create services with the data model
+        self._validation_service = ValidationService(self._data_model, self._config_manager)
+        self._import_service = ImportService(self._data_model, self._validation_service)
+        self._export_service = ExportService(self._data_model)
+        self._backup_service = BackupService(
+            self._data_model, self._config_manager.get_app_directory()
+        )
+        self._correction_service = CorrectionService(self._data_model, self._config_manager)
+
+        # Set up service cross-references
+        self._validation_service.set_correction_service(self._correction_service)
+
+        # Initialize controllers with services and data model
+        self._init_controllers()
