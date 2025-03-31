@@ -249,15 +249,18 @@ class CorrectionRuleManager:
         Move a rule to change its priority.
 
         Args:
-            from_index: Current index of the rule
-            to_index: Target index for the rule
+            from_index (int): Index of rule to move
+            to_index (int): Destination index
 
         Raises:
             IndexError: If either index is out of range
         """
-        if not (0 <= from_index < len(self._rules) and 0 <= to_index < len(self._rules)):
-            raise IndexError(f"Rule index out of range: from={from_index}, to={to_index}")
+        if not (0 <= from_index < len(self._rules)):
+            raise IndexError(f"From index out of range: {from_index}")
+        if not (0 <= to_index < len(self._rules)):
+            raise IndexError(f"To index out of range: {to_index}")
 
+        # Move the rule by removing it and inserting at the new position
         rule = self._rules.pop(from_index)
         self._rules.insert(to_index, rule)
 
@@ -266,7 +269,7 @@ class CorrectionRuleManager:
         Move a rule to the top of its category.
 
         Args:
-            index: Index of the rule to move
+            index (int): Index of rule to move
 
         Raises:
             IndexError: If index is out of range
@@ -274,19 +277,26 @@ class CorrectionRuleManager:
         if not (0 <= index < len(self._rules)):
             raise IndexError(f"Rule index out of range: {index}")
 
+        # Get the rule to move
         rule = self._rules[index]
-        category_rules = [i for i, r in enumerate(self._rules) if r.category == rule.category]
 
-        if category_rules:
-            top_index = min(category_rules)
-            self.move_rule(index, top_index)
+        # Find the first rule with the same category
+        category_start_index = 0
+        for i, r in enumerate(self._rules):
+            if r.category == rule.category and i != index:
+                category_start_index = i
+                break
+
+        # Move the rule by removing it and inserting at the category start
+        self._rules.pop(index)
+        self._rules.insert(category_start_index, rule)
 
     def move_rule_to_bottom(self, index: int) -> None:
         """
         Move a rule to the bottom of its category.
 
         Args:
-            index: Index of the rule to move
+            index (int): Index of rule to move
 
         Raises:
             IndexError: If index is out of range
@@ -294,19 +304,26 @@ class CorrectionRuleManager:
         if not (0 <= index < len(self._rules)):
             raise IndexError(f"Rule index out of range: {index}")
 
+        # Get the rule to move
         rule = self._rules[index]
-        category_rules = [i for i, r in enumerate(self._rules) if r.category == rule.category]
 
-        if category_rules:
-            bottom_index = max(category_rules)
-            self.move_rule(index, bottom_index)
+        # Find the last rule with the same category
+        category_end_index = len(self._rules) - 1
+        for i in range(len(self._rules) - 1, -1, -1):
+            if self._rules[i].category == rule.category and i != index:
+                category_end_index = i
+                break
+
+        # Move the rule by removing it and inserting after the category end
+        self._rules.pop(index)
+        self._rules.insert(category_end_index + 1, rule)
 
     def toggle_rule_status(self, index: int) -> None:
         """
         Toggle a rule's enabled/disabled status.
 
         Args:
-            index: Index of the rule to toggle
+            index (int): Index of rule to toggle
 
         Raises:
             IndexError: If index is out of range
@@ -315,124 +332,95 @@ class CorrectionRuleManager:
             raise IndexError(f"Rule index out of range: {index}")
 
         rule = self._rules[index]
-        new_status = "disabled" if rule.status == "enabled" else "enabled"
-
-        updated_rule = CorrectionRule(
-            to_value=rule.to_value,
-            from_value=rule.from_value,
-            category=rule.category,
-            status=new_status,
-            order=rule.order,
-        )
-
-        self.update_rule(index, updated_rule)
+        if rule.status == "enabled":
+            rule.status = "disabled"
+        else:
+            rule.status = "enabled"
 
     def get_prioritized_rules(self) -> List[CorrectionRule]:
         """
-        Get rules sorted for application priority.
+        Get rules sorted by priority.
 
         Returns:
-            List[CorrectionRule]: Rules in priority order
-
-        Note:
-            Priority order:
-            1. General rules first
-            2. Category-specific rules
-            Within each group, sorted by order
+            List[CorrectionRule]: Rules ordered by category and position in the list
         """
-        # Get general rules and category-specific rules
-        general_rules = [rule for rule in self._rules if rule.category == "general"]
-        category_rules = [rule for rule in self._rules if rule.category != "general"]
-
-        # Sort each group by order
-        general_rules.sort(key=lambda rule: rule.order)
-        category_rules.sort(key=lambda rule: rule.order)
-
-        # Combine with general rules first
-        return general_rules + category_rules
+        # Rules are already ordered by their position in the list
+        # We only need to filter for enabled rules
+        return [rule for rule in self._rules if rule.status == "enabled"]
 
     def import_rules(
         self, file_path: Union[str, Path], replace: bool = False, save_as_default: bool = True
     ) -> None:
         """
-        Import rules from a CSV file.
+        Import rules from a file.
 
         Args:
-            file_path: Path to the CSV file
-            replace: Whether to replace existing rules or append to them
-            save_as_default: Whether to save this path as the default for future loads
+            file_path (Path): Path to import file
+            replace (bool): Whether to replace existing rules
+            save_as_default (bool): Whether to save imported rules as default
 
         Raises:
-            FileNotFoundError: If the file does not exist
-            ValueError: If the file format is invalid
+            FileNotFoundError: If file does not exist
+            ValueError: If file has invalid format
+            pd.errors.ParserError: If CSV parsing fails
         """
         path = Path(file_path)
-
         if not path.exists():
-            logger.error(f"Rules file not found: {path}")
             raise FileNotFoundError(f"Rules file not found: {path}")
 
         try:
-            # If replacing, clear existing rules
+            # Determine file type by extension
+            ext = path.suffix.lower()
+            if ext == ".csv":
+                df = pd.read_csv(path)
+            elif ext == ".txt":
+                # For TXT files, assume tab-separated format
+                df = pd.read_csv(path, sep="\t")
+            else:
+                raise ValueError(f"Unsupported file extension: {ext}")
+
+            # Clear existing rules if replace is True
             if replace:
                 self._rules = []
 
-            # Read the CSV file
-            df = pd.read_csv(path)
-
-            # Validate columns
-            required_columns = {"From", "To", "Category", "Status"}
-            if not required_columns.issubset(set(df.columns)):
-                # Check if columns are in reverse order (To, From, Category, Status)
-                if "To" in df.columns and "From" in df.columns:
-                    # Rename columns to correct order if needed
-                    df = df.rename(columns={"To": "temp_to", "From": "temp_from"})
-                    df = df.rename(columns={"temp_to": "From", "temp_from": "To"})
-                    logger.warning(f"Adjusted column order in import file: {path}")
-                else:
-                    error_msg = f"CSV file missing required columns. Required: {required_columns}, Found: {set(df.columns)}"
-                    logger.error(error_msg)
-                    raise ValueError(error_msg)
-
-            # Import each rule
+            # Process each row
             imported_count = 0
             for _, row in df.iterrows():
-                try:
-                    # Create rule from row data
-                    rule = CorrectionRule(
-                        from_value=row["From"],
-                        to_value=row["To"],
-                        category=row["Category"],
-                        status=row["Status"].lower() if "Status" in row else "enabled",
-                        order=row.get("Order", 0),
-                    )
-                    # Add the rule
-                    self.add_rule(rule)
+                # Convert row to dict and create rule
+                row_dict = row.to_dict()
+
+                # Skip rows without required fields
+                if "From" not in row_dict or "To" not in row_dict:
+                    continue
+
+                rule = CorrectionRule.from_dict(row_dict)
+
+                # Add rule if it doesn't exist
+                if rule not in self._rules:
+                    self._rules.append(rule)
                     imported_count += 1
-                except Exception as e:
-                    logger.warning(f"Error importing rule: {row}, Error: {e}")
 
             logger.info(f"Imported {imported_count} rules from {path}")
 
-            # After successful import, save path to config if requested
-            if save_as_default and imported_count > 0:
-                self.save_custom_path_to_config(path)
+            # Save as default if requested
+            if save_as_default:
+                self.save_rules()
 
-            return imported_count
         except Exception as e:
             logger.error(f"Error importing rules from {path}: {e}")
             raise
 
     def export_rules(self, file_path: Union[str, Path], only_enabled: bool = False) -> None:
         """
-        Export rules to a CSV file.
+        Export rules to a file.
 
         Args:
-            file_path: Path to the CSV file
-            only_enabled: Whether to export only enabled rules
+            file_path (Path): Path to export file
+            only_enabled (bool): Whether to export only enabled rules
 
         Raises:
-            IOError: If the file cannot be written
+            ValueError: If unsupported file extension
+            IOError: If file cannot be written
         """
         path = Path(file_path)
 
@@ -440,19 +428,29 @@ class CorrectionRuleManager:
             # Create directory if it doesn't exist
             path.parent.mkdir(parents=True, exist_ok=True)
 
-            # Filter rules if needed
-            rules_to_export = self._rules
-            if only_enabled:
-                rules_to_export = [rule for rule in self._rules if rule.status == "enabled"]
+            # Filter rules if only_enabled is True
+            rules_to_export = (
+                [rule for rule in self._rules if rule.status == "enabled"]
+                if only_enabled
+                else self._rules
+            )
 
             # Convert rules to DataFrame
             rules_data = [rule.to_dict() for rule in rules_to_export]
             df = pd.DataFrame(rules_data)
 
-            # Save to CSV
-            df.to_csv(path, index=False)
-            logger.info(f"Exported {len(rules_to_export)} correction rules to {path}")
-            return len(rules_to_export)
+            # Determine export format by extension
+            ext = path.suffix.lower()
+            if ext == ".csv":
+                df.to_csv(path, index=False)
+            elif ext == ".txt":
+                # For TXT files, use tab-separated format
+                df.to_csv(path, sep="\t", index=False)
+            else:
+                raise ValueError(f"Unsupported file extension: {ext}")
+
+            logger.info(f"Exported {len(rules_to_export)} rules to {path}")
+
         except Exception as e:
             logger.error(f"Error exporting rules to {path}: {e}")
             raise

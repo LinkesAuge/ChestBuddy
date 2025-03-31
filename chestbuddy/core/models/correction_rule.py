@@ -20,13 +20,13 @@ class CorrectionRule:
         from_value (str): The incorrect value to be replaced
         category (str): The category (player, chest_type, source, general)
         status (str): The rule status (enabled or disabled)
-        order (int): The rule's priority order within its category
         description (str): Optional description or notes about the rule
 
     Implementation Notes:
         - Equality is determined by to_value, from_value, and category only
-        - Order and status don't affect equality
+        - Status doesn't affect equality
         - Rules can be serialized to/from dictionary format for CSV storage
+        - Order is implicitly handled by position in list/file
     """
 
     def __init__(
@@ -35,7 +35,6 @@ class CorrectionRule:
         from_value: str,
         category: str = "general",
         status: str = "enabled",
-        order: int = 0,
         description: str = "",
     ):
         """
@@ -46,14 +45,12 @@ class CorrectionRule:
             from_value (str): The incorrect value to be replaced
             category (str): The category (player, chest_type, source, general)
             status (str): The rule status (enabled or disabled)
-            order (int): The rule's priority order within its category
             description (str): Optional description or notes about the rule
         """
         self.to_value = to_value
         self.from_value = from_value
         self.category = category
         self.status = status
-        self.order = order
         self.description = description
 
     def __eq__(self, other) -> bool:
@@ -68,7 +65,7 @@ class CorrectionRule:
 
         Note:
             Two rules are considered equal if they have the same to_value,
-            from_value, and category. Status and order don't affect equality.
+            from_value, and category. Status doesn't affect equality.
         """
         if not isinstance(other, CorrectionRule):
             return False
@@ -87,7 +84,7 @@ class CorrectionRule:
         """
         return (
             f"CorrectionRule(to='{self.to_value}', from='{self.from_value}', "
-            f"category='{self.category}', status='{self.status}', order={self.order})"
+            f"category='{self.category}', status='{self.status}')"
         )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -102,7 +99,6 @@ class CorrectionRule:
             "From": self.from_value,
             "Category": self.category,
             "Status": self.status,
-            "Order": self.order,
             "Description": self.description,
         }
 
@@ -116,18 +112,12 @@ class CorrectionRule:
 
         Returns:
             CorrectionRule: New correction rule instance
-
-        Note:
-            Empty order strings are converted to 0
         """
-        order = data.get("Order", 0)
-        if isinstance(order, str) and order.strip() == "":
-            order = 0
+        # Ignore 'Order' field if present in data for backward compatibility
         return cls(
             to_value=data.get("To", ""),
             from_value=data.get("From", ""),
             category=data.get("Category", "general"),
             status=data.get("Status", "enabled"),
-            order=int(order),
             description=data.get("Description", ""),
         )

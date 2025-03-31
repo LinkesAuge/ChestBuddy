@@ -71,6 +71,9 @@ class CorrectionRuleView(QWidget):
         self._logger = logging.getLogger(__name__)
         self._controller = controller
 
+        # Flag to prevent multiple delete operations
+        self._deletion_in_progress = False
+
         # Initialize attributes needed for testing
         self._import_button = None
         self._export_button = None
@@ -228,13 +231,12 @@ class CorrectionRuleView(QWidget):
         self._rule_table.setAlternatingRowColors(True)
 
         # Set up columns - exactly match the order and names expected by tests
-        self._rule_table.setColumnCount(5)
-        headers = ["Order", "From", "To", "Category", "Status"]
+        self._rule_table.setColumnCount(4)
+        headers = ["From", "To", "Category", "Status"]
         self._rule_table.setHorizontalHeaderLabels(headers)
         header = self._rule_table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.Stretch)
-        header.setSectionResizeMode(0, QHeaderView.ResizeToContents)  # Order
-        header.setSectionResizeMode(4, QHeaderView.ResizeToContents)  # Status
+        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)  # Status
 
         table_layout.addWidget(self._rule_table)
 
@@ -347,19 +349,18 @@ class CorrectionRuleView(QWidget):
             row = self._rule_table.rowCount()
             self._rule_table.insertRow(row)
 
-            # Add items in the exact order expected by tests
-            self._rule_table.setItem(row, 0, QTableWidgetItem(str(rule.order)))
-            self._rule_table.setItem(row, 1, QTableWidgetItem(rule.from_value))
-            self._rule_table.setItem(row, 2, QTableWidgetItem(rule.to_value))
-            self._rule_table.setItem(row, 3, QTableWidgetItem(rule.category))
-            self._rule_table.setItem(row, 4, QTableWidgetItem(rule.status))
+            # Add items in the order of the headers
+            self._rule_table.setItem(row, 0, QTableWidgetItem(rule.from_value))
+            self._rule_table.setItem(row, 1, QTableWidgetItem(rule.to_value))
+            self._rule_table.setItem(row, 2, QTableWidgetItem(rule.category))
+            self._rule_table.setItem(row, 3, QTableWidgetItem(rule.status))
 
             # Find the rule's index in the full list
             rule_key = (rule.from_value, rule.to_value, rule.category)
             full_index = rule_to_index.get(rule_key, i)  # Fall back to filtered index if not found
 
             # Set row data for identifying the rule (store full list index)
-            for col in range(5):
+            for col in range(4):
                 item = self._rule_table.item(row, col)
                 if item:
                     item.setData(Qt.UserRole, full_index)
@@ -510,6 +511,10 @@ class CorrectionRuleView(QWidget):
 
     def _on_delete_rule(self):
         """Delete the selected correction rule."""
+        # Prevent multiple delete operations from a single click
+        if self._deletion_in_progress:
+            return
+
         rule_id = self._get_selected_rule_id()
         if rule_id is None:
             return
@@ -529,14 +534,21 @@ class CorrectionRuleView(QWidget):
         )
 
         if response == QMessageBox.Yes:
-            # Perform deletion directly on the controller
-            success = self._controller.delete_rule(rule_id)
-            if success:
-                self.rule_deleted.emit(rule_id)
-                self._logger.info(f"Deleted rule: {rule.from_value} -> {rule.to_value}")
-                # Refresh the table to ensure indices are updated correctly
-                self._refresh_rule_table()
-                self._update_categories_filter()
+            try:
+                # Set flag to prevent multiple deletions
+                self._deletion_in_progress = True
+
+                # Perform deletion directly on the controller
+                success = self._controller.delete_rule(rule_id)
+                if success:
+                    self.rule_deleted.emit(rule_id)
+                    self._logger.info(f"Deleted rule: {rule.from_value} -> {rule.to_value}")
+                    # Refresh the table to ensure indices are updated correctly
+                    self._refresh_rule_table()
+                    self._update_categories_filter()
+            finally:
+                # Always reset the flag when done
+                self._deletion_in_progress = False
 
     def _on_toggle_status(self):
         """Toggle the status of the selected rule."""
