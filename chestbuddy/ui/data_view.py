@@ -546,9 +546,83 @@ class DataView(QWidget):
         # Apply additional styling to ensure visibility
         self._apply_table_styling()
 
-        # Add table view directly to main layout for maximum space
-        main_layout.addWidget(self._table_view)
-        main_layout.setStretch(1, 1)  # Give table view all available space
+        # Create a container for the table view and color legend
+        table_container = QWidget()
+        table_layout = QHBoxLayout(table_container)
+        table_layout.setContentsMargins(0, 0, 0, 0)
+
+        # Create and add the color legend
+        self._color_legend = self._create_color_legend()
+        self._color_legend.setMaximumWidth(200)  # Limit width of the legend
+
+        # Add table view and color legend to the container
+        table_layout.addWidget(self._table_view, 5)  # Give table 5x the space
+        table_layout.addWidget(self._color_legend, 1)  # Give legend 1x the space
+
+        # Add the table container to the main layout
+        main_layout.addWidget(table_container)
+        main_layout.setStretch(1, 1)  # Give table container all available space
+
+    def _create_color_legend(self) -> QGroupBox:
+        """
+        Create the color legend widget explaining the cell highlighting colors.
+
+        Returns:
+            QGroupBox: A group box containing the color legend
+        """
+        # Create group box with title
+        legend = QGroupBox("Color Legend")
+        layout = QVBoxLayout(legend)
+        layout.setContentsMargins(8, 16, 8, 8)
+        layout.setSpacing(4)
+
+        # Add each color with its explanation
+
+        # Red - Invalid
+        invalid_row = QHBoxLayout()
+        invalid_color = QLabel()
+        invalid_color.setObjectName("invalid_color")
+        invalid_color.setFixedSize(16, 16)
+        invalid_color.setStyleSheet("background-color: #FFB6B6; border: 1px solid #D32F2F;")
+        invalid_row.addWidget(invalid_color)
+        invalid_row.addWidget(QLabel("Invalid"))
+        invalid_row.addStretch()
+        layout.addLayout(invalid_row)
+
+        # Orange - Invalid (correctable)
+        invalid_corr_row = QHBoxLayout()
+        invalid_corr_color = QLabel()
+        invalid_corr_color.setObjectName("invalid_correctable_color")
+        invalid_corr_color.setFixedSize(16, 16)
+        invalid_corr_color.setStyleSheet("background-color: #FFD6A5; border: 1px solid #F57C00;")
+        invalid_corr_row.addWidget(invalid_corr_color)
+        invalid_corr_row.addWidget(QLabel("Invalid (correctable)"))
+        invalid_corr_row.addStretch()
+        layout.addLayout(invalid_corr_row)
+
+        # Green - Corrected
+        corrected_row = QHBoxLayout()
+        corrected_color = QLabel()
+        corrected_color.setObjectName("corrected_color")
+        corrected_color.setFixedSize(16, 16)
+        corrected_color.setStyleSheet("background-color: #B6FFB6; border: 1px solid #4CAF50;")
+        corrected_row.addWidget(corrected_color)
+        corrected_row.addWidget(QLabel("Corrected"))
+        corrected_row.addStretch()
+        layout.addLayout(corrected_row)
+
+        # Purple - Correctable
+        correctable_row = QHBoxLayout()
+        correctable_color = QLabel()
+        correctable_color.setObjectName("correctable_color")
+        correctable_color.setFixedSize(16, 16)
+        correctable_color.setStyleSheet("background-color: #D6B6FF; border: 1px solid #7E57C2;")
+        correctable_row.addWidget(correctable_color)
+        correctable_row.addWidget(QLabel("Correctable"))
+        correctable_row.addStretch()
+        layout.addLayout(correctable_row)
+
+        return legend
 
     def _populate_column_selector(self) -> None:
         """Populate the column selector dropdown with available columns."""
@@ -2081,9 +2155,278 @@ class DataView(QWidget):
         self._add_batch_correction_action.triggered.connect(self._on_add_batch_correction)
         self._context_menu.addAction(self._add_batch_correction_action)
 
+        # Add enhanced correction actions
+        self._context_menu.addSeparator()
+
+        # Action to apply all correction rules to selected cells
+        self._apply_correction_rules_action = QAction(
+            "Apply Correction Rules to Selected Cells", self
+        )
+        self._apply_correction_rules_action.triggered.connect(self._on_apply_correction_rules)
+        self._context_menu.addAction(self._apply_correction_rules_action)
+
+        # Submenu for applying specific rules
+        self._apply_specific_rule_menu = QMenu("Apply Specific Rule", self)
+        self._context_menu.addMenu(self._apply_specific_rule_menu)
+
+        # Action to view validation details
+        self._view_validation_details_action = QAction("View Validation Details", self)
+        self._view_validation_details_action.triggered.connect(self._on_view_validation_details)
+        self._context_menu.addAction(self._view_validation_details_action)
+
         # Set context menu policy
         self._table_view.setContextMenuPolicy(Qt.CustomContextMenu)
         self._table_view.customContextMenuRequested.connect(self._on_context_menu_requested)
+
+    def _on_context_menu_requested(self, position):
+        """
+        Handle the context menu request and show the menu.
+
+        Args:
+            position (QPoint): The position where the context menu was requested
+        """
+        if self._data_model.is_empty:
+            return
+
+        # Get the index at the position
+        index = self._table_view.indexAt(position)
+        if not index.isValid():
+            return
+
+        # Update menu actions based on current selection
+        self._update_context_menu_actions()
+
+        # Update the specific rule submenu
+        self._update_specific_rule_submenu()
+
+        # Show the menu
+        self._context_menu.exec_(self._table_view.viewport().mapToGlobal(position))
+
+    def _update_context_menu_actions(self):
+        """
+        Update the enabled/disabled state of context menu actions based on current selection.
+        """
+        # Get the current selection
+        selected_indices = self._table_view.selectedIndexes()
+        has_selection = len(selected_indices) > 0
+
+        # Enable/disable actions based on selection
+        self._add_correction_rule_action.setEnabled(has_selection)
+        self._add_batch_correction_action.setEnabled(has_selection)
+        self._apply_correction_rules_action.setEnabled(has_selection)
+        self._apply_specific_rule_menu.setEnabled(has_selection)
+        self._view_validation_details_action.setEnabled(has_selection)
+
+        # Additional logic based on correction status could be added here
+        # For example, disabling "Apply Correction Rules" if no rules are applicable
+
+    def _update_specific_rule_submenu(self):
+        """
+        Update the specific rule submenu with applicable rules for the current selection.
+        """
+        # Clear the submenu
+        self._apply_specific_rule_menu.clear()
+
+        # Get selected cells
+        selected_cells = self._get_selected_cells()
+        if not selected_cells:
+            return
+
+        # Get the first selected cell for determining applicable rules
+        # In the future, this could be enhanced to handle multiple selections better
+        first_cell = selected_cells[0]
+        value = first_cell.get("value", "")
+        column_name = first_cell.get("column_name", "")
+
+        # Get applicable rules from the correction controller
+        correction_controller = self._get_correction_controller()
+        if not correction_controller:
+            return
+
+        applicable_rules = correction_controller.get_applicable_rules(value, column_name)
+
+        # Add an action for each applicable rule
+        for rule in applicable_rules:
+            rule_text = f"'{rule.from_value}' → '{rule.to_value}'"
+            action = QAction(rule_text, self)
+            # Use a lambda with default argument to capture the current rule
+            action.triggered.connect(lambda checked=False, r=rule: self._on_apply_specific_rule(r))
+            self._apply_specific_rule_menu.addAction(action)
+
+        # If no rules are applicable, add a disabled action indicating this
+        if not applicable_rules:
+            no_rules_action = QAction("No applicable rules", self)
+            no_rules_action.setEnabled(False)
+            self._apply_specific_rule_menu.addAction(no_rules_action)
+
+    def _on_copy_to_clipboard(self):
+        """Copy the selected cell content to clipboard."""
+        selected_indices = self._table_view.selectedIndexes()
+        if not selected_indices:
+            return
+
+        # Use the first selected index
+        index = selected_indices[0]
+        if not index.isValid():
+            return
+
+        # Get the data
+        source_index = self._proxy_model.mapToSource(index) if self._proxy_model else index
+        value = self._table_model.data(source_index, Qt.DisplayRole)
+
+        # Copy to clipboard
+        if value:
+            clipboard = QApplication.clipboard()
+            clipboard.setText(str(value))
+            self._update_status(f"Copied value to clipboard: {value}", False)
+
+    def _on_copy_row_to_clipboard(self):
+        """Copy the selected row content to clipboard as tab-separated values."""
+        selected_indices = self._table_view.selectedIndexes()
+        if not selected_indices:
+            return
+
+        # Get the row of the first selected cell
+        row = selected_indices[0].row()
+
+        # Get all cells in that row
+        row_data = []
+        for col in range(self._table_view.model().columnCount()):
+            index = self._table_view.model().index(row, col)
+            value = self._table_view.model().data(index, Qt.DisplayRole)
+            row_data.append(str(value) if value else "")
+
+        # Copy to clipboard as tab-separated values
+        clipboard = QApplication.clipboard()
+        clipboard.setText("\t".join(row_data))
+        self._update_status(f"Copied row to clipboard", False)
+
+    def _on_apply_correction_rules(self):
+        """Apply all applicable correction rules to the selected cells."""
+        selected_cells = self._get_selected_cells()
+        if not selected_cells:
+            QMessageBox.warning(self, "Warning", "No cells selected.")
+            return
+
+        # Get the correction controller
+        correction_controller = self._get_correction_controller()
+        if not correction_controller:
+            QMessageBox.warning(self, "Error", "Correction controller not available.")
+            return
+
+        # Apply rules to the selection
+        result = correction_controller.apply_rules_to_selection(selected_cells)
+
+        # Show results
+        corrected_count = len(result.get("corrected_cells", []))
+        errors = len(result.get("errors", []))
+
+        # Update status
+        if corrected_count > 0:
+            self._update_status(
+                f"Applied correction rules: {corrected_count} cells corrected, {errors} errors",
+                False,
+            )
+        else:
+            self._update_status("No corrections applied", False)
+
+        # Refresh to show changes
+        self.refresh()
+
+    def _on_apply_specific_rule(self, rule):
+        """
+        Apply a specific correction rule to the selected cells.
+
+        Args:
+            rule: The CorrectionRule to apply
+        """
+        selected_cells = self._get_selected_cells()
+        if not selected_cells:
+            QMessageBox.warning(self, "Warning", "No cells selected.")
+            return
+
+        # Get the correction controller
+        correction_controller = self._get_correction_controller()
+        if not correction_controller:
+            QMessageBox.warning(self, "Error", "Correction controller not available.")
+            return
+
+        # Apply the specific rule to all selected cells
+        corrected_count = 0
+        for cell in selected_cells:
+            # Check if the rule is applicable to this cell
+            cell_value = cell.get("value", "")
+            cell_column = cell.get("column_name", "")
+
+            if rule.category.lower() == cell_column.lower() or rule.category.lower() == "general":
+                # Apply the rule to this cell
+                success = correction_controller.apply_single_rule(rule, [cell])
+                if success:
+                    corrected_count += 1
+
+        # Update status
+        if corrected_count > 0:
+            self._update_status(
+                f"Applied rule '{rule.from_value}' → '{rule.to_value}' to {corrected_count} cells",
+                False,
+            )
+        else:
+            self._update_status("No corrections applied", False)
+
+        # Refresh to show changes
+        self.refresh()
+
+    def _on_view_validation_details(self):
+        """Show validation details for the selected cell."""
+        # Get the current index
+        current_index = self._table_view.currentIndex()
+        if not current_index.isValid():
+            QMessageBox.warning(self, "Warning", "No cell selected.")
+            return
+
+        # Map to source index
+        source_index = (
+            self._proxy_model.mapToSource(current_index) if self._proxy_model else current_index
+        )
+        source_row = source_index.row()
+        source_col = source_index.column()
+
+        # Get the correction controller
+        correction_controller = self._get_correction_controller()
+        if not correction_controller:
+            QMessageBox.warning(self, "Error", "Correction controller not available.")
+            return
+
+        # Get validation service from the correction controller
+        validation_service = correction_controller.get_validation_service()
+        if not validation_service:
+            QMessageBox.warning(self, "Error", "Validation service not available.")
+            return
+
+        # Get validation details
+        details = validation_service.get_cell_validation_details(source_row, source_col)
+
+        # Show details in a message box
+        column_name = self._table_model.headerData(source_col, Qt.Horizontal, Qt.DisplayRole)
+        value = self._table_model.data(source_index, Qt.DisplayRole)
+
+        message = f"Validation Details for Cell ({source_row}, {source_col}):\n\n"
+        message += f"Column: {column_name}\n"
+        message += f"Value: {value}\n\n"
+
+        if details:
+            message += f"Status: {details.get('status', 'Unknown')}\n"
+            message += f"Validation Details: {details.get('details', 'No details available')}\n"
+            if "rules" in details and details["rules"]:
+                message += "\nApplicable Correction Rules:\n"
+                for rule in details["rules"]:
+                    message += f"- '{rule.from_value}' → '{rule.to_value}'\n"
+            else:
+                message += "\nNo applicable correction rules found."
+        else:
+            message += "No validation details available for this cell."
+
+        QMessageBox.information(self, "Validation Details", message)
 
     def _get_selected_cells(self):
         """Get information about selected cells."""
@@ -2262,10 +2605,12 @@ class DataView(QWidget):
         if not correction_status:
             return
 
-        # Prepare color constants
-        invalid_color = QColor(255, 0, 0, 50)  # Red, semi-transparent
-        correctable_color = QColor(255, 165, 0, 50)  # Orange, semi-transparent
-        corrected_color = QColor(0, 255, 0, 50)  # Green, semi-transparent
+        # Define color constants matching our color legend
+        # These colors should match the ones in _create_color_legend method
+        invalid_color = QColor(255, 182, 182)  # #FFB6B6 Light red from legend
+        correctable_color = QColor(255, 214, 165)  # #FFD6A5 Light orange from legend
+        corrected_color = QColor(182, 255, 182)  # #B6FFB6 Light green from legend
+        purple_color = QColor(214, 182, 255)  # #D6B6FF Light purple from legend
 
         # Process cells that need highlighting
         invalid_cells = correction_status.get("invalid_cells", [])
@@ -2292,8 +2637,8 @@ class DataView(QWidget):
 
             for row, col in correctable_cells:
                 if (row, col) not in invalid_cells and (row, col) not in corrected_cells:
-                    # Correctable but not invalid or corrected (still orange but lighter)
-                    self._highlight_cell(row, col, QColor(255, 165, 0, 30))
+                    # Correctable but not invalid or corrected (purple)
+                    self._highlight_cell(row, col, purple_color)
         finally:
             # End batch updates
             if hasattr(self, "_table_model") and self._table_model:
@@ -2380,3 +2725,12 @@ class DataView(QWidget):
         item = self._table_model.itemFromIndex(view_index)
         if item:
             item.setToolTip(tooltip)
+
+    def update_cell_highlighting(self):
+        """
+        Update cell highlighting based on validation and correction status.
+
+        This method calls the _highlight_correction_cells method to apply
+        the appropriate highlighting to cells based on their status.
+        """
+        self._highlight_correction_cells()

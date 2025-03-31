@@ -42,6 +42,14 @@ def data_view(qtbot, mock_data_model):
     if hasattr(view, "_add_batch_correction_action"):
         delattr(view, "_add_batch_correction_action")
 
+    # Also ensure enhanced menu items don't exist
+    if hasattr(view, "_apply_correction_rules_action"):
+        delattr(view, "_apply_correction_rules_action")
+    if hasattr(view, "_apply_specific_rule_menu"):
+        delattr(view, "_apply_specific_rule_menu")
+    if hasattr(view, "_view_validation_details_action"):
+        delattr(view, "_view_validation_details_action")
+
     qtbot.addWidget(view)
     view.show()
     return view
@@ -58,10 +66,18 @@ def test_setup_context_menu(data_view):
     # Verify actions were added
     assert hasattr(data_view, "_add_correction_rule_action")
     assert hasattr(data_view, "_add_batch_correction_action")
+    # Verify enhanced menu items are added
+    assert hasattr(data_view, "_apply_correction_rules_action")
+    assert hasattr(data_view, "_apply_specific_rule_menu")
+    assert hasattr(data_view, "_view_validation_details_action")
 
     # Verify actions were added to the context menu
     data_view._context_menu.addAction.assert_any_call(data_view._add_correction_rule_action)
     data_view._context_menu.addAction.assert_any_call(data_view._add_batch_correction_action)
+    data_view._context_menu.addAction.assert_any_call(data_view._apply_correction_rules_action)
+    data_view._context_menu.addAction.assert_any_call(data_view._view_validation_details_action)
+    # For the submenu, we should check it was added
+    data_view._context_menu.addMenu.assert_any_call(data_view._apply_specific_rule_menu)
 
 
 def test_context_menu_no_selection(data_view):
@@ -69,6 +85,9 @@ def test_context_menu_no_selection(data_view):
     # Setup
     data_view._add_correction_rule_action = MagicMock()
     data_view._add_batch_correction_action = MagicMock()
+    data_view._apply_correction_rules_action = MagicMock()
+    data_view._apply_specific_rule_menu = MagicMock()
+    data_view._view_validation_details_action = MagicMock()
     data_view._table_view.selectedIndexes.return_value = []
 
     # Call method to update action states
@@ -77,6 +96,9 @@ def test_context_menu_no_selection(data_view):
     # Verify actions are disabled
     data_view._add_correction_rule_action.setEnabled.assert_called_with(False)
     data_view._add_batch_correction_action.setEnabled.assert_called_with(False)
+    data_view._apply_correction_rules_action.setEnabled.assert_called_with(False)
+    data_view._apply_specific_rule_menu.setEnabled.assert_called_with(False)
+    data_view._view_validation_details_action.setEnabled.assert_called_with(False)
 
 
 def test_context_menu_with_selection(data_view):
@@ -84,6 +106,9 @@ def test_context_menu_with_selection(data_view):
     # Setup
     data_view._add_correction_rule_action = MagicMock()
     data_view._add_batch_correction_action = MagicMock()
+    data_view._apply_correction_rules_action = MagicMock()
+    data_view._apply_specific_rule_menu = MagicMock()
+    data_view._view_validation_details_action = MagicMock()
 
     # Mock selected index
     mock_index = MagicMock()
@@ -95,6 +120,9 @@ def test_context_menu_with_selection(data_view):
     # Verify actions are enabled
     data_view._add_correction_rule_action.setEnabled.assert_called_with(True)
     data_view._add_batch_correction_action.setEnabled.assert_called_with(True)
+    data_view._apply_correction_rules_action.setEnabled.assert_called_with(True)
+    data_view._apply_specific_rule_menu.setEnabled.assert_called_with(True)
+    data_view._view_validation_details_action.setEnabled.assert_called_with(True)
 
 
 def test_add_correction_rule_action(qtbot, data_view):
@@ -185,6 +213,135 @@ def test_show_context_menu(data_view):
                 # The test passes if no exceptions are raised
 
 
+def test_on_apply_correction_rules(data_view):
+    """Test the apply correction rules action."""
+    # Setup - mock the get_correction_controller method
+    correction_controller = MagicMock()
+    data_view._get_correction_controller = MagicMock(return_value=correction_controller)
+
+    # Setup selected cells
+    data_view._get_selected_cells = MagicMock(
+        return_value=[{"row": 0, "col": 1, "value": "test", "column_name": "PLAYER"}]
+    )
+
+    # Call the method
+    data_view._on_apply_correction_rules()
+
+    # Verify the controller method was called with the correct parameters
+    correction_controller.apply_rules_to_selection.assert_called_once()
+    # Check the first argument (selection)
+    selection = correction_controller.apply_rules_to_selection.call_args[0][0]
+    assert len(selection) == 1
+    assert selection[0]["row"] == 0
+    assert selection[0]["col"] == 1
+    assert selection[0]["value"] == "test"
+    assert selection[0]["column_name"] == "PLAYER"
+
+
+def test_on_apply_specific_rule(data_view):
+    """Test the apply specific rule action."""
+    # Setup - mock the get_correction_controller method
+    correction_controller = MagicMock()
+    data_view._get_correction_controller = MagicMock(return_value=correction_controller)
+
+    # Create a mock rule
+    from chestbuddy.core.models.correction_rule import CorrectionRule
+
+    mock_rule = MagicMock(spec=CorrectionRule)
+    mock_rule.from_value = "test"
+    mock_rule.to_value = "corrected"
+
+    # Setup selected cells
+    data_view._get_selected_cells = MagicMock(
+        return_value=[{"row": 0, "col": 1, "value": "test", "column_name": "PLAYER"}]
+    )
+
+    # Call the method
+    data_view._on_apply_specific_rule(mock_rule)
+
+    # Verify the controller method was called with the correct parameters
+    assert correction_controller.apply_single_rule.call_count == 1
+    # Check the first argument (rule)
+    rule_arg = correction_controller.apply_single_rule.call_args[0][0]
+    assert rule_arg is mock_rule
+    # Check the second argument (selection)
+    selection = correction_controller.apply_single_rule.call_args[0][1]
+    assert len(selection) == 1
+    assert selection[0]["row"] == 0
+    assert selection[0]["col"] == 1
+
+
+def test_on_view_validation_details(data_view):
+    """Test the view validation details action."""
+    # Setup - mock the get_correction_controller method
+    correction_controller = MagicMock()
+    validation_service = MagicMock()
+    correction_controller.get_validation_service = MagicMock(return_value=validation_service)
+    data_view._get_correction_controller = MagicMock(return_value=correction_controller)
+
+    # Setup a selected cell
+    mock_index = MagicMock()
+    source_index = MagicMock()
+    source_index.row.return_value = 0
+    source_index.column.return_value = 1
+    data_view._table_view.currentIndex.return_value = mock_index
+    data_view._proxy_model.mapToSource.return_value = source_index
+
+    # Add mocks for QMessageBox
+    with patch("PySide6.QtWidgets.QMessageBox.information") as mock_message_box:
+        # Call the method
+        data_view._on_view_validation_details()
+
+        # Verify the validation service method was called with the correct parameters
+        validation_service.get_cell_validation_details.assert_called_once_with(0, 1)
+
+        # Verify the message box was shown
+        assert mock_message_box.call_count == 1
+
+
+def test_update_specific_rule_submenu(data_view):
+    """Test that the specific rule submenu is updated correctly."""
+    # Setup - create a mock rule manager with some rules
+    correction_controller = MagicMock()
+    from chestbuddy.core.models.correction_rule import CorrectionRule
+
+    # Create some mock rules
+    rule1 = MagicMock(spec=CorrectionRule)
+    rule1.from_value = "test1"
+    rule1.to_value = "corrected1"
+    rule1.category = "PLAYER"
+
+    rule2 = MagicMock(spec=CorrectionRule)
+    rule2.from_value = "test2"
+    rule2.to_value = "corrected2"
+    rule2.category = "CHEST"
+
+    # Setup the controller to return these rules
+    correction_controller.get_applicable_rules = MagicMock(return_value=[rule1, rule2])
+    data_view._get_correction_controller = MagicMock(return_value=correction_controller)
+
+    # Mock the submenu
+    data_view._apply_specific_rule_menu = MagicMock()
+    data_view._apply_specific_rule_menu.clear = MagicMock()
+    data_view._apply_specific_rule_menu.addAction = MagicMock()
+
+    # Setup selected cells with a value
+    selected_cell = {"row": 0, "col": 1, "value": "test", "column_name": "PLAYER"}
+    data_view._get_selected_cells = MagicMock(return_value=[selected_cell])
+
+    # Call the method
+    data_view._update_specific_rule_submenu()
+
+    # Verify the submenu was cleared
+    data_view._apply_specific_rule_menu.clear.assert_called_once()
+
+    # Verify the controller was asked for applicable rules
+    correction_controller.get_applicable_rules.assert_called_once_with("test", "PLAYER")
+
+    # Verify actions were added for each rule
+    assert data_view._apply_specific_rule_menu.addAction.call_count == 2
+
+
 def test_correction_actions_in_context_menu(data_view):
     """Test that correction actions are added to the context menu."""
     # Setup - make sure actions exist
@@ -193,12 +350,21 @@ def test_correction_actions_in_context_menu(data_view):
     # Verify the actions exist
     assert hasattr(data_view, "_add_correction_rule_action")
     assert hasattr(data_view, "_add_batch_correction_action")
+    assert hasattr(data_view, "_apply_correction_rules_action")
+    assert hasattr(data_view, "_apply_specific_rule_menu")
+    assert hasattr(data_view, "_view_validation_details_action")
 
     # Test the menu integration in a simpler way
     original_show_context_menu = data_view._show_context_menu
 
     # Create a flag to check if our actions were included
-    actions_added = {"rule": False, "batch": False}
+    actions_added = {
+        "rule": False,
+        "batch": False,
+        "apply_rules": False,
+        "specific_rule_menu": False,
+        "validation_details": False,
+    }
 
     # Replace addAction with our own function that checks if our actions are added
     def mock_add_action(action):
@@ -206,10 +372,19 @@ def test_correction_actions_in_context_menu(data_view):
             actions_added["rule"] = True
         if action is data_view._add_batch_correction_action:
             actions_added["batch"] = True
+        if action is data_view._apply_correction_rules_action:
+            actions_added["apply_rules"] = True
+        if action is data_view._view_validation_details_action:
+            actions_added["validation_details"] = True
 
-    # Replace the context menu's addAction method
+    def mock_add_menu(menu):
+        if menu is data_view._apply_specific_rule_menu:
+            actions_added["specific_rule_menu"] = True
+
+    # Replace the context menu's methods
     context_menu = MagicMock()
     context_menu.addAction = mock_add_action
+    context_menu.addMenu = mock_add_menu
     context_menu.addSeparator = MagicMock()
     context_menu.exec_ = MagicMock()
 
@@ -226,10 +401,16 @@ def test_correction_actions_in_context_menu(data_view):
         # Use our mock context menu
         data_view._add_correction_rule_action = QAction("Add Correction Rule")
         data_view._add_batch_correction_action = QAction("Add Batch Correction")
+        data_view._apply_correction_rules_action = QAction("Apply Correction Rules")
+        data_view._apply_specific_rule_menu = QMenu("Apply Specific Rule")
+        data_view._view_validation_details_action = QAction("View Validation Details")
 
         # Add our correction actions to the menu
         mock_add_action(data_view._add_correction_rule_action)
         mock_add_action(data_view._add_batch_correction_action)
+        mock_add_action(data_view._apply_correction_rules_action)
+        mock_add_menu(data_view._apply_specific_rule_menu)
+        mock_add_action(data_view._view_validation_details_action)
 
     # Patch the method
     data_view._show_context_menu = patched_show_context_menu
@@ -241,6 +422,9 @@ def test_correction_actions_in_context_menu(data_view):
         # Verify our actions were added
         assert actions_added["rule"] is True
         assert actions_added["batch"] is True
+        assert actions_added["apply_rules"] is True
+        assert actions_added["specific_rule_menu"] is True
+        assert actions_added["validation_details"] is True
 
     finally:
         # Restore original method
