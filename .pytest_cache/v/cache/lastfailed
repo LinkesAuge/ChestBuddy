@@ -149,5 +149,13 @@
   "tests/unit/core/controllers/test_correction_controller.py::TestCorrectionController::test_get_correction_preview": true,
   "tests/unit/core/controllers/test_correction_controller.py::TestCorrectionController::test_import_rules": true,
   "tests/unit/core/controllers/test_correction_controller.py::TestCorrectionController::test_export_rules": true,
-  "tests/unit/ui/views/test_correction_rule_view.py::TestCorrectionRuleView::test_apply_corrections": true
+  "tests/unit/ui/views/test_data_view_highlighting.py::test_color_legend": true,
+  "tests/unit/ui/views/test_data_view_context_menu.py::test_setup_context_menu": true,
+  "tests/unit/ui/views/test_data_view_context_menu.py::test_add_correction_rule_action": true,
+  "tests/unit/ui/views/test_data_view_context_menu.py::test_batch_correction_action": true,
+  "tests/unit/ui/views/test_data_view_context_menu.py::test_show_context_menu": true,
+  "tests/unit/ui/views/test_data_view_context_menu.py::test_on_apply_correction_rules": true,
+  "tests/unit/ui/views/test_data_view_context_menu.py::test_on_apply_specific_rule": true,
+  "tests/unit/ui/views/test_data_view_context_menu.py::test_on_view_validation_details": true,
+  "tests/test_integration.py": true
 }

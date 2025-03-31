@@ -1,4 +1,232 @@
-# Correction Feature Refactoring: Detailed Implementation Plan
+# Correction Feature Refactoring Plan
+
+## Status Update - May 11, 2024
+
+### Completed Features:
+- ✅ Status bar in CorrectionRuleView showing rule counts in the format "Total rules: X | Enabled: Y | Disabled: Z"
+- ✅ Color legend in DataView explaining the different highlight colors
+- ✅ Consistent cell highlighting system matching the color legend
+- ✅ Update mechanism for cell highlighting via update_cell_highlighting method
+
+### In Progress:
+- 🔄 Import/Export buttons in the header
+- 🔄 Settings panel with configuration options
+- 🔄 Context menu for rule actions
+
+### Next Steps (Prioritized):
+
+#### 1. Import/Export Buttons in Header
+- Add Import/Export buttons to the CorrectionRuleView header
+- Connect buttons to existing controller methods
+- Implement file dialog integration
+- Test integration with existing import/export functionality
+
+```python
+# ui/views/correction_rule_view.py - updates
+def _setup_header_actions(self):
+    """Set up actions in the header area."""
+    header_layout = QHBoxLayout()
+    
+    # Title label
+    title_label = QLabel("Correction Rules")
+    title_label.setStyleSheet("font-size: 16px; font-weight: bold;")
+    header_layout.addWidget(title_label)
+    
+    header_layout.addStretch()
+    
+    # Import button
+    self._import_button = QPushButton("Import Rules")
+    self._import_button.setIcon(QIcon(":/icons/import.png"))
+    self._import_button.clicked.connect(lambda: self._on_action_clicked("import"))
+    header_layout.addWidget(self._import_button)
+    
+    # Export button
+    self._export_button = QPushButton("Export Rules")
+    self._export_button.setIcon(QIcon(":/icons/export.png"))
+    self._export_button.clicked.connect(lambda: self._on_action_clicked("export"))
+    header_layout.addWidget(self._export_button)
+    
+    return header_layout
+```
+
+#### 2. Settings Panel Enhancement
+- Complete the settings panel with all configuration options from mockup
+- Connect settings to ConfigManager for persistence
+- Update UI to match mockup style
+- Add tooltips for settings options
+
+```python
+# ui/views/correction_rule_view.py - updates
+def _setup_settings_panel(self):
+    """Set up the settings panel."""
+    settings_group = QGroupBox("Correction Settings")
+    settings_layout = QVBoxLayout(settings_group)
+    
+    # Recursive option
+    self._recursive_checkbox = QCheckBox("Apply corrections recursively")
+    self._recursive_checkbox.setToolTip(
+        "Apply corrections repeatedly until no more changes are made"
+    )
+    self._recursive_checkbox.setChecked(True)
+    settings_layout.addWidget(self._recursive_checkbox)
+    
+    # Only invalid cells option
+    self._correct_invalid_only_checkbox = QCheckBox("Only correct invalid cells")
+    self._correct_invalid_only_checkbox.setToolTip(
+        "Only apply corrections to cells marked as invalid"
+    )
+    self._correct_invalid_only_checkbox.setChecked(True)
+    settings_layout.addWidget(self._correct_invalid_only_checkbox)
+    
+    # Auto-enable new rules option
+    self._auto_enable_checkbox = QCheckBox("Auto-enable new rules")
+    self._auto_enable_checkbox.setToolTip(
+        "Automatically enable new rules when they are created"
+    )
+    self._auto_enable_checkbox.setChecked(True)
+    settings_layout.addWidget(self._auto_enable_checkbox)
+    
+    # Add to validation list option
+    self._add_to_validation_checkbox = QCheckBox("Add corrected values to validation lists")
+    self._add_to_validation_checkbox.setToolTip(
+        "Automatically add corrected values to the appropriate validation lists"
+    )
+    self._add_to_validation_checkbox.setChecked(False)
+    settings_layout.addWidget(self._add_to_validation_checkbox)
+    
+    # Apply corrections button
+    self._apply_button = QPushButton("Apply Corrections")
+    self._apply_button.setObjectName("primaryButton")
+    settings_layout.addWidget(self._apply_button)
+    
+    # Load settings from config
+    self._load_settings_from_config()
+    
+    # Connect setting changes to config
+    self._recursive_checkbox.toggled.connect(self._on_setting_changed)
+    self._correct_invalid_only_checkbox.toggled.connect(self._on_setting_changed)
+    self._auto_enable_checkbox.toggled.connect(self._on_setting_changed)
+    self._add_to_validation_checkbox.toggled.connect(self._on_setting_changed)
+    
+    return settings_group
+
+def _load_settings_from_config(self):
+    """Load settings from the configuration."""
+    config = ConfigManager.instance()
+    
+    # Set checkbox states from config with defaults
+    self._recursive_checkbox.setChecked(
+        config.get_value("correction", "recursive", True)
+    )
+    self._correct_invalid_only_checkbox.setChecked(
+        config.get_value("correction", "correct_invalid_only", True)
+    )
+    self._auto_enable_checkbox.setChecked(
+        config.get_value("correction", "auto_enable_rules", True)
+    )
+    self._add_to_validation_checkbox.setChecked(
+        config.get_value("correction", "add_to_validation", False)
+    )
+
+def _on_setting_changed(self):
+    """Save settings when they change."""
+    config = ConfigManager.instance()
+    
+    # Save settings to config
+    config.set_value(
+        "correction", "recursive", self._recursive_checkbox.isChecked()
+    )
+    config.set_value(
+        "correction", "correct_invalid_only", self._correct_invalid_only_checkbox.isChecked()
+    )
+    config.set_value(
+        "correction", "auto_enable_rules", self._auto_enable_checkbox.isChecked()
+    )
+    config.set_value(
+        "correction", "add_to_validation", self._add_to_validation_checkbox.isChecked()
+    )
+```
+
+#### 3. Context Menu for Rules
+- Implement context menu for the rule table
+- Connect menu actions to existing rule management methods
+- Test context menu functionality
+
+```python
+# ui/views/correction_rule_view.py - updates
+def _setup_table(self):
+    """Set up the rule table."""
+    # Existing table setup code...
+    
+    # Add context menu support
+    self._rule_table.setContextMenuPolicy(Qt.CustomContextMenu)
+    self._rule_table.customContextMenuRequested.connect(self._show_context_menu)
+    
+def _show_context_menu(self, position):
+    """Show context menu for rule table."""
+    # Get selected item
+    if not self._rule_table.selectedItems():
+        return
+        
+    # Create menu
+    menu = QMenu()
+    
+    # Add actions
+    edit_action = menu.addAction("Edit")
+    delete_action = menu.addAction("Delete")
+    menu.addSeparator()
+    
+    move_menu = menu.addMenu("Move")
+    move_up_action = move_menu.addAction("Move Up")
+    move_down_action = move_menu.addAction("Move Down")
+    move_top_action = move_menu.addAction("Move to Top")
+    move_bottom_action = move_menu.addAction("Move to Bottom")
+    
+    menu.addSeparator()
+    toggle_action = menu.addAction("Enable/Disable")
+    apply_single_action = menu.addAction("Apply This Rule Only")
+    
+    # Show menu and handle action
+    action = menu.exec_(self._rule_table.viewport().mapToGlobal(position))
+    
+    # Connect actions to handlers
+    if action == edit_action:
+        self._on_edit_rule()
+    elif action == delete_action:
+        self._on_delete_rule()
+    elif action == move_up_action:
+        self._on_move_rule_up()
+    elif action == move_down_action:
+        self._on_move_rule_down()
+    elif action == move_top_action:
+        self._on_move_rule_to_top()
+    elif action == move_bottom_action:
+        self._on_move_rule_to_bottom()
+    elif action == toggle_action:
+        self._on_toggle_status()
+    elif action == apply_single_action:
+        self._on_apply_single_rule()
+
+def _on_apply_single_rule(self):
+    """Apply only the selected rule."""
+    rule_id = self._get_selected_rule_id()
+    if rule_id is None:
+        return
+    
+    only_invalid = self._correct_invalid_only_checkbox.isChecked()
+    success = self._controller.apply_single_rule(rule_id, only_invalid)
+    
+    if success:
+        QMessageBox.information(
+            self, "Rule Applied", "The selected rule was applied successfully."
+        )
+    else:
+        QMessageBox.warning(
+            self, "Rule Application Failed", "Failed to apply the selected rule."
+        )
+```
+
+## Implementation Plan Overview
 
 ## Overview
 
@@ -15,7 +243,7 @@ This plan provides a comprehensive roadmap for refactoring the ChestBuddy applic
 
 ## Implementation Phases
 
-### Phase 1: Core Data Model (Days 1-2)
+### Phase 1: Core Data Model (Completed ✅)
 
 #### 1.1 CorrectionRule Model Class
 
@@ -183,7 +411,7 @@ def test_rule_ordering():
     # Test code...
 ```
 
-### Phase 2: Services Layer (Days 3-4)
+### Phase 2: Services Layer (Completed ✅)
 
 #### 2.1 CorrectionService
 
@@ -389,7 +617,7 @@ def test_correction_history():
     # Test code...
 ```
 
-### Phase 3: Controller Layer (Days 5-6)
+### Phase 3: Controller Layer (Completed ✅)
 
 #### 3.1 CorrectionController
 
@@ -570,7 +798,7 @@ def test_import_export():
     # Test code...
 ```
 
-### Phase 4: UI Components (Days 7-9)
+### Phase 4: UI Components (In Progress 🔄)
 
 #### 4.1 CorrectionView
 
@@ -666,8 +894,15 @@ class CorrectionRuleView(QWidget):
         
     def _update_status_bar(self):
         """Update the status bar with rule counts."""
-        # Implementation details...
-        
+        # Get rules from controller 
+        rules = self._controller.get_rules()
+        total_rules = len(rules)
+        enabled_rules = sum(1 for rule in rules if rule.status == "enabled")
+        disabled_rules = total_rules - enabled_rules
+
+        self._status_bar.showMessage(
+            f"Total rules: {total_rules} | Enabled: {enabled_rules} | Disabled: {disabled_rules}"
+        )
     def _update_button_states(self):
         """Update button states based on selection."""
         # Implementation details...
@@ -814,66 +1049,94 @@ def _export_rules(self):
 ##### Settings Panel
 ```python
 # ui/views/correction_rule_view.py - updates
-def _setup_ui(self):
-    """Set up the UI components."""
-    # Existing setup code...
+def _setup_settings_panel(self):
+    """Set up the settings panel."""
+    settings_group = QGroupBox("Correction Settings")
+    settings_layout = QVBoxLayout(settings_group)
     
-    # Add settings panel
-    self._settings_group = QGroupBox("Settings")
-    settings_layout = QVBoxLayout(self._settings_group)
+    # Recursive option
+    self._recursive_checkbox = QCheckBox("Apply corrections recursively")
+    self._recursive_checkbox.setToolTip(
+        "Apply corrections repeatedly until no more changes are made"
+    )
+    self._recursive_checkbox.setChecked(True)
+    settings_layout.addWidget(self._recursive_checkbox)
     
-    self._auto_correct_checkbox = QCheckBox("Auto-correct after validation")
-    self._correct_invalid_checkbox = QCheckBox("Correct only invalid entries")
-    self._auto_enable_checkbox = QCheckBox("Auto-enable imported rules")
-    self._export_enabled_checkbox = QCheckBox("Export only enabled rules")
+    # Only invalid cells option
+    self._correct_invalid_only_checkbox = QCheckBox("Only correct invalid cells")
+    self._correct_invalid_only_checkbox.setToolTip(
+        "Only apply corrections to cells marked as invalid"
+    )
+    self._correct_invalid_only_checkbox.setChecked(True)
+    settings_layout.addWidget(self._correct_invalid_only_checkbox)
     
-    settings_layout.addWidget(self._auto_correct_checkbox)
-    settings_layout.addWidget(self._correct_invalid_checkbox)
+    # Auto-enable new rules option
+    self._auto_enable_checkbox = QCheckBox("Auto-enable new rules")
+    self._auto_enable_checkbox.setToolTip(
+        "Automatically enable new rules when they are created"
+    )
+    self._auto_enable_checkbox.setChecked(True)
     settings_layout.addWidget(self._auto_enable_checkbox)
-    settings_layout.addWidget(self._export_enabled_checkbox)
     
-    self._load_settings()
-    main_layout.addWidget(self._settings_group)
+    # Add to validation list option
+    self._add_to_validation_checkbox = QCheckBox("Add corrected values to validation lists")
+    self._add_to_validation_checkbox.setToolTip(
+        "Automatically add corrected values to the appropriate validation lists"
+    )
+    self._add_to_validation_checkbox.setChecked(False)
+    settings_layout.addWidget(self._add_to_validation_checkbox)
     
-def _load_settings(self):
-    """Load settings from configuration."""
-    if hasattr(self._controller, "get_config_manager"):
-        config = self._controller.get_config_manager()
-        
-        self._auto_correct_checkbox.setChecked(
-            config.get_bool("corrections", "auto_correct_after_validation", True)
-        )
-        self._correct_invalid_checkbox.setChecked(
-            config.get_bool("corrections", "correct_only_invalid", True)
-        )
-        self._auto_enable_checkbox.setChecked(
-            config.get_bool("corrections", "auto_enable_imported", True)
-        )
-        self._export_enabled_checkbox.setChecked(
-            config.get_bool("corrections", "export_only_enabled", True)
-        )
-        
-def _save_settings(self):
-    """Save settings to configuration."""
-    if hasattr(self._controller, "get_config_manager"):
-        config = self._controller.get_config_manager()
-        
-        config.set_bool(
-            "corrections", "auto_correct_after_validation", 
-            self._auto_correct_checkbox.isChecked()
-        )
-        config.set_bool(
-            "corrections", "correct_only_invalid", 
-            self._correct_invalid_checkbox.isChecked()
-        )
-        config.set_bool(
-            "corrections", "auto_enable_imported", 
-            self._auto_enable_checkbox.isChecked()
-        )
-        config.set_bool(
-            "corrections", "export_only_enabled", 
-            self._export_enabled_checkbox.isChecked()
-        )
+    # Apply corrections button
+    self._apply_button = QPushButton("Apply Corrections")
+    self._apply_button.setObjectName("primaryButton")
+    settings_layout.addWidget(self._apply_button)
+    
+    # Load settings from config
+    self._load_settings_from_config()
+    
+    # Connect setting changes to config
+    self._recursive_checkbox.toggled.connect(self._on_setting_changed)
+    self._correct_invalid_only_checkbox.toggled.connect(self._on_setting_changed)
+    self._auto_enable_checkbox.toggled.connect(self._on_setting_changed)
+    self._add_to_validation_checkbox.toggled.connect(self._on_setting_changed)
+    
+    return settings_group
+
+def _load_settings_from_config(self):
+    """Load settings from the configuration."""
+    config = ConfigManager.instance()
+    
+    # Set checkbox states from config with defaults
+    self._recursive_checkbox.setChecked(
+        config.get_value("correction", "recursive", True)
+    )
+    self._correct_invalid_only_checkbox.setChecked(
+        config.get_value("correction", "correct_invalid_only", True)
+    )
+    self._auto_enable_checkbox.setChecked(
+        config.get_value("correction", "auto_enable_rules", True)
+    )
+    self._add_to_validation_checkbox.setChecked(
+        config.get_value("correction", "add_to_validation", False)
+    )
+
+def _on_setting_changed(self):
+    """Save settings when they change."""
+    config = ConfigManager.instance()
+    
+    # Save settings to config
+    config.set_value(
+        "correction", "recursive", self._recursive_checkbox.isChecked()
+    )
+    config.set_value(
+        "correction", "correct_invalid_only", self._correct_invalid_only_checkbox.isChecked()
+    )
+    config.set_value(
+        "correction", "auto_enable_rules", self._auto_enable_checkbox.isChecked()
+    )
+    config.set_value(
+        "correction", "add_to_validation", self._add_to_validation_checkbox.isChecked()
+    )
 ```
 
 ##### Complete Rule Control Buttons
@@ -1011,15 +1274,23 @@ class AddEditRuleDialog(QDialog):
         # Implementation details...
 ```
 
-### Phase 5: Data View Integration (Days 10-11)
+### Phase 5: Data View Integration (In Progress 🔄)
 
-#### 5.1 Cell Highlighting
+#### 5.1 Cell Highlighting (Completed ✅)
+
+We've updated the cell highlighting to use consistent colors that match the color legend:
 
 ```python
-# ui/views/data_view.py (Extension)
+# ui/data_view.py
 
-def update_cell_highlighting(self):
-    """Update cell highlighting in DataView."""
+def _highlight_correction_cells(self):
+    """Highlight cells based on correction status."""
+    # Define colors
+    invalid_color = QColor(255, 182, 182)  # Light red
+    correctable_color = QColor(255, 214, 165)  # Light orange
+    corrected_color = QColor(182, 255, 182)  # Light green
+    purple_color = QColor(214, 182, 255)  # Light purple
+    
     # Get cells that need highlighting
     invalid_cells = self._get_invalid_cells()
     corrected_cells = self._get_corrected_cells()
@@ -1029,22 +1300,120 @@ def update_cell_highlighting(self):
     for row, col in invalid_cells:
         if (row, col) in correctable_cells:
             # Invalid with correction rule (orange)
-            self._highlight_cell(row, col, "orange")
+            self._highlight_cell(row, col, correctable_color)
         else:
             # Invalid without correction rule (red)
-            self._highlight_cell(row, col, "red")
+            self._highlight_cell(row, col, invalid_color)
             
     for row, col in corrected_cells:
         # Corrected cells (green)
-        self._highlight_cell(row, col, "green")
+        self._highlight_cell(row, col, corrected_color)
         
     for row, col in correctable_cells:
         if (row, col) not in invalid_cells and (row, col) not in corrected_cells:
             # Correctable but not invalid or corrected (purple)
-            self._highlight_cell(row, col, "purple")
+            self._highlight_cell(row, col, purple_color)
 ```
 
-#### 5.2 Context Menu Integration
+We've also added the update_cell_highlighting method to delegate to _highlight_correction_cells:
+
+```python
+def update_cell_highlighting(self):
+    """
+    Update cell highlighting based on validation and correction status.
+    
+    This method delegates to _highlight_correction_cells to apply the appropriate
+    highlighting to cells based on their validation and correction status.
+    """
+    self._highlight_correction_cells()
+```
+
+#### 5.2 Color Legend (Completed ✅)
+
+We've added a color legend to the DataView to explain the highlighting colors:
+
+```python
+# ui/data_view.py
+
+def _create_color_legend(self) -> QGroupBox:
+    """
+    Create a color legend explaining the cell highlighting colors.
+    
+    Returns:
+        QGroupBox: The color legend widget
+    """
+    legend = QGroupBox("Color Legend")
+    legend_layout = QVBoxLayout(legend)
+    
+    # Create the legend items
+    for color, text in [
+        ("#FFB6B6", "Invalid"),  # Light red
+        ("#FFD6A5", "Invalid (correctable)"),  # Light orange
+        ("#B6FFB6", "Corrected"),  # Light green
+        ("#D6B6FF", "Correctable")  # Light purple
+    ]:
+        item_layout = QHBoxLayout()
+        
+        # Create color box
+        color_box = QLabel()
+        color_box.setFixedSize(16, 16)
+        color_box.setStyleSheet(f"background-color: {color}; border: 1px solid #888;")
+        item_layout.addWidget(color_box)
+        
+        # Create text label
+        text_label = QLabel(text)
+        item_layout.addWidget(text_label)
+        item_layout.addStretch()
+        
+        legend_layout.addLayout(item_layout)
+    
+    legend_layout.addStretch()
+    return legend
+```
+
+Tests have been added to verify the color legend:
+
+```python
+# tests/unit/ui/views/test_data_view_highlighting.py
+
+def test_color_legend(data_view):
+    """Test that the data view has a color legend explaining the highlighting colors."""
+    # Check if the color legend exists
+    assert hasattr(data_view, "_color_legend"), "DataView should have a _color_legend attribute"
+
+    # Check the color legend is a QGroupBox
+    assert isinstance(data_view._color_legend, QGroupBox), "Color legend should be a QGroupBox"
+
+    # Check the color legend has the right title
+    assert data_view._color_legend.title() == "Color Legend", (
+        "Color legend should have title 'Color Legend'"
+    )
+
+    # Get all labels in the color legend
+    labels = data_view._color_legend.findChildren(QLabel)
+
+    # Check that there are enough labels (at least 8 - 4 color blocks and 4 text labels)
+    assert len(labels) >= 8, "Color legend should have at least 8 QLabel widgets"
+
+    # Check for text labels with the right descriptions
+    label_texts = [label.text() for label in labels if label.text()]
+    assert any("Invalid" in text for text in label_texts), "Should have a label for 'Invalid' cells"
+    assert any("Invalid (correctable)" in text for text in label_texts), (
+        "Should have a label for 'Invalid (correctable)' cells"
+    )
+    assert any("Corrected" in text for text in label_texts), (
+        "Should have a label for 'Corrected' cells"
+    )
+    assert any("Correctable" in text for text in label_texts), (
+        "Should have a label for 'Correctable' cells"
+    )
+
+    # Check for color blocks with different colors
+    color_blocks = [label for label in labels if not label.text() and label.styleSheet()]
+    assert len(color_blocks) >= 4, "Should have at least 4 color block QLabels"
+```
+
+#### 5.3 Context Menu Integration
 
 ```python
 # ui/views/data_view.py (Extension)
@@ -1098,7 +1467,7 @@ def _on_add_batch_correction(self):
     self.add_batch_correction_rules_requested.emit(selections)
 ```
 
-#### 5.3 Tooltips for Cell Status
+#### 5.4 Tooltips for Cell Status
 
 ```python
 # ui/views/data_view.py (Extension)
@@ -1126,7 +1495,7 @@ def _setup_tooltips(self):
             self.parent().setToolTip(tooltip)
 ```
 
-### Phase 6: Testing and Optimization (Days 12-13)
+### Phase 6: Testing and Optimization (Next)
 
 #### 6.1 Integration Tests
 

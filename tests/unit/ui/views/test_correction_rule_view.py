@@ -115,6 +115,16 @@ class TestCorrectionRuleView:
         assert correction_rule_view._apply_button is not None
         assert correction_rule_view._apply_button.text() == "Apply Corrections"
 
+        # Check that Import/Export buttons exist in the header
+        assert hasattr(correction_rule_view, "_import_button"), "Import button should exist"
+        assert hasattr(correction_rule_view, "_export_button"), "Export button should exist"
+
+        assert correction_rule_view._import_button is not None
+        assert correction_rule_view._export_button is not None
+
+        assert correction_rule_view._import_button.text() == "Import Rules"
+        assert correction_rule_view._export_button.text() == "Export Rules"
+
     def test_rule_table_population(self, correction_rule_view, mock_correction_controller):
         """Test that the rule table is populated correctly with rules."""
         # Reset the mock to clear previous calls
@@ -317,7 +327,7 @@ class TestCorrectionRuleView:
         assert correction_rule_view._correct_invalid_only_checkbox.isChecked() == False
 
     def test_update_status_bar(self, correction_rule_view, mock_correction_controller):
-        """Test that the status bar is updated correctly."""
+        """Test that the status bar is updated correctly with proper format."""
         # Mock the rule counts
         mock_correction_controller.get_rules.return_value = [
             CorrectionRule("test1", "corrected1", "general", "enabled", 0),
@@ -331,6 +341,27 @@ class TestCorrectionRuleView:
 
         # Check that the status bar exists
         assert correction_rule_view._status_bar is not None
+
+        # Check the content follows the expected format
+        status_text = correction_rule_view._status_bar.currentMessage()
+        assert "Total rules: 4" in status_text
+        assert "Enabled: 2" in status_text
+        assert "Disabled: 2" in status_text
+
+        # Test updating counts with different data
+        mock_correction_controller.get_rules.return_value = [
+            CorrectionRule("test1", "corrected1", "general", "enabled", 0),
+            CorrectionRule("test3", "corrected3", "chest_type", "disabled", 2),
+        ]
+
+        # Force update again
+        correction_rule_view._update_status_bar()
+
+        # Verify new counts
+        status_text = correction_rule_view._status_bar.currentMessage()
+        assert "Total rules: 2" in status_text
+        assert "Enabled: 1" in status_text
+        assert "Disabled: 1" in status_text
 
     def test_context_menu(self, qtbot, correction_rule_view, mock_correction_controller):
         """Test the rule table has expected structure for context menu."""

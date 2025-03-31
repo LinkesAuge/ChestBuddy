@@ -7,6 +7,7 @@ related to the correction feature.
 
 import pytest
 from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QLabel, QGroupBox
 from unittest.mock import MagicMock, patch
 
 from chestbuddy.ui.data_view import DataView
@@ -162,3 +163,65 @@ def test_on_correction_applied(data_view):
 
     # Verify that update_cell_highlighting was called
     data_view.update_cell_highlighting.assert_called_once()
+
+
+def test_color_legend(data_view):
+    """Test that the data view has a color legend explaining the highlighting colors."""
+    # Check if the color legend exists
+    assert hasattr(data_view, "_color_legend"), "DataView should have a _color_legend attribute"
+
+    # Check the color legend is a QGroupBox
+    assert isinstance(data_view._color_legend, QGroupBox), "Color legend should be a QGroupBox"
+
+    # Check the color legend has the right title
+    assert data_view._color_legend.title() == "Color Legend", (
+        "Color legend should have title 'Color Legend'"
+    )
+
+    # Get all labels in the color legend
+    labels = data_view._color_legend.findChildren(QLabel)
+
+    # Check that there are enough labels (at least 8 - 4 color blocks and 4 text labels)
+    assert len(labels) >= 8, "Color legend should have at least 8 QLabel widgets"
+
+    # Check for text labels with the right descriptions
+    label_texts = [label.text() for label in labels if label.text()]
+    assert any("Invalid" in text for text in label_texts), "Should have a label for 'Invalid' cells"
+    assert any("Invalid (correctable)" in text for text in label_texts), (
+        "Should have a label for 'Invalid (correctable)' cells"
+    )
+    assert any("Corrected" in text for text in label_texts), (
+        "Should have a label for 'Corrected' cells"
+    )
+    assert any("Correctable" in text for text in label_texts), (
+        "Should have a label for 'Correctable' cells"
+    )
+
+    # Check for color blocks with different colors
+    color_blocks = [label for label in labels if not label.text() and label.styleSheet()]
+    assert len(color_blocks) >= 4, "Should have at least 4 color block QLabels"
+
+    # Check for different colors
+    style_sheets = [block.styleSheet() for block in color_blocks]
+
+    # Check for red color (invalid)
+    assert any("background-color" in ss and "red" in ss.lower() for ss in style_sheets), (
+        "Should have a red color block"
+    )
+
+    # Check for orange color (invalid with correction)
+    assert any(
+        "background-color" in ss and ("orange" in ss.lower() or "255, 165, 0" in ss)
+        for ss in style_sheets
+    ), "Should have an orange color block"
+
+    # Check for green color (corrected)
+    assert any("background-color" in ss and "green" in ss.lower() for ss in style_sheets), (
+        "Should have a green color block"
+    )
+
+    # Check for purple color (correctable)
+    assert any(
+        "background-color" in ss and ("purple" in ss.lower() or "magenta" in ss.lower())
+        for ss in style_sheets
+    ), "Should have a purple color block"
