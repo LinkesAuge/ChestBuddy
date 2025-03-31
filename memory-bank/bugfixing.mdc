@@ -435,3 +435,99 @@ self._validation_tab.validation_changed.connect(self._validation_service.validat
    ```
 
 **Result**: CorrectionController now provides all the functionality needed for proper DataView integration, enabling seamless user interaction with the correction feature.
+
+# Bug Tracking and Fixes
+
+## UI Components
+
+### AddEditRuleDialog
+
+#### Issue: Failed at test_dialog_closes_on_cancel
+- **Error**: AssertionError: The close() method of the dialog was not called once. It was called 0 times.
+- **Root Cause**: The cancel button signal was not correctly connected to close the dialog.
+- **Fix**: Connected cancel button's clicked signal to dialog's close method.
+- **Status**: FIXED
+
+#### Issue: Failed at test_ok_button_enabled_when_inputs_valid
+- **Error**: AssertionError: ok_button.setEnabled(True) was not called as expected
+- **Root Cause**: The validation method was not correctly setting the OK button state.
+- **Fix**: Updated the _validate_inputs method to properly enable the OK button when all inputs are valid.
+- **Status**: FIXED
+
+### BatchCorrectionDialog
+
+#### Issue: Failed at test_apply_button_state
+- **Error**: AssertionError: apply_button.setEnabled(False) calls not found in expected function
+- **Root Cause**: The apply button state was managed in a different method than expected.
+- **Fix**: Changed test to verify the state of the button instead of checking if a particular method was called.
+- **Status**: FIXED
+
+#### Issue: Failed at test_checkbox_states
+- **Error**: AssertionError: checkbox states did not match expected values
+- **Root Cause**: Initialization of checkbox states was happening in a different order than expected.
+- **Fix**: Updated test to focus on final checkbox states rather than exact sequence of method calls.
+- **Status**: FIXED
+
+## Model Components
+
+### CorrectionRuleManager
+
+#### Issue: Deleting a rule causes two entries to be deleted
+- **Error**: When deleting a single rule, two rules are removed from the list
+- **Root Cause**: Index handling issues in the rule deletion method where rule indices were becoming stale after deletion operations
+- **Fix**: Implemented a more robust approach to rule deletion that ensures indices remain valid during iterative deletion operations
+- **Status**: FIXED
+
+#### Issue: Redundant 'order' field in CorrectionRule
+- **Problem**: The 'order' field in CorrectionRule was redundant as rules could be ordered by their position in the list
+- **Root Cause**: Initial design included an explicit order field which proved unnecessary
+- **Fix**: Removed the 'order' field from CorrectionRule and updated all related methods to use the implicit ordering from the list position
+- **Status**: FIXED
+
+#### Issue: Unused 'description' field in CorrectionRule
+- **Problem**: The 'description' field was unused throughout the application
+- **Root Cause**: Initial design included a description field that was not actually needed in practice
+- **Fix**: Removed the 'description' field from CorrectionRule and updated all related methods to exclude this field
+- **Status**: FIXED
+
+## Controller Components
+
+### CorrectionController
+
+#### Issue: Filtering rules by description doesn't work after removing the field
+- **Problem**: After removing the description field, methods that filtered by description needed updates
+- **Root Cause**: Code dependencies on the removed description field
+- **Fix**: Updated all methods to remove references to the description field, particularly in search and filter operations
+- **Status**: FIXED
+
+## Testing Approach
+
+### Changed from Behavior to State Verification
+
+#### Issue: Tests failing when implementation details change
+- **Problem**: Tests were tightly coupled to implementation details, breaking when methods changed
+- **Root Cause**: Over-reliance on behavior verification (checking which methods were called)
+- **Fix**: Shifted focus to state verification (checking the resulting state) which is more robust to implementation changes
+- **Status**: FIXED
+
+### Improved Timing in UI Tests
+
+#### Issue: Intermittent failures in UI tests with signals
+- **Problem**: Signal-based tests occasionally failed due to timing issues
+- **Root Cause**: Signals not completing before assertions were checked
+- **Fix**: Added proper waiting mechanisms for signals using QSignalSpy and explicit waiting
+- **Status**: FIXED
+
+## Ongoing Issues
+
+### Performance with large datasets
+- **Problem**: Cell highlighting becomes slow with large datasets
+- **Status**: IN PROGRESS
+
+### Import/Export dialog error handling
+- **Problem**: Error handling during import/export operations needs improvement
+- **Status**: PLANNED
+
+### Selection handling in batch correction dialog
+- **Problem**: Selection handling in batch correction dialog needs refinement
+- **Status**: PLANNED
