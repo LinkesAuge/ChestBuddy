@@ -893,3 +893,147 @@ class TestCorrectionService:
         mock_validation_service.update_correctable_status.assert_called_once_with(
             [(0, 0), (1, 1), (2, 2)]
         )
+
+    def test_recursive_correction(self, mocker):
+        """Test that corrections are applied recursively until no more changes occur."""
+        # Create test data with values that will require multiple passes to correct
+        # First pass: Value1 -> Value2
+        # Second pass: Value2 -> Value3
+        # Third pass: Value3 -> Value4
+        # No further changes
+        initial_data = pd.DataFrame(
+            {
+                "Column1": ["Value1", "Value2", "Value3", "OtherValue"],
+            }
+        )
+
+        # Create a real data model instead of a mock for easier debugging
+        mock_data_model = mocker.Mock()
+        mock_data_model.data = initial_data.copy()
+        mock_data_model.get_data.return_value = mock_data_model.data
+        mock_data_model.get_column_names.return_value = ["Column1"]
+
+        # Configure mock behavior for update_data
+        def update_data_side_effect(new_data):
+            mock_data_model.data = new_data.copy()
+            mock_data_model.get_data.return_value = mock_data_model.data
+            print(f"Data updated to:\n{mock_data_model.data}")
+
+        mock_data_model.update_data.side_effect = update_data_side_effect
+
+        # Set up validation service to mark all cells as valid (since we're not filtering by validation status)
+        mock_validation_service = mocker.Mock()
+        validation_status = pd.DataFrame(
+            {
+                "Column1_valid": [
+                    ValidationStatus.VALID,
+                    ValidationStatus.VALID,
+                    ValidationStatus.VALID,
+                    ValidationStatus.VALID,
+                ],
+            }
+        )
+        mock_validation_service.get_validation_status.return_value = validation_status
+
+        # Create rule manager with chained correction rules
+        rule_manager = CorrectionRuleManager()
+
+        # Order matters - first add the rule that should be applied last in the chain
+        rule_manager.add_rule(
+            CorrectionRule(
+                from_value="Value3", to_value="Value4", category="general", status="enabled"
+            )
+        )
+        rule_manager.add_rule(
+            CorrectionRule(
+                from_value="Value2", to_value="Value3", category="general", status="enabled"
+            )
+        )
+        rule_manager.add_rule(
+            CorrectionRule(
+                from_value="Value1", to_value="Value2", category="general", status="enabled"
+            )
+        )
+
+        # Create service with our mocks
+        service = CorrectionService(mock_data_model)
+        service._rule_manager = rule_manager
+        service._validation_service = mock_validation_service
+
+        # Debug: Print initial rules
+        print(f"Rules in manager: {[str(r) for r in rule_manager.get_rules()]}")
+        print(f"Prioritized rules: {[str(r) for r in rule_manager.get_prioritized_rules()]}")
+
+        # Apply corrections with recursion enabled
+        print("Applying corrections with recursion=True")
+        stats = service.apply_corrections(recursive=True)
+        print(f"Correction stats: {stats}")
+
+        # Verify all corrections were made
+        final_data = mock_data_model.data
+        print(f"Final data after recursive correction:\n{final_data}")
+
+        # Verify all transformations were applied (Value1 -> Value4)
+        assert final_data.at[0, "Column1"] == "Value4", (
+            f"Expected 'Value4', got '{final_data.at[0, 'Column1']}'"
+        )
+
+        # Verify the chained corrections (Value2 -> Value4)
+        assert final_data.at[1, "Column1"] == "Value4", (
+            f"Expected 'Value4', got '{final_data.at[1, 'Column1']}'"
+        )
+
+        # Verify the single correction (Value3 -> Value4)
+        assert final_data.at[2, "Column1"] == "Value4", (
+            f"Expected 'Value4', got '{final_data.at[2, 'Column1']}'"
+        )
+
+        # Verify the unchanged value
+        assert final_data.at[3, "Column1"] == "OtherValue", (
+            f"Expected 'OtherValue', got '{final_data.at[3, 'Column1']}'"
+        )
+
+        # Verify stats show the total number of corrections across all iterations
+        assert stats["total_corrections"] == 6, (
+            f"Expected 6 total corrections, got {stats['total_corrections']}"
+        )  # 3 in first pass + 2 in second pass + 1 in third pass
+        assert stats["iterations"] == 4, (
+            f"Expected 4 iterations, got {stats['iterations']}"
+        )  # 3 iterations with changes + 1 final check with no changes
+
+        # Verify that a max iterations limit is respected
+        service.MAX_ITERATIONS = 2  # Set a lower limit
+
+        # Reset the data
+        mock_data_model.data = initial_data.copy()
+        mock_data_model.get_data.return_value = mock_data_model.data
+        mock_data_model.update_data.reset_mock()
+
+        # Apply corrections with a lower iteration limit
+        print("\nApplying corrections with MAX_ITERATIONS=2")
+        stats = service.apply_corrections(recursive=True)
+        print(f"Correction stats with limited iterations: {stats}")
+
+        # Verify final state after limited iterations
+        final_data = mock_data_model.data
+        print(f"Final data with limited iterations:\n{final_data}")
+
+        # Verify only two levels of corrections were applied
+        assert final_data.at[0, "Column1"] == "Value3", (
+            f"Expected 'Value3', got '{final_data.at[0, 'Column1']}'"
+        )  # Value1 -> Value2 -> Value3
+        assert final_data.at[1, "Column1"] == "Value4", (
+            f"Expected 'Value4', got '{final_data.at[1, 'Column1']}'"
+        )  # Value2 -> Value3 -> Value4
+        assert final_data.at[2, "Column1"] == "Value4", (
+            f"Expected 'Value4', got '{final_data.at[2, 'Column1']}'"
+        )  # Value3 -> Value4
+        assert final_data.at[3, "Column1"] == "OtherValue", (
+            f"Expected 'OtherValue', got '{final_data.at[3, 'Column1']}'"
+        )  # Unchanged
+
+        # Verify stats only include first two iterations
+        assert stats["total_corrections"] == 5, (
+            f"Expected 5 total corrections, got {stats['total_corrections']}"
+        )  # 3 in first pass + 2 in second pass
+        assert stats["iterations"] == 2, f"Expected 2 iterations, got {stats['iterations']}"

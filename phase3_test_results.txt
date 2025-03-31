@@ -1,0 +1,19 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.9, pytest-8.3.5, pluggy-1.5.0 -- D:\Projekte\ChestBuddy\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+PySide6 6.6.0 -- Qt runtime 6.6.0 -- Qt compiled 6.6.0
+rootdir: D:\Projekte\ChestBuddy
+configfile: pytest.ini
+plugins: cov-6.0.0, mock-3.14.0, qt-4.4.0
+collecting ... collected 2 items
+
+tests/unit/core/services/test_correction_service_phase3.py::TestCorrectionServicePhase3::test_get_correctable_cells PASSED [ 50%]
+tests/unit/core/services/test_correction_service_phase3.py::TestCorrectionServicePhase3::test_check_correctable_status_method PASSED [100%]
+
+============================== warnings summary ===============================
+chestbuddy\utils\signal_manager.py:25
+  D:\Projekte\ChestBuddy\chestbuddy\utils\signal_manager.py:25: UserWarning: signal_tracer is a debugging utility and should not be used in production code.
+    from chestbuddy.utils.signal_tracer import signal_tracer
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================== 2 passed, 1 warning in 0.13s =========================
