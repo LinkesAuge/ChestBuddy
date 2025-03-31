@@ -9,6 +9,8 @@
   "tests/core/services/test_validation_service_config.py::test_validation_preferences_signal",
   "tests/e2e/test_example_e2e.py::TestWorkflows::test_complete_workflow",
   "tests/e2e/test_example_e2e.py::TestWorkflows::test_error_handling_workflow",
+  "tests/e2e/workflows/test_correction_feature_e2e.py::TestCorrectionFeatureWorkflow::test_complete_correction_workflow",
+  "tests/e2e/workflows/test_correction_feature_e2e.py::TestCorrectionFeatureWorkflow::test_correction_error_handling",
   "tests/integration/test_config_import_export.py::test_config_validation_integration",
   "tests/integration/test_config_import_export.py::test_default_list_integration",
   "tests/integration/test_config_import_export.py::test_export_import_workflow",

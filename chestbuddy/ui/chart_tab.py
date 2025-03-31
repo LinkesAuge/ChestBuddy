@@ -5,10 +5,14 @@ Description: Provides the Chart Tab UI component for visualizing data with vario
 Usage:
     chart_tab = ChartTab(data_model, chart_service)
     main_window.add_tab(chart_tab, "Charts")
+
+DEPRECATED: This module is deprecated and will be removed in a future version.
+Use chestbuddy.ui.views.chart_view_adapter.ChartViewAdapter instead.
 """
 
 from pathlib import Path
 from typing import Optional, List, Dict, Any
+import warnings
 
 from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtWidgets import (
@@ -31,6 +35,14 @@ from PySide6.QtGui import QPainter
 from chestbuddy.core.models.chest_data_model import ChestDataModel
 from chestbuddy.core.services.chart_service import ChartService
 
+# Issue deprecation warning
+warnings.warn(
+    "ChartTab is deprecated and will be removed in a future version. "
+    "Use ChartViewAdapter from chestbuddy.ui.views.chart_view_adapter instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
 
 class ChartTab(QWidget):
     """
@@ -44,6 +56,8 @@ class ChartTab(QWidget):
         - Uses QtCharts for chart visualization
         - Supports bar, pie, and line charts
         - Allows exporting charts to image files
+
+    DEPRECATED: This class is deprecated. Use ChartViewAdapter instead.
     """
 
     def __init__(self, data_model: ChestDataModel, chart_service: ChartService):
@@ -54,6 +68,11 @@ class ChartTab(QWidget):
             data_model (ChestDataModel): The data model containing chest data
             chart_service (ChartService): Service for generating charts
         """
+        warnings.warn(
+            "ChartTab is deprecated. Use ChartViewAdapter instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         super().__init__()
         self.data_model = data_model
         self.chart_service = chart_service

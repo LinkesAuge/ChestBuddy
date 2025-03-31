@@ -2,11 +2,15 @@
 ValidationTab module.
 
 This module provides the ValidationTab class for displaying validation results.
+
+DEPRECATED: This module is deprecated and will be removed in a future version.
+Use chestbuddy.ui.views.validation_tab_view.ValidationTabView instead.
 """
 
 import logging
 from typing import Dict, List, Optional, Set
 import time
+import warnings
 
 from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtWidgets import (
@@ -36,6 +40,14 @@ from chestbuddy.core.services import ValidationService
 # Set up logger
 logger = logging.getLogger(__name__)
 
+# Issue deprecation warning
+warnings.warn(
+    "ValidationTab is deprecated and will be removed in a future version. "
+    "Use ValidationTabView from chestbuddy.ui.views.validation_tab_view instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
 
 class ValidationTab(QWidget):
     """
@@ -49,6 +61,8 @@ class ValidationTab(QWidget):
         - Allows filtering by validation rule
         - Provides action buttons for validating data
         - Integrates with the ValidationService
+
+    DEPRECATED: This class is deprecated. Use ValidationTabView instead.
     """
 
     # Add class variable to track last update time
@@ -69,6 +83,11 @@ class ValidationTab(QWidget):
             validation_service: The validation service to use.
             parent: The parent widget.
         """
+        warnings.warn(
+            "ValidationTab is deprecated. Use ValidationTabView instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         super().__init__(parent)
 
         # Initialize class variables

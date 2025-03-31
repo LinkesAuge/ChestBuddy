@@ -3,12 +3,16 @@ Signal tracing utility for debugging and visualizing Qt signal flow.
 
 This module provides tools to trace Qt signal emissions, record signal paths,
 measure timing, and visualize signal flow paths.
+
+NOTE: This is a debugging utility and should not be used in production code.
+      It is intended for development and testing purposes only.
 """
 
 import inspect
 import logging
 import time
 import uuid
+import warnings
 from collections import defaultdict
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union, cast
 from datetime import datetime
@@ -18,6 +22,13 @@ from PySide6.QtCore import QObject, Signal
 
 # Set up logger
 logger = logging.getLogger(__name__)
+
+# Issue debug utility warning
+warnings.warn(
+    "signal_tracer is a debugging utility and should not be used in production code.",
+    UserWarning,
+    stacklevel=2,
+)
 
 # Store the original emit function to restore it later
 _original_signal_emit = None

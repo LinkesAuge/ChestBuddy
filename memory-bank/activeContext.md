@@ -1,9 +1,23 @@
 ---
 title: Active Context - ChestBuddy Application
-date: 2024-05-13
+date: 2024-05-15
 ---
 
 # Active Development Context
+
+## Recent Codebase Cleanup
+
+We have performed a cleanup of redundant code in the ChestBuddy application:
+
+1. **Removed redundant service_locator.py** from the core directory, as it duplicated functionality in utils/service_locator.py
+2. **Added deprecation warnings** to legacy UI components that are being phased out:
+   - validation_tab.py
+   - correction_tab.py
+   - chart_tab.py
+3. **Marked signal_tracer.py** as a debug-only utility
+4. **Created documentation** for future cleanup tasks in memory-bank/codebase_cleanup.md
+
+These changes are part of our ongoing effort to modernize the codebase by moving from the tab-based UI to a view-based architecture. The next phase will involve refactoring adapter views to remove dependencies on legacy components, followed by updating tests to use the new components directly.
 
 ## Current Focus: Complete CorrectionView UI Implementation
 

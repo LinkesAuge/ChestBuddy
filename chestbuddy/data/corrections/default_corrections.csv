@@ -1,28 +1,28 @@
-To,From,Category,Status,Order,Description
-Маһоп12,D4rkBlizZ4rD,player,enabled,1,
-АЙ,D4rkBlizZ4rD,player,enabled,2,
-"Fenrir""s Chest",Fenrir's Chest,chest,enabled,3,
-"Hermes"" Store",Hermes' Store,source,enabled,4,
-"VVarrior""s Chest""",Warrior's Chest,chest,enabled,5,
-Clan vvealth,Clan wealth,source,enabled,6,
-OsmanliTorunu,OsmanlıTorunu,player,enabled,7,
-Epic Ancient sguad,Epic Ancient squad,source,enabled,8,
-Snovvvveaver,Snowweaver,player,enabled,9,
-Krimelmonster,Krümelmonster,player,enabled,10,
-GUARDIENOfTHUNDER,GUARDIENofTHUNDER,player,enabled,11,
-Rare Chest of VVealth,Rare Chest of Wealth,chest,enabled,12,
-Epic Chest of Vvealth,Epic Chest of Wealth,chest,enabled,13,
-Sir Nightvvoolf,Sir Nightwoolf,player,enabled,14,
-Hammerschlagi,Hammerschlag1,player,enabled,15,
-Feldjager,Feldjäger,player,enabled,16,
-Feldj䧥r,Feldjäger,player,enabled,17,
-Lord Ore,Lord Öre,player,enabled,18,
-Lord ֲe,Lord Öre,player,enabled,19,
-revvard,reward,general,enabled,20,
-sguad,squad,general,enabled,21,
-Vvealth,Wealth,general,enabled,22,
-VVealth,Wealth,general,enabled,23,
-Juslius C䳡r,Julius Cäsar,player,enabled,24,
-Juslius Cäsar,Julius Cäsar,player,enabled,25,
-Julius Casar,Julius Cäsar,player,enabled,26,
-"Ancients""",Ancients',general,enabled,27,
+From,To,Category,Status
+Маһоп12,D4rkBlizZ4rD,player,enabled
+АЙ,D4rkBlizZ4rD,player,enabled
+"Fenrir""s Chest",Fenrir's Chest,chest,enabled
+"Hermes"" Store",Hermes' Store,source,enabled
+"VVarrior""s Chest""",Warrior's Chest,chest,enabled
+Clan vvealth,Clan wealth,source,enabled
+OsmanliTorunu,OsmanlıTorunu,player,enabled
+Epic Ancient sguad,Epic Ancient squad,source,enabled
+Snovvvveaver,Snowweaver,player,enabled
+Krimelmonster,Krümelmonster,player,enabled
+GUARDIENOfTHUNDER,GUARDIENofTHUNDER,player,enabled
+Rare Chest of VVealth,Rare Chest of Wealth,chest,enabled
+Epic Chest of Vvealth,Epic Chest of Wealth,chest,enabled
+Sir Nightvvoolf,Sir Nightwoolf,player,enabled
+Hammerschlagi,Hammerschlag1,player,enabled
+Feldjager,Feldjäger,player,enabled
+Feldj䧥r,Feldjäger,player,enabled
+Lord Ore,Lord Öre,player,enabled
+Lord ֲe,Lord Öre,player,enabled
+revvard,reward,general,enabled
+sguad,squad,general,enabled
+Vvealth,Wealth,general,enabled
+VVealth,Wealth,general,enabled
+Juslius C䳡r,Julius Cäsar,player,enabled
+Juslius Cäsar,Julius Cäsar,player,enabled
+Julius Casar,Julius Cäsar,player,enabled
+"Ancients""",Ancients',general,enabled

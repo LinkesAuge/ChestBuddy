@@ -2,11 +2,15 @@
 CorrectionTab module.
 
 This module provides the CorrectionTab class for applying corrections to data.
+
+DEPRECATED: This module is deprecated and will be removed in a future version.
+Use chestbuddy.ui.views.correction_view.CorrectionView instead.
 """
 
 import logging
 from typing import Dict, List, Optional, Set, Any
 import time
+import warnings
 
 import pandas as pd
 from PySide6.QtCore import Qt, Signal, Slot
@@ -44,6 +48,14 @@ from chestbuddy.core.services import CorrectionService
 # Set up logger
 logger = logging.getLogger(__name__)
 
+# Issue deprecation warning
+warnings.warn(
+    "CorrectionTab is deprecated and will be removed in a future version. "
+    "Use CorrectionView from chestbuddy.ui.views.correction_view instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
 
 class CorrectionTab(QWidget):
     """
@@ -57,6 +69,8 @@ class CorrectionTab(QWidget):
         - Allows selection of columns and rows to correct
         - Provides parameters for correction strategies
         - Tracks correction history
+
+    DEPRECATED: This class is deprecated. Use CorrectionView instead.
     """
 
     # Add class variable to track last update time
@@ -77,6 +91,11 @@ class CorrectionTab(QWidget):
             correction_service: The correction service to use.
             parent: The parent widget.
         """
+        warnings.warn(
+            "CorrectionTab is deprecated. Use CorrectionView instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         super().__init__(parent)
 
         # Initialize class variables
