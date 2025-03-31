@@ -580,3 +580,25 @@ self._validation_tab.validation_changed.connect(self._validation_service.validat
    - **Implementation**: Made the import conditional and caught the warning
 
 **Result**: Application starts and shuts down cleanly without errors or warnings.
+
+## 2025-03-31: Fixed error when applying corrections
+
+**Bug**: When trying to apply corrections, an error was occurring: `CorrectionService.apply_corrections() got an unexpected keyword argument 'recursive'`
+
+**Root Cause**: In the `correction_controller.py` file, the `_apply_corrections_task` method was passing parameters to the `correction_service.apply_corrections()` method that it didn't accept. Specifically, it was passing `recursive` and `selected_only` parameters, but the service method only accepts `only_invalid`.
+
+**Fix**: Modified the `_apply_corrections_task` method in `correction_controller.py` to only pass the `only_invalid` parameter to the service's `apply_corrections` method:
+
+```python
+# Before
+correction_stats = self._correction_service.apply_corrections(
+    only_invalid=only_invalid, recursive=recursive, selected_only=selected_only
+)
+
+# After
+correction_stats = self._correction_service.apply_corrections(
+    only_invalid=only_invalid
+)
+```
+
+**Status**: Fixed. Corrected the mismatch between the controller and service method parameters.

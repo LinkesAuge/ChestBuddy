@@ -143,9 +143,7 @@ class CorrectionController(BaseController):
             progress_callback(0, 100)
 
         # Apply corrections
-        correction_stats = self._correction_service.apply_corrections(
-            only_invalid=only_invalid, recursive=recursive, selected_only=selected_only
-        )
+        correction_stats = self._correction_service.apply_corrections(only_invalid=only_invalid)
 
         # Report final progress
         if progress_callback:
