@@ -1317,3 +1317,29 @@ class SettingsTabView(QWidget):
         """
         logger.debug(f"Settings tab changed to index {index}")
         # Any additional logic for tab changes can be added here
+
+    def _browse_validation_lists_dir(self) -> None:
+        """Open a file dialog to select a directory for validation lists."""
+        # Get current validation lists directory
+        current_dir = self._config_manager.get("Validation", "validation_lists_dir", "")
+
+        # Open directory selection dialog
+        dir_path = QFileDialog.getExistingDirectory(
+            self,
+            "Select Validation Lists Directory",
+            current_dir,
+            QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks,
+        )
+
+        if dir_path:
+            # Update config
+            self._config_manager.set("Validation", "validation_lists_dir", dir_path)
+            self._config_manager.save()
+
+            # Update UI
+            dir_input = self._settings_widgets.get("Validation", {}).get("validation_lists_dir")
+            if dir_input:
+                dir_input.setText(dir_path)
+
+            # Log the change
+            logger.info(f"Validation lists directory updated to: {dir_path}")

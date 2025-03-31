@@ -22,6 +22,8 @@ class Colors:
     PRIMARY_HOVER = "#263D5A"  # Hover state for primary
     PRIMARY_ACTIVE = "#0F1A2A"  # Active/pressed state for primary
     SECONDARY = "#D4AF37"  # Gold
+    SECONDARY_LIGHT = "#E9C86A"  # Lighter gold
+    SECONDARY_DARK = "#B18F2D"  # Darker gold
     ACCENT = "#4A90E2"  # Light blue
 
     # State colors

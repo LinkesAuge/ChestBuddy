@@ -106,9 +106,10 @@ class ChestBuddyApp(QObject):
 
                 # Initialize CorrectionRuleManager and CorrectionService with all required parameters
                 self._correction_rule_manager = CorrectionRuleManager(self._config_manager)
-                self._correction_service = CorrectionService(
-                    self._correction_rule_manager, self._data_model, self._validation_service
-                )
+                self._correction_service = CorrectionService(self._data_model, self._config_manager)
+
+                # Set validation service in correction service
+                self._correction_service._validation_service = self._validation_service
 
                 # Load correction rules
                 try:
@@ -335,6 +336,15 @@ class ChestBuddyApp(QObject):
                 "validation_completed",
                 self._correction_controller,
                 "auto_correct_after_validation",
+            )
+
+            # Connect data_loaded signal to auto_correct_on_import
+            # This ensures auto-correction happens after import if enabled
+            self._signal_manager.connect(
+                self._data_manager,
+                "data_loaded",
+                self._correction_controller,
+                "auto_correct_on_import",
             )
 
             # The view state controller will handle signaling when views should be shown

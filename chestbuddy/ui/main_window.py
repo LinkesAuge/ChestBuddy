@@ -57,7 +57,7 @@ from chestbuddy.ui.widgets import ProgressDialog, ProgressBar
 from chestbuddy.ui.data_view import DataView
 import pandas as pd
 from chestbuddy.utils.service_locator import ServiceLocator
-from chestbuddy.core.services import ConfigManager, ImportService, ExportService, BackupService
+from chestbuddy.utils.config import ConfigManager
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -1453,11 +1453,6 @@ class MainWindow(QMainWindow):
 
         # Create services with the data model
         self._validation_service = ValidationService(self._data_model, self._config_manager)
-        self._import_service = ImportService(self._data_model, self._validation_service)
-        self._export_service = ExportService(self._data_model)
-        self._backup_service = BackupService(
-            self._data_model, self._config_manager.get_app_directory()
-        )
         self._correction_service = CorrectionService(self._data_model, self._config_manager)
 
         # Set up service cross-references

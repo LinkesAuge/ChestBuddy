@@ -878,13 +878,16 @@ class CorrectionController(BaseController):
             logger.error(f"Error calculating data hash: {e}")
             return None
 
-    def auto_correct_after_validation(self):
+    def auto_correct_after_validation(self, results=None):
         """
         Apply auto-correction after validation if enabled.
 
         This method checks the configuration to see if auto-correction
         after validation is enabled, and if so, applies corrections
         to invalid cells.
+
+        Args:
+            results: Optional validation results (ignored, but needed for signal compatibility)
 
         Returns:
             bool: True if auto-correction was applied, False otherwise
@@ -903,12 +906,15 @@ class CorrectionController(BaseController):
         self.apply_corrections(only_invalid=True, recursive=True)
         return True
 
-    def auto_correct_on_import(self):
+    def auto_correct_on_import(self, data=None):
         """
         Apply auto-correction on import if enabled.
 
         This method checks the configuration to see if auto-correction
         on import is enabled, and if so, applies corrections to all cells.
+
+        Args:
+            data: Optional data parameter (ignored, but may be needed for signal compatibility)
 
         Returns:
             bool: True if auto-correction was applied, False otherwise
