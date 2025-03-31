@@ -159,7 +159,9 @@ class CorrectionView(UpdatableView):
             # Connect the rule view to the correction controller
             if self._rule_view:
                 self._rule_view.apply_corrections_requested.connect(
-                    self._correction_controller.apply_corrections
+                    lambda recursive, only_invalid: self._correction_controller.apply_corrections(
+                        only_invalid=only_invalid, recursive=recursive, selected_only=False
+                    )
                 )
                 self._rule_view.rule_added.connect(self._correction_controller.add_rule)
                 self._rule_view.rule_edited.connect(self._correction_controller.update_rule)
@@ -384,7 +386,9 @@ class CorrectionView(UpdatableView):
 
             # Connect the rule view to the correction controller
             self._rule_view.apply_corrections_requested.connect(
-                self._correction_controller.apply_corrections
+                lambda recursive, only_invalid: self._correction_controller.apply_corrections(
+                    only_invalid=only_invalid, recursive=recursive, selected_only=False
+                )
             )
             self._rule_view.rule_added.connect(self._correction_controller.add_rule)
             self._rule_view.rule_edited.connect(self._correction_controller.update_rule)

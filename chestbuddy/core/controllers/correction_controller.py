@@ -612,6 +612,98 @@ class CorrectionController(BaseController):
             self.correction_error.emit(f"Error getting applicable rules: {str(e)}")
             return []
 
+    def reorder_rule(self, index, direction):
+        """
+        Reorder a rule by moving it up or down.
+
+        Args:
+            index (int): Index of rule to move
+            direction (int): -1 to move up, 1 to move down
+
+        Returns:
+            bool: Success status
+        """
+        try:
+            # Calculate the target index
+            rules = self._rule_manager.get_rules()
+            if not (0 <= index < len(rules)):
+                logger.error(f"Invalid rule index for reordering: {index}")
+                return False
+
+            target_index = index + direction
+            if not (0 <= target_index < len(rules)):
+                logger.error(f"Cannot move rule to index {target_index}")
+                return False
+
+            # Move rule
+            self._rule_manager.move_rule(index, target_index)
+            logger.info(f"Reordered rule from index {index} to {target_index}")
+            return True
+        except Exception as e:
+            logger.error(f"Error reordering rule: {e}")
+            self.correction_error.emit(f"Error reordering rule: {str(e)}")
+            return False
+
+    def toggle_rule_status(self, index):
+        """
+        Toggle a rule's enabled/disabled status.
+
+        Args:
+            index (int): Index of rule to toggle
+
+        Returns:
+            bool: Success status
+        """
+        try:
+            # Toggle rule status
+            self._rule_manager.toggle_rule_status(index)
+            logger.info(f"Toggled status of rule at index {index}")
+            return True
+        except Exception as e:
+            logger.error(f"Error toggling rule status: {e}")
+            self.correction_error.emit(f"Error toggling rule status: {str(e)}")
+            return False
+
+    def move_rule_to_top(self, index):
+        """
+        Move a rule to the top of its category.
+
+        Args:
+            index (int): Index of rule to move
+
+        Returns:
+            bool: Success status
+        """
+        try:
+            # Move rule to top
+            self._rule_manager.move_rule_to_top(index)
+            logger.info(f"Moved rule at index {index} to top")
+            return True
+        except Exception as e:
+            logger.error(f"Error moving rule to top: {e}")
+            self.correction_error.emit(f"Error moving rule to top: {str(e)}")
+            return False
+
+    def move_rule_to_bottom(self, index):
+        """
+        Move a rule to the bottom of its category.
+
+        Args:
+            index (int): Index of rule to move
+
+        Returns:
+            bool: Success status
+        """
+        try:
+            # Move rule to bottom
+            self._rule_manager.move_rule_to_bottom(index)
+            logger.info(f"Moved rule at index {index} to bottom")
+            return True
+        except Exception as e:
+            logger.error(f"Error moving rule to bottom: {e}")
+            self.correction_error.emit(f"Error moving rule to bottom: {str(e)}")
+            return False
+
     def apply_rules_to_selection(self, selection, recursive=True, only_invalid=True):
         """
         Apply correction rules to a selection of cells.

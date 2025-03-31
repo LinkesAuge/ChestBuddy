@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QStatusBar,
     QApplication,
+    QMenu,
 )
 
 from chestbuddy.core.controllers.correction_controller import CorrectionController
@@ -309,6 +310,10 @@ class CorrectionRuleView(QWidget):
         self._rule_table.doubleClicked.connect(self._on_rule_double_clicked)
         self._rule_table.itemSelectionChanged.connect(self._update_button_states)
 
+        # Context menu
+        self._rule_table.setContextMenuPolicy(Qt.CustomContextMenu)
+        self._rule_table.customContextMenuRequested.connect(self._show_context_menu)
+
         # Apply corrections signal
         self._apply_button.clicked.connect(self._on_apply_corrections)
 
@@ -337,11 +342,23 @@ class CorrectionRuleView(QWidget):
             self._rule_table.setItem(row, 3, QTableWidgetItem(rule.category))
             self._rule_table.setItem(row, 4, QTableWidgetItem(rule.status))
 
-            # Set row data for identifying the rule
+            # Get the rule's index in the full list
+            all_rules = self._controller.get_rules()
+            full_index = None
+            for j, full_rule in enumerate(all_rules):
+                if (
+                    rule.from_value == full_rule.from_value
+                    and rule.to_value == full_rule.to_value
+                    and rule.category == full_rule.category
+                ):
+                    full_index = j
+                    break
+
+            # Set row data for identifying the rule (store full list index)
             for col in range(5):
                 item = self._rule_table.item(row, col)
                 if item:
-                    item.setData(Qt.UserRole, i)
+                    item.setData(Qt.UserRole, full_index)
 
         # Update button states after refreshing
         self._update_button_states()
@@ -413,6 +430,7 @@ class CorrectionRuleView(QWidget):
             return None
 
         # Get the first selected item and extract the rule ID from user data
+        # This is now the index in the full list, not just the filtered list
         return selected_rows[0].data(Qt.UserRole)
 
     def _on_filter_changed(self):
@@ -649,3 +667,64 @@ class CorrectionRuleView(QWidget):
                     self._logger.info(f"Rules imported successfully from {file_path}")
                     self._refresh_rule_table()
                     self._update_categories_filter()
+
+    def _show_context_menu(self, position):
+        """Show context menu for rule table."""
+        # Get selected item
+        if not self._rule_table.selectedItems():
+            return
+
+        # Create menu
+        menu = QMenu()
+
+        # Add actions
+        edit_action = menu.addAction("Edit")
+        delete_action = menu.addAction("Delete")
+        menu.addSeparator()
+
+        move_menu = menu.addMenu("Move")
+        move_up_action = move_menu.addAction("Move Up")
+        move_down_action = move_menu.addAction("Move Down")
+        move_top_action = move_menu.addAction("Move to Top")
+        move_bottom_action = move_menu.addAction("Move to Bottom")
+
+        menu.addSeparator()
+        toggle_action = menu.addAction("Enable/Disable")
+        apply_single_action = menu.addAction("Apply This Rule Only")
+
+        # Show menu and handle action
+        action = menu.exec_(self._rule_table.viewport().mapToGlobal(position))
+
+        # Connect actions to handlers
+        if action == edit_action:
+            self._on_edit_rule()
+        elif action == delete_action:
+            self._on_delete_rule()
+        elif action == move_up_action:
+            self._on_move_rule_up()
+        elif action == move_down_action:
+            self._on_move_rule_down()
+        elif action == move_top_action:
+            self._on_move_rule_to_top()
+        elif action == move_bottom_action:
+            self._on_move_rule_to_bottom()
+        elif action == toggle_action:
+            self._on_toggle_status()
+        elif action == apply_single_action:
+            self._on_apply_single_rule()
+
+    def _on_apply_single_rule(self):
+        """Apply a single selected rule."""
+        rule_id = self._get_selected_rule_id()
+        if rule_id is None:
+            return
+
+        rule = self._controller.get_rule(rule_id)
+        if not rule:
+            QMessageBox.warning(self, "Error", "Rule not found.")
+            return
+
+        # Apply this rule only
+        only_invalid = self._correct_invalid_only_checkbox.isChecked()
+        self._controller.apply_single_rule(rule, only_invalid=only_invalid)
+        self._logger.info(f"Applied single rule: {rule.from_value} -> {rule.to_value}")
