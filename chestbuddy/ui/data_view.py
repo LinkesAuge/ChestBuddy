@@ -51,7 +51,7 @@ from chestbuddy.core.models import ChestDataModel
 from chestbuddy.ui.widgets.action_toolbar import ActionToolbar
 from chestbuddy.ui.widgets.action_button import ActionButton
 from chestbuddy.ui.widgets.validation_delegate import ValidationStatusDelegate
-from chestbuddy.core.validation_enums import ValidationStatus
+from chestbuddy.core.enums.validation_enums import ValidationStatus
 from chestbuddy.ui.dialogs.add_edit_rule_dialog import AddEditRuleDialog
 from chestbuddy.ui.dialogs.batch_correction_dialog import BatchCorrectionDialog
 
@@ -1779,7 +1779,7 @@ class DataView(QWidget):
 
             # Prepare status updates for batch processing
             status_updates = []
-            cell_status_updates = []  # Track specific cell changes
+            cell_status_updates = []
 
             # Iterate through the validation status DataFrame (data model indices)
             for row_idx, row_data in validation_status.iterrows():
@@ -1800,11 +1800,26 @@ class DataView(QWidget):
                     )
                     # logger.debug(f"Row {row_idx}: STATUS column missing, inferred validity: {is_row_overall_valid}")
 
-                status_text = "Valid" if is_row_overall_valid else "Invalid"
-                # Handle non-boolean cases if they occur
-                if not isinstance(is_row_overall_valid, bool):
-                    status_text = str(row_data.get(self.STATUS_COLUMN, "Unknown"))
-                    is_row_overall_valid = False  # Treat non-bool as invalid for row context
+                # Check for correctable status
+                has_correctable = False
+                for col in validatable_columns:
+                    status_key = f"{col}_status"
+                    if (
+                        status_key in row_data
+                        and row_data[status_key] == ValidationStatus.CORRECTABLE
+                    ):
+                        has_correctable = True
+                        break
+
+                # Determine status text based on validation state
+                if has_correctable:
+                    status_text = "Correctable"
+                else:
+                    status_text = "Valid" if is_row_overall_valid else "Invalid"
+                    # Handle non-boolean cases if they occur
+                    if not isinstance(is_row_overall_valid, bool):
+                        status_text = str(row_data.get(self.STATUS_COLUMN, "Unknown"))
+                        is_row_overall_valid = False  # Treat non-bool as invalid for row context
 
                 # Add status column text update to batch
                 if status_col != -1:
@@ -1828,11 +1843,16 @@ class DataView(QWidget):
                     is_cell_specifically_valid = row_data.get(validation_col_name, True)
                     is_cell_invalid = not is_cell_specifically_valid
 
+                    # Get the specific validation status for this cell
+                    status_col_name = f"{column_name}_status"
+                    cell_status = row_data.get(status_col_name, ValidationStatus.VALID)
+
                     # Store simple boolean status: True if invalid, False otherwise
                     target_status = is_cell_invalid
 
                     # Get current status
                     current_status = item.data(Qt.UserRole + 1)
+                    current_val_status = item.data(Qt.UserRole + 2)
 
                     # Apply the target status only if it's different from the current one
                     if current_status != target_status:
@@ -1841,6 +1861,14 @@ class DataView(QWidget):
                             (filtered_idx, col_idx, column_name, target_status)
                         )
                         # logger.debug(f"Set cell ({filtered_idx}, {col_idx}) [{column_name}] status to: {target_status}")
+
+                    # Also store the detailed validation status enum value
+                    if current_val_status != cell_status:
+                        item.setData(cell_status, Qt.UserRole + 2)
+                        if cell_status == ValidationStatus.CORRECTABLE:
+                            logger.debug(
+                                f"Set cell ({filtered_idx}, {col_idx}) validation status to CORRECTABLE"
+                            )
 
             logger.debug(f"Processed {len(validation_status)} rows for highlighting.")
             logger.debug(f"Updating {len(status_updates)} STATUS column texts.")
@@ -1862,6 +1890,7 @@ class DataView(QWidget):
                 item.setData(None, Qt.BackgroundRole)
                 # Also clear our custom validation role for the status cell itself
                 item.setData(None, Qt.UserRole + 1)
+                item.setData(None, Qt.UserRole + 2)  # Clear validation status for status cell
 
         finally:
             # Unblock signals after batch updates

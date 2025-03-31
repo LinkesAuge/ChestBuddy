@@ -41,6 +41,8 @@ class ValidationStatusDelegate(QStyledItemDelegate):
     INVALID_BORDER_COLOR = QColor(0, 0, 0, 255)  # Black border
     INVALID_ROW_COLOR = QColor(255, 220, 220, 120)  # Light pink for invalid rows
     NOT_VALIDATED_COLOR = QColor(200, 200, 200, 40)  # Light gray for not validated
+    CORRECTABLE_COLOR = QColor(255, 140, 0, 120)  # Distinct orange for correctable entries
+    CORRECTABLE_BORDER_COLOR = QColor(180, 95, 6, 255)  # Darker orange border
 
     # Column name constants
     STATUS_COLUMN = "STATUS"
@@ -83,6 +85,12 @@ class ValidationStatusDelegate(QStyledItemDelegate):
         if not isinstance(is_cell_invalid, bool):
             # self.logger.debug(f"Cell [{index.row()},{index.column()}] UserRole+1 data is not bool: {is_cell_invalid}")
             is_cell_invalid = False  # Default to not invalid if data is missing or not boolean
+
+        # Get the validation status from model data if available
+        validation_status = index.data(Qt.ItemDataRole.UserRole + 2)
+        is_correctable = False
+        if hasattr(ValidationStatus, "CORRECTABLE"):
+            is_correctable = validation_status == ValidationStatus.CORRECTABLE
 
         # Get model and column name
         model = index.model()
@@ -131,8 +139,16 @@ class ValidationStatusDelegate(QStyledItemDelegate):
         border_color = None
         border_width = 1
 
-        if is_cell_invalid and is_validatable_column:
-            # Highest priority: Specifically invalid cell in a validatable column
+        if is_correctable and is_validatable_column:
+            # Highest priority after invalid: Correctable cell
+            background_color = self.CORRECTABLE_COLOR
+            border_color = self.CORRECTABLE_BORDER_COLOR
+            border_width = 2
+            self.logger.debug(
+                f"Painting correctable cell [{index.row()},{index.column()}], col={column_name}, value={repr(index.data())}"
+            )
+        elif is_cell_invalid and is_validatable_column:
+            # High priority: Specifically invalid cell in a validatable column
             background_color = self.INVALID_COLOR
             border_color = self.INVALID_BORDER_COLOR
             border_width = 2
@@ -152,6 +168,10 @@ class ValidationStatusDelegate(QStyledItemDelegate):
             # Cell is in a row that hasn't been validated
             background_color = self.NOT_VALIDATED_COLOR
             # self.logger.debug(f"Painting cell [{index.row()},{index.column()}] as NOT_VALIDATED")
+        elif row_status_text == "Correctable":
+            # Cell is in a row that's correctable
+            background_color = self.CORRECTABLE_COLOR
+            # self.logger.debug(f"Painting cell [{index.row()},{index.column()}] as CORRECTABLE")
         # else: Status is Unknown or cell is in STATUS column - use default background (None)
 
         # Apply background if determined
