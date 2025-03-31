@@ -340,6 +340,10 @@ class CorrectionController(BaseController):
         try:
             # Get the rule for logging
             rule = self._rule_manager.get_rule(index)
+            if rule is None:
+                logger.error(f"Rule at index {index} not found for deletion")
+                self.correction_error.emit(f"Error deleting rule: Rule at index {index} not found")
+                return False
 
             # Delete rule from manager
             self._rule_manager.delete_rule(index)

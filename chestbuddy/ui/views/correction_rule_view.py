@@ -325,13 +325,25 @@ class CorrectionRuleView(QWidget):
         search = self._current_filter["search"]
 
         # Get the rules from the controller with filter parameters
-        rules = self._controller.get_rules(category=category, status=status, search_term=search)
+        filtered_rules = self._controller.get_rules(
+            category=category, status=status, search_term=search
+        )
+
+        # Get all rules for index mapping
+        all_rules = self._controller.get_rules()
+
+        # Create a mapping from rule to full index
+        rule_to_index = {}
+        for idx, rule in enumerate(all_rules):
+            # Create a unique key for the rule
+            key = (rule.from_value, rule.to_value, rule.category)
+            rule_to_index[key] = idx
 
         # Clear table
         self._rule_table.setRowCount(0)
 
         # Populate table
-        for i, rule in enumerate(rules):
+        for i, rule in enumerate(filtered_rules):
             row = self._rule_table.rowCount()
             self._rule_table.insertRow(row)
 
@@ -342,17 +354,9 @@ class CorrectionRuleView(QWidget):
             self._rule_table.setItem(row, 3, QTableWidgetItem(rule.category))
             self._rule_table.setItem(row, 4, QTableWidgetItem(rule.status))
 
-            # Get the rule's index in the full list
-            all_rules = self._controller.get_rules()
-            full_index = None
-            for j, full_rule in enumerate(all_rules):
-                if (
-                    rule.from_value == full_rule.from_value
-                    and rule.to_value == full_rule.to_value
-                    and rule.category == full_rule.category
-                ):
-                    full_index = j
-                    break
+            # Find the rule's index in the full list
+            rule_key = (rule.from_value, rule.to_value, rule.category)
+            full_index = rule_to_index.get(rule_key, i)  # Fall back to filtered index if not found
 
             # Set row data for identifying the rule (store full list index)
             for col in range(5):
@@ -364,7 +368,7 @@ class CorrectionRuleView(QWidget):
         self._update_button_states()
 
         # Update status bar with the current rules (avoiding another controller call)
-        self._update_status_bar(rules)
+        self._update_status_bar(filtered_rules)
 
     def _update_categories_filter(self):
         """Update the category filter with available categories."""
@@ -525,11 +529,14 @@ class CorrectionRuleView(QWidget):
         )
 
         if response == QMessageBox.Yes:
-            self._controller.delete_rule(rule_id)
-            self.rule_deleted.emit(rule_id)
-            self._logger.info(f"Deleted rule: {rule.from_value} -> {rule.to_value}")
-            self._refresh_rule_table()
-            self._update_categories_filter()
+            # Perform deletion directly on the controller
+            success = self._controller.delete_rule(rule_id)
+            if success:
+                self.rule_deleted.emit(rule_id)
+                self._logger.info(f"Deleted rule: {rule.from_value} -> {rule.to_value}")
+                # Refresh the table to ensure indices are updated correctly
+                self._refresh_rule_table()
+                self._update_categories_filter()
 
     def _on_toggle_status(self):
         """Toggle the status of the selected rule."""
@@ -726,5 +733,11 @@ class CorrectionRuleView(QWidget):
 
         # Apply this rule only
         only_invalid = self._correct_invalid_only_checkbox.isChecked()
-        self._controller.apply_single_rule(rule, only_invalid=only_invalid)
-        self._logger.info(f"Applied single rule: {rule.from_value} -> {rule.to_value}")
+        success = self._controller.apply_single_rule(rule, only_invalid=only_invalid)
+
+        if success:
+            self._logger.info(f"Applied single rule: {rule.from_value} -> {rule.to_value}")
+            # Refresh the view to reflect any changes
+            self._refresh_rule_table()
+        else:
+            QMessageBox.warning(self, "Error", "Failed to apply the rule.")
