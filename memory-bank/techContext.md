@@ -239,3 +239,116 @@ The application uses a `ConfigManager` class for managing application settings:
 - **Validation**: Validation preferences, paths to validation lists
 - **Correction**: Auto-correction settings, path to correction rules
 - **UI**: Window size, table pagination
+
+## Technologies Used
+
+### Core Technologies
+
+- **Python 3.9+** - Core programming language
+- **PySide6** - Qt bindings for Python (UI framework)
+- **UV** - Package management and virtual environment
+- **pytest** - Testing framework
+
+### UI Framework
+
+- **PySide6 (Qt)** - Primary UI framework
+  - QTableView - Used for data display
+  - QWidgets - Core UI components
+  - Qt Signals/Slots - Event handling mechanism
+  - QSS - Styling the UI components
+
+### Development Tools
+
+- **Ruff** - Python linter
+- **pytest** - Test framework
+- **pytest-qt** - Qt testing utilities
+- **pytest-cov** - Test coverage
+- **mypy** - Static type checking
+
+## Design Patterns
+
+### MVC Pattern
+
+The application follows a Model-View-Controller architecture:
+
+- **Models**: DataModel, ValidationModel, CorrectionModel
+- **Views**: Various UI components
+- **Controllers**: Bridge between models and views
+
+### Service Pattern
+
+Business logic is encapsulated in service classes:
+
+- **DataService** - Data operations
+- **ValidationService** - Validation logic
+- **CorrectionService** - Correction logic
+- **ChartService** - Chart generation
+
+### Observer Pattern (Qt Signals/Slots)
+
+Qt's signal/slot mechanism is used throughout the application for event handling and communication between components:
+
+- **Signals** - Notify about events
+- **Slots** - React to events
+- **Connections** - Link signals to slots
+
+### Recursive Processing Pattern
+
+A recursive processing pattern is used in the enhanced correction system to repeatedly apply corrections until no more changes occur:
+
+```python
+def apply_corrections_recursive():
+    total_corrections = 0
+    corrections = initial_correction_pass()
+    total_corrections += corrections
+    
+    while corrections > 0:
+        corrections = subsequent_correction_pass()
+        total_corrections += corrections
+    
+    return total_corrections
+```
+
+### Status State Machine
+
+The validation and correction system uses a state machine pattern to track entry status:
+
+- **VALID** → Data is valid
+- **INVALID** → Data is invalid
+- **CORRECTABLE** → Data is invalid but can be corrected
+- **CORRECTED** → Data was invalid but has been corrected
+
+### Configuration Management
+
+Application settings are managed centrally through a configuration manager:
+
+```python
+config_manager = ConfigManager()
+value = config_manager.get_value("section/key", default_value)
+config_manager.set_value("section/key", new_value)
+```
+
+## Testing Strategy
+
+- **Unit Tests**: Test individual components in isolation
+- **Integration Tests**: Test interactions between components
+- **UI Tests**: Test UI components and interactions
+- **Test-Driven Development**: Write tests before implementing features
+
+## Data Flow Architecture
+
+The application uses a layered data flow architecture:
+
+1. **User Interface** - User interaction layer
+2. **Controllers** - Coordination layer
+3. **Services** - Business logic layer
+4. **Data Model** - Data storage layer
+5. **Persistence** - File I/O layer
+
+## Asynchronous Processing
+
+Long-running operations are executed asynchronously to keep the UI responsive:
+
+- **QThreadPool** - Thread pool for background tasks
+- **QRunnable** - Runnable tasks for background processing
+- **Signals** - Communicate results back to the UI thread

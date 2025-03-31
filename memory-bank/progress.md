@@ -363,3 +363,118 @@ The current focus is on completing the UI implementation for the correction feat
 ### Test Categories
 
 #### Unit Tests
+
+## Correction System Improvements (In Progress)
+
+### Current Status (2025-03-31)
+- Fixed the error when applying corrections by removing the `recursive` and `selected_only` parameters from the service call
+- The fix addressed the error but didn't implement the intended functionality
+- Created a comprehensive plan for improving the correction system
+
+### Next Steps
+- Implement test-driven development approach for each improvement:
+  1. Write tests for recursive correction
+  2. Implement recursive correction in the controller
+  3. Write tests for selection-based correction
+  4. Implement selection-based correction
+  5. Write tests for correctable status detection integration
+  6. Implement correctable status detection
+  7. Write tests for auto-correction options
+  8. Implement auto-correction configuration and workflow integration
+
+### Outstanding Issues
+- Corrections are not being applied even though the error is fixed
+- The recursive correction functionality is not implemented
+- Selection-based correction is not implemented
+- Correctable status detection needs to be integrated with validation
+- Auto-correction options for validation and import are not implemented
+
+## Progress
+
+## Overview
+
+This document tracks the progress of the ChestBuddy project, including completed features, ongoing work, and planned enhancements.
+
+## Working Features
+
+- ✅ Basic application structure
+- ✅ Data import and export
+- ✅ Data validation
+- ✅ Basic correction rules
+- ✅ Chart generation
+- ✅ View-based architecture
+- ✅ Dashboard view
+
+## In Progress
+
+- ⏳ Correction system improvements
+  - Phase 1: Recursive Correction
+  - Phase 2: Selection-Based Correction
+  - Phase 3: Correctable Status Detection
+  - Phase 4: Auto-Correction Options
+- ⏳ User interface enhancements
+- ⏳ Performance optimizations
+
+## Pending Features
+
+- ❌ Advanced data analytics
+- ❌ User customizable dashboards
+- ❌ Custom validation rules
+- ❌ Multi-language support
+- ❌ Cloud synchronization
+
+## Recently Completed
+
+- Fixed a bug in the `_apply_corrections_task` method where it was incorrectly passing the `recursive` parameter
+- Created comprehensive planning for correction system improvements
+- Designed UI mockups for improved correction functionality
+
+## Correction System Improvement Plan
+
+### Current Status
+
+- ✅ Issue identified: The correction system is not applying corrections properly
+- ✅ Root cause identified: Incorrect parameter passing and missing recursive functionality
+- ✅ Initial bug fix applied (parameter passing)
+- ✅ Plan created for comprehensive improvements
+- ✅ UI mockups created
+- ✅ Technical implementation plan created
+
+### Next Steps
+
+1. **Phase 1: Recursive Correction**
+   - Implement tests for recursive correction
+   - Implement recursive correction in CorrectionService
+   - Update CorrectionController to handle recursion
+
+2. **Phase 2: Selection-Based Correction**
+   - Implement tests for selection-based correction
+   - Add UI elements for selection-based correction
+   - Implement selection handling in controller and service
+
+3. **Phase 3: Correctable Status Detection**
+   - Extend ValidationStatus enum
+   - Implement tests for correctable status
+   - Update data view to highlight correctable items
+
+4. **Phase 4: Auto-Correction Options**
+   - Add configuration options
+   - Implement tests for auto-correction
+   - Update workflow to handle auto-correction
+
+## Known Issues
+
+- Corrections are not being applied recursively (in progress)
+- The UI does not indicate which invalid entries are correctable (planned)
+- No way to apply corrections to only selected data (planned)
+- Auto-correction options are not configurable (planned)
+
+## Milestones
+
+| Milestone | Target Date | Status |
+|-----------|-------------|--------|
+| Correction System Phase 1 | 2023-04-07 | In Progress |
+| Correction System Phase 2 | 2023-04-14 | Planned |
+| Correction System Phase 3 | 2023-04-21 | Planned |
+| Correction System Phase 4 | 2023-04-28 | Planned |
+| Complete Correction System | 2023-05-05 | Planned |

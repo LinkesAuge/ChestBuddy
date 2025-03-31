@@ -721,207 +721,62 @@ We're updating our testing approach to match the new architecture:
 
 ## Current Focus
 
-We are modernizing the UI architecture from a tab-based to a view-based approach. This involves updating existing components to use the new architecture and refactoring tests to match.
+The current focus is on improving the correction system in ChestBuddy to address several identified issues and enhance functionality.
 
-The current focus is on updating the MainWindow tests to align with the new view-based architecture.
+## Correction System Improvement Project (2023-04-01)
 
-## Status
+### Overview
 
-- ChartView implementation complete ✅
-- MainWindow updated to use ChartView directly ✅
-- ChartView unit tests fixed and passing ✅
-- MainWindow test update Phase 1 complete ✅
-  - Example test file created
-  - Utility script for analyzing tests
-  - Patterns for mocking view controllers
-- MainWindow test update Phase 2 complete ✅
-  - File operations tests updated
-  - Data loading/saving tests updated
-  - Menu interaction tests updated
+We are implementing a series of improvements to the correction system to address the issue of corrections not being applied correctly. The detailed plans and documentation for this work are located in:
 
-- MainWindow test update Phase 3 in progress ⏳
-  - View interaction tests implemented ✅
-  - Controller interaction tests implemented ✅
-  - Helper script for running tests created ✅
-  - Signal handling tests pending
-  - Proper cleanup to prevent signal disconnection warnings pending
+- `plans/correction_system_improvements_plan.md` - Detailed implementation plan using Test-Driven Development
+- `plans/correction_ui_mockup.md` - User interface mockups for the improved correction system
+- `plans/correction_system_technical_implementation.md` - Technical implementation details
 
-## Next Steps
+### Key Issues Identified
 
-1. Complete MainWindow test update Phase 3
-   - Add tests for signal dispatching between controllers
-   - Fix signal disconnection warnings during test teardown
-   - Create integration tests for controller chains
-   - Update remaining dialog interaction tests
+1. **Recursive Correction:** Currently, corrections are only applied once. If a corrected value would match another rule, that secondary correction is not applied.
+2. **Selection-Based Correction:** Users should be able to apply corrections to a specific selection of cells.
+3. **Correctable Status Detection:** The system needs to identify which invalid entries can be fixed with available correction rules.
+4. **Auto-Correction Options:** More flexible configuration for when corrections are automatically applied.
 
-2. ValidationTabView
-   - Create comprehensive tests for ValidationTabView
-   - Ensure test coverage for validation result display
+### Implementation Approach
 
-3. DashboardView
-   - Complete implementation
-   - Create tests for dashboard widgets
+We are following a Test-Driven Development approach across four primary phases:
 
-4. View Signal Management
-   - Improve signal connection/disconnection
-   - Add signal tracking for debugging
+1. **Phase 1: Recursive Correction**
+   - Implement and test recursive correction functionality
+   - Fix the current issue with the `apply_corrections` method parameters
+
+2. **Phase 2: Selection-Based Correction**
+   - Enable applying corrections to selected data only
+   - Implement context menu and UI integration
+
+3. **Phase 3: Correctable Status Detection**
+   - Extend ValidationStatus enum with CORRECTABLE state
+   - Implement detection of correctable entries
+
+4. **Phase 4: Auto-Correction Options**
+   - Add configuration options for auto-correction
+   - Implement UI components for correction settings
 
 ## Recent Changes
 
-- MainWindow refactored to use view-based architecture instead of tabs
-- ChartView now used directly in MainWindow
-- Tests updated to align with new architecture
-- Utility script created for analyzing and updating MainWindow tests
+- Fixed a bug in the `_apply_corrections_task` method where it was incorrectly passing the `recursive` parameter to the `apply_corrections` method
+- Created comprehensive planning documents for the correction system improvements
+- Designed UI mockups for the improved correction features
 
-- New test files created for view interaction and controller interaction testing
-- Comprehensive test coverage for view switching and navigation
-- Test coverage for controller integration and signal handling
-- Helper script created to run controller and view interaction tests
+## Next Steps
 
-## Current Challenges
+1. Implement tests for the recursive correction functionality
+2. Implement recursive correction in the CorrectionService and CorrectionController
+3. Update the ValidationStatus enum to include correctable states
+4. Implement the UI changes according to the mockups
+5. Update the configuration manager to include new correction settings
 
-- Signal disconnection warnings during test teardown need to be addressed
-- Some controllers lack proper disconnect methods
-- Need to establish consistent pattern for controller lifecycle management in tests
-- Integration testing between controllers is complex due to signal chains
+## Active Decisions
 
-## MainWindow Test Update - Phase 1 (Completed)
-
-### Findings
-- Controller method names needed fixing (e.g., `open_file` vs. `open_files`)
-- Menu text assertions needed updating due to text changes
-- View switching requires using `view_state_controller` instead of direct tab access
-
-### Implementation
-- Created example test file with correct patterns
-- Created utility script for analyzing tests
-- Updated test fixtures with proper controller mocking
-
-## MainWindow Test Update - Phase 2 (Completed)
-
-### Updates Completed
-- File operations tests updated to use the `file_operations_controller`
-  - Fixed method name references (e.g., `open_file` vs. `open_files`)
-  - Added mock resets to prevent false positives
-  - Added tests for file dialog cancellation handling
-- Data loading/saving tests enhanced
-  - Added tests for data state changes
-  - Added tests for progress reporting
-  - Added tests for auto-save prompts
-- Menu interaction tests improved
-  - Added comprehensive menu existence tests
-  - Added enabling/disabling tests for menu items
-  - Added keyboard shortcut tests
-- Improved test patterns for view switching and navigation
-
-## MainWindow Test Update - Phase 3 (In Progress)
-
-### Updates Completed
-- View interaction tests implemented
-  - Created `test_main_window_view_interaction.py` with comprehensive tests
-  - Tested view navigation via sidebar
-  - Tested view navigation via menu actions
-  - Tested view state changes and data-dependent view protection
-  - Tested view history navigation
-- Controller interaction tests implemented
-  - Created `test_main_window_controller_interaction.py` with comprehensive tests
-  - Tested file operation controller integration
-  - Tested progress controller interactions
-  - Tested data view controller signals
-  - Tested controller signal connections
-  - Added tests for controller disconnection during cleanup
-- Test helper script created
-  - Added support for running specific test categories
-  - Added coverage reporting options
-  - Added verbose output options
-
-### Pending Updates
-- Signal handling tests
-  - Tests for signal chains between controllers
-  - Tests for proper signal disconnection
-- Integration tests
-  - Tests for complex interactions between multiple controllers
-  - Tests for state persistence between view changes
-- Dialog interaction tests
-  - Tests for modal dialogs
-  - Tests for non-modal dialogs
-
-## PySide6 Installation Update and Test Fixes
-
-### PySide6 Compatibility
-
-We encountered issues with the latest version of PySide6 (6.8.3) when trying to run tests with coverage. The issue manifested as an import error:
-
-```
-ImportError: cannot import name 'QObject' from 'PySide6.QtCore'
-```
-
-We resolved this by downgrading to PySide6 version 6.6.0, which proved to be more compatible with our current test setup. The tests now run successfully with this version.
-
-### ValidationTabView Test Improvements
-
-We've made significant improvements to the `test_validation_tab_view.py` tests:
-
-1. Added a `MockSignal` class to properly simulate Qt signals without relying on real QObject signal connections
-2. Updated the mock fixtures to avoid creating real UI components during testing
-3. Fixed the validation service mock to include all needed methods and properties
-4. Modified the test methods to directly test the targeted functionality rather than going through UI interactions
-
-These changes have resulted in a more robust test suite that's less prone to issues with Qt's signal/slot mechanism during testing. All tests now pass successfully.
-
-The current test coverage for `validation_tab_view.py` is approximately 29%, with most of the missing coverage in UI setup and initialization code. Future test improvements could focus on increasing this coverage.
-
-## ValidationTabView Test Coverage Improvements
-
-We have significantly improved the test coverage for the ValidationTabView component in the ChestBuddy application. The coverage has increased from 29% to 67%, which is a substantial improvement.
-
-### Test Additions
-
-We added the following new tests to improve coverage:
-
-1. **UI Setup Tests**:
-   - `test_real_ui_setup`: Tests the actual UI component creation with minimal patching
-   - `test_validation_list_section_creation`: Tests the validation list section creation
-   - `test_actual_create_validation_list_section`: Tests the implementation details of validation list sections
-
-2. **Signal Connection Tests**:
-   - Enhanced the signal connection tests to properly handle Qt signals
-   - Added a custom `MockSignal` implementation to simulate Qt signals without causing access violations
-
-3. **Event Handler Tests**:
-   - `test_on_validation_changed`: Tests response to validation changes
-   - `test_update_validation_preference`: Tests preference updates
-   - `test_on_list_add_clicked_with_dialog_interaction`: Tests dialog interactions
-   - `test_on_list_add_clicked_dialog_cancelled`: Tests dialog cancellation
-
-4. **Error Handling Tests**:
-   - `test_display_service_error`: Tests error display for service errors
-   - `test_display_error`: Tests general error display functionality
-
-### Challenges
-
-We encountered several challenges with the Qt signal/slot testing, particularly with:
-
-1. Signal spying in PySide6
-2. Mocking QMessageBox dialogs
-3. PySide6 compatibility with test coverage tools
-
-### Solutions
-
-We implemented several solutions to overcome these challenges:
-
-1. Created a custom `MockSignal` class to avoid real QObject signal issues
-2. Used method replacement instead of direct patching for some tests
-3. Improved test patterns for signal connections
-4. Downgraded PySide6 to version 6.6.0 for better compatibility with tests
-
-### Next Steps
-
-To further improve test coverage, we should consider:
-
-1. Adding tests for the remaining uncovered code sections (73-75, 452-564, 595-602, 615-619)
-2. Enhancing tests for dialog interactions
-3. Implementing more real-world scenario tests
-4. Testing validation list operations more comprehensively
-
-The test improvements provide a solid foundation for future UI components testing and align with our goal of maintaining high code quality and test coverage throughout the codebase.
+- We have decided to extend the ValidationStatus enum with CORRECTABLE and CORRECTED states
+- We will implement the recursive correction with cycle detection to prevent infinite loops
+- We will add selection-based correction with context menu integration
+- We will enhance the correction UI to show correctable items and correction counts

@@ -741,4 +741,113 @@ class CorrectionWorker(QObject):
    - Regular backups during operations
    - Import/export support
 
-This architecture provides a clean, maintainable system for managing correction rules and applying them to data, while maintaining strict separation of concerns and leveraging existing architectural patterns. 
+This architecture provides a clean, maintainable system for managing correction rules and applying them to data, while maintaining strict separation of concerns and leveraging existing architectural patterns.
+
+## Correction System Architecture
+
+The correction system is designed to automatically fix invalid data entries based on predefined correction rules. The system is being enhanced with the following improvements:
+
+1. **Recursive Correction** - Apply corrections repeatedly until no more matches
+2. **Selection-Based Correction** - Apply corrections to selected data only
+3. **Correctable Status Detection** - Identify which invalid entries can be fixed
+4. **Auto-Correction Options** - Control when corrections are applied automatically
+
+### Key Components
+
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│  DataController │     │  CorrectionCtrl │     │  ValidationCtrl │
+└────────┬────────┘     └────────┬────────┘     └────────┬────────┘
+         │                       │                       │
+         ▼                       ▼                       ▼
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│   DataService   │     │ CorrectionService│     │ValidationService│
+└────────┬────────┘     └────────┬────────┘     └────────┬────────┘
+         │                       │                       │
+         └───────────────►◄──────┴───────────────►◄──────┘
+                             DataModel
+```
+
+### Data Flow
+
+1. **Validation Process**:
+   - DataController loads data
+   - ValidationController validates data
+   - Invalid entries are marked
+   - CorrectionController identifies correctable entries
+
+2. **Correction Process**:
+   - CorrectionController initiates correction
+   - CorrectionService applies rules to data
+   - If recursive, process repeats until no more corrections
+   - ValidationController re-validates data
+   - DataView updates to show corrected data
+
+### Validation Status Workflow
+
+```
+┌─────────┐     ┌─────────┐     ┌─────────────┐     ┌────────────┐
+│  VALID  │     │ INVALID │────►│ CORRECTABLE │────►│  CORRECTED │
+└─────────┘     └─────────┘     └─────────────┘     └────────────┘
+                      ▲                                   │
+                      └───────────────────────────────────┘
+```
+
+## View System Architecture
+
+ChestBuddy uses a view-based architecture with the following key components:
+
+1. **MainWindow** - The main application window that hosts all views
+2. **ViewStateController** - Manages view navigation and history
+3. **View Components** - Individual UI components for different functions
+
+### View Hierarchy
+
+```
+MainWindow
+├── SidebarView
+├── ContentArea
+│   ├── DashboardView
+│   ├── DataView
+│   ├── ValidationView
+│   ├── CorrectionView
+│   └── ChartView
+└── StatusBar
+```
+
+## Controller Architecture
+
+Controllers manage application logic and coordinate between the UI and services:
+
+1. **DataController** - Manages data operations
+2. **ValidationController** - Manages data validation
+3. **CorrectionController** - Manages data correction
+4. **FileOperationsController** - Manages file operations
+5. **ChartController** - Manages chart generation
+6. **ViewStateController** - Manages navigation between views
+
+## Service Architecture
+
+Services implement business logic and interact with the data model:
+
+1. **DataService** - Core data operations
+2. **ValidationService** - Data validation logic
+3. **CorrectionService** - Data correction logic
+4. **ChartService** - Chart generation logic
+5. **ImportExportService** - Import/export functionality
+
+## Data Model
+
+The data model is a structure that holds the application data and provides methods for data access and manipulation:
+
+1. **DataModel** - The main model that holds all data
+2. **ValidationModel** - Stores validation rules and results
+3. **CorrectionModel** - Stores correction rules
+
+## Configuration Management
+
+The application uses a centralized configuration system:
+
+1. **ConfigManager** - Manages application settings
+2. **Default Settings** - Provides default configuration values
+3. **User Settings** - Stored in config.ini 
