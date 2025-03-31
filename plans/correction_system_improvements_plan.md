@@ -6,8 +6,37 @@ This document outlines the comprehensive plan for improving the ChestBuddy corre
 
 1. **Recursive Correction**: The controller is passing `recursive=True` but the service doesn't implement recursion
 2. **Selection-Based Correction**: The `selected_only` parameter isn't properly implemented
-3. **Correctable Status Detection**: The "correctable" status now has proper visual integration with validation (✓ Partially Complete)
-4. **Auto-Correction Options**: Auto-correction on validation and import aren't implemented
+3. **Correctable Status Detection**: The "correctable" status now has proper visual integration with validation (✓ Complete)
+4. **Auto-Correction Options**: Auto-correction on validation and import (✓ Complete)
+
+## Progress Update - August 2, 2024
+
+### Phase 3: Correctable Status Detection ✓ Complete
+We have successfully implemented the algorithmic detection of correctable cells. This builds on the validation visualization system fix that was completed earlier:
+
+1. **Core Implementation**:
+   - Enhanced the `CorrectionService` to identify invalid cells that have matching correction rules
+   - Implemented integration with the validation service to mark cells as correctable
+   - Added comprehensive tests to verify the functionality works correctly
+
+2. **Key Features**:
+   - The `get_cells_with_available_corrections` method correctly filters for invalid cells with matching rules
+   - The `check_correctable_status` method properly integrates with the validation service
+   - Correctable cells are clearly identified in the system, enabling auto-correction workflows
+
+### Phase 4: Auto-Correction Options ✓ Complete
+
+We have successfully implemented the auto-correction options feature, allowing for automatic application of corrections:
+
+1. **Configuration Options**:
+   - Added `auto_correct_on_validation` and `auto_correct_on_import` settings to ConfigManager
+   - Implemented getters and setters for these options
+   - Set default values to False to ensure explicit opt-in by users
+
+2. **Integration Points**:
+   - Utilized existing methods in CorrectionController for auto-correction functionality
+   - Confirmed proper signal connections in DataViewController for triggering auto-correction
+   - Verified that all unit tests pass with the new configuration options
 
 ## Progress Update - August 1, 2024
 
@@ -263,311 +292,29 @@ def _apply_corrections_task(
     return total_stats
 ```
 
-### Phase 3: Correctable Status Detection Implementation (Partially Complete)
+## Timeline and Prioritization (Updated August 2, 2024)
 
-#### Visual Integration ✓ Complete
+1. ~~**Phase 3**: Complete the algorithmic detection of correctable cells based on available rules~~ ✓ Completed
+2. ~~**Phase 4**: Implement auto-correction options~~ ✓ Completed
+3. **Phase 1**: Implement recursive correction functionality (2 days)
+4. **Phase 2**: Implement selection-based correction (2 days)
 
-We have successfully implemented the visual integration part of this phase:
-
-1. Added proper visualization for different validation statuses:
-   - Valid cells with light green background
-   - Invalid cells with deep red background with black border
-   - Correctable cells with orange background with darker orange border
-
-2. Updated ValidationStatusDelegate to prioritize status display:
-   - Clear priority order (CORRECTABLE > INVALID > row status)
-   - Enhanced color distinction
-   - Improved visual feedback
-
-3. Fixed ValidationService._update_validation_status to properly mark cells as CORRECTABLE
-
-#### 3.1: Test for Correctable Status Detection (Day 5 - Remaining)
-
-```python
-def test_check_correctable_status(self, mocker):
-    """Test that invalid cells with matching rules are marked as correctable."""
-    # Mock dependencies
-    mock_data_model = mocker.Mock()
-    mock_rule_manager = mocker.Mock()
-    mock_validation_service = mocker.Mock()
-    
-    # Create test data
-    import pandas as pd
-    test_data = pd.DataFrame({
-        "DATE": ["2023-01-01", "2023-01-02", "2023-01-03"],
-        "PLAYER": ["Player1", "InvalidPlayer", "Player3"],
-        "SOURCE": ["Source1", "Source2", "InvalidSource"]
-    })
-    
-    # Configure validation status
-    from chestbuddy.core.validation_enums import ValidationStatus
-    validation_df = pd.DataFrame({
-        "duplicates": [None, None, None],
-        "player_validation": [None, "Invalid player", None],
-        "PLAYER_valid": [True, False, True],
-        "source_validation": [None, None, "Invalid source"],
-        "SOURCE_valid": [True, True, False],
-        "DATE_valid": [True, True, True]
-    })
-    
-    # Configure mocks
-    mock_data_model.data = test_data
-    mock_validation_service.get_validation_status.return_value = validation_df
-    
-    # Configure rule manager to return matching rules for specific values
-    def has_matching_rule_mock(value, column_name):
-        if value == "InvalidPlayer" and column_name == "PLAYER":
-            return True
-        return False
-        
-    # Create service with mocks
-    service = CorrectionService(
-        mock_rule_manager, mock_data_model, mock_validation_service
-    )
-    service._has_matching_rule = mocker.Mock(side_effect=has_matching_rule_mock)
-    
-    # Call the method
-    service.check_correctable_status()
-    
-    # Verify the validation status was updated correctly
-    updated_status = mock_validation_service.set_validation_status.call_args[0][0]
-    
-    # Invalid player should be marked as correctable
-    assert updated_status.at[1, "PLAYER_valid"] == ValidationStatus.CORRECTABLE
-    
-    # Invalid source should remain invalid (no matching rule)
-    assert updated_status.at[2, "SOURCE_valid"] == ValidationStatus.INVALID
-    
-    # Valid cells should remain valid
-    assert updated_status.at[0, "PLAYER_valid"] == ValidationStatus.VALID
-```
-
-#### 3.2: Implement Correctable Status Detection (Day 5-6 - Remaining)
-
-```python
-def check_correctable_status(self):
-    """
-    Check which invalid cells can be corrected with available rules.
-    
-    Updates the validation status to mark invalid cells as correctable
-    if they have a matching correction rule.
-    
-    Returns:
-        int: Number of correctable cells identified
-    """
-    data = self._data_model.data
-    if data is None or data.empty:
-        logger.warning("No data available to check for correctable cells")
-        return 0
-    
-    logger.info("Checking for correctable cells")
-    
-    # Get validation status
-    validation_status = self._validation_service.get_validation_status()
-    if validation_status is None:
-        logger.warning("No validation status available")
-        return 0
-    
-    correctable_count = 0
-    
-    # Create a copy to avoid modifying during iteration
-    validation_copy = validation_status.copy()
-    
-    # Map column indices to names for validation status
-    col_validation_map = {}
-    for col_idx, col_name in enumerate(data.columns):
-        col_validation_map[col_idx] = f"{col_name}_valid"
-    
-    # Check each cell
-    for row_idx in range(len(data)):
-        for col_idx in range(len(data.columns)):
-            col_name = data.columns[col_idx]
-            status_col = col_validation_map.get(col_idx)
-            
-            if status_col not in validation_copy.columns:
-                continue
-                
-            # Get current validation status
-            current_status = validation_copy.at[row_idx, status_col]
-            
-            # Skip cells that aren't invalid
-            if current_status != ValidationStatus.INVALID:
-                continue
-                
-            # Check if this cell has a matching correction rule
-            cell_value = data.at[row_idx, col_name]
-            if self._has_matching_rule(cell_value, col_name):
-                # Update status to CORRECTABLE
-                validation_copy.at[row_idx, status_col] = ValidationStatus.CORRECTABLE
-                correctable_count += 1
-                logger.debug(f"Cell [{row_idx}, {col_idx}] '{cell_value}' marked as correctable")
-    
-    # Update the validation status
-    if correctable_count > 0:
-        logger.info(f"Identified {correctable_count} correctable cells")
-        self._validation_service.set_validation_status(validation_copy)
-    
-    return correctable_count
-```
-
-### Phase 4: Auto-Correction Options Implementation
-
-#### 4.1: Test for Auto-Correction Configuration (Day 7)
-
-```python
-def test_auto_correction_config(self):
-    """Test auto-correction configuration options."""
-    # Create config manager with a temporary file
-    import tempfile
-    import os
-    
-    # Create a temporary config file
-    with tempfile.NamedTemporaryFile(delete=False) as temp:
-        temp_path = temp.name
-    
-    try:
-        # Create config manager
-        from chestbuddy.utils.config import ConfigManager
-        config = ConfigManager(temp_path)
-        
-        # Test default values
-        assert config.get_auto_correct_on_validation() is False
-        assert config.get_auto_correct_on_import() is False
-        
-        # Test setting values
-        config.set_auto_correct_on_validation(True)
-        assert config.get_auto_correct_on_validation() is True
-        
-        config.set_auto_correct_on_import(True)
-        assert config.get_auto_correct_on_import() is True
-        
-        # Test setting back to false
-        config.set_auto_correct_on_validation(False)
-        assert config.get_auto_correct_on_validation() is False
-        
-        # Verify settings were saved to file
-        config.save()
-        
-        # Create a new instance to verify persistence
-        config2 = ConfigManager(temp_path)
-        assert config2.get_auto_correct_on_import() is True
-        assert config2.get_auto_correct_on_validation() is False
-        
-    finally:
-        # Clean up
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
-```
-
-#### 4.2: Implement Auto-Correction Configuration (Day 7-8)
-
-```python
-def get_auto_correct_on_validation(self):
-    """
-    Get whether to automatically apply corrections after validation.
-    
-    Returns:
-        bool: True if auto-correction on validation is enabled
-    """
-    return self.get_boolean("Correction", "auto_correct_on_validation", False)
-    
-def set_auto_correct_on_validation(self, value):
-    """
-    Set whether to automatically apply corrections after validation.
-    
-    Args:
-        value (bool): True to enable auto-correction on validation
-    """
-    self.set("Correction", "auto_correct_on_validation", str(value))
-    
-def get_auto_correct_on_import(self):
-    """
-    Get whether to automatically apply corrections on import.
-    
-    Returns:
-        bool: True if auto-correction on import is enabled
-    """
-    return self.get_boolean("Correction", "auto_correct_on_import", False)
-    
-def set_auto_correct_on_import(self, value):
-    """
-    Set whether to automatically apply corrections on import.
-    
-    Args:
-        value (bool): True to enable auto-correction on import
-    """
-    self.set("Correction", "auto_correct_on_import", str(value))
-```
-
-#### 4.3: Implement Workflow Integration (Day 8-9)
-
-```python
-def _on_data_imported(self):
-    """
-    Handle data import completion with validation and auto-correction.
-    """
-    # Always check correctable status on import
-    if self._correction_service:
-        self._correction_service.check_correctable_status()
-        logger.debug("Checked correctable status after import")
-    
-    # Apply auto-validation if enabled
-    auto_validate = self._config_manager.get_auto_validate()
-    if auto_validate and self._validation_service:
-        logger.info("Auto-validation enabled, validating imported data")
-        self._validation_service.validate_data()
-        
-        # Apply auto-correction if enabled
-        auto_correct = self._config_manager.get_auto_correct_on_import()
-        if auto_correct and self._correction_controller:
-            logger.info("Auto-correction on import enabled, applying corrections")
-            self._correction_controller.apply_corrections(only_invalid=True)
-    
-    # Update UI state
-    self._update_ui_state()
-
-def _on_validation_completed(self):
-    """
-    Handle validation completion with auto-correction.
-    """
-    # Check which invalid cells are correctable
-    if self._correction_service:
-        self._correction_service.check_correctable_status()
-        logger.debug("Checked correctable status after validation")
-    
-    # Apply auto-correction if enabled
-    auto_correct = self._config_manager.get_auto_correct_on_validation()
-    if auto_correct and self._correction_controller:
-        logger.info("Auto-correction on validation enabled, applying corrections")
-        self._correction_controller.apply_corrections(only_invalid=True)
-    
-    # Update UI state
-    self._update_ui_state()
-```
-
-## Timeline and Prioritization
-
-1. **Phase 3 (Partially Complete)**: Complete the algorithmic detection of correctable cells based on available rules (2 days)
-2. **Phase 1**: Implement recursive correction functionality (2 days)
-3. **Phase 2**: Implement selection-based correction (2 days)
-4. **Phase 4**: Implement auto-correction options (3 days)
-
-Total estimated time: 9 working days
+Total estimated time remaining: 4 working days
 
 ## Acceptance Criteria
 
 1. Recursive correction continues applying rules until no more changes are made
 2. Selection-based correction only applies to selected cells
-3. Correctable status detection identifies invalid cells that have matching rules
-4. Auto-correction options can be configured and work correctly
+3. ✓ Correctable status detection identifies invalid cells that have matching rules
+4. ✓ Auto-correction options can be configured and work correctly
 
 ## Testing Strategy
 
 Each phase includes dedicated test cases:
 1. Test that recursive correction applies rules until no more changes occur
 2. Test that selection-based correction only applies to selected cells
-3. Test that correctable status detection correctly identifies cells that can be corrected
-4. Test that auto-correction options are correctly stored in config and applied when enabled
+3. ✓ Test that correctable status detection correctly identifies cells that can be corrected
+4. ✓ Test that auto-correction options are correctly stored in config and applied when enabled
 
 ## UI Implications
 

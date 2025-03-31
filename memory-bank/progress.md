@@ -227,6 +227,8 @@ ChestBuddy is currently undergoing a major architectural update, transitioning f
 - Simplified data structure (removed 'order' and 'description' fields)
 - Fixed deletion functionality to prevent unwanted multiple deletions
 - Proper visualization of validation statuses (Valid, Invalid, Correctable)
+- ✅ Correctable status detection (identifies cells with matching correction rules)
+- ✅ Auto-correction configuration options (on validation and on import)
 
 ## What's in progress
 
@@ -246,10 +248,11 @@ ChestBuddy is currently undergoing a major architectural update, transitioning f
 - Rule application efficiency
 - Batch operations speed
 
-### Correction System Improvements (15% complete)
-- Recursive correction implementation
-- Selection-based correction
-- Advanced auto-correction options
+### Correction System Improvements (40% complete)
+- ✅ Phase 3: Correctable status detection implementation complete
+- ✅ Phase 4: Auto-correction options implementation complete
+- Recursive correction implementation (Phase 1)
+- Selection-based correction (Phase 2)
 
 ## What's planned
 
