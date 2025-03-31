@@ -78,7 +78,12 @@ This document records cleanup activities performed on the ChestBuddy codebase to
      - `tests/test_main_window.py` - Updated fixtures to support the new MainWindow constructor (2024-05-16)
        - Added mock objects for all required dependencies
        - Updated assertions to focus on core functionality rather than specific UI implementation
+       - Updated view switching tests to work with the view-based architecture instead of tab-based (2024-05-17)
+       - Skipped obsolete tab-based tests with appropriate deprecation notices
      - `tests/unit/ui/views/test_chart_view.py` - Created comprehensive tests for the new ChartView component (2024-05-16)
+       - Fixed signal connection issues in tests (2024-05-17)
+       - Added proper logger initialization (2024-05-17)
+       - Added tests for controller signal handling with mock approach (2024-05-17)
 
 3. **Organize Debug Utilities**
    - Move debug-only utilities to a dedicated debug or tools directory

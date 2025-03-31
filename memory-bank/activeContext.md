@@ -296,10 +296,13 @@ Status:
 - ✅ ChartView implementation complete
 - ✅ MainWindow updated to use ChartView directly
 - ✅ ChartView unit tests fixed and passing
-- ❌ MainWindow tests need to be updated to work with the new architecture
+- 🔄 MainWindow tests being updated to work with the new architecture
+  - ✅ Fixed basic initialization tests
+  - ✅ Updated view switching tests to work with view-based architecture
+  - ❌ Other MainWindow tests still need updates
 
 Next steps:
-1. Update MainWindow tests to work with the new architecture
+1. Continue updating MainWindow tests to work with the new architecture
 2. Create comprehensive tests for ValidationTabView
 3. Complete implementation of DashboardView
 4. Replace all legacy tab components with their modern view counterparts
