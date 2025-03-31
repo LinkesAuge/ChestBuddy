@@ -148,5 +148,9 @@
   "tests/unit/ui/views/test_data_view_context_menu.py::test_on_view_validation_details": true,
   "tests/test_integration.py": true,
   "tests/test_main_window.py::TestMainWindow::test_export_action": true,
-  "tests/test_main_window.py::TestMainWindow::test_open_chart_view": true
+  "tests/test_main_window.py::TestMainWindow::test_open_chart_view": true,
+  "tests/unit/ui/views/test_validation_tab_view.py::TestValidationTabView::test_validation_list_add": true,
+  "tests/unit/ui/views/test_validation_tab_view.py::TestValidationTabView::test_validation_list_remove": true,
+  "tests/unit/ui/views/test_validation_tab_view.py::TestValidationTabView::test_validation_list_import": true,
+  "tests/unit/ui/views/test_validation_tab_view.py::TestValidationTabView::test_validation_list_export": true
 }

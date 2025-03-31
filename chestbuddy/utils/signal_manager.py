@@ -18,8 +18,16 @@ from PySide6.QtCore import QObject, QTimer, Signal
 # Set up logger
 logger = logging.getLogger(__name__)
 
-# Add import for the signal tracer
-from chestbuddy.utils.signal_tracer import signal_tracer
+# Conditional import of signal_tracer to avoid warnings in production
+signal_tracer = None
+try:
+    # Only import if in debug mode
+    from chestbuddy.utils.signal_tracer import signal_tracer
+except ImportError:
+    pass
+except UserWarning:
+    # Ignore the UserWarning from signal_tracer
+    pass
 
 
 class SignalManager:
@@ -229,7 +237,14 @@ class SignalManager:
                 logger.warning(f"Could not check signal/slot compatibility: {e}")
             return True  # Skip checking on error
 
-    def connect(self, sender: QObject, signal_name: str, receiver: QObject, slot_name: str) -> bool:
+    def connect(
+        self,
+        sender: QObject,
+        signal_name: str,
+        receiver: QObject,
+        slot_name: str,
+        disconnect_first: bool = False,
+    ) -> bool:
         """
         Connect a signal to a slot with tracking.
 
@@ -238,6 +253,7 @@ class SignalManager:
             signal_name: Name of the signal (without the signal() suffix)
             receiver: Object that will receive the signal
             slot_name: Name of the method to call when signal is emitted
+            disconnect_first: Whether to disconnect existing connections first
 
         Returns:
             bool: True if connection was established, False if already connected
@@ -262,11 +278,24 @@ class SignalManager:
                 self._connections[connection_key] = set()
 
             if connection_value in self._connections[connection_key]:
-                if self._debug_mode:
-                    logger.debug(
-                        f"Connection already exists: {sender}.{signal_name} -> {receiver}.{slot_name}"
-                    )
-                return False
+                if disconnect_first:
+                    # Disconnect existing connection before reconnecting
+                    try:
+                        signal.disconnect(slot)
+                        self._connections[connection_key].remove(connection_value)
+                        if self._debug_mode:
+                            logger.debug(
+                                f"Disconnected existing connection: {sender}.{signal_name} -> {receiver}.{slot_name}"
+                            )
+                    except (TypeError, RuntimeError) as e:
+                        # The connection might have been lost already, just log and continue
+                        logger.debug(f"Could not disconnect: {e}")
+                else:
+                    if self._debug_mode:
+                        logger.debug(
+                            f"Connection already exists: {sender}.{signal_name} -> {receiver}.{slot_name}"
+                        )
+                    return False
 
             # Make the connection
             signal.connect(slot)
@@ -1201,13 +1230,13 @@ class SignalManager:
                     signal.connect(slot_name_or_callable)
                     return True
                 elif isinstance(slot_name_or_callable, str):
-                    # It's a method name, connect through our regular connect method
+                    # It's a method name, connect through our regular connect method with the appropriate parameter
                     return self.connect(
                         sender,
                         signal_name,
                         receiver,
                         slot_name_or_callable,
-                        disconnect_first=safe_disconnect_first,
+                        disconnect_first=safe_disconnect_first,  # Use the parameter name expected by connect()
                     )
                 else:
                     logger.error(

@@ -481,6 +481,32 @@ class BackgroundWorker(QObject):
     task_completed = Signal(str, object)  # task_id, result
     task_failed = Signal(str, Exception)  # task_id, error
 
+    # Track all active worker instances
+    _active_workers = set()
+
+    @classmethod
+    def shutdown(cls):
+        """
+        Class method to shut down all active background workers.
+        Used during application cleanup to ensure all threads are properly terminated.
+        """
+        try:
+            workers_to_shutdown = list(cls._active_workers)
+            logger.debug(f"Shutting down {len(workers_to_shutdown)} background workers")
+
+            for worker in workers_to_shutdown:
+                try:
+                    if worker.is_running:
+                        worker.cancel()
+                except Exception as e:
+                    logger.debug(f"Error shutting down worker: {e}")
+
+            # Clear the set after shutdown attempts
+            cls._active_workers.clear()
+            logger.debug("All background workers shutdown completed")
+        except Exception as e:
+            logger.error(f"Error in BackgroundWorker.shutdown: {e}")
+
     def __init__(self) -> None:
         """Initialize the background worker."""
         super().__init__()
@@ -499,6 +525,9 @@ class BackgroundWorker(QObject):
         # Initialize variables
         self._task = None
         self._is_running = False
+
+        # Register this worker in the active workers set
+        BackgroundWorker._active_workers.add(self)
 
     @property
     def is_running(self) -> bool:

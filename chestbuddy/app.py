@@ -338,8 +338,13 @@ class ChestBuddyApp(QObject):
         try:
             logger.info("Cleaning up application resources")
 
-            # Process pending signals
-            QMetaObject.invokeMethod(self, "_process_pending", Qt.ConnectionType.DirectConnection)
+            # Process pending signals - only invoke if method exists
+            try:
+                QMetaObject.invokeMethod(
+                    self, "_process_pending", Qt.ConnectionType.DirectConnection
+                )
+            except Exception as e:
+                logger.debug(f"Skipping _process_pending: {e}")
 
             # Disconnect all signals
             self._signal_manager.disconnect_all()
@@ -361,6 +366,16 @@ class ChestBuddyApp(QObject):
             logger.info("Application cleanup completed")
         except Exception as e:
             logger.error(f"Error during application cleanup: {e}")
+
+    @Slot()
+    def _process_pending(self) -> None:
+        """
+        Process any pending events before shutdown.
+        This method is called during cleanup to ensure all pending events are processed.
+        """
+        logger.debug("Processing pending events before shutdown")
+        # Process any pending events in the event queue
+        QApplication.processEvents()
 
     # ===== Slots =====
 

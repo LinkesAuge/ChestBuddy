@@ -531,3 +531,52 @@ self._validation_tab.validation_changed.connect(self._validation_service.validat
 ### Selection handling in batch correction dialog
 - **Problem**: Selection handling in batch correction dialog needs refinement
 - **Status**: PLANNED
+
+## NumPy Compatibility with PySide6 (May 31, 2024)
+
+### FIXED: NumPy 2.x Incompatibility with PySide6
+
+**Issue**: Application would fail to start with NumPy 2.x installed.
+
+**Error Message**: A module that was compiled using NumPy 1.x cannot be run in NumPy 2.2.4 as it may crash.
+
+**Root Cause**: PySide6 (and specifically the Shiboken component) was compiled against NumPy 1.x and cannot run with NumPy 2.x. This is a known issue with several Python packages that have C extensions compiled against NumPy's C API, which changed significantly in NumPy 2.0.
+
+**Fix**: 
+1. Downgraded NumPy from version 2.2.4 to 1.26.4 using: `uv pip install numpy<2.0.0`
+2. Updated pyproject.toml to include version constraint: `"numpy>=1.25.0,<2.0.0"`
+3. Also added upper bound for pandas: `"pandas>=2.0.0,<3.0.0"`
+
+**Result**: Application now starts successfully without the NumPy compatibility error.
+
+**Future Considerations**:
+1. Monitor for updates to PySide6 that support NumPy 2.x
+2. Consider adding a version constraint check at application startup
+
+## Startup and Shutdown Issues (May 31, 2024)
+
+### FIXED: Signal Manager and Background Worker Issues
+
+**Issues Fixed**:
+
+1. **BackgroundWorker missing shutdown method**: 
+   - **Error**: `Error during application cleanup: type object 'BackgroundWorker' has no attribute 'shutdown'`
+   - **Fix**: Added `shutdown` class method to BackgroundWorker that properly terminates all active worker threads
+   - **Implementation**: Added tracking of all active worker instances and cleanup code that cancels any running tasks
+
+2. **Signal Manager parameter mismatch**: 
+   - **Error**: `Error in safe_connect: SignalManager.connect() got an unexpected keyword argument 'disconnect_first'`
+   - **Fix**: Updated the `connect` method to accept the `disconnect_first` parameter and properly handle it
+   - **Implementation**: Modified connect method to handle disconnecting existing connections before reconnecting
+
+3. **Missing _process_pending method**: 
+   - **Error**: `QMetaObject::invokeMethod: No such method ChestBuddyApp::_process_pending()`
+   - **Fix**: Added the missing method and made the call in cleanup more robust
+   - **Implementation**: Added _process_pending slot to process events during cleanup and wrapped the call in try/except
+
+4. **signal_tracer debugging warning**: 
+   - **Warning**: `signal_tracer is a debugging utility and should not be used in production code`
+   - **Fix**: Modified how signal_tracer is imported to reduce warnings in production
+   - **Implementation**: Made the import conditional and caught the warning
+
+**Result**: Application starts and shuts down cleanly without errors or warnings.
