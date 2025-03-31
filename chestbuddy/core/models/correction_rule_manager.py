@@ -216,8 +216,8 @@ class CorrectionRuleManager:
         Args:
             category: Filter by rule category (player, chest_type, etc.)
             status: Filter by rule status (enabled, disabled)
-            search_term: Filter rules that contain the search term in 'from_value',
-                         'to_value', or 'description'. Case-insensitive.
+            search_term: Filter rules that contain the search term in 'from_value'
+                         or 'to_value'. Case-insensitive.
 
         Returns:
             List[CorrectionRule]: Filtered rules
@@ -238,7 +238,6 @@ class CorrectionRuleManager:
                 if (
                     (rule.from_value and search_term in rule.from_value.lower())
                     or (rule.to_value and search_term in rule.to_value.lower())
-                    or (rule.description and search_term in rule.description.lower())
                 )
             ]
 

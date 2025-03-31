@@ -20,7 +20,6 @@ class CorrectionRule:
         from_value (str): The incorrect value to be replaced
         category (str): The category (player, chest_type, source, general)
         status (str): The rule status (enabled or disabled)
-        description (str): Optional description or notes about the rule
 
     Implementation Notes:
         - Equality is determined by to_value, from_value, and category only
@@ -35,7 +34,6 @@ class CorrectionRule:
         from_value: str,
         category: str = "general",
         status: str = "enabled",
-        description: str = "",
     ):
         """
         Initialize a correction rule.
@@ -45,13 +43,11 @@ class CorrectionRule:
             from_value (str): The incorrect value to be replaced
             category (str): The category (player, chest_type, source, general)
             status (str): The rule status (enabled or disabled)
-            description (str): Optional description or notes about the rule
         """
         self.to_value = to_value
         self.from_value = from_value
         self.category = category
         self.status = status
-        self.description = description
 
     def __eq__(self, other) -> bool:
         """
@@ -99,7 +95,6 @@ class CorrectionRule:
             "From": self.from_value,
             "Category": self.category,
             "Status": self.status,
-            "Description": self.description,
         }
 
     @classmethod
@@ -113,11 +108,10 @@ class CorrectionRule:
         Returns:
             CorrectionRule: New correction rule instance
         """
-        # Ignore 'Order' field if present in data for backward compatibility
+        # Ignore 'Order' and 'Description' fields if present for backward compatibility
         return cls(
             to_value=data.get("To", ""),
             from_value=data.get("From", ""),
             category=data.get("Category", "general"),
             status=data.get("Status", "enabled"),
-            description=data.get("Description", ""),
         )

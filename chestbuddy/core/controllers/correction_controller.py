@@ -371,28 +371,29 @@ class CorrectionController(BaseController):
             self.correction_error.emit(f"Error clearing rules: {str(e)}")
             return False
 
-    def get_rules(self, status=None, category=None, search_term=None):
+    def get_rules(
+        self,
+        category: Optional[str] = None,
+        status: Optional[str] = None,
+        search_term: Optional[str] = None,
+    ) -> List[CorrectionRule]:
         """
-        Get all correction rules.
+        Get correction rules with optional filtering.
 
         Args:
-            status (str, optional): Filter rules by status (e.g., "enabled", "disabled").
-                                   If None, returns all rules.
-            category (str, optional): Filter rules by category. If None, returns rules for all categories.
-            search_term (str, optional): Filter rules that contain the search term in 'from_value',
-                                      'to_value', or 'description'. Case-insensitive.
+            category (str, optional): Filter by category (player, chest_type, etc.)
+            status (str, optional): Filter by status (enabled, disabled)
+            search_term (str, optional): Filter rules containing this text in 'from_value' or
+                'to_value'. Case-insensitive.
 
         Returns:
-            List[CorrectionRule]: List of correction rules
+            List[CorrectionRule]: Filtered correction rules
         """
-        try:
-            return self._rule_manager.get_rules(
-                category=category, status=status, search_term=search_term
-            )
-        except Exception as e:
-            logger.error(f"Error getting correction rules: {e}")
-            self.correction_error.emit(f"Error getting rules: {str(e)}")
-            return []
+        return self._rule_manager.get_rules(
+            category=category,
+            status=status,
+            search_term=search_term,
+        )
 
     def get_rule(self, index):
         """

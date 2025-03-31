@@ -301,18 +301,26 @@ class AddEditRuleDialog(QDialog):
 
     def get_rule(self) -> CorrectionRule:
         """
-        Get a CorrectionRule object based on the current dialog values.
+        Get a CorrectionRule from the dialog values.
 
         Returns:
-            CorrectionRule: A rule with values from the dialog fields
+            CorrectionRule: The rule with values from the dialog
         """
+        from_value = self._from_value.text().strip()
+        to_value = self._to_value.text().strip()
+        category = self._category_combo.currentText().strip()
+
+        # Default to 'general' if category is empty
+        if not category:
+            category = "general"
+
+        # Get status (enabled or disabled)
         status = "enabled" if self._enabled_radio.isChecked() else "disabled"
 
-        # Map UI fields to CorrectionRule constructor correctly
+        # Create and return the rule
         return CorrectionRule(
-            to_value=self._to_value.text(),
-            from_value=self._from_value.text(),
-            category=self._category_combo.currentText(),
+            from_value=from_value,
+            to_value=to_value,
+            category=category,
             status=status,
-            order=self._order.value(),
         )

@@ -23,12 +23,12 @@ from chestbuddy.core.models.correction_rule_manager import CorrectionRuleManager
 def sample_rules():
     """Fixture providing a list of sample correction rules for testing."""
     return [
-        CorrectionRule("Player1", "player1", "player", "enabled", 0),
-        CorrectionRule("Player2", "player2", "player", "enabled", 1),
-        CorrectionRule("Chest1", "chest1", "chest_type", "enabled", 0),
-        CorrectionRule("Source1", "source1", "source", "enabled", 0),
-        CorrectionRule("General1", "general1", "general", "enabled", 0),
-        CorrectionRule("General2", "general2", "general", "disabled", 1),
+        CorrectionRule("Player1", "player1", "player", "enabled"),
+        CorrectionRule("Player2", "player2", "player", "enabled"),
+        CorrectionRule("Chest1", "chest1", "chest_type", "enabled"),
+        CorrectionRule("Source1", "source1", "source", "enabled"),
+        CorrectionRule("General1", "general1", "general", "enabled"),
+        CorrectionRule("General2", "general2", "general", "disabled"),
     ]
 
 
@@ -158,7 +158,7 @@ class TestCorrectionRuleManager:
         for rule in sample_rules:
             manager.add_rule(rule)
 
-        updated_rule = CorrectionRule("UpdatedValue", "general1", "general", "enabled", 0)
+        updated_rule = CorrectionRule("UpdatedValue", "general1", "general", "enabled")
         manager.update_rule(4, updated_rule)
 
         # Check that the rule was updated
@@ -328,28 +328,30 @@ class TestCorrectionRuleManager:
         for rule in sample_rules:
             manager.add_rule(rule)
 
-        # Add a rule with a specific term in description
-        search_rule = CorrectionRule("SearchResult", "SearchTerm", "general", "enabled", 5)
-        search_rule.description = "This is a searchable description"
-        manager.add_rule(search_rule)
+        # Add a rule with a specific search term in from_value
+        search_rule_from = CorrectionRule(
+            "SearchFromResult", "SearchFromTerm", "general", "enabled"
+        )
+        manager.add_rule(search_rule_from)
+
+        # Add another rule with a specific search term in to_value
+        search_rule_to = CorrectionRule("SearchToTerm", "SearchToSource", "general", "enabled")
+        manager.add_rule(search_rule_to)
 
         # Test search in from_value
-        result = manager.get_rules(search_term="Search")
+        result = manager.get_rules(search_term="SearchFrom")
         assert len(result) == 1
-        assert result[0].to_value == "SearchResult"
+        assert result[0].to_value == "SearchFromResult"
+        assert result[0].from_value == "SearchFromTerm"
 
         # Test search in to_value
-        result = manager.get_rules(search_term="Term")
+        result = manager.get_rules(search_term="SearchTo")
         assert len(result) == 1
-        assert result[0].from_value == "SearchTerm"
-
-        # Test search in description
-        result = manager.get_rules(search_term="searchable")
-        assert len(result) == 1
-        assert "searchable" in result[0].description.lower()
+        assert result[0].to_value == "SearchToTerm"
+        assert result[0].from_value == "SearchToSource"
 
         # Test combining search with category and status
-        player_rule = CorrectionRule("PlayerSearch", "PlayerTarget", "player", "enabled", 6)
+        player_rule = CorrectionRule("PlayerSearch", "PlayerTarget", "player", "enabled")
         manager.add_rule(player_rule)
 
         result = manager.get_rules(category="player", status="enabled", search_term="Search")
