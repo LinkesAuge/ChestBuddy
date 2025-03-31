@@ -350,20 +350,81 @@ class TestCorrectionController:
             assert signal_receiver.started_signals[0] == "Applying correction rules"
 
     def test_apply_corrections_task(self, controller, mock_correction_service, mock_view):
-        """Test the apply_corrections_task method."""
-        # Set up the view
+        """Test applying corrections in a background task."""
+        # Set up
         controller.set_view(mock_view)
 
-        # Directly call the task method (normally called by the worker)
-        result = controller._apply_corrections_task(
-            only_invalid=False, progress_callback=MagicMock()
-        )
+        # Run the task
+        result = controller._apply_corrections_task(only_invalid=True)
 
-        # Verify the correction service was called
-        mock_correction_service.apply_corrections.assert_called_once_with(only_invalid=False)
+        # Verify service was called
+        mock_correction_service.apply_corrections.assert_called_once_with(only_invalid=True)
 
-        # Verify the result includes the stats from the correction service
+        # Verify result matches service output
         assert result == mock_correction_service.apply_corrections.return_value
+
+    def test_recursive_correction(self, mocker, controller, mock_correction_service):
+        """Test that corrections are applied recursively until no more changes occur."""
+        # Configure mock service to return different results for each call
+        # First call: 5 corrections, second call: 3 corrections, third call: 0 corrections
+        mock_correction_service.apply_corrections.side_effect = [
+            {"total_corrections": 5, "corrected_rows": 3, "corrected_cells": 5},
+            {"total_corrections": 3, "corrected_rows": 2, "corrected_cells": 3},
+            {"total_corrections": 0, "corrected_rows": 0, "corrected_cells": 0},
+        ]
+
+        # Mock data hash method to simulate data changes
+        controller._get_data_hash = mocker.Mock()
+        controller._get_data_hash.side_effect = ["hash1", "hash2", "hash3", "hash3"]
+
+        # Call the method with recursive=True
+        result = controller._apply_corrections_task(recursive=True)
+
+        # Verify service was called three times
+        assert mock_correction_service.apply_corrections.call_count == 3
+
+        # Verify accumulated statistics
+        assert result["total_corrections"] == 8  # 5 + 3
+        assert result["corrected_rows"] == 3  # Max value
+        assert result["corrected_cells"] == 5  # Max value
+        assert result["iterations"] == 3
+
+    def test_selection_based_correction(
+        self, mocker, controller, mock_correction_service, mock_view
+    ):
+        """Test that corrections are applied only to selected cells when selected_only=True."""
+        # Setup view
+        controller.set_view(mock_view)
+
+        # Configure mocks
+        mock_correction_service.apply_corrections.return_value = {
+            "total_corrections": 5,
+            "corrected_rows": 3,
+            "corrected_cells": 5,
+        }
+
+        # Setup selected cells
+        mock_view.get_selected_indexes = mocker.Mock(return_value=[(0, 1), (1, 2), (2, 3)])
+
+        # Mock data model
+        mock_data_model = mocker.Mock()
+        mock_data_model.apply_selection_filter = mocker.Mock()
+        mock_data_model.restore_from_filtered_changes = mocker.Mock()
+
+        # Attach data model to controller
+        controller._data_model = mock_data_model
+
+        # Call the method with selected_only=True
+        result = controller._apply_corrections_task(selected_only=True)
+
+        # Verify selection filter was applied
+        mock_data_model.apply_selection_filter.assert_called_once()
+
+        # Verify data was restored after correction
+        mock_data_model.restore_from_filtered_changes.assert_called_once()
+
+        # Verify service was called with the filtered data
+        assert mock_correction_service.apply_corrections.call_count == 1
 
     def test_apply_corrections_task_with_progress(self, controller, mock_correction_service):
         """Test the apply_corrections_task method with progress reporting."""

@@ -9,6 +9,7 @@ Usage:
 """
 
 import logging
+import hashlib
 from typing import Dict, List, Any, Optional, Tuple, Callable
 from PySide6.QtCore import Signal, QObject, QThread
 
@@ -39,6 +40,9 @@ class CorrectionController(BaseController):
     correction_progress = Signal(int, int)  # current, total
     correction_completed = Signal(object)  # Statistics dictionary
     correction_error = Signal(str)
+
+    # Maximum recursive iterations to prevent infinite loops
+    MAX_ITERATIONS = 10
 
     def __init__(
         self,
@@ -131,25 +135,93 @@ class CorrectionController(BaseController):
 
         Args:
             only_invalid (bool): If True, only apply corrections to invalid cells
-            recursive (bool): If True, apply corrections recursively
+            recursive (bool): If True, apply corrections recursively until no more changes occur
             selected_only (bool): If True, only apply to selected cells
             progress_callback (callable): Function to report progress
 
         Returns:
             Dict[str, int]: Correction statistics
         """
+        # Initialize accumulators for statistics
+        total_stats = {"total_corrections": 0, "corrected_rows": 0, "corrected_cells": 0}
+        iteration = 0
+
         # Report initial progress
         if progress_callback:
             progress_callback(0, 100)
 
-        # Apply corrections
-        correction_stats = self._correction_service.apply_corrections(only_invalid=only_invalid)
+        # Track data state for detecting changes
+        previous_hash = None
+        current_hash = self._get_data_hash()
+
+        logger.info(
+            f"Starting correction process: only_invalid={only_invalid}, recursive={recursive}, selected_only={selected_only}"
+        )
+
+        # Handle selection-based correction
+        if (
+            selected_only
+            and hasattr(self, "_view")
+            and self._view is not None
+            and hasattr(self._view, "get_selected_indexes")
+        ):
+            # Get selected indexes
+            selected_indexes = self._view.get_selected_indexes()
+
+            # If there are selected indexes, apply selection filtering
+            if selected_indexes and hasattr(self, "_data_model") and self._data_model is not None:
+                self._data_model.apply_selection_filter(selected_indexes)
+
+        try:
+            # Apply corrections iteratively if recursive is True
+            while iteration < self.MAX_ITERATIONS:
+                # Apply a single round of corrections
+                current_stats = self._correction_service.apply_corrections(
+                    only_invalid=only_invalid
+                )
+
+                # Update accumulated statistics
+                total_stats["total_corrections"] += current_stats["total_corrections"]
+                # Take the maximum values for rows and cells as they might overlap
+                total_stats["corrected_rows"] = max(
+                    total_stats["corrected_rows"], current_stats["corrected_rows"]
+                )
+                total_stats["corrected_cells"] = max(
+                    total_stats["corrected_cells"], current_stats["corrected_cells"]
+                )
+
+                # Update progress
+                if progress_callback:
+                    progress = min(90, int(90 * (iteration + 1) / self.MAX_ITERATIONS))
+                    progress_callback(progress, 100)
+
+                iteration += 1
+                logger.debug(f"Correction iteration {iteration}: {current_stats}")
+
+                # Stop if no corrections were made or we're not in recursive mode
+                if current_stats["total_corrections"] == 0 or not recursive:
+                    break
+
+                # Check if data has changed
+                previous_hash = current_hash
+                current_hash = self._get_data_hash()
+                if previous_hash == current_hash:
+                    logger.debug("No data changes detected, stopping recursive correction")
+                    break
+        finally:
+            # Clean up selection filtering
+            if selected_only and hasattr(self, "_data_model") and self._data_model is not None:
+                self._data_model.restore_from_filtered_changes()
+
+        # Add iteration count to statistics
+        total_stats["iterations"] = iteration
 
         # Report final progress
         if progress_callback:
             progress_callback(100, 100)
 
-        return correction_stats
+        logger.info(f"Correction completed after {iteration} iterations: {total_stats}")
+        return total_stats
 
     def _on_corrections_progress(self, current, total):
         """
@@ -785,3 +857,24 @@ class CorrectionController(BaseController):
             self.correction_error.emit(error_msg)
             logger.error(error_msg)
             return result
+
+    def _get_data_hash(self):
+        """
+        Get a hash of the current data state to detect changes.
+
+        Returns:
+            str: A hash string representing the current data state
+        """
+        if (
+            not hasattr(self._correction_service, "_data_model")
+            or self._correction_service._data_model is None
+        ):
+            return "empty"
+
+        data = self._correction_service._data_model.data
+        if data is None or data.empty:
+            return "empty"
+
+        # Create a string representation of the DataFrame and hash it
+        data_str = data.to_string()
+        return hashlib.md5(data_str.encode()).hexdigest()
