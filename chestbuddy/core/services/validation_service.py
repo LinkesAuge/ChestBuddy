@@ -479,6 +479,9 @@ class ValidationService(QObject):
         try:
             # Skip if validation list is not available
             if not self._player_list_model:
+                logger.warning(
+                    "Player validation list model is not available, skipping player validation"
+                )
                 return {}
 
             result = {}
@@ -486,21 +489,53 @@ class ValidationService(QObject):
 
             # Skip if column is not available
             if self.PLAYER_COLUMN not in df.columns:
+                logger.warning(
+                    f"{self.PLAYER_COLUMN} column not found in data, skipping player validation"
+                )
                 return {}
+
+            # Count tracking variables
+            total_players = 0
+            invalid_players = 0
+            valid_players = 0
+            empty_players = 0
+
+            # Debug: List valid players from model for reference
+            player_list = self._player_list_model.get_entries()
+            first_few_valid = player_list[:5] if player_list else []
+            logger.debug(
+                f"Player validation using {len(player_list)} entries. First few: {first_few_valid}"
+            )
 
             # Check each player name against validation list
             for idx, player in df[self.PLAYER_COLUMN].items():
+                total_players += 1
+
                 # Skip empty values
                 if pd.isna(player) or player == "":
+                    empty_players += 1
                     continue
 
                 # Check if player is in validation list
                 if not self._player_list_model.contains(player):
                     result[idx] = f"Invalid player name: {player}"
+                    invalid_players += 1
+
+                    # Log detailed info for the first few invalid players
+                    if invalid_players <= 5:
+                        logger.debug(f"INVALID PLAYER at row {idx}: '{player}'")
+                else:
+                    valid_players += 1
+
+            # Log summary of findings
+            logger.debug(
+                f"Player validation complete: {total_players} total, {valid_players} valid, {invalid_players} invalid, {empty_players} empty"
+            )
+            logger.debug(f"Found {len(result)} invalid player entries")
 
             return result
         except Exception as e:
-            logger.error(f"Error checking player names: {e}")
+            logger.error(f"Error checking players: {e}")
             return {}
 
     def _check_chest_types(self) -> Dict[int, str]:
@@ -513,6 +548,9 @@ class ValidationService(QObject):
         try:
             # Skip if validation list is not available
             if not self._chest_type_list_model:
+                logger.warning(
+                    "Chest type validation list model is not available, skipping chest type validation"
+                )
                 return {}
 
             result = {}
@@ -520,17 +558,49 @@ class ValidationService(QObject):
 
             # Skip if column is not available
             if self.CHEST_COLUMN not in df.columns:
+                logger.warning(
+                    f"{self.CHEST_COLUMN} column not found in data, skipping chest type validation"
+                )
                 return {}
+
+            # Count tracking variables
+            total_chests = 0
+            invalid_chests = 0
+            valid_chests = 0
+            empty_chests = 0
+
+            # Debug: List valid chest types from model for reference
+            chest_list = self._chest_type_list_model.get_entries()
+            first_few_valid = chest_list[:5] if chest_list else []
+            logger.debug(
+                f"Chest type validation using {len(chest_list)} entries. First few: {first_few_valid}"
+            )
 
             # Check each chest type against validation list
             for idx, chest_type in df[self.CHEST_COLUMN].items():
+                total_chests += 1
+
                 # Skip empty values
                 if pd.isna(chest_type) or chest_type == "":
+                    empty_chests += 1
                     continue
 
                 # Check if chest type is in validation list
                 if not self._chest_type_list_model.contains(chest_type):
                     result[idx] = f"Invalid chest type: {chest_type}"
+                    invalid_chests += 1
+
+                    # Log detailed info for the first few invalid chest types
+                    if invalid_chests <= 5:
+                        logger.debug(f"INVALID CHEST TYPE at row {idx}: '{chest_type}'")
+                else:
+                    valid_chests += 1
+
+            # Log summary of findings
+            logger.debug(
+                f"Chest type validation complete: {total_chests} total, {valid_chests} valid, {invalid_chests} invalid, {empty_chests} empty"
+            )
+            logger.debug(f"Found {len(result)} invalid chest type entries")
 
             return result
         except Exception as e:
@@ -547,6 +617,9 @@ class ValidationService(QObject):
         try:
             # Skip if validation list is not available
             if not self._source_list_model:
+                logger.warning(
+                    "Source validation list model is not available, skipping source validation"
+                )
                 return {}
 
             result = {}
@@ -554,17 +627,49 @@ class ValidationService(QObject):
 
             # Skip if column is not available
             if self.SOURCE_COLUMN not in df.columns:
+                logger.warning(
+                    f"{self.SOURCE_COLUMN} column not found in data, skipping source validation"
+                )
                 return {}
+
+            # Count tracking variables
+            total_sources = 0
+            invalid_sources = 0
+            valid_sources = 0
+            empty_sources = 0
+
+            # Debug: List valid sources from model for reference
+            source_list = self._source_list_model.get_entries()
+            first_few_valid = source_list[:5] if source_list else []
+            logger.debug(
+                f"Source validation using {len(source_list)} entries. First few: {first_few_valid}"
+            )
 
             # Check each source against validation list
             for idx, source in df[self.SOURCE_COLUMN].items():
+                total_sources += 1
+
                 # Skip empty values
                 if pd.isna(source) or source == "":
+                    empty_sources += 1
                     continue
 
                 # Check if source is in validation list
                 if not self._source_list_model.contains(source):
                     result[idx] = f"Invalid source: {source}"
+                    invalid_sources += 1
+
+                    # Log detailed info for the first few invalid sources
+                    if invalid_sources <= 5:
+                        logger.debug(f"INVALID SOURCE at row {idx}: '{source}'")
+                else:
+                    valid_sources += 1
+
+            # Log summary of findings
+            logger.debug(
+                f"Source validation complete: {total_sources} total, {valid_sources} valid, {invalid_sources} invalid, {empty_sources} empty"
+            )
+            logger.debug(f"Found {len(result)} invalid source entries")
 
             return result
         except Exception as e:
@@ -825,6 +930,14 @@ class ValidationService(QObject):
             # Add column for overall row status
             status_df["_row_status"] = ValidationStatus.VALID
 
+            # Debug: Count issues before processing
+            total_issues = sum(len(rule_issues) for rule_issues in validation_results.values())
+            logger.debug(
+                f"*** VALIDATION: Processing {total_issues} total issues from {len(validation_results)} rules ***"
+            )
+            for rule_name, issues in validation_results.items():
+                logger.debug(f"Rule '{rule_name}' has {len(issues)} issues")
+
             # Flag cells as invalid based on validation results
             for rule_name, issues in validation_results.items():
                 for row_idx, message in issues.items():
@@ -850,6 +963,48 @@ class ValidationService(QObject):
             # Detect and mark correctable entries
             if self._correction_service is not None:
                 status_df = self._mark_correctable_entries(status_df)
+
+            # Debug: Count status types after processing
+            status_counts = {
+                "valid": 0,
+                "invalid": 0,
+                "correctable": 0,
+                "invalid_row": 0,
+                "not_validated": 0,
+                "other": 0,
+            }
+
+            for col in status_df.columns:
+                if col.endswith("_status"):
+                    for status in status_df[col]:
+                        if status == ValidationStatus.VALID:
+                            status_counts["valid"] += 1
+                        elif status == ValidationStatus.INVALID:
+                            status_counts["invalid"] += 1
+                        elif status == ValidationStatus.CORRECTABLE:
+                            status_counts["correctable"] += 1
+                        elif status == ValidationStatus.INVALID_ROW:
+                            status_counts["invalid_row"] += 1
+                        elif status == ValidationStatus.NOT_VALIDATED:
+                            status_counts["not_validated"] += 1
+                        else:
+                            status_counts["other"] += 1
+
+            logger.debug(f"*** VALIDATION: Final status count in status_df: {status_counts} ***")
+
+            # Log a sample of invalid or correctable rows
+            for idx in range(min(5, len(status_df))):
+                row_data = status_df.iloc[idx]
+                row_status = row_data.get("_row_status", "Unknown")
+                if row_status != ValidationStatus.VALID:
+                    logger.debug(f"Sample invalid row {idx}: {row_status}")
+                    for col in column_names:
+                        status_col = f"{col}_status"
+                        if (
+                            status_col in row_data
+                            and row_data[status_col] != ValidationStatus.VALID
+                        ):
+                            logger.debug(f"  - {col}: {row_data[status_col]}")
 
             # Update the validation status in the data model
             self._data_model.set_validation_status(status_df)

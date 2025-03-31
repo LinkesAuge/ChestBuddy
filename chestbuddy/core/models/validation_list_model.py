@@ -282,7 +282,7 @@ class ValidationListModel(QObject):
 
     def contains(self, entry: str) -> bool:
         """
-        Check if an entry exists in the list.
+        Check if an entry exists in the validation list.
 
         Args:
             entry (str): Entry to check
@@ -290,7 +290,33 @@ class ValidationListModel(QObject):
         Returns:
             bool: True if entry exists, False otherwise
         """
-        return self._is_duplicate_entry(entry)
+        if entry is None or entry == "":
+            return False
+
+        # Static counter for debugging - limit logging to first few checks
+        if not hasattr(self, "_contains_call_count"):
+            self._contains_call_count = 0
+        self._contains_call_count += 1
+
+        # Only log the first 10 calls for this file to avoid excessive logging
+        should_log = self._contains_call_count <= 10
+
+        # Check if entry exists
+        if self._case_sensitive:
+            result = entry in self.entries
+            if should_log:
+                logger.debug(
+                    f"[{self._contains_call_count}] CASE SENSITIVE check if '{entry}' in list '{self.file_path.name}': {result}"
+                )
+            return result
+        else:
+            entry_lower = entry.lower()
+            result = any(e.lower() == entry_lower for e in self.entries)
+            if should_log:
+                logger.debug(
+                    f"[{self._contains_call_count}] CASE INSENSITIVE check if '{entry}' in list '{self.file_path.name}': {result}"
+                )
+            return result
 
     def get_entries(self) -> List[str]:
         """

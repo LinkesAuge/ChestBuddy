@@ -1764,11 +1764,55 @@ class DataView(QWidget):
             logger.debug(
                 f"Highlighting based on validation_status shape: {validation_status.shape}"
             )  # Log shape
-            # Log first few rows of status data
+
+            # Count validation statuses for debugging
+            status_counts = {
+                "valid": 0,
+                "invalid": 0,
+                "correctable": 0,
+                "not_validated": 0,
+                "other": 0,
+            }
+            validatable_cols = [self.PLAYER_COLUMN, self.SOURCE_COLUMN, self.CHEST_COLUMN]
+
+            # Sample some rows for detailed logging
+            sample_rows = []
             if not validation_status.empty:
-                logger.debug(
-                    f"Validation status head for highlighting:\n{validation_status.head().to_string()}"
-                )
+                # Log first few rows of status data
+                logger.debug(f"Validation status head:\n{validation_status.head().to_string()}")
+
+                # Count statuses
+                for _, row in validation_status.iterrows():
+                    for col in validatable_cols:
+                        status_key = f"{col}_status"
+                        if status_key in row:
+                            status_val = row[status_key]
+                            if status_val == ValidationStatus.VALID:
+                                status_counts["valid"] += 1
+                            elif status_val == ValidationStatus.INVALID:
+                                status_counts["invalid"] += 1
+                            elif status_val == ValidationStatus.CORRECTABLE:
+                                status_counts["correctable"] += 1
+                            elif status_val == ValidationStatus.NOT_VALIDATED:
+                                status_counts["not_validated"] += 1
+                            else:
+                                status_counts["other"] += 1
+
+                # Sample a few rows for detailed logging
+                for i in range(min(5, len(validation_status))):
+                    row = validation_status.iloc[i]
+                    row_data = {}
+                    for col in validatable_cols:
+                        status_key = f"{col}_status"
+                        valid_key = f"{col}_valid"
+                        if status_key in row:
+                            row_data[status_key] = row[status_key]
+                        if valid_key in row:
+                            row_data[valid_key] = row[valid_key]
+                    sample_rows.append(row_data)
+
+                logger.debug(f"Validation status counts: {status_counts}")
+                logger.debug(f"Sample rows validation data: {sample_rows}")
 
             # Block signals for performance during batch update
             self._table_model.blockSignals(True)
@@ -1780,6 +1824,13 @@ class DataView(QWidget):
             # Prepare status updates for batch processing
             status_updates = []
             cell_status_updates = []
+            status_text_counts = {
+                "Valid": 0,
+                "Invalid": 0,
+                "Correctable": 0,
+                "Not validated": 0,
+                "Other": 0,
+            }
 
             # Iterate through the validation status DataFrame (data model indices)
             for row_idx, row_data in validation_status.iterrows():
@@ -1802,30 +1853,46 @@ class DataView(QWidget):
 
                 # Check for correctable status
                 has_correctable = False
+                has_invalid = False
                 for col in validatable_columns:
                     status_key = f"{col}_status"
+                    valid_key = f"{col}_valid"
                     if (
                         status_key in row_data
                         and row_data[status_key] == ValidationStatus.CORRECTABLE
                     ):
                         has_correctable = True
-                        break
+                    if valid_key in row_data and not row_data[valid_key]:
+                        has_invalid = True
 
                 # Determine status text based on validation state
                 if has_correctable:
                     status_text = "Correctable"
+                    status_text_counts["Correctable"] += 1
+                elif has_invalid or not is_row_overall_valid:
+                    status_text = "Invalid"
+                    status_text_counts["Invalid"] += 1
                 else:
                     status_text = "Valid" if is_row_overall_valid else "Invalid"
                     # Handle non-boolean cases if they occur
                     if not isinstance(is_row_overall_valid, bool):
                         status_text = str(row_data.get(self.STATUS_COLUMN, "Unknown"))
                         is_row_overall_valid = False  # Treat non-bool as invalid for row context
+                    status_text_counts[
+                        status_text if status_text in status_text_counts else "Other"
+                    ] += 1
 
                 # Add status column text update to batch
                 if status_col != -1:
                     status_updates.append((filtered_idx, status_col, status_text))
                 else:
                     logger.warning("STATUS column index not found, cannot update status text.")
+
+                # For detailed logging of a few rows
+                if row_idx < 5:
+                    logger.debug(
+                        f"Row {row_idx}: valid={is_row_overall_valid}, has_invalid={has_invalid}, has_correctable={has_correctable}, status_text={status_text}"
+                    )
 
                 # Process each data column in the row
                 for col_idx in range(self._table_model.columnCount()):
@@ -1850,6 +1917,12 @@ class DataView(QWidget):
                     # Store simple boolean status: True if invalid, False otherwise
                     target_status = is_cell_invalid
 
+                    # Log detailed info for a few cells
+                    if row_idx < 5 and column_name in validatable_columns:
+                        logger.debug(
+                            f"Cell [{row_idx},{col_idx}] {column_name}: valid={is_cell_specifically_valid}, status={cell_status}, target_status={target_status}"
+                        )
+
                     # Get current status
                     current_status = item.data(Qt.UserRole + 1)
                     current_val_status = item.data(Qt.UserRole + 2)
@@ -1869,9 +1942,15 @@ class DataView(QWidget):
                             logger.debug(
                                 f"Set cell ({filtered_idx}, {col_idx}) validation status to CORRECTABLE"
                             )
+                        elif cell_status == ValidationStatus.INVALID:
+                            logger.debug(
+                                f"Set cell ({filtered_idx}, {col_idx}) validation status to INVALID"
+                            )
 
             logger.debug(f"Processed {len(validation_status)} rows for highlighting.")
-            logger.debug(f"Updating {len(status_updates)} STATUS column texts.")
+            logger.debug(
+                f"Updating {len(status_updates)} STATUS column texts with counts: {status_text_counts}"
+            )
             logger.debug(
                 f"Updating {len(cell_status_updates)} individual cell validation statuses."
             )
@@ -1901,7 +1980,10 @@ class DataView(QWidget):
         self._table_view.viewport().update()
         # Count invalid rows based on the text in the status column now
         invalid_row_count = sum(1 for _, _, text in status_updates if text == "Invalid")
-        logger.debug(f"Applied validation status: {invalid_row_count} invalid rows identified.")
+        correctable_row_count = sum(1 for _, _, text in status_updates if text == "Correctable")
+        logger.debug(
+            f"Applied validation status: {invalid_row_count} invalid rows, {correctable_row_count} correctable rows identified."
+        )
 
     @Slot(object)
     def _on_correction_applied(self, correction_status) -> None:

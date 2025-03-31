@@ -13,10 +13,13 @@ from PySide6.QtCore import Qt, QModelIndex, QRect
 from PySide6.QtGui import QPainter, QColor
 from PySide6.QtWidgets import QStyledItemDelegate, QStyle, QStyleOptionViewItem
 
-from chestbuddy.core.validation_enums import ValidationStatus
+from chestbuddy.core.enums.validation_enums import ValidationStatus
 
 # Set up logger
 logger = logging.getLogger(__name__)
+
+# Log the available validation statuses for debugging
+logger.debug(f"ValidationStatus enum loaded: {[status.name for status in ValidationStatus]}")
 
 
 class ValidationStatusDelegate(QStyledItemDelegate):
