@@ -21,16 +21,22 @@ This document records cleanup activities performed on the ChestBuddy codebase to
    - Deleted `chestbuddy/ui/validation_tab.py` as it has been replaced by ValidationTabView
    - Updated tests in `tests/test_ui_components.py` to use ValidationTabView
 
+4. **Implemented New View Components** (2024-05-16)
+   - Created `chestbuddy/ui/views/chart_view.py` to replace ChartViewAdapter and ChartTab
+   - Implemented following the same pattern as CorrectionView
+   - Maintained signal compatibility with ChartViewAdapter for smooth transition
+
 ## Current Refactoring Status
 
 1. **UI Component Migration Progress**
    - ValidationTab → ValidationTabView: ✓ Complete (component deleted)
-   - CorrectionTab → CorrectionView: 🔄 In Progress
+   - CorrectionTab → CorrectionView: ✓ Complete
      - MainWindow now uses CorrectionView directly
-     - CorrectionViewAdapter still uses CorrectionTab and is marked deprecated
+     - CorrectionViewAdapter still exists but is marked deprecated
    - ChartTab → ChartView: 🔄 In Progress
-     - ChartViewAdapter still depends on ChartTab and is marked deprecated
-     - ChartView component needs to be implemented
+     - ChartView implementation is complete
+     - MainWindow needs to be updated to use ChartView directly
+     - ChartViewAdapter still exists but is marked deprecated
 
 2. **Adapter Status**
    - ValidationViewAdapter: Uses ValidationTabView (modern component)
@@ -39,37 +45,35 @@ This document records cleanup activities performed on the ChestBuddy codebase to
      - Will be removed once all code uses CorrectionView directly
    - ChartViewAdapter: Still uses ChartTab (legacy component)
      - Now marked deprecated with warnings
-     - Will be replaced by ChartView in a future release
+     - Will be replaced by ChartView (implementation complete)
 
 ## Future Cleanup Tasks
 
-1. **Remove Remaining Legacy UI Components**
+1. **Update MainWindow to Use ChartView**
+   - Replace imports and initialization of ChartViewAdapter with ChartView
+   - Similar to how CorrectionView is already being used
+
+2. **Remove Remaining Legacy UI Components**
    - Once all adapter views are refactored to not depend on legacy components, remove:
      - `chestbuddy/ui/correction_tab.py`
      - `chestbuddy/ui/chart_tab.py`
      - `chestbuddy/ui/views/correction_view_adapter.py`
      - `chestbuddy/ui/views/chart_view_adapter.py`
 
-2. **Update Tests**
+3. **Update Tests**
    - Update remaining tests to use the new view-based components directly
    - Tests to be updated include:
      - `tests/test_chart_tab.py`
      - `tests/test_chart_tab_simple.py`
      - `tests/test_mainwindow_chart_integration.py`
+     - `tests/test_chart_view_adapter.py`
+   - Create new tests for ChartView
    - Completed test updates:
      - `tests/test_main_window.py` - Updated fixtures to support the new MainWindow constructor (2024-05-16)
        - Added mock objects for all required dependencies
        - Updated assertions to focus on core functionality rather than specific UI implementation
 
-3. **Refactor Adapter Views**
-   - Refactor these adapter views to not depend on the legacy components:
-     - `chestbuddy/ui/views/chart_view_adapter.py`
-
-4. **Implement Missing View Components**
-   - Create `ChartView` component to replace `ChartViewAdapter` and `ChartTab`
-   - Follow the same pattern as `CorrectionView`
-
-5. **Organize Debug Utilities**
+4. **Organize Debug Utilities**
    - Move debug-only utilities to a dedicated debug or tools directory
    - Consider creating a proper debug module for development tools
 
@@ -99,6 +103,8 @@ When refactoring adapter views:
 
 ### ChartTab to ChartView
 - ChartViewAdapter currently wraps ChartTab but has been marked as deprecated
-- A new ChartView component needs to be implemented following the same pattern as CorrectionView
+- ChartView implementation is now complete, following the same pattern as CorrectionView
 - The MainWindow still imports and uses ChartViewAdapter
-- Once ChartView is implemented, MainWindow should be updated to use it directly 
+- Next step is to update MainWindow to use ChartView directly
+- ChartView maintains the same signals as ChartViewAdapter to ensure compatibility
+- Once all code uses ChartView directly, both ChartViewAdapter and ChartTab can be removed 
