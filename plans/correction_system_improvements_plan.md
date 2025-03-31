@@ -263,9 +263,25 @@ def _apply_corrections_task(
     return total_stats
 ```
 
-### Phase 3: Correctable Status Detection Implementation
+### Phase 3: Correctable Status Detection Implementation (Partially Complete)
 
-#### 3.1: Test for Correctable Status Detection (Day 5)
+#### Visual Integration ✓ Complete
+
+We have successfully implemented the visual integration part of this phase:
+
+1. Added proper visualization for different validation statuses:
+   - Valid cells with light green background
+   - Invalid cells with deep red background with black border
+   - Correctable cells with orange background with darker orange border
+
+2. Updated ValidationStatusDelegate to prioritize status display:
+   - Clear priority order (CORRECTABLE > INVALID > row status)
+   - Enhanced color distinction
+   - Improved visual feedback
+
+3. Fixed ValidationService._update_validation_status to properly mark cells as CORRECTABLE
+
+#### 3.1: Test for Correctable Status Detection (Day 5 - Remaining)
 
 ```python
 def test_check_correctable_status(self, mocker):
@@ -326,7 +342,7 @@ def test_check_correctable_status(self, mocker):
     assert updated_status.at[0, "PLAYER_valid"] == ValidationStatus.VALID
 ```
 
-#### 3.2: Implement Correctable Status Detection (Day 5-6)
+#### 3.2: Implement Correctable Status Detection (Day 5-6 - Remaining)
 
 ```python
 def check_correctable_status(self):
@@ -529,165 +545,32 @@ def _on_validation_completed(self):
     self._update_ui_state()
 ```
 
-### Phase 5: Settings UI Implementation
+## Timeline and Prioritization
 
-#### 5.1: Update Settings UI (Day 10-11)
+1. **Phase 3 (Partially Complete)**: Complete the algorithmic detection of correctable cells based on available rules (2 days)
+2. **Phase 1**: Implement recursive correction functionality (2 days)
+3. **Phase 2**: Implement selection-based correction (2 days)
+4. **Phase 4**: Implement auto-correction options (3 days)
 
-```python
-def _setup_ui(self):
-    """Set up the settings UI with correction options."""
-    # ... existing code ...
-    
-    # Create correction settings group
-    correction_group = QGroupBox("Correction Settings")
-    correction_layout = QVBoxLayout()
-    
-    # Create checkbox options
-    self._auto_correct_on_validation = QCheckBox("Automatically apply corrections after validation")
-    self._auto_correct_on_import = QCheckBox("Automatically apply corrections on import")
-    
-    # Initialize checkbox states
-    self._auto_correct_on_validation.setChecked(
-        self._config_manager.get_auto_correct_on_validation()
-    )
-    self._auto_correct_on_import.setChecked(
-        self._config_manager.get_auto_correct_on_import()
-    )
-    
-    # Add to layout
-    correction_layout.addWidget(self._auto_correct_on_validation)
-    correction_layout.addWidget(self._auto_correct_on_import)
-    correction_group.setLayout(correction_layout)
-    
-    # Add to main layout
-    self._layout.addWidget(correction_group)
-    
-    # ... existing code ...
+Total estimated time: 9 working days
 
-def _apply_settings(self):
-    """Apply all settings."""
-    # ... existing code ...
-    
-    # Apply correction settings
-    self._config_manager.set_auto_correct_on_validation(
-        self._auto_correct_on_validation.isChecked()
-    )
-    self._config_manager.set_auto_correct_on_import(
-        self._auto_correct_on_import.isChecked()
-    )
-    
-    # ... existing code ...
-```
+## Acceptance Criteria
 
-### Phase 6: Integration Testing
+1. Recursive correction continues applying rules until no more changes are made
+2. Selection-based correction only applies to selected cells
+3. Correctable status detection identifies invalid cells that have matching rules
+4. Auto-correction options can be configured and work correctly
 
-#### 6.1: Create Integration Tests (Day 12-14)
+## Testing Strategy
 
-```python
-def test_correction_workflow_e2e(self, qtbot, main_window):
-    """Test the complete correction workflow end-to-end."""
-    # Import test data with invalid entries
-    # ... import code ...
-    
-    # Verify validation shows invalid cells
-    # ... validation check code ...
-    
-    # Verify correctable cells are marked correctly
-    # ... check correctable status ...
-    
-    # Apply corrections
-    # Access correction view
-    main_window._set_active_view('correction')
-    correction_view = main_window._views['correction']
-    
-    # Get apply button and click it
-    apply_button = correction_view._rule_view._apply_button
-    qtbot.mouseClick(apply_button, Qt.LeftButton)
-    
-    # Wait for correction to complete
-    qtbot.waitUntil(lambda: not hasattr(correction_view._correction_controller, '_worker') 
-                   or correction_view._correction_controller._worker is None)
-    
-    # Verify corrections were applied
-    # ... check correction results ...
-```
+Each phase includes dedicated test cases:
+1. Test that recursive correction applies rules until no more changes occur
+2. Test that selection-based correction only applies to selected cells
+3. Test that correctable status detection correctly identifies cells that can be corrected
+4. Test that auto-correction options are correctly stored in config and applied when enabled
 
-## Enhanced UI Features
+## UI Implications
 
-### Updated UI Components
-
-1. **Settings Panel with Auto-Correction Options**
-   - Add checkboxes for auto-correction on validation
-   - Add checkboxes for auto-correction on import
-   - Add correction configuration options
-   - Add UI for recursive correction options
-
-2. **Improved Data View Integration**
-   - Enhanced cell highlighting for correctable cells
-   - Tooltip showing correction rule that would be applied
-   - Context menu with correction options
-   - Status indicator in status bar showing correctable cell count
-
-3. **Correction View Enhancements**
-   - Rules table with correctable count column
-   - Preview feature showing affected cells
-   - Enhanced rule editor with validation
-   - Import/Export with format options
-
-## Implementation Timeline
-
-### Week 1
-- Phase 1: Test and implement recursive correction
-- Phase 2: Test and implement selection-based correction
-
-### Week 2
-- Phase 3: Test and implement correctable status detection
-- Phase 4: Test and implement auto-correction options
-
-### Week 3
-- Phase 5: Test and implement UI components
-- Phase 6: Create integration tests
-
-### Week 4
-- Final testing and bug fixes
-- Documentation updates
-- Performance optimization
-
-## Success Criteria
-
-1. **Functionality**
-   - Recursive correction works properly
-   - Selection-based correction works properly
-   - Correctable status is properly detected and displayed
-   - Auto-correction options work as expected
-
-2. **Test Coverage**
-   - Test coverage of new features is at least 90%
-   - All test cases pass consistently
-
-3. **Documentation**
-   - Code is properly documented with docstrings
-   - User documentation is updated
-   - Memory-bank entries are updated
-
-4. **Performance**
-   - Correction operation completes within acceptable time limits
-   - UI remains responsive during correction operations
-
-## Risk Management
-
-1. **Performance with Large Datasets**
-   - Risk: Recursive correction could be slow with large datasets
-   - Mitigation: Add progress reporting, cancel option, and batch processing
-
-2. **Integration Issues**
-   - Risk: New features might conflict with existing code
-   - Mitigation: Comprehensive integration testing and incremental implementation
-
-3. **UI Responsiveness**
-   - Risk: Complex operations might freeze the UI
-   - Mitigation: Ensure all operations run in background threads with proper progress reporting
-
-## Conclusion
-
-This plan outlines a comprehensive approach to improving the correction system in ChestBuddy. Following this plan will address the current issues with the system and add new features to enhance the user experience. The test-driven development approach will ensure high quality and maintainability of the code. 
+1. Add a "Recursive" checkbox in the correction dialog
+2. Add "Auto-correct on validation" and "Auto-correct on import" options in settings
+3. Update cell highlighting to use distinct colors for different validation statuses

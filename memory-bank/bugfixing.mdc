@@ -249,360 +249,60 @@ def _populate_table_chunked(self, start_row=0, chunk_size=200):
 
 **Fix**: Added file locking mechanism to prevent concurrent access.
 
-```python
-def save(self):
-    """Save the configuration to file."""
-    try:
-        with FileLock(self._config_file + ".lock"):
-            with open(self._config_file, 'w') as f:
-                self._config.write(f)
-        return True
-    except Exception as e:
-        self._logger.error(f"Error saving configuration: {str(e)}")
-        return False
-```
+## April 28, 2024: Signal Handling in Tests
 
-**Result**: Configuration now saves reliably without permission errors.
+### FIXED: Signal Access Violation in Tests
 
-## April 25, 2024: Validation System
+**Issue**: Tests getting C++ object access violation exceptions when accessing Qt signals.
 
-### FIXED: Validation Status Not Updating
+**Root Cause**: Trying to access signals after QObject cleanup.
 
-**Issue**: Validation status in the UI would not update when validation lists changed.
-
-**Root Cause**: Signal connection issue between ValidationService and ValidationTabView.
-
-**Fix**: 
-1. Modified the signal definition in ValidationTabView
-2. Updated signal emission to include necessary data
-3. Fixed signal connection in application initialization
+**Fix**: Created a helper class for handling signals safely in tests:
 
 ```python
-# In ValidationTabView
-validation_changed = Signal(object)  # Changed from Signal()
-
-# In _on_entries_changed method
-self.validation_changed.emit(pd.DataFrame())  # Changed from self.validation_changed.emit()
-
-# In application initialization
-self._validation_tab.validation_changed.connect(self._validation_service.validate_data)
+class MockSignal:
+    """Helper class for mocking Qt signals in tests."""
+    def __init__(self):
+        self.connected_slots = []
+        
+    def connect(self, slot):
+        self.connected_slots.append(slot)
+        
+    def emit(self, *args, **kwargs):
+        for slot in self.connected_slots:
+            slot(*args, **kwargs)
 ```
 
-**Result**: Validation status now updates correctly when validation lists change.
+## April 25, 2024: MainWindow Test Fixes
 
-## BatchCorrectionDialog and DataView Integration (May 10, 2024)
+### FIXED: MainWindow Tests Failing After Architecture Change
 
-### FIXED: BatchCorrectionDialog Integration with DataView
+**Issue**: 22 tests failing in test_main_window.py after architecture change.
 
-**Issue**: BatchCorrectionDialog was not properly integrated with the DataView for getting selected cells.
+**Root Cause**: MainWindow constructor parameters and initialization changed.
 
-**Root Cause**: Missing context menu integration and selected cell collection functionality in DataView.
-
-**Fix**:
-1. Added context menu integration in DataView:
-   ```python
-   def _setup_context_menu(self) -> None:
-       # Create context menu
-       self._context_menu = QMenu(self)
-       
-       # Add existing actions...
-       
-       # Add separator before correction actions
-       self._context_menu.addSeparator()
-       
-       # Add correction-related items
-       self._add_correction_rule_action = QAction("Add Correction Rule", self)
-       self._add_correction_rule_action.triggered.connect(self._on_add_correction_rule)
-       self._context_menu.addAction(self._add_correction_rule_action)
-       
-       self._add_batch_correction_action = QAction("Create Batch Correction Rules", self)
-       self._add_batch_correction_action.triggered.connect(self._on_add_batch_correction)
-       self._context_menu.addAction(self._add_batch_correction_action)
-   ```
-
-2. Implemented selected cell collection in DataView:
-   ```python
-   def _get_selected_cells(self):
-       """Get information about selected cells."""
-       selected_cells = []
-       
-       # Get selected indexes from the table view
-       selected_indexes = self._table_view.selectedIndexes()
-       if not selected_indexes:
-           return selected_cells
-           
-       # Process each index...
-       for index in selected_indexes:
-           # Get data and add to selected_cells list...
-           selected_cells.append({
-               "row": source_row,
-               "col": source_column,
-               "value": value,
-               "column_name": column_name
-           })
-       
-       return selected_cells
-   ```
-
-3. Connected BatchCorrectionDialog to use selected cells data in CorrectionRuleView:
-   ```python
-   def _show_batch_correction_dialog(self):
-       """Show the batch correction dialog."""
-       # Get selected cells from DataView
-       selected_cells = []
-       app = QApplication.instance()
-       if hasattr(app, "get_main_window"):
-           main_window = app.get_main_window()
-           if main_window and hasattr(main_window, "get_active_view"):
-               active_view = main_window.get_active_view()
-               if active_view and hasattr(active_view, "_get_selected_cells"):
-                   selected_cells = active_view._get_selected_cells()
-      
-       # Show dialog with selected cells...
-   ```
-
-**Result**: BatchCorrectionDialog now properly works with DataView selected cells, allowing users to create correction rules from selected data.
-
-### IMPLEMENTED: Cell Highlighting for Correction Status
-
-**Issue**: DataView did not provide visual feedback for correction status.
-
-**Fix**:
-1. Added highlighting method in DataView:
-   ```python
-   def _highlight_correction_cells(self):
-       """Highlight cells based on correction status."""
-       # Get correction status from controller
-       correction_status = correction_controller.get_correction_status()
-       
-       # Apply highlighting for different cell types:
-       # - Red for invalid cells without correction rules
-       # - Orange for invalid cells with correction rules
-       # - Green for corrected cells
-   ```
-
-2. Added tooltips to show correction information:
-   ```python
-   def _update_correction_tooltips(self):
-       """Update tooltips with correction information."""
-       # Get tooltips from correction status
-       tooltips = correction_status.get("tooltips", {})
-       
-       # Apply tooltips to cells
-       for (row, col), tooltip in tooltips.items():
-           self._set_cell_tooltip(row, col, tooltip)
-   ```
-
-3. Connected to correction completion signal:
-   ```python
-   def _on_correction_completed(self, stats):
-       """Handle correction completed signal."""
-       # Update highlighting and tooltips
-       self._highlight_correction_cells()
-       self._update_correction_tooltips()
-   ```
-
-**Result**: DataView now shows visual feedback for correction status, making it easier for users to identify corrected cells and cells that need correction.
-
-### ENHANCED: CorrectionController for DataView Integration
-
-**Issue**: CorrectionController lacked methods needed for proper data view integration.
-
-**Fix**:
-1. Added get_correction_status() method to provide correction status information:
-   ```python
-   def get_correction_status(self):
-       """Get correction status for all cells."""
-       # Return dict with:
-       # - invalid_cells: List of (row, col) for invalid cells
-       # - corrected_cells: List of (row, col) for corrected cells
-       # - correctable_cells: List of (row, col) for cells with rules
-       # - tooltips: Dict mapping (row, col) to tooltip text
-   ```
-
-2. Added get_applicable_rules() method to find rules for specific cells:
-   ```python
-   def get_applicable_rules(self, value, column_name=None):
-       """Get rules applicable to a specific value and column."""
-       # Find and return matching rules
-   ```
-
-3. Added apply_rules_to_selection() method for batch correction:
-   ```python
-   def apply_rules_to_selection(self, selection, recursive=True, only_invalid=True):
-       """Apply correction rules to a selection of cells."""
-       # Apply appropriate rules to each selected cell
-   ```
-
-**Result**: CorrectionController now provides all the functionality needed for proper DataView integration, enabling seamless user interaction with the correction feature.
-
-# Bug Tracking and Fixes
-
-## UI Components
-
-### AddEditRuleDialog
-
-#### Issue: Failed at test_dialog_closes_on_cancel
-- **Error**: AssertionError: The close() method of the dialog was not called once. It was called 0 times.
-- **Root Cause**: The cancel button signal was not correctly connected to close the dialog.
-- **Fix**: Connected cancel button's clicked signal to dialog's close method.
-- **Status**: FIXED
-
-#### Issue: Failed at test_ok_button_enabled_when_inputs_valid
-- **Error**: AssertionError: ok_button.setEnabled(True) was not called as expected
-- **Root Cause**: The validation method was not correctly setting the OK button state.
-- **Fix**: Updated the _validate_inputs method to properly enable the OK button when all inputs are valid.
-- **Status**: FIXED
-
-### BatchCorrectionDialog
-
-#### Issue: Failed at test_apply_button_state
-- **Error**: AssertionError: apply_button.setEnabled(False) calls not found in expected function
-- **Root Cause**: The apply button state was managed in a different method than expected.
-- **Fix**: Changed test to verify the state of the button instead of checking if a particular method was called.
-- **Status**: FIXED
-
-#### Issue: Failed at test_checkbox_states
-- **Error**: AssertionError: checkbox states did not match expected values
-- **Root Cause**: Initialization of checkbox states was happening in a different order than expected.
-- **Fix**: Updated test to focus on final checkbox states rather than exact sequence of method calls.
-- **Status**: FIXED
-
-## Model Components
-
-### CorrectionRuleManager
-
-#### Issue: Deleting a rule causes two entries to be deleted
-- **Error**: When deleting a single rule, two rules are removed from the list
-- **Root Cause**: Index handling issues in the rule deletion method where rule indices were becoming stale after deletion operations
-- **Fix**: Implemented a more robust approach to rule deletion that ensures indices remain valid during iterative deletion operations
-- **Status**: FIXED
-
-#### Issue: Redundant 'order' field in CorrectionRule
-- **Problem**: The 'order' field in CorrectionRule was redundant as rules could be ordered by their position in the list
-- **Root Cause**: Initial design included an explicit order field which proved unnecessary
-- **Fix**: Removed the 'order' field from CorrectionRule and updated all related methods to use the implicit ordering from the list position
-- **Status**: FIXED
-
-#### Issue: Unused 'description' field in CorrectionRule
-- **Problem**: The 'description' field was unused throughout the application
-- **Root Cause**: Initial design included a description field that was not actually needed in practice
-- **Fix**: Removed the 'description' field from CorrectionRule and updated all related methods to exclude this field
-- **Status**: FIXED
-
-## Controller Components
-
-### CorrectionController
-
-#### Issue: Filtering rules by description doesn't work after removing the field
-- **Problem**: After removing the description field, methods that filtered by description needed updates
-- **Root Cause**: Code dependencies on the removed description field
-- **Fix**: Updated all methods to remove references to the description field, particularly in search and filter operations
-- **Status**: FIXED
-
-## Testing Approach
-
-### Changed from Behavior to State Verification
-
-#### Issue: Tests failing when implementation details change
-- **Problem**: Tests were tightly coupled to implementation details, breaking when methods changed
-- **Root Cause**: Over-reliance on behavior verification (checking which methods were called)
-- **Fix**: Shifted focus to state verification (checking the resulting state) which is more robust to implementation changes
-- **Status**: FIXED
-
-### Improved Timing in UI Tests
-
-#### Issue: Intermittent failures in UI tests with signals
-- **Problem**: Signal-based tests occasionally failed due to timing issues
-- **Root Cause**: Signals not completing before assertions were checked
-- **Fix**: Added proper waiting mechanisms for signals using QSignalSpy and explicit waiting
-- **Status**: FIXED
-
-## Ongoing Issues
-
-### Performance with large datasets
-- **Problem**: Cell highlighting becomes slow with large datasets
-- **Status**: IN PROGRESS
-
-### Import/Export dialog error handling
-- **Problem**: Error handling during import/export operations needs improvement
-- **Status**: PLANNED
-
-### Selection handling in batch correction dialog
-- **Problem**: Selection handling in batch correction dialog needs refinement
-- **Status**: PLANNED
-
-## NumPy Compatibility with PySide6 (May 31, 2024)
-
-### FIXED: NumPy 2.x Incompatibility with PySide6
-
-**Issue**: Application would fail to start with NumPy 2.x installed.
-
-**Error Message**: A module that was compiled using NumPy 1.x cannot be run in NumPy 2.2.4 as it may crash.
-
-**Root Cause**: PySide6 (and specifically the Shiboken component) was compiled against NumPy 1.x and cannot run with NumPy 2.x. This is a known issue with several Python packages that have C extensions compiled against NumPy's C API, which changed significantly in NumPy 2.0.
-
-**Fix**: 
-1. Downgraded NumPy from version 2.2.4 to 1.26.4 using: `uv pip install numpy<2.0.0`
-2. Updated pyproject.toml to include version constraint: `"numpy>=1.25.0,<2.0.0"`
-3. Also added upper bound for pandas: `"pandas>=2.0.0,<3.0.0"`
-
-**Result**: Application now starts successfully without the NumPy compatibility error.
-
-**Future Considerations**:
-1. Monitor for updates to PySide6 that support NumPy 2.x
-2. Consider adding a version constraint check at application startup
-
-## Startup and Shutdown Issues (May 31, 2024)
-
-### FIXED: Signal Manager and Background Worker Issues
-
-**Issues Fixed**:
-
-1. **BackgroundWorker missing shutdown method**: 
-   - **Error**: `Error during application cleanup: type object 'BackgroundWorker' has no attribute 'shutdown'`
-   - **Fix**: Added `shutdown` class method to BackgroundWorker that properly terminates all active worker threads
-   - **Implementation**: Added tracking of all active worker instances and cleanup code that cancels any running tasks
-
-2. **Signal Manager parameter mismatch**: 
-   - **Error**: `Error in safe_connect: SignalManager.connect() got an unexpected keyword argument 'disconnect_first'`
-   - **Fix**: Updated the `connect` method to accept the `disconnect_first` parameter and properly handle it
-   - **Implementation**: Modified connect method to handle disconnecting existing connections before reconnecting
-
-3. **Missing _process_pending method**: 
-   - **Error**: `QMetaObject::invokeMethod: No such method ChestBuddyApp::_process_pending()`
-   - **Fix**: Added the missing method and made the call in cleanup more robust
-   - **Implementation**: Added _process_pending slot to process events during cleanup and wrapped the call in try/except
-
-4. **signal_tracer debugging warning**: 
-   - **Warning**: `signal_tracer is a debugging utility and should not be used in production code`
-   - **Fix**: Modified how signal_tracer is imported to reduce warnings in production
-   - **Implementation**: Made the import conditional and caught the warning
-
-**Result**: Application starts and shuts down cleanly without errors or warnings.
-
-## 2025-03-31: Fixed error when applying corrections
-
-**Bug**: When trying to apply corrections, an error was occurring: `CorrectionService.apply_corrections() got an unexpected keyword argument 'recursive'`
-
-**Root Cause**: In the `correction_controller.py` file, the `_apply_corrections_task` method was passing parameters to the `correction_service.apply_corrections()` method that it didn't accept. Specifically, it was passing `recursive` and `selected_only` parameters, but the service method only accepts `only_invalid`.
-
-**Fix**: Modified the `_apply_corrections_task` method in `correction_controller.py` to only pass the `only_invalid` parameter to the service's `apply_corrections` method:
+**Fix**: Updated tests to use the new MainWindow constructor and initialization:
 
 ```python
-# Before
-correction_stats = self._correction_service.apply_corrections(
-    only_invalid=only_invalid, recursive=recursive, selected_only=selected_only
-)
-
-# After
-correction_stats = self._correction_service.apply_corrections(
-    only_invalid=only_invalid
-)
+def test_main_window_initialization(self):
+    """Test that MainWindow initializes correctly."""
+    # Create with mock services
+    main_window = MainWindow(
+        service_locator=self.mock_service_locator,
+        config_manager=self.mock_config_manager
+    )
+    # Verify window properties
+    assert main_window.windowTitle() == "ChestBuddy"
+    assert main_window.isVisible() == False
+    assert main_window.size().width() >= 800
+    assert main_window.size().height() >= 600
 ```
 
+<<<<<<< HEAD
 **Status**: Fixed. Corrected the mismatch between the controller and service method parameters.
 
+=======
+>>>>>>> 7e5d1952ea6a287baa4ccb4521d056f0d85c5746
 ## Validation Visualization Bug Fixed (August 1, 2024)
 
 ### FIXED: Validation Status Visualization Not Displaying Invalid Entries
@@ -628,4 +328,8 @@ correction_stats = self._correction_service.apply_corrections(
 - Invalid cells with deep red background and border
 - Correctable cells with orange background and border
 
+<<<<<<< HEAD
 This ensures the visual feedback matches the actual validation results, making it easier for users to identify and fix data issues.
+=======
+This ensures the visual feedback matches the actual validation results, making it easier for users to identify and fix data issues.
+>>>>>>> 7e5d1952ea6a287baa4ccb4521d056f0d85c5746
