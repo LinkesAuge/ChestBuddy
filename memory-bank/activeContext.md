@@ -1,9 +1,22 @@
 ---
 title: Active Context - ChestBuddy Application
-date: 2024-05-15
+date: 2024-05-16
 ---
 
 # Active Development Context
+
+## Active Context - May 16, 2024
+
+### Recent Codebase Cleanup
+- Added deprecation warnings to `chestbuddy/ui/correction_tab.py`, `chestbuddy/ui/chart_tab.py`, `chestbuddy/ui/views/correction_view_adapter.py`, marking these components as legacy
+- Removed `chestbuddy/core/service_locator.py` and consolidated to `chestbuddy/utils/service_locator.py`
+- Deleted `chestbuddy/ui/validation_tab.py` as it's been fully replaced by ValidationTabView
+- Added deprecation warnings to `correction_view_adapter.py` as MainWindow already uses CorrectionView directly
+- Documented migration status of UI components in `codebase_cleanup.md`
+- Updated `tests/test_main_window.py` to work with the new MainWindow constructor, fixing test failures
+
+### Key Tasks in Progress
+1. Modernizing the UI architecture from tab-based to view-based design
 
 ## Recent Codebase Cleanup
 
@@ -13,11 +26,13 @@ We have performed a cleanup of redundant code in the ChestBuddy application:
 2. **Added deprecation warnings** to legacy UI components that are being phased out:
    - correction_tab.py
    - chart_tab.py
+   - correction_view_adapter.py (identified that MainWindow already uses CorrectionView directly)
 3. **Deleted legacy UI component** no longer in use:
    - validation_tab.py (replaced by ValidationTabView)
    - Updated test_ui_components.py to use ValidationTabView
 4. **Marked signal_tracer.py** as a debug-only utility
 5. **Created documentation** for future cleanup tasks in memory-bank/codebase_cleanup.md
+6. **Documented migration status** of UI components in codebase_cleanup.md
 
 These changes are part of our ongoing effort to modernize the codebase by moving from the tab-based UI to a view-based architecture. The next phase will involve refactoring the remaining adapter views to remove dependencies on legacy components, followed by updating tests to use the new components directly.
 

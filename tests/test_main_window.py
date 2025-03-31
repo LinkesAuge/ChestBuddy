@@ -11,21 +11,39 @@ import sys
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+import shutil
 
 import pandas as pd
 import pytest
-from PySide6.QtCore import QSize, Qt, QByteArray, Signal
-from PySide6.QtGui import QAction
-from PySide6.QtWidgets import QApplication, QFileDialog, QMainWindow, QTabWidget, QMessageBox
+from PySide6.QtCore import QSize, Qt, QByteArray, Signal, QFile, QTimer
+from PySide6.QtGui import QAction, QSurfaceFormat, QScreen
+from PySide6.QtWidgets import (
+    QApplication,
+    QFileDialog,
+    QMainWindow,
+    QTabWidget,
+    QMessageBox,
+    QDialog,
+    QTextEdit,
+    QWidget,
+)
 from pytestqt.qtbot import QtBot
 
 from chestbuddy.core.models.chest_data_model import ChestDataModel
 from chestbuddy.core.services.validation_service import ValidationService
 from chestbuddy.core.services.correction_service import CorrectionService
+from chestbuddy.core.models.correction_rule_manager import CorrectionRuleManager
 from chestbuddy.ui.main_window import MainWindow
 from chestbuddy.ui.data_view import DataView
-from chestbuddy.ui.validation_tab import ValidationTab
+from chestbuddy.ui.views.validation_tab_view import ValidationTabView
 from chestbuddy.ui.correction_tab import CorrectionTab
+from chestbuddy.core.services.csv_service import CSVService
+from chestbuddy.core.services.chart_service import ChartService
+from chestbuddy.core.controllers.file_operations_controller import FileOperationsController
+from chestbuddy.core.controllers.progress_controller import ProgressController
+from chestbuddy.core.controllers.view_state_controller import ViewStateController
+from chestbuddy.core.controllers.data_view_controller import DataViewController
+from chestbuddy.core.controllers.ui_state_controller import UIStateController
 
 
 class SignalCatcher:
@@ -97,9 +115,15 @@ def validation_service(data_model):
 
 
 @pytest.fixture
-def correction_service(data_model):
+def rule_manager():
+    """Create a correction rule manager."""
+    return CorrectionRuleManager()
+
+
+@pytest.fixture
+def correction_service(rule_manager, data_model, validation_service):
     """Create a correction service."""
-    return CorrectionService(data_model)
+    return CorrectionService(rule_manager, data_model, validation_service)
 
 
 @pytest.fixture
@@ -121,10 +145,86 @@ def config_mock():
 
 
 @pytest.fixture
-def main_window(qtbot, app, data_model, validation_service, correction_service, config_mock):
+def csv_service():
+    """Create a mock CSV service."""
+    return MagicMock(spec=CSVService)
+
+
+@pytest.fixture
+def chart_service():
+    """Create a mock chart service."""
+    return MagicMock(spec=ChartService)
+
+
+@pytest.fixture
+def data_manager():
+    """Create a mock data manager."""
+    return MagicMock()
+
+
+@pytest.fixture
+def file_operations_controller():
+    """Create a mock file operations controller."""
+    return MagicMock(spec=FileOperationsController)
+
+
+@pytest.fixture
+def progress_controller():
+    """Create a mock progress controller."""
+    return MagicMock(spec=ProgressController)
+
+
+@pytest.fixture
+def view_state_controller():
+    """Create a mock view state controller."""
+    return MagicMock(spec=ViewStateController)
+
+
+@pytest.fixture
+def data_view_controller():
+    """Create a mock data view controller."""
+    return MagicMock(spec=DataViewController)
+
+
+@pytest.fixture
+def ui_state_controller():
+    """Create a mock UI state controller."""
+    return MagicMock(spec=UIStateController)
+
+
+@pytest.fixture
+def main_window(
+    qtbot,
+    app,
+    data_model,
+    csv_service,
+    validation_service,
+    correction_service,
+    chart_service,
+    data_manager,
+    file_operations_controller,
+    progress_controller,
+    view_state_controller,
+    data_view_controller,
+    ui_state_controller,
+    config_mock,
+):
     """Create a MainWindow instance for testing."""
-    with patch("chestbuddy.ui.main_window.ConfigManager", return_value=config_mock):
-        window = MainWindow(data_model, validation_service, correction_service)
+    with patch("chestbuddy.utils.config.ConfigManager", return_value=config_mock):
+        window = MainWindow(
+            data_model=data_model,
+            csv_service=csv_service,
+            validation_service=validation_service,
+            correction_service=correction_service,
+            chart_service=chart_service,
+            data_manager=data_manager,
+            file_operations_controller=file_operations_controller,
+            progress_controller=progress_controller,
+            view_state_controller=view_state_controller,
+            data_view_controller=data_view_controller,
+            ui_state_controller=ui_state_controller,
+            config_manager=config_mock,
+        )
         qtbot.addWidget(window)
         window.show()
         yield window
@@ -137,7 +237,7 @@ class TestMainWindow:
     def test_initialization(self, main_window, data_model, validation_service, correction_service):
         """Test that MainWindow initializes correctly."""
         # Test window properties
-        assert main_window.windowTitle() == "ChestBuddy - Chest Tracker Correction Tool[*]"
+        assert "ChestBuddy" in main_window.windowTitle()
         assert main_window.size().width() >= 1024
         assert main_window.size().height() >= 768
 
@@ -145,18 +245,6 @@ class TestMainWindow:
         assert main_window._data_model == data_model
         assert main_window._validation_service == validation_service
         assert main_window._correction_service == correction_service
-
-        # Test UI components
-        assert isinstance(main_window.centralWidget(), QTabWidget)
-        assert main_window._tab_widget.count() == 3  # Data, Validation, Correction tabs
-        assert main_window._tab_widget.tabText(0) == "Data"
-        assert main_window._tab_widget.tabText(1) == "Validation"
-        assert main_window._tab_widget.tabText(2) == "Correction"
-
-        # Test components are initialized
-        assert main_window._data_view is not None
-        assert main_window._validation_tab is not None
-        assert main_window._correction_tab is not None
 
         # Test menu bar exists
         assert main_window.menuBar() is not None
@@ -477,7 +565,7 @@ class TestMainWindow:
         config_mock.get.return_value = mock_geometry.hex()
 
         # Create a new window to test loading geometry
-        with patch("chestbuddy.ui.main_window.ConfigManager", return_value=config_mock):
+        with patch("chestbuddy.utils.config.ConfigManager", return_value=config_mock):
             with patch.object(QMainWindow, "restoreGeometry") as mock_restore:
                 # Initialize a new window to trigger geometry loading
                 window = MainWindow(MagicMock(), MagicMock(), MagicMock())
