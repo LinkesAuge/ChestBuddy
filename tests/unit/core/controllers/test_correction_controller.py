@@ -52,56 +52,49 @@ def signal_manager():
 
 @pytest.fixture
 def mock_correction_service():
-    """Fixture providing a mock CorrectionService."""
+    """Create a mock correction service for testing."""
     service = MagicMock()
-
-    # Setup default return values for common methods
     service.apply_corrections.return_value = {
-        "total_corrections": 10,
-        "corrected_rows": 5,
-        "corrected_cells": 10,
+        "total_corrections": 5,
+        "corrected_rows": 3,
+        "corrected_cells": 5,
     }
-    service.apply_single_rule.return_value = {
-        "total_corrections": 2,
-        "corrected_rows": 1,
-        "corrected_cells": 2,
-    }
-    service.get_cells_with_available_corrections.return_value = [(0, 0), (1, 1)]
-
+    service._data_model = MagicMock()
+    service._data_model.data = pd.DataFrame(
+        {"PLAYER": ["player1", "player2", "player3"], "CHEST": ["Gold", "Silver", "Bronze"]}
+    )
     return service
 
 
 @pytest.fixture
 def mock_rule_manager():
-    """Fixture providing a mock CorrectionRuleManager."""
-    manager = MagicMock()
-
-    # Setup defaults
-    rule1 = CorrectionRule(
-        to_value="player", from_value="Player", category="player", status="enabled"
-    )
-    rule2 = CorrectionRule(
-        to_value="chest", from_value="Chest", category="chest_type", status="enabled"
-    )
-
-    manager.get_rules.return_value = [rule1, rule2]
-    manager.add_rule.return_value = True
-    manager.update_rule.return_value = True
-    manager.delete_rule.return_value = True
-
-    return manager
+    """Create a mock rule manager for testing."""
+    rule_manager = MagicMock()
+    rule_manager.get_rules.return_value = [
+        CorrectionRule(
+            from_value="player1", to_value="Player 1", category="player", status="enabled"
+        ),
+        CorrectionRule(
+            from_value="Gold", to_value="Golden Chest", category="chest", status="enabled"
+        ),
+    ]
+    return rule_manager
 
 
 @pytest.fixture
 def mock_config_manager():
-    """Fixture providing a mock ConfigManager."""
-    config = MagicMock()
+    """Create a mock config manager for testing."""
+    config_manager = MagicMock()
+    config_manager.get_auto_correct_on_validation.return_value = False
+    config_manager.get_auto_correct_on_import.return_value = False
+    return config_manager
 
-    # Setup defaults
-    config.get_bool.return_value = True
-    config.get_path.return_value = "path/to/correction/rules.csv"
 
-    return config
+@pytest.fixture
+def mock_validation_service():
+    """Create a mock validation service for testing."""
+    validation_service = MagicMock()
+    return validation_service
 
 
 @pytest.fixture
@@ -114,13 +107,12 @@ def mock_view():
 
 
 @pytest.fixture
-def controller(mock_correction_service, mock_rule_manager, mock_config_manager, signal_manager):
-    """Fixture providing a CorrectionController instance with mock dependencies."""
+def controller(
+    mock_correction_service, mock_rule_manager, mock_config_manager, mock_validation_service
+):
+    """Create a correction controller for testing."""
     controller = CorrectionController(
-        correction_service=mock_correction_service,
-        rule_manager=mock_rule_manager,
-        config_manager=mock_config_manager,
-        signal_manager=signal_manager,
+        mock_correction_service, mock_rule_manager, mock_config_manager, mock_validation_service
     )
     return controller
 
@@ -586,3 +578,45 @@ class TestCorrectionController:
 
             # Verify cleanup was called
             mock_cleanup.assert_called_once()
+
+    def test_apply_corrections(controller, mock_correction_service):
+        """Test applying corrections."""
+        # Call the apply_corrections method
+        controller.apply_corrections(only_invalid=True, recursive=True)
+
+        # Check that the correction service was called with the right parameters
+        mock_correction_service.apply_corrections.assert_called_once_with(only_invalid=True)
+
+    def test_auto_correct_after_validation(
+        controller, mock_correction_service, mock_config_manager
+    ):
+        """Test auto-correction after validation."""
+        # Test when auto-correction is disabled
+        mock_config_manager.get_auto_correct_on_validation.return_value = False
+        result = controller.auto_correct_after_validation()
+        assert result is False
+        mock_correction_service.apply_corrections.assert_not_called()
+
+        # Test when auto-correction is enabled
+        mock_config_manager.get_auto_correct_on_validation.return_value = True
+        result = controller.auto_correct_after_validation()
+        assert result is True
+        mock_correction_service.apply_corrections.assert_called_once_with(
+            only_invalid=True, recursive=True
+        )
+
+    def test_auto_correct_on_import(controller, mock_correction_service, mock_config_manager):
+        """Test auto-correction on import."""
+        # Test when auto-correction is disabled
+        mock_config_manager.get_auto_correct_on_import.return_value = False
+        result = controller.auto_correct_on_import()
+        assert result is False
+        mock_correction_service.apply_corrections.assert_not_called()
+
+        # Test when auto-correction is enabled
+        mock_config_manager.get_auto_correct_on_import.return_value = True
+        result = controller.auto_correct_on_import()
+        assert result is True
+        mock_correction_service.apply_corrections.assert_called_once_with(
+            only_invalid=False, recursive=True
+        )

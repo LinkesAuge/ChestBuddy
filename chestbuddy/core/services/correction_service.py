@@ -472,6 +472,44 @@ class CorrectionService:
 
         return rule
 
+    def get_validation_service(self):
+        """
+        Get the validation service used by this correction service.
+
+        Returns:
+            ValidationService: The validation service
+        """
+        return self._validation_service
+
+    def check_correctable_status(self) -> int:
+        """
+        Check and mark cells that have available corrections as correctable.
+
+        This method uses the validation service to identify invalid cells
+        and mark those that can be corrected as CORRECTABLE.
+
+        Returns:
+            int: Number of cells marked as correctable
+        """
+        if not self._validation_service:
+            logger.warning("Validation service not available, can't mark correctable cells")
+            return 0
+
+        # Get cells with available corrections
+        correctable_cells = self.get_cells_with_available_corrections()
+
+        # Update validation status through the validation service
+        marked_count = 0
+        try:
+            # Let the validation service handle the status update
+            self._validation_service.update_correctable_status(correctable_cells)
+            marked_count = len(correctable_cells)
+            logger.info(f"Marked {marked_count} cells as correctable")
+        except Exception as e:
+            logger.error(f"Error marking correctable cells: {e}")
+
+        return marked_count
+
     def clear_correction_history(self) -> None:
         """Clear the correction history."""
         self._correction_history = []

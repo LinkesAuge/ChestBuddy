@@ -89,6 +89,8 @@ class ConfigManager:
             "Correction": {
                 "auto_correct": "True",
                 "correction_rules_file": str(self._config_dir / "correction_rules.csv"),
+                "auto_correct_on_validation": "False",
+                "auto_correct_on_import": "False",
             },
             "UI": {
                 "window_width": "1024",
@@ -149,6 +151,19 @@ class ConfigManager:
             # Remove the old option
             self._config.remove_option("Validation", "auto_validate")
             logger.info("Migrated 'auto_validate' to 'validate_on_import'")
+
+        # Ensure Correction section exists
+        if not self._config.has_section("Correction"):
+            self._config.add_section("Correction")
+
+        # Add new auto-correction settings if they don't exist
+        if not self._config.has_option("Correction", "auto_correct_on_validation"):
+            self.set("Correction", "auto_correct_on_validation", "False")
+            logger.info("Added new config option: auto_correct_on_validation")
+
+        if not self._config.has_option("Correction", "auto_correct_on_import"):
+            self.set("Correction", "auto_correct_on_import", "False")
+            logger.info("Added new config option: auto_correct_on_import")
 
         # Check if we need to migrate from older versions
         current_version = self.get("General", "version")
@@ -335,15 +350,15 @@ class ConfigManager:
         Args:
             section: The configuration section.
             option: The configuration option.
-            fallback: Fallback path if the option is not found.
+            fallback: Fallback value if the option is not found.
 
         Returns:
             The configuration value as a Path object.
         """
-        path_str = self.get(section, option, fallback)
-        if path_str:
-            return Path(path_str)
-        return Path()
+        value = self.get(section, option, fallback)
+        if value is None:
+            return None
+        return Path(value)
 
     def set_path(
         self, section: str, option: str, path: Union[str, Path], create_if_missing: bool = False
@@ -590,3 +605,41 @@ class ConfigManager:
             True if the option exists in the section, False otherwise.
         """
         return self._config.has_option(section, option)
+
+    def get_auto_correct_on_validation(self) -> bool:
+        """
+        Get whether to automatically apply corrections after validation.
+
+        Returns:
+            bool: True if auto-correction on validation is enabled
+        """
+        return self.get_bool("Correction", "auto_correct_on_validation", False)
+
+    def set_auto_correct_on_validation(self, value: bool) -> None:
+        """
+        Set whether to automatically apply corrections after validation.
+
+        Args:
+            value (bool): True to enable auto-correction on validation
+        """
+        self.set("Correction", "auto_correct_on_validation", str(value))
+        logger.debug(f"Set auto_correct_on_validation to {value}")
+
+    def get_auto_correct_on_import(self) -> bool:
+        """
+        Get whether to automatically apply corrections on import.
+
+        Returns:
+            bool: True if auto-correction on import is enabled
+        """
+        return self.get_bool("Correction", "auto_correct_on_import", False)
+
+    def set_auto_correct_on_import(self, value: bool) -> None:
+        """
+        Set whether to automatically apply corrections on import.
+
+        Args:
+            value (bool): True to enable auto-correction on import
+        """
+        self.set("Correction", "auto_correct_on_import", str(value))
+        logger.debug(f"Set auto_correct_on_import to {value}")

@@ -120,6 +120,7 @@ class SettingsTabView(QWidget):
         # Create settings tabs
         self._setup_general_tab()
         self._setup_validation_tab()
+        self._setup_correction_tab()
         self._setup_ui_tab()
         self._setup_backup_tab()
 
@@ -298,58 +299,58 @@ class SettingsTabView(QWidget):
             }}
         """)
 
-        # Create validation layout
-        validation_layout = QVBoxLayout(validation_group)
+        # Create form layout for settings
+        validation_layout = QFormLayout(validation_group)
         validation_layout.setContentsMargins(16, 24, 16, 16)
         validation_layout.setSpacing(12)
+        validation_layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+        validation_layout.setLabelAlignment(Qt.AlignRight)
 
-        # Validation options
-        validate_on_import = QCheckBox("Validate on import")
-        validate_on_import.setObjectName("validate_on_import")
-        validate_on_import.setStyleSheet(f"""
-            QCheckBox {{
-                color: {Colors.TEXT_LIGHT};
-                spacing: 8px;
-            }}
+        # Checkboxes
+        validate_label = QLabel("Validate on Import:")
+        validate_label.setStyleSheet(f"color: {Colors.TEXT_LIGHT};")
+
+        validate_checkbox = QCheckBox()
+        validate_checkbox.setObjectName("validate_on_import")
+        validate_checkbox.setStyleSheet(f"""
             QCheckBox::indicator {{
                 width: 18px;
                 height: 18px;
                 border: 1px solid {Colors.DARK_BORDER};
-                border-radius: 3px;
-                background-color: {Colors.PRIMARY_DARK};
+                border-radius: 2px;
+                background-color: {Colors.PRIMARY_LIGHT};
             }}
             QCheckBox::indicator:checked {{
+                image: url(:/icons/check.svg);
                 background-color: {Colors.SECONDARY};
-                border-color: {Colors.SECONDARY};
-                image: url(:/icons/check.png);
             }}
         """)
-        validate_on_import.setToolTip("Automatically validate data when importing")
 
-        case_sensitive = QCheckBox("Case-sensitive validation")
-        case_sensitive.setObjectName("case_sensitive")
-        case_sensitive.setStyleSheet(validate_on_import.styleSheet())
-        case_sensitive.setToolTip("Make validation case-sensitive (e.g., 'Player' != 'player')")
+        case_sensitive_label = QLabel("Case Sensitive:")
+        case_sensitive_label.setStyleSheet(f"color: {Colors.TEXT_LIGHT};")
 
-        auto_save = QCheckBox("Auto-save validation lists")
-        auto_save.setObjectName("auto_save")
-        auto_save.setStyleSheet(validate_on_import.styleSheet())
-        auto_save.setToolTip("Automatically save validation lists when modified")
+        case_sensitive_checkbox = QCheckBox()
+        case_sensitive_checkbox.setObjectName("case_sensitive")
+        case_sensitive_checkbox.setStyleSheet(validate_checkbox.styleSheet())
 
-        # Validation list path
-        path_layout = QHBoxLayout()
-        path_layout.setContentsMargins(0, 8, 0, 0)
-        path_layout.setSpacing(8)
+        auto_save_label = QLabel("Auto-save Lists:")
+        auto_save_label.setStyleSheet(f"color: {Colors.TEXT_LIGHT};")
 
-        path_label = QLabel("Validation Lists Directory:")
-        path_label.setStyleSheet(f"color: {Colors.TEXT_LIGHT};")
+        auto_save_checkbox = QCheckBox()
+        auto_save_checkbox.setObjectName("auto_save")
+        auto_save_checkbox.setStyleSheet(validate_checkbox.styleSheet())
 
-        path_input = QLineEdit()
-        path_input.setObjectName("validation_lists_dir")
-        path_input.setReadOnly(True)
-        path_input.setStyleSheet(f"""
+        # Validation lists directory input
+        dir_label = QLabel("Validation Lists Directory:")
+        dir_label.setStyleSheet(f"color: {Colors.TEXT_LIGHT};")
+
+        dir_layout = QHBoxLayout()
+        dir_input = QLineEdit()
+        dir_input.setObjectName("validation_lists_dir")
+        dir_input.setReadOnly(True)
+        dir_input.setStyleSheet(f"""
             QLineEdit {{
-                background-color: {Colors.PRIMARY_DARK};
+                background-color: {Colors.PRIMARY_LIGHT};
                 color: {Colors.TEXT_LIGHT};
                 border: 1px solid {Colors.DARK_BORDER};
                 border-radius: 4px;
@@ -358,63 +359,208 @@ class SettingsTabView(QWidget):
             }}
         """)
 
-        path_browse = QPushButton("Browse...")
-        path_browse.setStyleSheet(f"""
+        browse_button = QPushButton("Browse...")
+        browse_button.setStyleSheet(f"""
             QPushButton {{
-                background-color: {Colors.PRIMARY_DARK};
+                background-color: {Colors.SECONDARY};
                 color: {Colors.TEXT_LIGHT};
-                border: 1px solid {Colors.DARK_BORDER};
+                border: none;
                 border-radius: 4px;
-                padding: 4px 8px;
-                min-width: 80px;
+                padding: 4px 12px;
+                min-height: 25px;
             }}
             QPushButton:hover {{
-                background-color: {Colors.PRIMARY};
-                border-color: {Colors.SECONDARY};
+                background-color: {Colors.SECONDARY_LIGHT};
             }}
             QPushButton:pressed {{
-                background-color: {Colors.PRIMARY_LIGHT};
+                background-color: {Colors.SECONDARY_DARK};
             }}
         """)
 
-        path_layout.addWidget(path_label)
-        path_layout.addWidget(path_input, 1)
-        path_layout.addWidget(path_browse)
+        dir_layout.addWidget(dir_input)
+        dir_layout.addWidget(browse_button)
 
-        # Add widgets to layout
-        validation_layout.addWidget(validate_on_import)
-        validation_layout.addWidget(case_sensitive)
-        validation_layout.addWidget(auto_save)
-        validation_layout.addLayout(path_layout)
+        # Add fields to layout
+        validation_layout.addRow(validate_label, validate_checkbox)
+        validation_layout.addRow(case_sensitive_label, case_sensitive_checkbox)
+        validation_layout.addRow(auto_save_label, auto_save_checkbox)
+        validation_layout.addRow(dir_label, dir_layout)
 
         # Save widget references
         self._settings_widgets["Validation"] = {
-            "validate_on_import": validate_on_import,
-            "case_sensitive": case_sensitive,
-            "auto_save": auto_save,
-            "validation_lists_dir": path_input,
+            "validate_on_import": validate_checkbox,
+            "case_sensitive": case_sensitive_checkbox,
+            "auto_save": auto_save_checkbox,
+            "validation_lists_dir": dir_input,
         }
 
         # Connect signals
-        validate_on_import.toggled.connect(
-            lambda value: self._on_setting_changed("Validation", "validate_on_import", str(value))
+        validate_checkbox.stateChanged.connect(
+            lambda state: self._on_setting_changed(
+                "Validation", "validate_on_import", str(bool(state))
+            )
         )
-        case_sensitive.toggled.connect(
-            lambda value: self._on_setting_changed("Validation", "case_sensitive", str(value))
+        case_sensitive_checkbox.stateChanged.connect(
+            lambda state: self._on_setting_changed("Validation", "case_sensitive", str(bool(state)))
         )
-        auto_save.toggled.connect(
-            lambda value: self._on_setting_changed("Validation", "auto_save", str(value))
+        auto_save_checkbox.stateChanged.connect(
+            lambda state: self._on_setting_changed("Validation", "auto_save", str(bool(state)))
         )
-        path_browse.clicked.connect(self._on_validation_path_browse)
+        browse_button.clicked.connect(self._browse_validation_lists_dir)
 
-        # Add group to layout
+        # Add validation group to layout
         layout.addWidget(validation_group)
+
+        # Create correction settings group
+        correction_group = QGroupBox("Correction Settings")
+        correction_group.setStyleSheet(validation_group.styleSheet())
+
+        # Create layout for correction settings
+        correction_layout = QFormLayout(correction_group)
+        correction_layout.setContentsMargins(16, 24, 16, 16)
+        correction_layout.setSpacing(12)
+        correction_layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+        correction_layout.setLabelAlignment(Qt.AlignRight)
+
+        # Auto-correct on validation checkbox
+        auto_correct_validation_label = QLabel("Auto-correct after Validation:")
+        auto_correct_validation_label.setStyleSheet(f"color: {Colors.TEXT_LIGHT};")
+
+        auto_correct_validation_checkbox = QCheckBox()
+        auto_correct_validation_checkbox.setObjectName("auto_correct_on_validation")
+        auto_correct_validation_checkbox.setStyleSheet(validate_checkbox.styleSheet())
+
+        # Auto-correct on import checkbox
+        auto_correct_import_label = QLabel("Auto-correct on Import:")
+        auto_correct_import_label.setStyleSheet(f"color: {Colors.TEXT_LIGHT};")
+
+        auto_correct_import_checkbox = QCheckBox()
+        auto_correct_import_checkbox.setObjectName("auto_correct_on_import")
+        auto_correct_import_checkbox.setStyleSheet(validate_checkbox.styleSheet())
+
+        # Add fields to correction layout
+        correction_layout.addRow(auto_correct_validation_label, auto_correct_validation_checkbox)
+        correction_layout.addRow(auto_correct_import_label, auto_correct_import_checkbox)
+
+        # Save widget references
+        self._settings_widgets["Correction"] = {
+            "auto_correct_on_validation": auto_correct_validation_checkbox,
+            "auto_correct_on_import": auto_correct_import_checkbox,
+        }
+
+        # Connect signals
+        auto_correct_validation_checkbox.stateChanged.connect(
+            lambda state: self._on_setting_changed(
+                "Correction", "auto_correct_on_validation", str(bool(state))
+            )
+        )
+        auto_correct_import_checkbox.stateChanged.connect(
+            lambda state: self._on_setting_changed(
+                "Correction", "auto_correct_on_import", str(bool(state))
+            )
+        )
+
+        # Add correction group to layout
+        layout.addWidget(correction_group)
 
         # Add spacer at the bottom
         layout.addStretch(1)
 
         # Add tab
         self._tab_widget.addTab(scroll_area, "Validation")
+
+    def _setup_correction_tab(self) -> None:
+        """Set up the correction settings tab."""
+        # Create scrollable content
+        scroll_area, content_widget, layout = self._create_scrollable_content()
+
+        # Create correction settings group
+        correction_group = QGroupBox("Correction Settings")
+        correction_group.setStyleSheet(f"""
+            QGroupBox {{
+                background-color: {Colors.PRIMARY};
+                border-radius: 6px;
+                border: 1px solid {Colors.DARK_BORDER};
+                margin-top: 12px;
+                padding-top: 16px;
+            }}
+            QGroupBox::title {{
+                subcontrol-origin: margin;
+                left: 7px;
+                padding: 0 5px;
+                color: {Colors.TEXT_LIGHT};
+                font-weight: bold;
+            }}
+        """)
+
+        # Create form layout for settings
+        correction_layout = QFormLayout(correction_group)
+        correction_layout.setContentsMargins(16, 24, 16, 16)
+        correction_layout.setSpacing(12)
+        correction_layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+        correction_layout.setLabelAlignment(Qt.AlignRight)
+
+        # Auto-correction on validation
+        auto_correct_validation_label = QLabel("Auto-correct after validation:")
+        auto_correct_validation_label.setStyleSheet(f"color: {Colors.TEXT_LIGHT};")
+
+        auto_correct_validation_checkbox = QCheckBox()
+        auto_correct_validation_checkbox.setObjectName("auto_correct_on_validation")
+        auto_correct_validation_checkbox.setStyleSheet(f"""
+            QCheckBox {{
+                color: {Colors.TEXT_LIGHT};
+            }}
+            QCheckBox::indicator {{
+                width: 18px;
+                height: 18px;
+                border: 1px solid {Colors.DARK_BORDER};
+                border-radius: 3px;
+                background-color: {Colors.PRIMARY_LIGHT};
+            }}
+            QCheckBox::indicator:checked {{
+                background-color: {Colors.SECONDARY};
+                image: url(:/icons/check.png);
+            }}
+        """)
+
+        # Auto-correction on import
+        auto_correct_import_label = QLabel("Auto-correct after import:")
+        auto_correct_import_label.setStyleSheet(f"color: {Colors.TEXT_LIGHT};")
+
+        auto_correct_import_checkbox = QCheckBox()
+        auto_correct_import_checkbox.setObjectName("auto_correct_on_import")
+        auto_correct_import_checkbox.setStyleSheet(auto_correct_validation_checkbox.styleSheet())
+
+        # Add fields to layout
+        correction_layout.addRow(auto_correct_validation_label, auto_correct_validation_checkbox)
+        correction_layout.addRow(auto_correct_import_label, auto_correct_import_checkbox)
+
+        # Save widget references
+        self._settings_widgets["Correction"] = {
+            "auto_correct_on_validation": auto_correct_validation_checkbox,
+            "auto_correct_on_import": auto_correct_import_checkbox,
+        }
+
+        # Connect signals
+        auto_correct_validation_checkbox.stateChanged.connect(
+            lambda state: self._on_setting_changed(
+                "Correction", "auto_correct_on_validation", str(bool(state))
+            )
+        )
+        auto_correct_import_checkbox.stateChanged.connect(
+            lambda state: self._on_setting_changed(
+                "Correction", "auto_correct_on_import", str(bool(state))
+            )
+        )
+
+        # Add group to layout
+        layout.addWidget(correction_group)
+
+        # Add spacer at the bottom
+        layout.addStretch(1)
+
+        # Add tab
+        self._tab_widget.addTab(scroll_area, "Correction")
 
     def _setup_ui_tab(self) -> None:
         """Set up the UI settings tab."""
@@ -739,6 +885,18 @@ class SettingsTabView(QWidget):
         if validation_dir_input:
             dir_path = self._config_manager.get("Validation", "validation_lists_dir", "")
             validation_dir_input.setText(dir_path)
+
+        # Load Correction settings
+        correction_widgets = self._settings_widgets.get("Correction", {})
+        auto_correct_validation_checkbox = correction_widgets.get("auto_correct_on_validation")
+        if auto_correct_validation_checkbox:
+            auto_correct_validation = self._config_manager.get_auto_correct_on_validation()
+            auto_correct_validation_checkbox.setChecked(auto_correct_validation)
+
+        auto_correct_import_checkbox = correction_widgets.get("auto_correct_on_import")
+        if auto_correct_import_checkbox:
+            auto_correct_import = self._config_manager.get_auto_correct_on_import()
+            auto_correct_import_checkbox.setChecked(auto_correct_import)
 
         # Load UI settings
         ui_widgets = self._settings_widgets.get("UI", {})

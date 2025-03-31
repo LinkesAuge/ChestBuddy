@@ -860,21 +860,69 @@ class CorrectionController(BaseController):
 
     def _get_data_hash(self):
         """
-        Get a hash of the current data state to detect changes.
+        Get a hash of the current data model state.
 
         Returns:
-            str: A hash string representing the current data state
+            str: Hash of the current data state
         """
         if (
             not hasattr(self._correction_service, "_data_model")
             or self._correction_service._data_model is None
         ):
-            return "empty"
+            return None
 
-        data = self._correction_service._data_model.data
-        if data is None or data.empty:
-            return "empty"
+        try:
+            data_str = str(self._correction_service._data_model.data)
+            return hashlib.md5(data_str.encode()).hexdigest()
+        except Exception as e:
+            logger.error(f"Error calculating data hash: {e}")
+            return None
 
-        # Create a string representation of the DataFrame and hash it
-        data_str = data.to_string()
-        return hashlib.md5(data_str.encode()).hexdigest()
+    def auto_correct_after_validation(self):
+        """
+        Apply auto-correction after validation if enabled.
+
+        This method checks the configuration to see if auto-correction
+        after validation is enabled, and if so, applies corrections
+        to invalid cells.
+
+        Returns:
+            bool: True if auto-correction was applied, False otherwise
+        """
+        if not self._config_manager:
+            return False
+
+        # Check if auto-correction is enabled
+        auto_correct = self._config_manager.get_auto_correct_on_validation()
+        if not auto_correct:
+            logger.debug("Auto-correction after validation is disabled")
+            return False
+
+        # Apply corrections to invalid cells only
+        logger.info("Applying auto-correction after validation")
+        self.apply_corrections(only_invalid=True, recursive=True)
+        return True
+
+    def auto_correct_on_import(self):
+        """
+        Apply auto-correction on import if enabled.
+
+        This method checks the configuration to see if auto-correction
+        on import is enabled, and if so, applies corrections to all cells.
+
+        Returns:
+            bool: True if auto-correction was applied, False otherwise
+        """
+        if not self._config_manager:
+            return False
+
+        # Check if auto-correction is enabled
+        auto_correct = self._config_manager.get_auto_correct_on_import()
+        if not auto_correct:
+            logger.debug("Auto-correction on import is disabled")
+            return False
+
+        # Apply corrections to all cells
+        logger.info("Applying auto-correction on import")
+        self.apply_corrections(only_invalid=False, recursive=True)
+        return True

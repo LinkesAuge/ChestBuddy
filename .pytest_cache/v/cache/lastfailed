@@ -152,5 +152,19 @@
   "tests/unit/ui/views/test_validation_tab_view.py::TestValidationTabView::test_validation_list_add": true,
   "tests/unit/ui/views/test_validation_tab_view.py::TestValidationTabView::test_validation_list_remove": true,
   "tests/unit/ui/views/test_validation_tab_view.py::TestValidationTabView::test_validation_list_import": true,
-  "tests/unit/ui/views/test_validation_tab_view.py::TestValidationTabView::test_validation_list_export": true
+  "tests/unit/ui/views/test_validation_tab_view.py::TestValidationTabView::test_validation_list_export": true,
+  "tests/unit/core/controllers/test_correction_controller.py::TestCorrectionController::test_initialization": true,
+  "tests/unit/core/controllers/test_correction_controller.py::TestCorrectionController::test_set_view": true,
+  "tests/unit/core/controllers/test_correction_controller.py::TestCorrectionController::test_get_rules": true,
+  "tests/unit/core/controllers/test_correction_controller.py::TestCorrectionController::test_apply_corrections": true,
+  "tests/unit/core/controllers/test_correction_controller.py::TestCorrectionController::test_apply_corrections_task": true,
+  "tests/unit/core/controllers/test_correction_controller.py::TestCorrectionController::test_apply_corrections_task_with_progress": true,
+  "tests/unit/core/controllers/test_correction_controller.py::TestCorrectionController::test_on_corrections_completed": true,
+  "tests/unit/core/controllers/test_correction_controller.py::TestCorrectionController::test_on_corrections_error": true,
+  "tests/unit/core/controllers/test_correction_controller.py::TestCorrectionController::test_apply_single_rule": true,
+  "tests/unit/core/controllers/test_correction_controller.py::TestCorrectionController::test_get_cells_with_available_corrections": true,
+  "tests/unit/core/controllers/test_correction_controller.py::TestCorrectionController::test_worker_cleanup": true,
+  "tests/unit/core/controllers/test_correction_controller.py::TestCorrectionController::test_worker_cleanup_on_del": true,
+  "tests/unit/core/test_validation_enums.py": true,
+  "tests/unit/core/services/test_validation_service_correctable.py::test_update_validation_status_with_correctables": true
 }

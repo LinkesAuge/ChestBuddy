@@ -646,6 +646,21 @@ class DataViewController(BaseController):
             # Highlight invalid rows in the view
             self.highlight_invalid_rows()
 
+            # Apply auto-correction if enabled
+            # Get correction controller from ServiceLocator
+            try:
+                correction_controller = ServiceLocator.get("correction_controller")
+                if correction_controller:
+                    # Apply auto-correction after validation
+                    if correction_controller.auto_correct_after_validation():
+                        logger.info("Auto-correction after validation applied")
+                    else:
+                        logger.debug("Auto-correction after validation is disabled or failed")
+                else:
+                    logger.warning("CorrectionController not available for auto-correction")
+            except Exception as e:
+                logger.error(f"Error applying auto-correction after validation: {e}")
+
             logger.info(f"Handled validation completion with {len(results)} rule results")
 
         except Exception as e:
@@ -1239,6 +1254,22 @@ class DataViewController(BaseController):
         This method is connected to the data_loaded signal from DataManager.
         """
         try:
+            # First check for auto-correction on import (regardless of validation)
+            try:
+                correction_controller = ServiceLocator.get("correction_controller")
+                if correction_controller:
+                    # Apply auto-correction on import
+                    if correction_controller.auto_correct_on_import():
+                        logger.info("Auto-correction on import applied")
+                    else:
+                        logger.debug("Auto-correction on import is disabled or failed")
+                else:
+                    logger.warning(
+                        "CorrectionController not available for auto-correction on import"
+                    )
+            except Exception as e:
+                logger.error(f"Error applying auto-correction on import: {e}")
+
             # Get validation service from ServiceLocator
             validation_service = ServiceLocator.get("validation_service")
 

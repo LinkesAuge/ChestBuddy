@@ -940,6 +940,34 @@ class ValidationService(QObject):
 
         return self._correction_service.get_cells_with_available_corrections()
 
+    def update_correctable_status(self, correctable_cells: List[Tuple[int, int]]) -> None:
+        """
+        Update the validation status of cells with available corrections.
+
+        Args:
+            correctable_cells: List of (row, col) tuples for cells with available corrections
+        """
+        if not correctable_cells:
+            logger.debug("No correctable cells to update")
+            return
+
+        # Get the current validation status
+        status_df = self._data_model.get_validation_status()
+        if status_df.empty:
+            logger.warning("No validation status available to update")
+            return
+
+        # Update the validation status with correctable cells
+        status_df = self._mark_correctable_entries(status_df)
+
+        # Update the validation status in the data model
+        self._data_model.set_validation_status(status_df)
+
+        # Emit the validation changed signal
+        self.validation_changed.emit(status_df)
+
+        logger.info(f"Updated validation status with {len(correctable_cells)} correctable cells")
+
     def set_correction_service(self, correction_service: CorrectionService) -> None:
         """
         Set the correction service reference.

@@ -328,10 +328,48 @@ class ChestBuddyApp(QObject):
                 "_validate_after_import",
             )
 
+            # Connect auto-correction signals
+            # This ensures auto-correction happens after validation or import if enabled
+            self._signal_manager.connect(
+                self._data_view_controller,
+                "validation_completed",
+                self._correction_controller,
+                "auto_correct_after_validation",
+            )
+
+            # The view state controller will handle signaling when views should be shown
+            self._signal_manager.connect(
+                self._view_state_controller,
+                "state_changed",
+                self._main_window,
+                "_on_view_changed",
+            )
+
+            # Connect progress controller signals
+            self._signal_manager.connect(
+                self._progress_controller,
+                "progress_updated",
+                self._main_window,
+                "_on_progress_updated",
+            )
+
+            self._signal_manager.connect(
+                self._progress_controller,
+                "operation_started",
+                self._main_window,
+                "_on_operation_started",
+            )
+
+            self._signal_manager.connect(
+                self._progress_controller,
+                "operation_completed",
+                self._main_window,
+                "_on_operation_completed",
+            )
+
             logger.info("Application signals connected")
         except Exception as e:
-            logger.error(f"Error connecting signals: {e}")
-            self._error_controller.handle_exception(e, "Error connecting signals")
+            logger.error(f"Error in _connect_signals: {e}")
 
     def cleanup(self) -> None:
         """Clean up application resources before exit."""
