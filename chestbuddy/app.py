@@ -298,6 +298,9 @@ class ChestBuddyApp(QObject):
             self._file_controller.file_opened.connect(self._on_file_opened)
             self._file_controller.recent_files_changed.connect(self._on_recent_files_changed)
 
+            # Connect file controller's load_csv_triggered to data_manager.load_csv
+            self._file_controller.load_csv_triggered.connect(self._data_manager.load_csv)
+
             # Connect progress controller signals
             self._progress_controller.progress_canceled.connect(self._on_progress_canceled)
 
