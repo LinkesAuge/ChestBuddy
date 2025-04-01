@@ -305,22 +305,59 @@ class DataView(QWidget):
 
     def set_table_state_manager(self, manager):
         """
-        Set the table state manager for this view.
+        Set the table state manager for cell state tracking.
 
         Args:
             manager: The TableStateManager instance to use
         """
+        logger.debug("==== DataView.set_table_state_manager called ====")
+
+        if manager is None:
+            logger.warning("Attempted to set None TableStateManager")
+            return
+
         self._table_state_manager = manager
+        logger.debug("TableStateManager reference set in DataView")
 
         # Connect to state_changed signal if available
         if hasattr(manager, "state_changed"):
-            manager.state_changed.connect(self.update_cell_highlighting_from_state)
+            try:
+                manager.state_changed.connect(self.update_cell_highlighting_from_state)
+                logger.debug("Connected to TableStateManager.state_changed signal successfully")
+            except Exception as e:
+                logger.error(f"Error connecting to TableStateManager.state_changed: {e}")
+                import traceback
+
+                logger.error(traceback.format_exc())
+        else:
+            logger.warning("TableStateManager does not have state_changed signal")
 
         # Log the integration
-        logger.debug("TableStateManager integrated with DataView")
+        logger.debug("TableStateManager integration with DataView complete")
+
+        # Debug current cell states
+        self._debug_print_cell_states()
+
+    def _debug_print_cell_states(self):
+        """Debug method to print current cell states."""
+        if not hasattr(self, "_table_state_manager") or not self._table_state_manager:
+            logger.debug("No TableStateManager available to print cell states")
+            return
+
+        invalid_cells = self._table_state_manager.get_cells_by_state(CellState.INVALID)
+        correctable_cells = self._table_state_manager.get_cells_by_state(CellState.CORRECTABLE)
+        corrected_cells = self._table_state_manager.get_cells_by_state(CellState.CORRECTED)
+
+        logger.debug(
+            f"Current cell states: {len(invalid_cells)} invalid, "
+            f"{len(correctable_cells)} correctable, "
+            f"{len(corrected_cells)} corrected"
+        )
 
     def update_cell_highlighting_from_state(self):
         """Update cell highlighting based on the table state manager."""
+        logger.debug("==== DataView.update_cell_highlighting_from_state called ====")
+
         if not self._table_state_manager:
             logger.warning("Cannot update cell highlighting: TableStateManager not available")
             return
@@ -340,28 +377,48 @@ class DataView(QWidget):
             f"{len(processing_cells)} processing"
         )
 
+        # Log some sample cells for debugging
+        if invalid_cells:
+            logger.debug(f"Sample invalid cells (first 3): {invalid_cells[:3]}")
+        if correctable_cells:
+            logger.debug(f"Sample correctable cells (first 3): {correctable_cells[:3]}")
+        if corrected_cells:
+            logger.debug(f"Sample corrected cells (first 3): {corrected_cells[:3]}")
+
         # Define color constants matching our color legend
         invalid_color = QColor(255, 182, 182)  # Light red
         correctable_color = QColor(255, 214, 165)  # Light orange
         corrected_color = QColor(182, 255, 182)  # Light green
         processing_color = QColor(214, 182, 255)  # Light purple
 
+        # Count successfully highlighted cells
+        highlighted_count = 0
+
         # Apply highlighting for each cell type
         for row, col in invalid_cells:
             logger.debug(f"Highlighting invalid cell at ({row}, {col})")
-            self._highlight_cell(row, col, invalid_color)
+            if self._highlight_cell(row, col, invalid_color):
+                highlighted_count += 1
 
         for row, col in correctable_cells:
             logger.debug(f"Highlighting correctable cell at ({row}, {col})")
-            self._highlight_cell(row, col, correctable_color)
+            if self._highlight_cell(row, col, correctable_color):
+                highlighted_count += 1
 
         for row, col in corrected_cells:
             logger.debug(f"Highlighting corrected cell at ({row}, {col})")
-            self._highlight_cell(row, col, corrected_color)
+            if self._highlight_cell(row, col, corrected_color):
+                highlighted_count += 1
 
         for row, col in processing_cells:
             logger.debug(f"Highlighting processing cell at ({row}, {col})")
-            self._highlight_cell(row, col, processing_color)
+            if self._highlight_cell(row, col, processing_color):
+                highlighted_count += 1
+
+        logger.debug(
+            f"Successfully highlighted {highlighted_count} cells out of "
+            f"{len(invalid_cells) + len(correctable_cells) + len(corrected_cells) + len(processing_cells)} total"
+        )
 
         # Force the view to refresh after all highlighting is applied
         if hasattr(self, "_table_view") and self._table_view:
@@ -369,6 +426,77 @@ class DataView(QWidget):
             self._table_view.viewport().update()
 
         logger.debug("Cell highlighting update complete")
+
+    def _highlight_cell(self, row, col, color):
+        """
+        Highlight a cell with the specified color.
+
+        Args:
+            row: Source row index
+            col: Source column index
+            color: QColor for highlighting
+
+        Returns:
+            bool: True if cell was successfully highlighted, False otherwise
+        """
+        if not hasattr(self, "_table_model") or not self._table_model:
+            logger.warning("Cannot highlight cell: table model not available")
+            return False
+
+        # Check if we have valid row/column indices
+        if row < 0 or col < 0:
+            logger.warning(f"Invalid negative indices for cell ({row}, {col})")
+            return False
+
+        # Check if row/col are within bounds
+        if row >= self._table_model.rowCount():
+            logger.warning(
+                f"Row index {row} is out of bounds (max: {self._table_model.rowCount() - 1})"
+            )
+            return False
+
+        if col >= self._table_model.columnCount():
+            logger.warning(
+                f"Column index {col} is out of bounds (max: {self._table_model.columnCount() - 1})"
+            )
+            return False
+
+        # Create the source model index
+        source_index = self._table_model.index(row, col)
+        if not source_index.isValid():
+            logger.warning(f"Invalid source index for cell ({row}, {col})")
+            return False
+
+        # Get the item directly from source model first
+        item = self._table_model.itemFromIndex(source_index)
+        if not item:
+            logger.warning(f"Item not found for cell ({row}, {col})")
+            return False
+
+        # Apply highlighting color to the source model item
+        try:
+            item.setData(color, Qt.BackgroundRole)
+            logger.debug(f"Applied highlighting to cell ({row}, {col}) with color {color.name()}")
+
+            # Force update for this item
+            if hasattr(self, "_table_view") and self._table_view:
+                # If we have proxy model, map the index
+                if hasattr(self, "_proxy_model") and self._proxy_model:
+                    view_index = self._proxy_model.mapFromSource(source_index)
+                    if view_index.isValid():
+                        # Update the specific item in the view
+                        self._table_view.update(view_index)
+                else:
+                    # Update the specific item in the view
+                    self._table_view.update(source_index)
+
+            return True
+        except Exception as e:
+            logger.error(f"Error highlighting cell ({row}, {col}): {e}")
+            import traceback
+
+            logger.error(traceback.format_exc())
+            return False
 
     def update_tooltips_from_state(self):
         """Update cell tooltips based on the table state manager."""
@@ -424,13 +552,18 @@ class DataView(QWidget):
             validation_status (pd.DataFrame): The DataFrame containing validation status.
         """
         try:
-            logger.debug("Handling validation status change")
+            logger.debug("==== DataView._on_validation_changed called ====")
 
             if validation_status is None or validation_status.empty:
                 logger.debug("Validation status is None or empty, nothing to do")
                 return
 
             logger.debug(f"Received validation_status DataFrame shape: {validation_status.shape}")
+            logger.debug(f"Validation status columns: {validation_status.columns.tolist()}")
+
+            # Log a sample of the validation data for debugging
+            if not validation_status.empty:
+                logger.debug(f"Sample validation data (first 3 rows):\n{validation_status.head(3)}")
 
             # Update the TableStateManager with validation results
             if hasattr(self, "_table_state_manager") and self._table_state_manager:
@@ -438,6 +571,21 @@ class DataView(QWidget):
                 self._table_state_manager.update_cell_states_from_validation(validation_status)
                 # Update tooltips based on the updated states
                 self.update_tooltips_from_state()
+
+                # Get the counts of cells in different states for debugging
+                invalid_cells = self._table_state_manager.get_cells_by_state(CellState.INVALID)
+                correctable_cells = self._table_state_manager.get_cells_by_state(
+                    CellState.CORRECTABLE
+                )
+                logger.debug(
+                    f"After updating TableStateManager: {len(invalid_cells)} invalid cells, "
+                    f"{len(correctable_cells)} correctable cells"
+                )
+
+                # Force update after handling validation
+                if hasattr(self, "_table_view") and self._table_view:
+                    logger.debug("Forcing table view update after validation")
+                    self._table_view.viewport().update()
             else:
                 logger.warning(
                     "TableStateManager not available - validation highlighting will not be applied"
@@ -445,6 +593,9 @@ class DataView(QWidget):
 
         except Exception as e:
             logger.error(f"Error handling validation changed: {e}")
+            import traceback
+
+            logger.error(traceback.format_exc())
 
     @Slot(object)
     def _on_correction_applied(self, correction_status) -> None:
@@ -1954,7 +2105,10 @@ class DataView(QWidget):
 
     def _apply_table_styling(self) -> None:
         """Apply additional styling to ensure table content is visible."""
-        # Set text color explicitly via stylesheet
+        logger.debug("Applying table styling in DataView")
+
+        # Set text color explicitly via stylesheet but DO NOT SET BACKGROUND COLOR on items
+        # to allow cell-specific highlighting to work
         self._table_view.setStyleSheet("""
             QTableView {
                 color: white;
@@ -1965,12 +2119,8 @@ class DataView(QWidget):
             }
             QTableView::item {
                 color: white;
-                /* No background color to allow delegate painting to show through */
+                /* NO BACKGROUND COLOR HERE - allows item-specific background colors to work */
                 padding: 12px;
-            }
-            QTableView::item:alternate {
-                /* Very subtle alternating row color that won't interfere with validation highlighting */
-                background-color: rgba(45, 55, 72, 40);
             }
             QTableView::item:selected {
                 color: #1A2C42;
@@ -1978,8 +2128,9 @@ class DataView(QWidget):
             }
         """)
 
-        # Re-enable alternating row colors with subtle effect
-        self._table_view.setAlternatingRowColors(True)
+        # Make sure the alternating row colors feature is DISABLED as it can override our highlighting
+        self._table_view.setAlternatingRowColors(False)
+        logger.debug("Disabled alternating row colors to prevent highlighting issues")
 
         # Make sure the model has appropriate default foreground color
         if self._table_model:  # Check that table model exists before using it
@@ -1987,6 +2138,7 @@ class DataView(QWidget):
             prototype = self._table_model.itemPrototype()
             if prototype:
                 prototype.setForeground(QColor("white"))
+                logger.debug("Set default item foreground color to white")
 
     def _on_item_changed(self, item):
         """
@@ -2638,46 +2790,3 @@ class DataView(QWidget):
             self.update_cell_highlighting_from_state()
         else:
             logger.warning("Cannot update cell highlighting: TableStateManager not available")
-
-    def _highlight_cell(self, row, col, color):
-        """
-        Highlight a cell with the specified color.
-
-        Args:
-            row: Source row index
-            col: Source column index
-            color: QColor for highlighting
-        """
-        if not hasattr(self, "_table_model") or not self._table_model:
-            logger.warning("Cannot highlight cell: table model not available")
-            return
-
-        # Create the source model index
-        source_index = self._table_model.index(row, col)
-        if not source_index.isValid():
-            logger.warning(f"Invalid source index for cell ({row}, {col})")
-            return
-
-        # Get the item directly from source model first
-        item = self._table_model.itemFromIndex(source_index)
-        if not item:
-            logger.warning(f"Item not found for cell ({row}, {col})")
-            return
-
-        # Apply highlighting color to the source model item
-        item.setData(color, Qt.BackgroundRole)
-
-        # Log the highlighting
-        logger.debug(f"Applied highlighting to cell ({row}, {col}) with color {color.name()}")
-
-        # Force update for this item
-        if hasattr(self, "_table_view") and self._table_view:
-            # If we have proxy model, map the index
-            if hasattr(self, "_proxy_model") and self._proxy_model:
-                view_index = self._proxy_model.mapFromSource(source_index)
-                if view_index.isValid():
-                    # Update the specific item in the view
-                    self._table_view.update(view_index)
-            else:
-                # Update the specific item in the view
-                self._table_view.update(source_index)

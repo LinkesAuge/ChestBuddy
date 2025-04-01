@@ -252,11 +252,29 @@ class ValidationViewAdapter(BaseView):
         elif action_id == "refresh":
             self.refresh()
 
+    @Slot()
     def _on_validate_clicked(self) -> None:
-        """Handle validate button click using controller."""
+        """Handle validate button click."""
+        logger.debug("Validate button clicked in ValidationViewAdapter")
+
         # Schedule update through UI update system
         self.populate()
         self.validation_requested.emit()
+
+        # Forward to the controller
+        if self._controller and hasattr(self._controller, "validate_data"):
+            try:
+                logger.debug("Calling controller.validate_data()")
+                self._controller.validate_data()
+            except Exception as e:
+                logger.error(f"Error in validate_data: {e}")
+                import traceback
+
+                logger.error(traceback.format_exc())
+        else:
+            logger.warning(
+                "Cannot validate: controller not available or missing validate_data method"
+            )
 
     def _on_clear_clicked(self) -> None:
         """Handle clear validation button click."""
@@ -274,14 +292,63 @@ class ValidationViewAdapter(BaseView):
     @Slot(object)
     def _on_validation_completed(self, results) -> None:
         """
-        Handle validation completed event.
+        Handle validation completion.
 
         Args:
             results: The validation results
         """
-        # Update UI to show validation results
+        logger.debug("==== ValidationViewAdapter._on_validation_completed called ====")
+
+        # Log the results for debugging
+        logger.debug(f"Validation results type: {type(results)}")
+
+        if isinstance(results, dict):
+            logger.debug(f"Validation results keys: {list(results.keys())}")
+            if results:
+                # Log a sample of the first key and value
+                first_key = next(iter(results))
+                logger.debug(
+                    f"Sample result - Key: {first_key}, Value type: {type(results[first_key])}"
+                )
+        elif isinstance(results, pd.DataFrame):
+            logger.debug(f"Validation results shape: {results.shape}")
+            logger.debug(f"Validation results columns: {results.columns.tolist()}")
+            if not results.empty:
+                logger.debug(f"Sample validation results (first 3 rows):\n{results.head(3)}")
+        else:
+            logger.debug(f"Validation results: {results}")
+
+        # Forward to the wrapped view
+        if hasattr(self._validation_tab, "_on_validation_completed"):
+            try:
+                self._validation_tab._on_validation_completed(results)
+            except Exception as e:
+                logger.error(f"Error forwarding validation results to view: {e}")
+
+        # Set header status
         if hasattr(self, "_set_header_status"):
-            issue_count = len(results) if results else 0
+            issue_count = 0
+            if isinstance(results, dict):
+                issue_count = len(results)
+            elif isinstance(results, pd.DataFrame) and not results.empty:
+                # Try to count issues
+                try:
+                    if "STATUS" in results.columns:
+                        issue_count = results.query("STATUS == 'invalid'").shape[0]
+                    else:
+                        # Count cells with invalid status in any *_status column
+                        status_cols = [col for col in results.columns if col.endswith("_status")]
+                        for col in status_cols:
+                            invalid_count = results[
+                                results[col]
+                                .astype(str)
+                                .str.lower()
+                                .isin(["invalid", "validation_status.invalid", "false", "0"])
+                            ].shape[0]
+                            issue_count += invalid_count
+                except Exception as e:
+                    logger.error(f"Error counting validation issues: {e}")
+
             self._set_header_status(f"Validation complete: {issue_count} issues found")
 
         # Refresh the validation tab to show the latest results

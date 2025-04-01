@@ -280,9 +280,17 @@ class TableStateManager(QObject):
         Args:
             validation_status: DataFrame with validation results
         """
+        logger.debug("==== TableStateManager.update_cell_states_from_validation called ====")
+
         if validation_status is None or validation_status.empty:
             logger.debug("Empty validation status, nothing to update")
             return
+
+        # Log the validation status details
+        logger.debug(f"Validation status DataFrame shape: {validation_status.shape}")
+        logger.debug(f"Validation status columns: {validation_status.columns.tolist()}")
+        if not validation_status.empty:
+            logger.debug(f"Sample validation data (first 3 rows):\n{validation_status.head(3)}")
 
         # Reset existing validation states
         # First get all cells that are currently marked as invalid or correctable
@@ -303,6 +311,7 @@ class TableStateManager(QObject):
             # Standard format - use as is
             logger.debug("Using standard validation status format with ROW_IDX, COL_IDX, STATUS")
             # Set new states based on validation status
+            cells_updated = 0
             for _, row in validation_status.iterrows():
                 row_idx = row["ROW_IDX"]
                 col_idx = row["COL_IDX"]
@@ -312,6 +321,8 @@ class TableStateManager(QObject):
                     self.set_cell_state(row_idx, col_idx, CellState.INVALID)
                     self.set_cell_detail(row_idx, col_idx, "Invalid value: Failed validation")
                     logger.debug(f"Set cell ({row_idx}, {col_idx}) to INVALID state")
+                    cells_updated += 1
+            logger.debug(f"Updated {cells_updated} cells using standard format")
         else:
             # Try to convert from ValidationService format
             # Check for column-specific status fields: PLAYER_status, SOURCE_status, etc.
@@ -319,15 +330,57 @@ class TableStateManager(QObject):
             status_columns = [col for col in validation_status.columns if col.endswith("_status")]
             logger.debug(f"Found status columns: {status_columns}")
 
+            # If no status columns found, try to guess the format
+            if not status_columns:
+                logger.warning("No status columns found, trying to guess format")
+                # Look for columns that might contain validation status
+                for col in validation_status.columns:
+                    logger.debug(f"Examining column: {col}")
+                    if "status" in col.lower() or "valid" in col.lower():
+                        status_columns.append(col)
+                        logger.debug(f"Added potential status column: {col}")
+
+                if not status_columns:
+                    logger.error("Could not identify any status columns in validation data")
+                    # Try to print the full validation data to help understand the format
+                    try:
+                        logger.debug(f"Full validation data:\n{validation_status}")
+                    except Exception as e:
+                        logger.error(f"Error logging full validation data: {e}")
+                    return
+
             # Build a more accurate column map by looking at the actual model columns
             col_map = {}
+            column_names = []
+
+            # Try different ways to get column names from data model
             if hasattr(self._data_model, "column_names"):
-                # Use column_names if available
-                for idx, col_name in enumerate(self._data_model.column_names):
-                    status_col = f"{col_name}_status"
-                    if status_col in status_columns:
-                        col_map[status_col] = idx
-                        logger.debug(f"Mapped status column {status_col} to index {idx}")
+                column_names = self._data_model.column_names
+                logger.debug(f"Got column names from data_model.column_names: {column_names}")
+            elif hasattr(self._data_model, "get_columns") and callable(
+                self._data_model.get_columns
+            ):
+                column_names = self._data_model.get_columns()
+                logger.debug(f"Got column names from data_model.get_columns(): {column_names}")
+            elif hasattr(self._data_model, "columns"):
+                column_names = self._data_model.columns
+                logger.debug(f"Got column names from data_model.columns: {column_names}")
+            elif hasattr(self._data_model, "data") and hasattr(self._data_model.data, "columns"):
+                column_names = self._data_model.data.columns.tolist()
+                logger.debug(f"Got column names from data_model.data.columns: {column_names}")
+            else:
+                logger.warning("Could not get column names from data model")
+
+            if column_names:
+                # Map column names to indices
+                for idx, col_name in enumerate(column_names):
+                    # Try different status column name formats
+                    for status_suffix in ["_status", ".status", "Status"]:
+                        status_col = f"{col_name}{status_suffix}"
+                        if status_col in status_columns:
+                            col_map[status_col] = idx
+                            logger.debug(f"Mapped status column {status_col} to index {idx}")
+                            break
             else:
                 # Fallback to hard-coded mapping
                 logger.debug("Using fallback column mapping")
@@ -341,7 +394,9 @@ class TableStateManager(QObject):
 
             # Get rows in the data model
             cells_updated = 0
+            total_rows_processed = 0
             for data_row_idx, row in validation_status.iterrows():
+                total_rows_processed += 1
                 # Process each status column
                 for status_col in status_columns:
                     status_value = row[status_col]
@@ -388,10 +443,20 @@ class TableStateManager(QObject):
                             except Exception as e:
                                 logger.error(f"Unable to get columns from data model: {e}")
 
+                    logger.debug(
+                        f"Processing cell ({data_row_idx}, {col_idx}) with status: {status_value}"
+                    )
+
+                    # Debug the status value by casting to string and checking lower version
+                    status_str = str(status_value).lower()
+                    logger.debug(f"Status value as string (lowercase): '{status_str}'")
+
                     # If we found a valid column index and the status is invalid
-                    if col_idx >= 0 and str(status_value).lower() in (
+                    if col_idx >= 0 and status_str in (
                         "invalid",
                         "validation_status.invalid",
+                        "false",
+                        "0",
                     ):
                         self.set_cell_state(data_row_idx, col_idx, CellState.INVALID)
                         self.set_cell_detail(
@@ -401,7 +466,7 @@ class TableStateManager(QObject):
                         cells_updated += 1
 
                     # Handle correctable status if present
-                    if col_idx >= 0 and str(status_value).lower() in (
+                    if col_idx >= 0 and status_str in (
                         "correctable",
                         "validation_status.correctable",
                     ):
@@ -414,12 +479,20 @@ class TableStateManager(QObject):
                         logger.debug(f"Set cell ({data_row_idx}, {col_idx}) to CORRECTABLE state")
                         cells_updated += 1
 
+            logger.debug(f"Processed {total_rows_processed} rows from validation status")
+            logger.debug(f"Updated {cells_updated} cells using column-specific status format")
+
         # Notify that states have changed
         logger.debug("Emitting state_changed signal after updating validation states")
         self.state_changed.emit()
+
+        # Get final counts for logging
+        invalid_cells = self.get_cells_by_state(CellState.INVALID)
+        correctable_cells = self.get_cells_by_state(CellState.CORRECTABLE)
+
         logger.debug(
-            f"Updated cell states from validation status: "
-            f"{len(validation_status)} entries processed"
+            f"After updating: {len(invalid_cells)} cells marked as INVALID, "
+            f"{len(correctable_cells)} cells marked as CORRECTABLE"
         )
 
     def update_cell_states_from_correction(self, correction_status: Dict[str, Any]) -> None:
