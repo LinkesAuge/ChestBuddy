@@ -322,13 +322,23 @@ class DataView(QWidget):
     def update_cell_highlighting_from_state(self):
         """Update cell highlighting based on the table state manager."""
         if not self._table_state_manager:
+            logger.warning("Cannot update cell highlighting: TableStateManager not available")
             return
+
+        logger.debug("Updating cell highlighting from table state manager")
 
         # Get cells in different states
         invalid_cells = self._table_state_manager.get_cells_by_state(CellState.INVALID)
         correctable_cells = self._table_state_manager.get_cells_by_state(CellState.CORRECTABLE)
         corrected_cells = self._table_state_manager.get_cells_by_state(CellState.CORRECTED)
         processing_cells = self._table_state_manager.get_cells_by_state(CellState.PROCESSING)
+
+        logger.debug(
+            f"Found cells to highlight: {len(invalid_cells)} invalid, "
+            f"{len(correctable_cells)} correctable, "
+            f"{len(corrected_cells)} corrected, "
+            f"{len(processing_cells)} processing"
+        )
 
         # Define color constants matching our color legend
         invalid_color = QColor(255, 182, 182)  # Light red
@@ -338,16 +348,27 @@ class DataView(QWidget):
 
         # Apply highlighting for each cell type
         for row, col in invalid_cells:
+            logger.debug(f"Highlighting invalid cell at ({row}, {col})")
             self._highlight_cell(row, col, invalid_color)
 
         for row, col in correctable_cells:
+            logger.debug(f"Highlighting correctable cell at ({row}, {col})")
             self._highlight_cell(row, col, correctable_color)
 
         for row, col in corrected_cells:
+            logger.debug(f"Highlighting corrected cell at ({row}, {col})")
             self._highlight_cell(row, col, corrected_color)
 
         for row, col in processing_cells:
+            logger.debug(f"Highlighting processing cell at ({row}, {col})")
             self._highlight_cell(row, col, processing_color)
+
+        # Force the view to refresh after all highlighting is applied
+        if hasattr(self, "_table_view") and self._table_view:
+            logger.debug("Forcing table view update after highlighting")
+            self._table_view.viewport().update()
+
+        logger.debug("Cell highlighting update complete")
 
     def update_tooltips_from_state(self):
         """Update cell tooltips based on the table state manager."""
@@ -2628,20 +2649,35 @@ class DataView(QWidget):
             color: QColor for highlighting
         """
         if not hasattr(self, "_table_model") or not self._table_model:
+            logger.warning("Cannot highlight cell: table model not available")
             return
 
-        # Map to view indices if needed
-        view_index = None
-        if hasattr(self, "_proxy_model") and self._proxy_model:
-            model_index = self._table_model.index(row, col)
-            view_index = self._proxy_model.mapFromSource(model_index)
-        else:
-            view_index = self._table_model.index(row, col)
-
-        if not view_index or not view_index.isValid():
+        # Create the source model index
+        source_index = self._table_model.index(row, col)
+        if not source_index.isValid():
+            logger.warning(f"Invalid source index for cell ({row}, {col})")
             return
 
-        # Apply highlighting color
-        item = self._table_model.itemFromIndex(view_index)
-        if item:
-            item.setData(color, Qt.BackgroundRole)
+        # Get the item directly from source model first
+        item = self._table_model.itemFromIndex(source_index)
+        if not item:
+            logger.warning(f"Item not found for cell ({row}, {col})")
+            return
+
+        # Apply highlighting color to the source model item
+        item.setData(color, Qt.BackgroundRole)
+
+        # Log the highlighting
+        logger.debug(f"Applied highlighting to cell ({row}, {col}) with color {color.name()}")
+
+        # Force update for this item
+        if hasattr(self, "_table_view") and self._table_view:
+            # If we have proxy model, map the index
+            if hasattr(self, "_proxy_model") and self._proxy_model:
+                view_index = self._proxy_model.mapFromSource(source_index)
+                if view_index.isValid():
+                    # Update the specific item in the view
+                    self._table_view.update(view_index)
+            else:
+                # Update the specific item in the view
+                self._table_view.update(source_index)
