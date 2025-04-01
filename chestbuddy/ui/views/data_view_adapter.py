@@ -423,8 +423,14 @@ class DataViewAdapter(UpdatableView):
         # in its ActionToolbar
         pass
 
-    def _on_data_changed(self):
-        """Handle data model changes."""
+    @Slot(object)
+    def _on_data_changed(self, data_state=None):
+        """
+        Handle data model changes.
+
+        Args:
+            data_state: The DataState object containing information about the change
+        """
         logger.debug("DataViewAdapter: Data model changed, requesting update")
 
         # Mark as needing population
@@ -436,7 +442,10 @@ class DataViewAdapter(UpdatableView):
             self.request_update()
 
             # As a fallback, try to populate directly if update_manager isn't working
-            if not self._data_model.is_empty and hasattr(self._data_view, "populate_table"):
+            if data_state and hasattr(data_state, "row_count") and data_state.row_count > 0:
+                logger.debug("DataViewAdapter: Direct population fallback")
+                self.populate_table()
+            elif not self._data_model.is_empty and hasattr(self._data_view, "populate_table"):
                 logger.debug("DataViewAdapter: Direct population fallback")
                 self.populate_table()
         except Exception as e:

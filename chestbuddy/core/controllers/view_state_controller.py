@@ -925,3 +925,15 @@ class ViewStateController(BaseController):
 
         # Navigate to Dashboard
         self.set_active_view("Dashboard")
+
+    def get_view(self, view_name: str) -> Optional[QWidget]:
+        """
+        Get a view by name.
+
+        Args:
+            view_name: The name of the view to get
+
+        Returns:
+            The view widget, or None if not found
+        """
+        return self._views.get(view_name)
