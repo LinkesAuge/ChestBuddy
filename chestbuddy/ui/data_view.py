@@ -5,17 +5,17 @@ This module provides the DataView class for displaying and editing CSV data.
 """
 
 import logging
-from typing import Dict, List, Optional, Any
 import time
-import hashlib
-
+import re
+from typing import Dict, List, Optional, Tuple, Set, Any
 import pandas as pd
+
 from PySide6.QtCore import (
     Qt,
     Signal,
     Slot,
-    QModelIndex,
     QTimer,
+    QModelIndex,
     QSortFilterProxyModel,
     QRegularExpression,
 )
@@ -24,39 +24,47 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QHBoxLayout,
     QTableView,
-    QHeaderView,
     QLabel,
-    QPushButton,
-    QComboBox,
     QLineEdit,
+    QComboBox,
     QCheckBox,
-    QGroupBox,
-    QFormLayout,
-    QMessageBox,
+    QPushButton,
     QMenu,
-    QSplitter,
+    QHeaderView,
+    QStyledItemDelegate,
+    QStyleOptionViewItem,
+    QGroupBox,
+    QMessageBox,
+    QDialog,
     QApplication,
 )
 from PySide6.QtGui import (
+    QColor,
+    QBrush,
+    QPalette,
+    QFont,
     QStandardItemModel,
     QStandardItem,
-    QAction,
-    QColor,
+    QClipboard,
     QKeySequence,
     QShortcut,
-    QKeyEvent,
+    QAction,
 )
 
-from chestbuddy.core.models import ChestDataModel
-from chestbuddy.ui.widgets.action_toolbar import ActionToolbar
-from chestbuddy.ui.widgets.action_button import ActionButton
+from chestbuddy.core.enums.validation_enums import ValidationStatus, ValidationMode
+from chestbuddy.ui.widgets.action_toolbar import ActionToolbar, ActionButton
 from chestbuddy.ui.widgets.validation_delegate import ValidationStatusDelegate
-from chestbuddy.core.enums.validation_enums import ValidationStatus
 from chestbuddy.ui.dialogs.add_edit_rule_dialog import AddEditRuleDialog
 from chestbuddy.ui.dialogs.batch_correction_dialog import BatchCorrectionDialog
+from chestbuddy.ui.dialogs.import_export_dialog import ImportExportDialog
+from chestbuddy.ui.resources.style import Colors
+from chestbuddy.core.models.chest_data_model import ChestDataModel
+from chestbuddy.core.table_state_manager import TableStateManager, CellState
 
 # Set up logger
 logger = logging.getLogger(__name__)
+
+# Constants
 
 
 class CustomFilterProxyModel(QSortFilterProxyModel):
@@ -236,59 +244,126 @@ class DataView(QWidget):
         Initialize the DataView widget.
 
         Args:
-            data_model: Data model to display
-            parent: Parent widget
+            data_model: The data model to use
+            parent: The parent widget
         """
-        # Call parent init first
         super().__init__(parent)
 
-        # Initialize the data model
         self._data_model = data_model
-
-        # Create a QStandardItemModel for the table
-        self._table_model = QStandardItemModel(self)
-
-        # Create a proxy model for filtering and sorting
-        self._proxy_model = CustomFilterProxyModel(self)
-        self._proxy_model.setSourceModel(self._table_model)
-        self._proxy_model.setDynamicSortFilter(True)
-
-        # Initialize filter state
-        self._filter_criteria = ""  # Rename to avoid conflict with _filter_text UI element
-        self._filtered_data = None
-        self._filtered_rows = None
-
-        # Initialize state tracking variables
+        self._proxy_model = None
+        self._table_model = None
+        self._table_view = None
+        self._filter_bar = None
+        self._search_edit = None
+        self._column_selector = None
+        self._case_sensitive_checkbox = None
+        self._filter_mode_combo = None
+        self._status_label = None
+        self._validation_tooltip_cache = {}
+        self._clear_filter_button = None
+        self._refresh_button = None
+        self._export_button = None
+        self._import_button = None
+        self._validation_colors = {}  # Status -> QColor
+        self._filtered_row_cache = {}  # Map model rows to filtered rows
+        self._model_row_cache = {}  # Map filtered rows to model rows
+        self._auto_update_enabled = True
+        self._chunk_size = 1000
+        self._current_chunk = 0
+        self._total_chunks = 0
+        self._population_timer = QTimer(self)
+        self._table_state_manager = None  # TableStateManager integration
         self._is_updating = False
         self._population_in_progress = False
         self._initial_load = True
-        self._auto_update_enabled = True  # Default to enabled
+        self._visible_columns = []
+        self._filtered_rows = None
+        self._filtered_data = None
+        self._filter_text = ""
+        self._filter_criteria = ""
+        self._chunk_columns = []
+        self._chunk_data = None
+        self._chunk_row_count = 0
+        self._chunk_col_count = 0
+        self._chunk_start = 0
 
-        # Initialize the table header columns based on data_model columns
-        self._columns = (
-            self._data_model.column_names if hasattr(self._data_model, "column_names") else []
-        )
-        self._columns.append(self.STATUS_COLUMN)
+        # Configure timer for chunked population
+        self._population_timer.setInterval(10)  # 10ms between chunks
+        self._population_timer.timeout.connect(self._populate_chunk)
 
-        # Track which columns are visible (initially all)
-        self._visible_columns = [
-            self.DATE_COLUMN,
-            self.PLAYER_COLUMN,
-            self.SOURCE_COLUMN,
-            self.CHEST_COLUMN,
-            self.SCORE_COLUMN,
-            self.CLAN_COLUMN,
-            self.STATUS_COLUMN,
-        ]
+        # Set up logging
+        self._logger = logging.getLogger(__name__)
 
-        # Set up the UI components
+        # Initialize the User Interface
         self._init_ui()
 
         # Connect signals
         self._connect_signals()
 
-        # Set up the table view
+        # Populate the table
         self.populate_table()
+
+    def set_table_state_manager(self, manager):
+        """
+        Set the table state manager for this view.
+
+        Args:
+            manager: The TableStateManager instance to use
+        """
+        self._table_state_manager = manager
+
+        # Connect to state_changed signal if available
+        if hasattr(manager, "state_changed"):
+            manager.state_changed.connect(self.update_cell_highlighting_from_state)
+
+        # Log the integration
+        logger.debug("TableStateManager integrated with DataView")
+
+    def update_cell_highlighting_from_state(self):
+        """Update cell highlighting based on the table state manager."""
+        if not self._table_state_manager:
+            return
+
+        # Get cells in different states
+        invalid_cells = self._table_state_manager.get_cells_by_state(CellState.INVALID)
+        correctable_cells = self._table_state_manager.get_cells_by_state(CellState.CORRECTABLE)
+        corrected_cells = self._table_state_manager.get_cells_by_state(CellState.CORRECTED)
+        processing_cells = self._table_state_manager.get_cells_by_state(CellState.PROCESSING)
+
+        # Define color constants matching our color legend
+        invalid_color = QColor(255, 182, 182)  # Light red
+        correctable_color = QColor(255, 214, 165)  # Light orange
+        corrected_color = QColor(182, 255, 182)  # Light green
+        processing_color = QColor(214, 182, 255)  # Light purple
+
+        # Apply highlighting for each cell type
+        for row, col in invalid_cells:
+            self._highlight_cell(row, col, invalid_color)
+
+        for row, col in correctable_cells:
+            self._highlight_cell(row, col, correctable_color)
+
+        for row, col in corrected_cells:
+            self._highlight_cell(row, col, corrected_color)
+
+        for row, col in processing_cells:
+            self._highlight_cell(row, col, processing_color)
+
+    def update_tooltips_from_state(self):
+        """Update cell tooltips based on the table state manager."""
+        if not self._table_state_manager:
+            return
+
+        # Get cells with states
+        invalid_cells = self._table_state_manager.get_cells_by_state(CellState.INVALID)
+        correctable_cells = self._table_state_manager.get_cells_by_state(CellState.CORRECTABLE)
+        corrected_cells = self._table_state_manager.get_cells_by_state(CellState.CORRECTED)
+
+        # Update tooltips for cells with details
+        for row, col in invalid_cells + correctable_cells + corrected_cells:
+            detail = self._table_state_manager.get_cell_details(row, col)
+            if detail:
+                self._set_cell_tooltip(row, col, detail)
 
     @Slot()
     def _on_data_cleared(self) -> None:
@@ -302,6 +377,9 @@ class DataView(QWidget):
         self._filter_text = ""
         self._filtered_data = None
         self._filtered_rows = None
+
+        # Clear validation cache
+        self._clear_validation_cache()
 
         # Reset UI elements
         if hasattr(self, "_filter_input") and self._filter_input:
@@ -455,8 +533,6 @@ class DataView(QWidget):
         column_layout.addWidget(QLabel("Column:"))
         self._filter_column = QComboBox()
         self._filter_column.setMinimumWidth(150)
-        # Populate the column selector with available columns
-        self._populate_column_selector()
         column_layout.addWidget(self._filter_column)
         filter_layout.addWidget(column_container)
 
@@ -498,6 +574,13 @@ class DataView(QWidget):
 
         # Add header container to main layout
         main_layout.addWidget(header_container)
+
+        # Initialize the table model before using it
+        self._table_model = QStandardItemModel(self)
+
+        # Initialize the proxy model
+        self._proxy_model = CustomFilterProxyModel(self)
+        self._proxy_model.setSourceModel(self._table_model)
 
         # Table view with minimal spacing
         self._table_view = QTableView()
@@ -562,6 +645,12 @@ class DataView(QWidget):
         # Add the table container to the main layout
         main_layout.addWidget(table_container)
         main_layout.setStretch(1, 1)  # Give table container all available space
+
+        # Now populate the column selector after the table and model are initialized
+        self._populate_column_selector()
+
+        # Set up context menu for table view
+        self._setup_context_menu()
 
     def _create_color_legend(self) -> QGroupBox:
         """
@@ -2110,10 +2199,11 @@ class DataView(QWidget):
         self._table_view.setAlternatingRowColors(True)
 
         # Make sure the model has appropriate default foreground color
-        self._table_model.setItemPrototype(QStandardItem())
-        prototype = self._table_model.itemPrototype()
-        if prototype:
-            prototype.setForeground(QColor("white"))
+        if self._table_model:  # Check that table model exists before using it
+            self._table_model.setItemPrototype(QStandardItem())
+            prototype = self._table_model.itemPrototype()
+            if prototype:
+                prototype.setForeground(QColor("white"))
 
     def _on_item_changed(self, item):
         """
