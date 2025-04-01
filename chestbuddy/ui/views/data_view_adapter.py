@@ -9,15 +9,17 @@ Usage:
 """
 
 from PySide6.QtCore import Qt, Signal, Slot
-from PySide6.QtWidgets import QWidget, QVBoxLayout
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel
 import time
 import logging
+from typing import Optional
 
 from chestbuddy.core.models import ChestDataModel
 from chestbuddy.core.controllers.data_view_controller import DataViewController
 from chestbuddy.ui.data_view import DataView
 from chestbuddy.ui.views.updatable_view import UpdatableView
 from chestbuddy.ui.utils import get_update_manager
+from chestbuddy.utils.signal_manager import SignalManager
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -49,44 +51,85 @@ class DataViewAdapter(UpdatableView):
     export_requested = Signal()
 
     def __init__(
-        self, data_model: ChestDataModel, parent: QWidget = None, debug_mode: bool = False
+        self,
+        data_model: Optional[ChestDataModel] = None,
+        controller: Optional[DataViewController] = None,
+        parent: Optional[QWidget] = None,
     ):
         """
         Initialize the DataViewAdapter.
 
         Args:
-            data_model (ChestDataModel): The data model to display
-            parent (QWidget, optional): The parent widget. Defaults to None.
-            debug_mode (bool, optional): Enable debug mode for signal connections. Defaults to False.
+            data_model: The data model
+            controller: The data view controller
+            parent: The parent widget
         """
-        # Store references
+        # Store adapter-specific settings
         self._data_model = data_model
-        self._controller = None
-
-        # State tracking to prevent unnecessary refreshes
+        self._controller = controller
+        self._update_manager = None
+        self._needs_population = False
         self._last_data_state = {
             "row_count": 0,
             "column_count": 0,
-            "data_hash": self._data_model.data_hash
-            if hasattr(self._data_model, "data_hash")
-            else "",
+            "data_hash": "",
             "last_update_time": 0,
         }
+        self._signal_manager = SignalManager(debug_mode=True)
 
-        # Flag to track if the table needs population when shown
-        self._needs_population = False
+        # Create DataView first before initializing inherited view
+        try:
+            if data_model is None:
+                logger.warning("DataViewAdapter created with no data model")
 
-        # Create the underlying DataView
-        self._data_view = DataView(data_model)
-        # Disable auto-update to prevent double population
-        self._data_view.disable_auto_update()
+            logger.debug("Creating DataView instance")
+            self._data_view = DataView(data_model=data_model)
+            # We track the DataView instance with a unique ID to help debug multiple instances
+            self._data_view_id = id(self._data_view)
+            logger.debug(f"Created DataView instance with ID: {self._data_view_id}")
 
-        # Initialize the base view with debug mode option
-        super().__init__("Data View", parent, debug_mode=debug_mode)
-        self.setObjectName("DataViewAdapter")
+            # Initialize the BaseView with a title
+            super().__init__(title="Data View", parent=parent)
 
-        # Ensure the adapter itself has auto-update enabled
-        self.enable_auto_update()
+            # Set up the adapter
+            self._setup_adapted_view()
+            self._connect_view_signals()
+
+            # Get update manager if available
+            self._try_get_update_manager()
+
+            # Connect controller signals if controller provided
+            if controller:
+                self._connect_controller_signals()
+                logger.debug("Connected to controller signals")
+
+            # Connect data model signals
+            if data_model:
+                self._connect_model_signals()
+                logger.debug("Connected to data model signals")
+
+            # Disable update handling temporarily during initialization
+            was_enabled = False
+            if hasattr(self, "disable_auto_update"):
+                was_enabled = True
+                self.disable_auto_update()
+
+            # Populate the table if we have data
+            if data_model and not data_model.is_empty:
+                self._needs_population = True
+                if hasattr(self, "request_update"):
+                    self.request_update()
+
+            # Re-enable update handling if it was previously enabled
+            if was_enabled and hasattr(self, "enable_auto_update"):
+                self.enable_auto_update()
+
+            logger.info("DataViewAdapter initialized successfully")
+        except Exception as e:
+            logger.error(f"Error initializing DataViewAdapter: {e}")
+            import traceback
+
+            logger.error(traceback.format_exc())
 
     def set_controller(self, controller: DataViewController) -> None:
         """
@@ -127,12 +170,15 @@ class DataViewAdapter(UpdatableView):
         if manager and hasattr(manager, "state_changed"):
             try:
                 # Connect to state changes
-                self._signal_manager.safe_connect(
+                self._signal_manager.connect(
                     manager, "state_changed", self, "_on_table_state_changed"
                 )
                 logger.info("Connected to TableStateManager's state_changed signal")
             except Exception as e:
                 logger.error(f"Error connecting to TableStateManager signals: {e}")
+                import traceback
+
+                logger.error(traceback.format_exc())
 
     def _on_table_state_changed(self):
         """Handle state changes in the TableStateManager."""
@@ -253,13 +299,50 @@ class DataViewAdapter(UpdatableView):
 
         logger.debug(f"DataViewAdapter: View content reset")
 
-    def _setup_ui(self):
-        """Set up the UI components."""
-        # First call the parent class's _setup_ui method
-        super()._setup_ui()
+    def _setup_adapted_view(self) -> None:
+        """Set up the adapted view in the content area."""
+        # Get the content widget
+        content_widget = self.get_content_widget()
+        if not content_widget:
+            logger.error("Cannot set up adapted view: content widget is not available")
+            return
 
-        # Add the DataView to the content widget
-        self.get_content_layout().addWidget(self._data_view)
+        # Set content layout
+        layout = QVBoxLayout(content_widget)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+        # Check if the DataView exists and is valid
+        if not hasattr(self, "_data_view") or self._data_view is None:
+            logger.error("Cannot set up adapted view: DataView is not available")
+            error_label = QLabel("Error: Data view not available")
+            error_label.setStyleSheet("color: red; padding: 20px;")
+            layout.addWidget(error_label)
+            return
+
+        logger.debug(f"Setting up DataView (ID: {self._data_view_id}) in adapter")
+
+        # Disable the data view's auto-update to prevent double updates
+        if hasattr(self._data_view, "disable_auto_update"):
+            self._data_view.disable_auto_update()
+            logger.debug("Disabled auto-update on DataView")
+
+        # Add the data view to the layout
+        layout.addWidget(self._data_view)
+        logger.debug("Added DataView to adapter's layout")
+
+        # Verify layout setup
+        if layout.count() == 0:
+            logger.warning("DataView was not added to layout - layout is empty")
+        else:
+            logger.debug(f"Layout has {layout.count()} widgets")
+            for i in range(layout.count()):
+                widget = layout.itemAt(i).widget()
+                logger.debug(f"Widget {i} type: {type(widget).__name__}, ID: {id(widget)}")
+
+        # Set title
+        self.set_title("Data View")
+        self.setObjectName("DataViewAdapter")
 
     def _connect_signals(self):
         """Connect signals and slots using standardized pattern."""

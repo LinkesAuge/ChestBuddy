@@ -546,11 +546,22 @@ class MainWindow(QMainWindow):
         self._views["Dashboard"] = dashboard_view
 
         # Create Data view
+        logger.debug("=== Creating DataViewAdapter in MainWindow ===")
         data_view = DataViewAdapter(data_model=self._data_model)
+        data_view_id = id(data_view)
+        logger.debug(f"Created DataViewAdapter with ID: {data_view_id}")
+
+        if hasattr(data_view, "_data_view") and data_view._data_view:
+            data_view_internal_id = id(data_view._data_view)
+            logger.debug(f"Internal DataView has ID: {data_view_internal_id}")
+        else:
+            logger.warning("DataViewAdapter does not have a _data_view attribute or it is None")
+
         data_view.export_requested.connect(self._save_file_as)
 
         # Set the table state manager on the data view
         if hasattr(data_view, "set_table_state_manager") and self._table_state_manager:
+            logger.debug("Setting TableStateManager on DataViewAdapter via adapter method")
             data_view.set_table_state_manager(self._table_state_manager)
             logger.info("TableStateManager set on DataViewAdapter")
         elif (
@@ -558,6 +569,7 @@ class MainWindow(QMainWindow):
             and hasattr(data_view._data_view, "set_table_state_manager")
             and self._table_state_manager
         ):
+            logger.debug("Setting TableStateManager directly on internal DataView")
             data_view._data_view.set_table_state_manager(self._table_state_manager)
             logger.info("TableStateManager set on DataView within DataViewAdapter")
         elif self._table_state_manager:
@@ -566,10 +578,12 @@ class MainWindow(QMainWindow):
             )
 
         # Set up the data view controller with the view
+        logger.debug("Setting DataViewAdapter in DataViewController")
         self._data_view_controller.set_view(data_view)
 
         self._content_stack.addWidget(data_view)
         self._views["Data"] = data_view
+        logger.debug(f"Added DataViewAdapter to content stack and views dictionary with key 'Data'")
 
         # Create Validation view
         validation_view = ValidationViewAdapter(

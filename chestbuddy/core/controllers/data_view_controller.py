@@ -144,19 +144,70 @@ class DataViewController(BaseController):
         Args:
             view: The data view component
         """
+        logger.debug(
+            f"=== DataViewController.set_view called with view of type: {type(view).__name__} ==="
+        )
+        logger.debug(f"View instance ID: {id(view)}")
+
+        # Check if we already have a view
+        if hasattr(self, "_view") and self._view is not None:
+            old_view_id = id(self._view)
+            logger.warning(
+                f"Replacing existing view (ID: {old_view_id}) with new view (ID: {id(view)})"
+            )
+
+            # Check if the view types match
+            if type(self._view) != type(view):
+                logger.warning(
+                    f"View type changing from {type(self._view).__name__} to {type(view).__name__}"
+                )
+
+            # Disconnect from old view if needed
+            if hasattr(self, "_disconnect_from_view"):
+                try:
+                    self._disconnect_from_view(self._view)
+                    logger.debug("Disconnected from old view")
+                except Exception as e:
+                    logger.error(f"Error disconnecting from old view: {e}")
+
+        # Store the view reference
         self._view = view
+
+        # Check for DataView within DataViewAdapter
+        if hasattr(view, "_data_view") and view._data_view:
+            logger.debug(f"View contains internal DataView with ID: {id(view._data_view)}")
+
+            # Log TableStateManager status on DataView
+            if hasattr(view._data_view, "_table_state_manager"):
+                tsm = view._data_view._table_state_manager
+                logger.debug(
+                    f"Internal DataView has TableStateManager: {tsm is not None}, ID: {id(tsm) if tsm else 'None'}"
+                )
+            else:
+                logger.debug("Internal DataView does not have _table_state_manager attribute")
 
         # Connect view signals if available
         if hasattr(view, "_action_toolbar"):
+            logger.debug("View has _action_toolbar, connecting buttons")
             if hasattr(view._action_toolbar, "get_button_by_name"):
                 filter_button = view._action_toolbar.get_button_by_name("apply_filter")
                 clear_button = view._action_toolbar.get_button_by_name("clear_filter")
 
                 if filter_button and hasattr(filter_button, "clicked"):
                     filter_button.clicked.connect(self._handle_filter_button_clicked)
+                    logger.debug("Connected to filter button click")
 
                 if clear_button and hasattr(clear_button, "clicked"):
                     clear_button.clicked.connect(self._handle_clear_filter_button_clicked)
+                    logger.debug("Connected to clear filter button click")
+            else:
+                logger.debug("Action toolbar doesn't have get_button_by_name method")
+        else:
+            logger.debug("View does not have _action_toolbar attribute")
+
+        # Connect to view signals
+        self.connect_to_view(view)
+        logger.debug("Connected to view signals through connect_to_view method")
 
     def set_services(self, validation_service=None, correction_service=None):
         """
