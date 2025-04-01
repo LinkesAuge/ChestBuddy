@@ -850,11 +850,30 @@ class DataViewController(BaseController):
             # Get rows with validation issues
             invalid_rows = self.get_invalid_rows()
 
-            # If the view has a highlight_rows method, call it
-            if hasattr(self._view, "highlight_rows"):
+            # First check if view has access to TableStateManager
+            if hasattr(self._view, "_table_state_manager") and self._view._table_state_manager:
+                # Convert invalid_rows to the format TableStateManager expects
+                validation_status = pd.DataFrame(
+                    {
+                        "ROW_IDX": [row for row in invalid_rows],
+                        "COL_IDX": [0 for _ in invalid_rows],  # Just a placeholder
+                        "STATUS": ["invalid" for _ in invalid_rows],
+                    }
+                )
+                # Use TableStateManager to update cell states
+                self._view._table_state_manager.update_cell_states_from_validation(
+                    validation_status
+                )
+                return True
+            # Fallback options for backward compatibility
+            elif hasattr(self._view, "highlight_rows"):
                 self._view.highlight_rows(invalid_rows, "invalid")
                 return True
             elif hasattr(self._view, "_highlight_invalid_rows"):
+                # This call might need adjustment based on what _highlight_invalid_rows expects
+                logger.warning(
+                    "Using legacy _highlight_invalid_rows method which may not be maintained"
+                )
                 self._view._highlight_invalid_rows(invalid_rows)
                 return True
 

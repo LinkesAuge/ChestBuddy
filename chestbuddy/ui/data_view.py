@@ -406,26 +406,54 @@ class DataView(QWidget):
             logger.debug("Handling validation status change")
 
             if validation_status is None or validation_status.empty:
-                logger.debug("Validation status is None or empty, resetting highlights")
-                # Optional: Clear existing highlights if status is reset
+                logger.debug("Validation status is None or empty, nothing to do")
                 return
 
             logger.debug(f"Received validation_status DataFrame shape: {validation_status.shape}")
 
-            # If we have a table state manager, use it for highlighting
+            # Update the TableStateManager with validation results
             if hasattr(self, "_table_state_manager") and self._table_state_manager:
-                logger.debug("Using TableStateManager for validation highlighting")
-                # Update cell states in the TableStateManager
+                logger.debug("Updating TableStateManager with validation results")
                 self._table_state_manager.update_cell_states_from_validation(validation_status)
                 # Update tooltips based on the updated states
                 self.update_tooltips_from_state()
             else:
-                # Fall back to the old highlighting system if no TableStateManager
-                logger.debug("Falling back to legacy validation highlighting")
-                self._highlight_invalid_rows(validation_status)
+                logger.warning(
+                    "TableStateManager not available - validation highlighting will not be applied"
+                )
 
         except Exception as e:
             logger.error(f"Error handling validation changed: {e}")
+
+    @Slot(object)
+    def _on_correction_applied(self, correction_status) -> None:
+        """
+        Handle correction applied signal.
+
+        Args:
+            correction_status: The correction status.
+        """
+        try:
+            logger.debug("Handling correction applied")
+
+            if correction_status is None:
+                logger.debug("Correction status is None, nothing to do")
+                return
+
+            # Update the TableStateManager with correction results
+            if hasattr(self, "_table_state_manager") and self._table_state_manager:
+                logger.debug("Updating TableStateManager with correction results")
+                self._table_state_manager.update_cell_states_from_correction(correction_status)
+                # Update tooltips based on the updated states
+                self.update_tooltips_from_state()
+            else:
+                logger.warning(
+                    "TableStateManager not available - correction highlighting will not be applied"
+                )
+                self._on_data_changed()
+
+        except Exception as e:
+            logger.error(f"Error handling correction applied: {e}")
 
     def _apply_filter(self) -> None:
         """Apply the current filter to the data."""
@@ -1828,60 +1856,24 @@ class DataView(QWidget):
             logger.debug("Handling validation status change")
 
             if validation_status is None or validation_status.empty:
-                logger.debug("Validation status is None or empty, resetting highlights")
-                # Optional: Clear existing highlights if status is reset
+                logger.debug("Validation status is None or empty, nothing to do")
                 return
 
             logger.debug(f"Received validation_status DataFrame shape: {validation_status.shape}")
 
-            # If we have a table state manager, use it for highlighting
+            # Update the TableStateManager with validation results
             if hasattr(self, "_table_state_manager") and self._table_state_manager:
-                logger.debug("Using TableStateManager for validation highlighting")
-                # Update cell states in the TableStateManager
+                logger.debug("Updating TableStateManager with validation results")
                 self._table_state_manager.update_cell_states_from_validation(validation_status)
                 # Update tooltips based on the updated states
                 self.update_tooltips_from_state()
             else:
-                # Fall back to the old highlighting system if no TableStateManager
-                logger.debug("Falling back to legacy validation highlighting")
-                self._highlight_invalid_rows(validation_status)
+                logger.warning(
+                    "TableStateManager not available - validation highlighting will not be applied"
+                )
 
         except Exception as e:
             logger.error(f"Error handling validation changed: {e}")
-
-    def _highlight_invalid_rows(self, validation_status: pd.DataFrame):
-        """
-        Highlight rows with validation errors based on the status DataFrame.
-
-        This is a legacy method maintained for backward compatibility.
-        New code should use TableStateManager-based highlighting instead.
-
-        Args:
-            validation_status (pd.DataFrame): The DataFrame containing validation status.
-        """
-        try:
-            logger.debug("Using legacy _highlight_invalid_rows method")
-            if not self._has_valid_models() or validation_status is None:
-                logger.debug("Skipping highlight: Invalid models or no validation status")
-                return
-
-            # The rest of the method remains unchanged
-
-            # Block signals for performance during batch update
-            self._table_model.blockSignals(True)
-
-            # Get column indices
-            status_col = self._get_column_index(self.STATUS_COLUMN)
-            validatable_columns = [self.PLAYER_COLUMN, self.SOURCE_COLUMN, self.CHEST_COLUMN]
-
-            # Get rows with issues for highlighting
-            # ... (rest of the implementation continues as before)
-
-        except Exception as e:
-            logger.error(f"Error highlighting invalid rows: {e}")
-            import traceback
-
-            logger.error(traceback.format_exc())
 
     @Slot(object)
     def _on_correction_applied(self, correction_status) -> None:
@@ -1891,14 +1883,27 @@ class DataView(QWidget):
         Args:
             correction_status: The correction status.
         """
-        if hasattr(self, "_table_state_manager") and self._table_state_manager:
-            # Use the TableStateManager to handle correction status
-            self._table_state_manager.update_cell_states_from_correction(correction_status)
-            # Update tooltips based on the TableStateManager
-            self.update_tooltips_from_state()
-        else:
-            # Fall back to old method of updating the view
-            self._on_data_changed()
+        try:
+            logger.debug("Handling correction applied")
+
+            if correction_status is None:
+                logger.debug("Correction status is None, nothing to do")
+                return
+
+            # Update the TableStateManager with correction results
+            if hasattr(self, "_table_state_manager") and self._table_state_manager:
+                logger.debug("Updating TableStateManager with correction results")
+                self._table_state_manager.update_cell_states_from_correction(correction_status)
+                # Update tooltips based on the updated states
+                self.update_tooltips_from_state()
+            else:
+                logger.warning(
+                    "TableStateManager not available - correction highlighting will not be applied"
+                )
+                self._on_data_changed()
+
+        except Exception as e:
+            logger.error(f"Error handling correction applied: {e}")
 
     def _get_filtered_row_index(self, model_row_idx: int) -> int:
         """
@@ -2614,120 +2619,26 @@ class DataView(QWidget):
         """
         Highlight cells based on correction status.
 
-        This is a legacy method maintained for backward compatibility.
-        New code should use TableStateManager-based highlighting instead.
+        This method now simply forwards to the TableStateManager functionality.
         """
-        logger.debug("Using legacy _highlight_correction_cells method")
-
-        # If TableStateManager is available, use it instead
         if hasattr(self, "_table_state_manager") and self._table_state_manager:
-            logger.debug(
-                "TableStateManager detected, using update_cell_highlighting_from_state instead"
-            )
+            logger.debug("Using TableStateManager for correction highlighting")
+            # The state manager should already have the correction status applied
+            # Just refresh the visual highlighting based on current state
             self.update_cell_highlighting_from_state()
-            return
-
-        correction_controller = self._get_correction_controller()
-        if not correction_controller:
-            return
-
-        # Get correction status information
-        correction_status = correction_controller.get_correction_status()
-        if not correction_status:
-            return
-
-        # Define color constants matching our color legend
-        # These colors should match the ones in _create_color_legend method
-        invalid_color = QColor(255, 182, 182)  # #FFB6B6 Light red from legend
-        correctable_color = QColor(255, 214, 165)  # #FFD6A5 Light orange from legend
-        corrected_color = QColor(182, 255, 182)  # #B6FFB6 Light green from legend
-        purple_color = QColor(214, 182, 255)  # #D6B6FF Light purple from legend
-
-        # Process cells that need highlighting
-        invalid_cells = correction_status.get("invalid_cells", [])
-        corrected_cells = correction_status.get("corrected_cells", [])
-        correctable_cells = correction_status.get("correctable_cells", [])
-
-        # Start batch updates
-        if hasattr(self, "_table_model") and self._table_model:
-            self._table_model.blockSignals(True)
-
-        try:
-            # Apply highlighting for each cell type
-            for row, col in invalid_cells:
-                if (row, col) in correctable_cells:
-                    # Invalid with correction rule (orange)
-                    self._highlight_cell(row, col, correctable_color)
-                else:
-                    # Invalid without correction rule (red)
-                    self._highlight_cell(row, col, invalid_color)
-
-            for row, col in corrected_cells:
-                # Corrected cells (green)
-                self._highlight_cell(row, col, corrected_color)
-
-            for row, col in correctable_cells:
-                if (row, col) not in invalid_cells and (row, col) not in corrected_cells:
-                    # Correctable but not invalid or corrected (purple)
-                    self._highlight_cell(row, col, purple_color)
-        finally:
-            # End batch updates
-            if hasattr(self, "_table_model") and self._table_model:
-                self._table_model.blockSignals(False)
-
-        # Update the view
-        if hasattr(self, "_table_view") and self._table_view:
-            self._table_view.viewport().update()
-
-        self._logger.debug(f"Applied cell highlighting for correction status")
-
-    def _highlight_cell(self, row, col, color):
-        """
-        Highlight a cell with the specified color.
-
-        Args:
-            row: Source row index
-            col: Source column index
-            color: QColor for highlighting
-        """
-        if not hasattr(self, "_table_model") or not self._table_model:
-            return
-
-        # Map to view indices if needed
-        view_index = None
-        if hasattr(self, "_proxy_model") and self._proxy_model:
-            model_index = self._table_model.index(row, col)
-            view_index = self._proxy_model.mapFromSource(model_index)
         else:
-            view_index = self._table_model.index(row, col)
-
-        if not view_index or not view_index.isValid():
-            return
-
-        # Apply highlighting color
-        item = self._table_model.itemFromIndex(view_index)
-        if item:
-            item.setData(color, Qt.BackgroundRole)
+            logger.warning("Unable to highlight correction cells - TableStateManager not available")
 
     def _update_correction_tooltips(self):
-        """Update tooltips with correction information."""
-        correction_controller = self._get_correction_controller()
-        if not correction_controller:
-            return
+        """
+        Update tooltips with correction information.
 
-        # Get correction status information
-        correction_status = correction_controller.get_correction_status()
-        if not correction_status:
-            return
-
-        # Get the tooltips map
-        tooltips = correction_status.get("tooltips", {})
-
-        # Apply tooltips to cells
-        for (row, col), tooltip in tooltips.items():
-            self._set_cell_tooltip(row, col, tooltip)
-
-        self._logger.debug(f"Updated tooltips for {len(tooltips)} cells")
+        This is now a wrapper around update_tooltips_from_state.
+        """
+        if hasattr(self, "_table_state_manager") and self._table_state_manager:
+            self.update_tooltips_from_state()
+        else:
+            logger.warning("Cannot update correction tooltips: TableStateManager not available")
 
     def _set_cell_tooltip(self, row, col, tooltip):
         """
@@ -2761,12 +2672,37 @@ class DataView(QWidget):
         """
         Update cell highlighting based on validation and correction status.
 
-        When TableStateManager is available, it uses that system.
-        Otherwise falls back to the legacy highlighting system.
+        Uses TableStateManager to highlight cells based on their state.
         """
         if hasattr(self, "_table_state_manager") and self._table_state_manager:
-            # Use the new TableStateManager-based highlighting
             self.update_cell_highlighting_from_state()
         else:
-            # Fall back to legacy highlighting
-            self._highlight_correction_cells()
+            logger.warning("Cannot update cell highlighting: TableStateManager not available")
+
+    def _highlight_cell(self, row, col, color):
+        """
+        Highlight a cell with the specified color.
+
+        Args:
+            row: Source row index
+            col: Source column index
+            color: QColor for highlighting
+        """
+        if not hasattr(self, "_table_model") or not self._table_model:
+            return
+
+        # Map to view indices if needed
+        view_index = None
+        if hasattr(self, "_proxy_model") and self._proxy_model:
+            model_index = self._table_model.index(row, col)
+            view_index = self._proxy_model.mapFromSource(model_index)
+        else:
+            view_index = self._table_model.index(row, col)
+
+        if not view_index or not view_index.isValid():
+            return
+
+        # Apply highlighting color
+        item = self._table_model.itemFromIndex(view_index)
+        if item:
+            item.setData(color, Qt.BackgroundRole)
