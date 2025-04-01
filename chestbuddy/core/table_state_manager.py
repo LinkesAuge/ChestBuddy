@@ -278,16 +278,9 @@ class TableStateManager(QObject):
         Update cell states based on validation status.
 
         Args:
-            validation_status: DataFrame with validation results containing columns:
-                              ROW_IDX, COL_IDX, STATUS
+            validation_status: DataFrame with validation results
         """
         if validation_status is None or validation_status.empty:
-            return
-
-        # Ensure required columns are present
-        required_columns = {"ROW_IDX", "COL_IDX", "STATUS"}
-        if not all(col in validation_status.columns for col in required_columns):
-            logger.error("Validation status missing required columns")
             return
 
         # Reset existing validation states
@@ -299,17 +292,86 @@ class TableStateManager(QObject):
         for row, col in invalid_cells + correctable_cells:
             self.reset_cell_state(row, col)
 
-        # Set new states based on validation status
-        for _, row in validation_status.iterrows():
-            row_idx = row["ROW_IDX"]
-            col_idx = row["COL_IDX"]
-            status = row["STATUS"]
+        # Check if the validation status has the expected format (ROW_IDX, COL_IDX, STATUS)
+        expected_columns = {"ROW_IDX", "COL_IDX", "STATUS"}
+        if all(col in validation_status.columns for col in expected_columns):
+            # Standard format - use as is
+            logger.debug("Using standard validation status format")
+            # Set new states based on validation status
+            for _, row in validation_status.iterrows():
+                row_idx = row["ROW_IDX"]
+                col_idx = row["COL_IDX"]
+                status = row["STATUS"]
 
-            if status == "invalid":
-                self.set_cell_state(row_idx, col_idx, CellState.INVALID)
-                self.set_cell_detail(row_idx, col_idx, "Invalid value: Failed validation")
+                if status == "invalid":
+                    self.set_cell_state(row_idx, col_idx, CellState.INVALID)
+                    self.set_cell_detail(row_idx, col_idx, "Invalid value: Failed validation")
+        else:
+            # Try to convert from ValidationService format
+            # Check for column-specific status fields: PLAYER_status, SOURCE_status, etc.
+            logger.debug("Attempting to convert validation service format")
+            status_columns = [col for col in validation_status.columns if col.endswith("_status")]
+            col_map = {
+                "PLAYER_status": 1,  # Assuming PLAYER is column 1
+                "SOURCE_status": 2,  # Assuming SOURCE is column 2
+                "CHEST_status": 3,  # Assuming CHEST is column 3
+                "SCORE_status": 4,  # Assuming SCORE is column 4
+                "CLAN_status": 5,  # Assuming CLAN is column 5
+            }
 
-            # Note: We don't change the state for valid entries (they remain NORMAL)
+            # Get rows in the data model
+            for data_row_idx, row in validation_status.iterrows():
+                # Process each status column
+                for status_col in status_columns:
+                    status_value = row[status_col]
+
+                    # Map column name to column index
+                    col_name = status_col.split("_status")[0]  # Extract column name
+                    col_idx = col_map.get(status_col, -1)
+
+                    if col_idx == -1:
+                        # Try to find column index from data model
+                        if hasattr(self._data_model, "get_columns"):
+                            for i, col in enumerate(self._data_model.get_columns()):
+                                if col == col_name:
+                                    col_idx = i
+                                    break
+                        elif hasattr(self._data_model, "columns"):
+                            for i, col in enumerate(self._data_model.columns):
+                                if col == col_name:
+                                    col_idx = i
+                                    break
+                        else:
+                            # Try to get columns from dataframe directly
+                            try:
+                                for i, col in enumerate(self._data_model.data.columns):
+                                    if col == col_name:
+                                        col_idx = i
+                                        break
+                            except Exception as e:
+                                logger.error(f"Unable to get columns from data model: {e}")
+
+                    # If we found a valid column index and the status is invalid
+                    if col_idx >= 0 and str(status_value).lower() in (
+                        "invalid",
+                        "validation_status.invalid",
+                    ):
+                        self.set_cell_state(data_row_idx, col_idx, CellState.INVALID)
+                        self.set_cell_detail(
+                            data_row_idx, col_idx, f"Invalid {col_name}: Failed validation"
+                        )
+
+                    # Handle correctable status if present
+                    if col_idx >= 0 and str(status_value).lower() in (
+                        "correctable",
+                        "validation_status.correctable",
+                    ):
+                        self.set_cell_state(data_row_idx, col_idx, CellState.CORRECTABLE)
+                        self.set_cell_detail(
+                            data_row_idx,
+                            col_idx,
+                            f"Correctable {col_name}: Can be fixed automatically",
+                        )
 
         # Notify that states have changed
         self.state_changed.emit()

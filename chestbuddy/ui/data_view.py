@@ -408,15 +408,21 @@ class DataView(QWidget):
             if validation_status is None or validation_status.empty:
                 logger.debug("Validation status is None or empty, resetting highlights")
                 # Optional: Clear existing highlights if status is reset
-                # self._clear_all_highlights()
                 return
 
             logger.debug(f"Received validation_status DataFrame shape: {validation_status.shape}")
-            logger.debug(f"Validation status head:\n{validation_status.head().to_string()}")
 
-            # Apply highlighting based on the received status DataFrame
-            logger.debug("Calling _highlight_invalid_rows")
-            self._highlight_invalid_rows(validation_status)
+            # If we have a table state manager, use it for highlighting
+            if hasattr(self, "_table_state_manager") and self._table_state_manager:
+                logger.debug("Using TableStateManager for validation highlighting")
+                # Update cell states in the TableStateManager
+                self._table_state_manager.update_cell_states_from_validation(validation_status)
+                # Update tooltips based on the updated states
+                self.update_tooltips_from_state()
+            else:
+                # Fall back to the old highlighting system if no TableStateManager
+                logger.debug("Falling back to legacy validation highlighting")
+                self._highlight_invalid_rows(validation_status)
 
         except Exception as e:
             logger.error(f"Error handling validation changed: {e}")
@@ -1824,15 +1830,21 @@ class DataView(QWidget):
             if validation_status is None or validation_status.empty:
                 logger.debug("Validation status is None or empty, resetting highlights")
                 # Optional: Clear existing highlights if status is reset
-                # self._clear_all_highlights()
                 return
 
             logger.debug(f"Received validation_status DataFrame shape: {validation_status.shape}")
-            logger.debug(f"Validation status head:\n{validation_status.head().to_string()}")
 
-            # Apply highlighting based on the received status DataFrame
-            logger.debug("Calling _highlight_invalid_rows")
-            self._highlight_invalid_rows(validation_status)
+            # If we have a table state manager, use it for highlighting
+            if hasattr(self, "_table_state_manager") and self._table_state_manager:
+                logger.debug("Using TableStateManager for validation highlighting")
+                # Update cell states in the TableStateManager
+                self._table_state_manager.update_cell_states_from_validation(validation_status)
+                # Update tooltips based on the updated states
+                self.update_tooltips_from_state()
+            else:
+                # Fall back to the old highlighting system if no TableStateManager
+                logger.debug("Falling back to legacy validation highlighting")
+                self._highlight_invalid_rows(validation_status)
 
         except Exception as e:
             logger.error(f"Error handling validation changed: {e}")
