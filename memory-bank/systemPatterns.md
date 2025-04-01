@@ -339,6 +339,68 @@ For the ChestBuddy application, this pattern is used in:
 
 The implementation uses Qt's timer system (specifically `QTimer.singleShot()`) to schedule each chunk of work while ensuring the UI event loop can process pending events between chunks.
 
+### 11. State Management Pattern: TableStateManager
+
+**Implementation**: Centralized state management for table data
+
+**Key Components**:
+1. **TableStateManager**:
+   - Manages cell states and validation history
+   - Handles batch processing operations
+   - Tracks corrections and errors
+   - Provides correction summaries
+
+2. **Progress Reporting**:
+   - Non-blocking batch operations
+   - Progress visualization
+   - Correction logging
+   - Error aggregation
+
+**Example Implementation**:
+```python
+class TableStateManager:
+    def __init__(self):
+        self._states = {}  # (row, col) -> CellState
+        self._correction_log = []
+        self._error_log = []
+        self._batch_size = 100
+        
+    def process_validation(self, data, progress_callback):
+        """Process validation in batches with progress reporting"""
+        
+    def process_correction(self, data, progress_callback):
+        """Process corrections in batches with logging"""
+        
+    def get_correction_summary(self):
+        """Get summary of applied corrections"""
+```
+
+**Integration with MVC**:
+- **Model**: Stores cell states and correction history
+- **View**: Updates UI based on state changes
+- **Controller**: Coordinates state updates and UI refresh
+
+**Key Features**:
+1. Batch Processing:
+   - Fixed batch size of 100 rows
+   - Non-blocking operations
+   - Progress reporting
+
+2. State Tracking:
+   - Cell-level state management
+   - Validation history
+   - Correction logging
+
+3. Error Handling:
+   - Error aggregation
+   - Critical error detection
+   - Comprehensive logging
+
+4. Progress Visualization:
+   - Overall progress tracking
+   - Correction details display
+   - Error summary presentation
+
 ## Utility Patterns
 
 ### 1. SignalManager

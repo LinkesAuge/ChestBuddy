@@ -36,9 +36,14 @@ ChestBuddy is currently undergoing a major architectural update, transitioning f
 - Signal management improvements
 - Improved test patterns for controllers
 - Test refactoring to support the new architecture
-- Enhanced correction system implementation (Phase 1 of plan in progress)
+- Enhanced correction system implementation:
+  - TableStateManager implementation (Phase 1 in progress)
+  - Simplified correction display with original value, corrected value, and type
+  - Total corrections counter
+  - Batch processing with progress dialog
 
 ## What's Next
+- Complete TableStateManager implementation (13 days planned)
 - Implement recursive correction functionality (Phase 1 of correction improvement plan)
 - Implement selection-based correction (Phase 2 of correction improvement plan)
 - Complete auto-correction options (Phase 4 of correction improvement plan)
@@ -254,16 +259,23 @@ ChestBuddy is currently undergoing a major architectural update, transitioning f
 - Recursive correction implementation (Phase 1)
 - Selection-based correction (Phase 2)
 
-## What's planned
-
-### Advanced features
-- Custom business rules implementation
-- Template system for data entry
-- Advanced statistics and reporting
-- Multi-user support with permission levels
-- API for external integrations
-- Backup and restore functionality
-- Inventory valuation features
-- Deprecated item tracking
-- Item history tracking
-- Bulk import improvements
+### Correction feature (85% complete)
+- ✅ Creation, editing, and deletion of correction rules
+- ✅ Application of correction rules to data cells
+- ✅ View with rule table
+- ✅ Dialog to add new rules or edit existing rules
+- ✅ Basic import/export of rules
+- ✅ Cell highlighting based on correction status
+- ✅ Color legend for highlighting
+- ✅ Status bar showing rule counts
+- ✅ Import/Export buttons in the header
+- ✅ Simplified data structure (removed 'order' and 'description' fields)
+- ✅ Fixed deletion functionality
+- ✅ Proper visualization of validation statuses
+- ✅ Correctable status detection
+- ✅ Auto-correction configuration options
+- 🔄 TableStateManager implementation (in progress)
+- 🔄 Simplified correction display
+- 🔄 Batch processing with progress dialog
+- ⏳ Recursive correction implementation
+- ⏳ Selection-based correction

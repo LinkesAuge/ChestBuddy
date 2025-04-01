@@ -2,12 +2,45 @@
 
 ## Overview
 
-This document outlines the comprehensive plan for improving the ChestBuddy correction system, addressing current functionality gaps and implementing new features. We've identified several key issues with the current implementation that need to be addressed:
+This document outlines the comprehensive plan for improving the ChestBuddy correction system, addressing current functionality gaps and implementing new features. We've identified several key areas that need to be addressed:
 
 1. **Recursive Correction**: The controller is passing `recursive=True` but the service doesn't implement recursion
 2. **Selection-Based Correction**: The `selected_only` parameter isn't properly implemented
 3. **Correctable Status Detection**: The "correctable" status now has proper visual integration with validation (✓ Complete)
 4. **Auto-Correction Options**: Auto-correction on validation and import (✓ Complete)
+5. **TableStateManager**: New component for centralized state management and improved correction display
+6. **Simplified Correction Display**: Show only essential information (original value, corrected value, type)
+
+## Progress Update - April 1, 2024
+
+### TableStateManager Implementation Started
+
+We have begun implementing the TableStateManager to improve cell state handling and correction visualization:
+
+1. **Core Components Defined**:
+   - CellState enum for state tracking
+   - TableStateManager class structure
+   - ValidationProgressDialog for user feedback
+
+2. **Key Features**:
+   - Batch processing with 100 rows per batch
+   - Non-blocking UI updates
+   - Comprehensive error handling
+   - Detailed correction logging
+
+3. **Implementation Plan**:
+   - 8 phases defined with clear deliverables
+   - 13-day timeline established
+   - Test-driven development approach
+   - Performance considerations included
+
+### Simplified Correction Display
+
+We are implementing a streamlined correction display that shows:
+- Original value
+- Corrected value
+- Correction type
+- Total corrections counter
 
 ## Progress Update - August 2, 2024
 
@@ -292,14 +325,15 @@ def _apply_corrections_task(
     return total_stats
 ```
 
-## Timeline and Prioritization (Updated August 2, 2024)
+## Timeline and Prioritization (Updated April 1, 2024)
 
 1. ~~**Phase 3**: Complete the algorithmic detection of correctable cells based on available rules~~ ✓ Completed
 2. ~~**Phase 4**: Implement auto-correction options~~ ✓ Completed
-3. **Phase 1**: Implement recursive correction functionality (2 days)
-4. **Phase 2**: Implement selection-based correction (2 days)
+3. **TableStateManager**: Implement new state management system (13 days)
+4. **Phase 1**: Implement recursive correction functionality (2 days)
+5. **Phase 2**: Implement selection-based correction (2 days)
 
-Total estimated time remaining: 4 working days
+Total estimated time remaining: 17 working days
 
 ## Acceptance Criteria
 
@@ -307,6 +341,8 @@ Total estimated time remaining: 4 working days
 2. Selection-based correction only applies to selected cells
 3. ✓ Correctable status detection identifies invalid cells that have matching rules
 4. ✓ Auto-correction options can be configured and work correctly
+5. TableStateManager properly manages cell states and provides progress feedback
+6. Correction display shows only essential information in a clear format
 
 ## Testing Strategy
 
@@ -315,9 +351,27 @@ Each phase includes dedicated test cases:
 2. Test that selection-based correction only applies to selected cells
 3. ✓ Test that correctable status detection correctly identifies cells that can be corrected
 4. ✓ Test that auto-correction options are correctly stored in config and applied when enabled
+5. Test TableStateManager state tracking and batch processing
+6. Test simplified correction display format and accuracy
 
 ## UI Implications
 
 1. Add a "Recursive" checkbox in the correction dialog
-2. Add "Auto-correct on validation" and "Auto-correct on import" options in settings
-3. Update cell highlighting to use distinct colors for different validation statuses
+2. ✓ Add "Auto-correct on validation" and "Auto-correct on import" options in settings
+3. ✓ Update cell highlighting to use distinct colors for different validation statuses
+4. Add progress dialog with correction details
+5. Update correction log format to show essential information only
+6. Add total corrections counter to the UI
+
+## Implementation Priority
+
+1. TableStateManager Core Components
+2. Progress Dialog Implementation
+3. Batch Processing Logic
+4. Error Handling System
+5. DataView Integration
+6. Simplified Correction Display
+7. Recursive Correction
+8. Selection-Based Correction
+
+This updated plan reflects our current focus on the TableStateManager implementation while maintaining our commitment to completing the recursive and selection-based correction features.

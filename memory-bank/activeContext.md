@@ -366,3 +366,55 @@ The integration between the DataView and correction components is a critical par
    - Adding methods to apply corrections to selections
    - Implementing batch correction operations
    - Optimizing validation and correction workflows
+
+## Active Context - April 1, 2024
+
+### Correction System Improvements: TableStateManager Implementation
+
+We are implementing a new TableStateManager to improve cell state handling and correction visualization:
+
+#### Core Components
+
+1. **TableStateManager**:
+   - Integrated as a property of DataView
+   - Manages cell states and validation history
+   - Handles batch processing (100 rows per batch)
+   - Tracks corrections and errors
+   - Provides correction summaries
+
+2. **Progress Dialog**:
+   - Shows overall progress bar
+   - Displays correction details:
+     - Original value
+     - Corrected value
+     - Correction type
+   - Shows total corrections count
+   - Presents error summaries
+
+3. **Integration Points**:
+   - DataView integration for state management
+   - ValidationService for validation status
+   - CorrectionService for applying corrections
+   - Import/Export system integration
+
+#### Implementation Approach
+
+1. **Error Handling**:
+   - Continue on non-critical errors
+   - Aggregate errors for end summary
+   - Critical errors defined as data read/write failures
+   - Comprehensive error logging
+
+2. **Validation & Correction**:
+   - Independent validation and correction processes
+   - Consider active corrections during validation
+   - Auto-validation before auto-correction when both enabled
+   - Targeted updates for affected cells/rows
+
+#### Next Steps
+
+1. Implement CellState enum and TableStateManager
+2. Create ValidationProgressDialog
+3. Modify DataView for TableStateManager integration
+4. Update validation/correction code for batch processing
+5. Add comprehensive test coverage
