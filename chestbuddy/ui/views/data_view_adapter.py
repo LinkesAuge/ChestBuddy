@@ -106,6 +106,23 @@ class DataViewAdapter(UpdatableView):
 
             logger.info("DataViewAdapter: Controller set and signals connected")
 
+    def set_table_state_manager(self, manager) -> None:
+        """
+        Set the table state manager and pass it to the wrapped DataView.
+
+        Args:
+            manager: The TableStateManager instance
+        """
+        # Store the reference at the adapter level
+        self._table_state_manager = manager
+
+        # Pass it to the wrapped DataView if available
+        if hasattr(self._data_view, "set_table_state_manager"):
+            self._data_view.set_table_state_manager(manager)
+            logger.info("TableStateManager passed to wrapped DataView")
+        else:
+            logger.warning("DataView does not implement set_table_state_manager method")
+
     @property
     def needs_population(self) -> bool:
         """Get whether the view needs table population when shown."""

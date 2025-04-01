@@ -42,6 +42,7 @@ from chestbuddy.utils.signal_manager import SignalManager
 from chestbuddy.utils.service_locator import ServiceLocator
 from chestbuddy.ui.utils.update_manager import UpdateManager
 from chestbuddy.core.models.correction_rule_manager import CorrectionRuleManager
+from chestbuddy.core.table_state_manager import TableStateManager
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -90,6 +91,10 @@ class ChestBuddyApp(QObject):
 
             # Initialize data model
             self._data_model = ChestDataModel()
+
+            # Initialize table state manager
+            self._table_state_manager = TableStateManager(self._data_model)
+            logger.info("TableStateManager initialized")
 
             # Create controllers - create error controller early
             self._error_controller = ErrorHandlingController(self._signal_manager)
@@ -267,6 +272,7 @@ class ChestBuddyApp(QObject):
                 data_view_controller=self._data_view_controller,
                 ui_state_controller=self._ui_state_controller,
                 config_manager=self._config_manager,
+                table_state_manager=self._table_state_manager,
             )
             self._main_window.show()
             logging.info("UI created successfully")
@@ -279,107 +285,45 @@ class ChestBuddyApp(QObject):
         """Connect application-level signals."""
         try:
             # Connect data manager signals
-            self._signal_manager.connect(
-                self._data_manager, "load_error", self._error_controller, "show_error"
-            )
+            self._data_manager.load_started.connect(self._on_load_started)
+            self._data_manager.load_finished.connect(self._on_load_finished)
+            self._data_manager.load_progress.connect(self._on_load_progress)
+            self._data_manager.load_error.connect(self._on_load_error)
+            self._data_manager.load_success.connect(self._on_save_success)
+            self._data_manager.save_success.connect(self._on_save_success)
+            self._data_manager.save_error.connect(self._on_save_error)
+            self._data_manager.data_loaded.connect(self._on_data_loaded)
 
             # Connect file controller signals
-            self._signal_manager.connect(
-                self._file_controller,
-                "operation_error",
-                self._error_controller,
-                "show_error",
-            )
-
-            # Connect file controller's load_csv_triggered to data_manager.load_csv
-            # This is crucial for file import functionality to work properly
-            self._signal_manager.connect(
-                self._file_controller, "load_csv_triggered", self._data_manager, "load_csv"
-            )
-
-            # Connect data view controller signals
-            self._signal_manager.connect(
-                self._data_view_controller,
-                "operation_error",
-                self._error_controller,
-                "show_error",
-            )
-
-            # Connect validation-related signals to UIStateController
-            self._signal_manager.connect(
-                self._data_view_controller,
-                "validation_completed",
-                self._ui_state_controller,
-                "handle_validation_results",
-            )
-
-            self._signal_manager.connect(
-                self._validation_service,
-                "validation_preferences_changed",
-                self._data_view_controller,
-                "validate_data",
-            )
-
-            # Connect data_loaded signal to validate_after_import method
-            # This ensures validation happens after import if validate_on_import is enabled
-            self._signal_manager.connect(
-                self._data_manager,
-                "data_loaded",
-                self._data_view_controller,
-                "_validate_after_import",
-            )
-
-            # Connect auto-correction signals
-            # This ensures auto-correction happens after validation or import if enabled
-            self._signal_manager.connect(
-                self._data_view_controller,
-                "validation_completed",
-                self._correction_controller,
-                "auto_correct_after_validation",
-            )
-
-            # Connect data_loaded signal to auto_correct_on_import
-            # This ensures auto-correction happens after import if enabled
-            self._signal_manager.connect(
-                self._data_manager,
-                "data_loaded",
-                self._correction_controller,
-                "auto_correct_on_import",
-            )
-
-            # The view state controller will handle signaling when views should be shown
-            self._signal_manager.connect(
-                self._view_state_controller,
-                "state_changed",
-                self._main_window,
-                "_on_view_changed",
-            )
+            self._file_controller.file_opened.connect(self._on_file_opened)
+            self._file_controller.recent_files_changed.connect(self._on_recent_files_changed)
 
             # Connect progress controller signals
-            self._signal_manager.connect(
-                self._progress_controller,
-                "progress_updated",
-                self._main_window,
-                "_on_progress_updated",
-            )
+            self._progress_controller.progress_canceled.connect(self._on_progress_canceled)
 
-            self._signal_manager.connect(
-                self._progress_controller,
-                "operation_started",
-                self._main_window,
-                "_on_operation_started",
-            )
+            # Connect data view controller signals
+            self._data_view_controller.table_populated.connect(self._on_table_populated)
+            self._data_view_controller.validation_error.connect(self._on_data_view_error)
+            self._data_view_controller.correction_error.connect(self._on_data_view_error)
+            self._data_view_controller.operation_error.connect(self._on_data_view_error)
 
-            self._signal_manager.connect(
-                self._progress_controller,
-                "operation_completed",
-                self._main_window,
-                "_on_operation_completed",
-            )
+            # Connect validation service signals to update table state manager
+            if hasattr(self._validation_service, "validation_complete"):
+                self._validation_service.validation_complete.connect(
+                    self._update_table_state_from_validation
+                )
+                logger.info("Connected validation_complete signal to table state manager update")
 
-            logger.info("Application signals connected")
+            # Connect data model signals
+            if hasattr(self._data_model, "data_changed"):
+                self._data_model.data_changed.connect(self._on_data_changed)
+            if hasattr(self._data_model, "data_cleared"):
+                self._data_model.data_cleared.connect(self._on_data_cleared)
+
+            logger.debug("Application-level signals connected")
         except Exception as e:
-            logger.error(f"Error in _connect_signals: {e}")
+            logger.error(f"Error connecting signals: {e}")
+            self._error_controller.handle_exception(e, "Error connecting signals")
 
     def cleanup(self) -> None:
         """Clean up application resources before exit."""
@@ -540,12 +484,47 @@ class ChestBuddyApp(QObject):
     @Slot(object)
     def _on_data_changed(self, data_state=None) -> None:
         """
-        Handler for data changed signal.
+        Handle data model changes.
 
         Args:
             data_state: The current DataState object (optional)
         """
-        logger.info("App: Data model changed signal received")
+        try:
+            if data_state:
+                has_data = data_state.has_data
+            else:
+                has_data = not self._data_model.is_empty
+
+            logger.info(f"Data changed event: has_data={has_data}")
+        except Exception as e:
+            logger.error(f"Error in _on_data_changed: {e}")
+
+    @Slot(object)
+    def _update_table_state_from_validation(self, validation_results):
+        """
+        Update the TableStateManager with validation results.
+
+        Args:
+            validation_results: The validation results from the validation service
+        """
+        if not self._table_state_manager:
+            logger.warning("Cannot update table state: TableStateManager not initialized")
+            return
+
+        try:
+            # First reset all cell states to ensure clean state
+            self._table_state_manager.reset_cell_states()
+            logger.debug("Reset cell states in TableStateManager")
+
+            # Process validation results if available
+            if validation_results is not None:
+                # Update the table state based on validation results
+                self._table_state_manager.update_cell_states_from_validation(validation_results)
+                logger.info(f"Updated TableStateManager with validation results")
+            else:
+                logger.warning("Validation results are None, skipping table state update")
+        except Exception as e:
+            logger.error(f"Error updating table state from validation: {e}")
 
     @Slot()
     def _on_data_cleared(self) -> None:

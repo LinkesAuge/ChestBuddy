@@ -118,6 +118,7 @@ class MainWindow(QMainWindow):
         data_view_controller: DataViewController,
         ui_state_controller: UIStateController,
         config_manager=None,
+        table_state_manager=None,
         parent: Optional[QWidget] = None,
     ) -> None:
         """
@@ -136,6 +137,7 @@ class MainWindow(QMainWindow):
             data_view_controller (DataViewController): The data view controller.
             ui_state_controller (UIStateController): The UI state controller.
             config_manager: The configuration manager.
+            table_state_manager: The table state manager.
             parent (Optional[QWidget], optional): Parent widget. Defaults to None.
         """
         super().__init__(parent)
@@ -152,6 +154,7 @@ class MainWindow(QMainWindow):
         self._data_view_controller = data_view_controller
         self._ui_state_controller = ui_state_controller
         self._config_manager = config_manager
+        self._table_state_manager = table_state_manager
 
         if self._data_manager:
             logger.debug("MainWindow initialized with data_manager")
@@ -545,6 +548,22 @@ class MainWindow(QMainWindow):
         # Create Data view
         data_view = DataViewAdapter(data_model=self._data_model)
         data_view.export_requested.connect(self._save_file_as)
+
+        # Set the table state manager on the data view
+        if hasattr(data_view, "set_table_state_manager") and self._table_state_manager:
+            data_view.set_table_state_manager(self._table_state_manager)
+            logger.info("TableStateManager set on DataViewAdapter")
+        elif (
+            hasattr(data_view, "_data_view")
+            and hasattr(data_view._data_view, "set_table_state_manager")
+            and self._table_state_manager
+        ):
+            data_view._data_view.set_table_state_manager(self._table_state_manager)
+            logger.info("TableStateManager set on DataView within DataViewAdapter")
+        elif self._table_state_manager:
+            logger.warning(
+                "Unable to set TableStateManager on data view - set_table_state_manager method not found"
+            )
 
         # Set up the data view controller with the view
         self._data_view_controller.set_view(data_view)
