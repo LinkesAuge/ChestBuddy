@@ -123,6 +123,34 @@ class DataViewAdapter(UpdatableView):
         else:
             logger.warning("DataView does not implement set_table_state_manager method")
 
+        # Connect to the TableStateManager's state_changed signal if it exists
+        if manager and hasattr(manager, "state_changed"):
+            try:
+                # Connect to state changes
+                self._signal_manager.safe_connect(
+                    manager, "state_changed", self, "_on_table_state_changed"
+                )
+                logger.info("Connected to TableStateManager's state_changed signal")
+            except Exception as e:
+                logger.error(f"Error connecting to TableStateManager signals: {e}")
+
+    def _on_table_state_changed(self):
+        """Handle state changes in the TableStateManager."""
+        logger.debug("TableStateManager state changed")
+
+        # Forward to the DataView if it has the update_cell_highlighting_from_state method
+        if hasattr(self._data_view, "update_cell_highlighting_from_state"):
+            logger.debug("Forwarding table state change to DataView")
+            self._data_view.update_cell_highlighting_from_state()
+
+        # Also update tooltips if the method exists
+        if hasattr(self._data_view, "update_tooltips_from_state"):
+            logger.debug("Updating tooltips from state")
+            self._data_view.update_tooltips_from_state()
+
+        # Request an update to refresh the view
+        self.request_update()
+
     @property
     def needs_population(self) -> bool:
         """Get whether the view needs table population when shown."""
@@ -331,6 +359,13 @@ class DataViewAdapter(UpdatableView):
                     self._data_model, "validation_changed", self, "_on_validation_changed"
                 )
                 logger.debug("Connected to validation_changed signal")
+
+            # Connect to correction_applied signal for correction updates
+            if hasattr(self._data_model, "correction_applied"):
+                self._signal_manager.safe_connect(
+                    self._data_model, "correction_applied", self, "_on_correction_applied"
+                )
+                logger.debug("Connected to correction_applied signal")
         except Exception as e:
             logger.error(f"Error connecting model signals in DataViewAdapter: {e}")
 
@@ -389,6 +424,14 @@ class DataViewAdapter(UpdatableView):
             issue_count = len(results) if results else 0
             self._set_header_status(f"Validation complete: {issue_count} issues found")
 
+        # Forward to the underlying DataView if it has the appropriate method
+        if hasattr(self._data_view, "_on_validation_changed"):
+            logger.debug("Forwarding validation results to DataView from controller")
+            self._data_view._on_validation_changed(results)
+
+        # Request an update to refresh the view
+        self.request_update()
+
     @Slot()
     def _on_correction_started(self):
         """Handle correction started event."""
@@ -402,6 +445,16 @@ class DataViewAdapter(UpdatableView):
         # Update UI to show correction results
         if hasattr(self, "_set_header_status"):
             self._set_header_status(f"Corrections applied: {affected_rows} rows affected")
+
+        # Forward to the underlying DataView if it has the appropriate method
+        if hasattr(self._data_view, "_on_correction_applied"):
+            logger.debug("Forwarding correction results to DataView from controller")
+            # Create a correction status object that DataView can process
+            correction_status = {"strategy": strategy, "affected_rows": affected_rows}
+            self._data_view._on_correction_applied(correction_status)
+
+        # Request an update to refresh the view
+        self.request_update()
 
     @Slot(str)
     def _on_operation_error(self, error_message):
@@ -606,3 +659,32 @@ class DataViewAdapter(UpdatableView):
         # Request update from the UpdateManager
         self.request_update()
         logger.debug("Handled validation changed signal")
+
+    def _on_correction_applied(self, correction_status=None):
+        """
+        Handle correction status changes in the data model.
+
+        Args:
+            correction_status: The correction status information.
+                If None, will try to get current correction status from the data_model.
+        """
+        logger.debug(
+            f"DataViewAdapter: _on_correction_applied called with status: {correction_status}"
+        )
+
+        # If no correction_status is provided, try to get it from the data model if possible
+        if correction_status is None and hasattr(self._data_model, "get_correction_status"):
+            try:
+                correction_status = self._data_model.get_correction_status()
+                logger.debug(f"Retrieved correction status from model: {correction_status}")
+            except Exception as e:
+                logger.error(f"Error getting correction status from model: {e}")
+
+        # Forward to the underlying DataView
+        if hasattr(self._data_view, "_on_correction_applied"):
+            logger.debug("Forwarding correction status to DataView")
+            self._data_view._on_correction_applied(correction_status)
+
+        # Request update from the UpdateManager
+        self.request_update()
+        logger.debug("Handled correction applied signal")

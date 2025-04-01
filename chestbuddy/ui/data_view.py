@@ -1844,67 +1844,6 @@ class DataView(QWidget):
             and self._table_model is not None
         )
 
-    @Slot(object)
-    def _on_validation_changed(self, validation_status: pd.DataFrame) -> None:
-        """
-        Handle validation status changes from the data model.
-
-        Args:
-            validation_status (pd.DataFrame): The DataFrame containing validation status.
-        """
-        try:
-            logger.debug("Handling validation status change")
-
-            if validation_status is None or validation_status.empty:
-                logger.debug("Validation status is None or empty, nothing to do")
-                return
-
-            logger.debug(f"Received validation_status DataFrame shape: {validation_status.shape}")
-
-            # Update the TableStateManager with validation results
-            if hasattr(self, "_table_state_manager") and self._table_state_manager:
-                logger.debug("Updating TableStateManager with validation results")
-                self._table_state_manager.update_cell_states_from_validation(validation_status)
-                # Update tooltips based on the updated states
-                self.update_tooltips_from_state()
-            else:
-                logger.warning(
-                    "TableStateManager not available - validation highlighting will not be applied"
-                )
-
-        except Exception as e:
-            logger.error(f"Error handling validation changed: {e}")
-
-    @Slot(object)
-    def _on_correction_applied(self, correction_status) -> None:
-        """
-        Handle correction applied signal.
-
-        Args:
-            correction_status: The correction status.
-        """
-        try:
-            logger.debug("Handling correction applied")
-
-            if correction_status is None:
-                logger.debug("Correction status is None, nothing to do")
-                return
-
-            # Update the TableStateManager with correction results
-            if hasattr(self, "_table_state_manager") and self._table_state_manager:
-                logger.debug("Updating TableStateManager with correction results")
-                self._table_state_manager.update_cell_states_from_correction(correction_status)
-                # Update tooltips based on the updated states
-                self.update_tooltips_from_state()
-            else:
-                logger.warning(
-                    "TableStateManager not available - correction highlighting will not be applied"
-                )
-                self._on_data_changed()
-
-        except Exception as e:
-            logger.error(f"Error handling correction applied: {e}")
-
     def _get_filtered_row_index(self, model_row_idx: int) -> int:
         """
         Convert a data model row index to a view row index, accounting for filtering.
