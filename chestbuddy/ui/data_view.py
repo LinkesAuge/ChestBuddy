@@ -428,130 +428,85 @@ class DataView(QWidget):
         logger.debug("Cell highlighting update complete")
 
     def _highlight_cell(self, row, col, color):
-        """
-        Highlight a cell with the specified color.
+        """Highlight a cell with the specified color.
 
         Args:
-            row: Source row index
-            col: Source column index
-            color: QColor for highlighting
+            row: The row index.
+            col: The column index.
+            color: The QColor to use for highlighting.
 
         Returns:
-            bool: True if cell was successfully highlighted, False otherwise
+            bool: True if highlighting was applied, False otherwise.
         """
         logger.debug(f"_highlight_cell called for ({row}, {col}) with color {color.name()}")
-
-        # Check if we have a valid table model
-        if not hasattr(self, "_table_model") or not self._table_model:
-            logger.warning("Cannot highlight cell: table model not available")
+        if not hasattr(self, "_table_model") or self._table_model is None:
+            logger.error("Table model not initialized, cannot highlight cell")
             return False
 
-        # Check if we have valid row/column indices
-        if row < 0 or col < 0:
-            logger.warning(f"Invalid negative indices for cell ({row}, {col})")
-            return False
-
-        # Track model state
-        model_row_count = self._table_model.rowCount()
-        model_col_count = self._table_model.columnCount()
-        logger.debug(
-            f"Current table dimensions: {model_row_count} rows x {model_col_count} columns"
-        )
-
-        # Check if row/col are within bounds
-        if row >= model_row_count:
-            logger.warning(f"Row index {row} is out of bounds (max: {model_row_count - 1})")
-            return False
-
-        if col >= model_col_count:
-            logger.warning(f"Column index {col} is out of bounds (max: {model_col_count - 1})")
-            return False
-
-        # Create the source model index
-        source_index = self._table_model.index(row, col)
-        if not source_index.isValid():
-            logger.warning(f"Invalid source index for cell ({row}, {col})")
-            logger.debug(f"Source index validity check failed: {source_index}")
-            return False
-
-        # Log index details
-        logger.debug(
-            f"Source index: row={source_index.row()}, col={source_index.column()}, valid={source_index.isValid()}"
-        )
-
-        # Get the item directly from source model first
         try:
-            item = self._table_model.itemFromIndex(source_index)
-            if not item:
-                logger.warning(f"Item not found for valid index at ({row}, {col})")
-                # Additional debug to check model state
-                logger.debug(
-                    f"Model item check: row={row}, col={col}, index valid={source_index.isValid()}"
-                )
+            # Check dimensions
+            rows = self._table_model.rowCount()
+            cols = self._table_model.columnCount()
+            logger.debug(f"Current table dimensions: {rows} rows x {cols} columns\n")
 
-                # Try to get data directly from model
-                data = self._table_model.data(source_index, role=Qt.DisplayRole)
-                logger.debug(
-                    f"Model contains data at this index: {data is not None}, value: {data}"
-                )
+            if not (0 <= row < rows and 0 <= col < cols):
+                logger.warning(f"Cell ({row}, {col}) is outside table dimensions ({rows}, {cols})")
+                return False
+
+            # Get source index
+            source_index = self._table_model.index(row, col)
+            logger.debug(
+                f"Source index: row={source_index.row()}, col={source_index.column()}, valid={source_index.isValid()}"
+            )
+
+            # Get item from model
+            item = self._table_model.item(row, col)
+            if item is None:
+                logger.warning(f"No item found for cell ({row}, {col})")
                 return False
 
             logger.debug(f"Found item for cell ({row}, {col}): {item}")
-        except Exception as e:
-            logger.error(f"Exception getting item from index ({row}, {col}): {e}")
-            import traceback
 
-            logger.error(traceback.format_exc())
-            return False
+            # Log the background color before setting it
+            bg_before = item.data(Qt.BackgroundRole)
+            logger.debug(f"Before setting color - background role data: {bg_before}")
 
-        # Apply highlighting color to the source model item
-        try:
-            before_color = item.data(Qt.BackgroundRole)
-            logger.debug(f"Before setting color - background role data: {before_color}")
+            # Block signals to prevent itemChanged from triggering
+            original_signal_state = None
+            if hasattr(self._table_model, "blockSignals"):
+                original_signal_state = self._table_model.blockSignals(True)
+                logger.debug(f"Temporarily blocking table model signals")
 
+            # Set the background color
             item.setData(color, Qt.BackgroundRole)
-            after_color = item.data(Qt.BackgroundRole)
-            logger.debug(f"After setting color - background role data: {after_color}")
+
+            # Restore original signal blocking state
+            if hasattr(self._table_model, "blockSignals") and original_signal_state is not None:
+                self._table_model.blockSignals(original_signal_state)
+                logger.debug(f"Restored table model signals to: {original_signal_state}")
+
+            # Log the background color after setting it
+            bg_after = item.data(Qt.BackgroundRole)
+            logger.debug(f"After setting color - background role data: {bg_after}")
+
+            # Map to proxy index for update
+            if hasattr(self, "_proxy_model") and self._proxy_model is not None:
+                proxy_index = self._proxy_model.mapFromSource(source_index)
+                if proxy_index.isValid():
+                    # Update specific cell in view
+                    logger.debug(
+                        f"Mapped to proxy index: valid={proxy_index.isValid()}, row={proxy_index.row()}, col={proxy_index.column()}"
+                    )
+                    if hasattr(self, "_table_view") and self._table_view is not None:
+                        self._table_view.update(proxy_index)
+                        logger.debug(
+                            f"Updated view at proxy index ({proxy_index.row()}, {proxy_index.column()})"
+                        )
 
             logger.debug(f"Applied highlighting to cell ({row}, {col}) with color {color.name()}")
-
-            # Force update for this item
-            if hasattr(self, "_table_view") and self._table_view:
-                try:
-                    # If we have proxy model, map the index
-                    if hasattr(self, "_proxy_model") and self._proxy_model:
-                        view_index = self._proxy_model.mapFromSource(source_index)
-                        logger.debug(
-                            f"Mapped to proxy index: valid={view_index.isValid()}, row={view_index.row()}, col={view_index.column()}"
-                        )
-                        if view_index.isValid():
-                            # Update the specific item in the view
-                            self._table_view.update(view_index)
-                            logger.debug(
-                                f"Updated view at proxy index ({view_index.row()}, {view_index.column()})"
-                            )
-                        else:
-                            logger.warning(
-                                f"Invalid proxy index after mapping from source index ({row}, {col})"
-                            )
-                    else:
-                        # Update the specific item in the view
-                        self._table_view.update(source_index)
-                        logger.debug(f"Updated view at source index ({row}, {col})")
-                except Exception as e:
-                    logger.error(f"Error updating view for cell ({row}, {col}): {e}")
-                    import traceback
-
-                    logger.error(traceback.format_exc())
-            else:
-                logger.warning("No table view available to update")
-
             return True
         except Exception as e:
-            logger.error(f"Error highlighting cell ({row}, {col}): {e}")
-            import traceback
-
-            logger.error(traceback.format_exc())
+            logger.exception(f"Error highlighting cell ({row}, {col}): {str(e)}")
             return False
 
     def update_tooltips_from_state(self):

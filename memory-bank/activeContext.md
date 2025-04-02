@@ -418,3 +418,13 @@ We are implementing a new TableStateManager to improve cell state handling and c
 3. Modify DataView for TableStateManager integration
 4. Update validation/correction code for batch processing
 5. Add comprehensive test coverage
+
+## Current Status (04/02/2025)
+
+### Recent Fixes
+
+1. **DataView Cell Highlighting Issue**: Fixed a critical bug where cell highlighting in the DataView was not persisting. The issue occurred because setting the background color triggered an `itemChanged` signal, which propagated to the data model causing a complete table repopulation that wiped out all highlighting. The fix involved temporarily blocking signals in the `_highlight_cell` method while setting background colors.
+
+2. **DataViewAdapter Connection Issue**: Fixed an initialization error in the DataViewAdapter where it was trying to call a non-existent method `_connect_view_signals()`. The fix was to call the correct existing method `_connect_signals()` instead. This resolved issues with the DataView not being visible in the main application.
+
+### Current Work

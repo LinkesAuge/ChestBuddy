@@ -1,18 +1,127 @@
-============================= test session starts =============================
-platform win32 -- Python 3.12.9, pytest-8.3.5, pluggy-1.5.0 -- D:\Projekte\ChestBuddy\.venv\Scripts\python.exe
-cachedir: .pytest_cache
-PySide6 6.6.0 -- Qt runtime 6.6.0 -- Qt compiled 6.6.0
-rootdir: D:\Projekte\ChestBuddy
-configfile: pytest.ini
-plugins: cov-6.0.0, mock-3.14.0, qt-4.4.0
-collecting ... collected 1 item
-
-tests/unit/core/services/test_correction_service.py::TestCorrectionService::test_recursive_correction PASSED [100%]
-
-============================== warnings summary ===============================
-chestbuddy\utils\signal_manager.py:25
-  D:\Projekte\ChestBuddy\chestbuddy\utils\signal_manager.py:25: UserWarning: signal_tracer is a debugging utility and should not be used in production code.
-    from chestbuddy.utils.signal_tracer import signal_tracer
-
--- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-======================== 1 passed, 1 warning in 0.24s =========================
+D:\Projekte\ChestBuddy\chestbuddy\utils\signal_manager.py:25: UserWarning: signal_tracer is a debugging utility and should not be used in production code.
+  from chestbuddy.utils.signal_tracer import signal_tracer
+2025-04-02 15:04:34,983 [INFO] minimal_data_view_test: === Setting up minimal test ===
+2025-04-02 15:04:34,983 [INFO] minimal_data_view_test: Creating sample data
+2025-04-02 15:04:34,984 [INFO] minimal_data_view_test: Sample data created with shape: (4, 5)
+2025-04-02 15:04:34,985 [INFO] minimal_data_view_test: Creating data model
+2025-04-02 15:04:34,987 [DEBUG] chestbuddy.utils.config: Loaded existing configuration from: C:\Users\schrd\AppData\Roaming\ChestBuddy\config.ini
+2025-04-02 15:04:34,987 [DEBUG] chestbuddy.utils.config: Config get: General.version = 1.1
+2025-04-02 15:04:34,987 [DEBUG] chestbuddy.core.models.chest_data_model: Updated data hash to: 1d4f9f63b040166415e97d034fc84c19
+2025-04-02 15:04:34,987 [DEBUG] chestbuddy.core.state.data_state: DataState updated: 0 rows, 6 columns
+2025-04-02 15:04:34,989 [INFO] minimal_data_view_test: Data model created, is_empty: False
+2025-04-02 15:04:34,989 [INFO] minimal_data_view_test: Creating TableStateManager
+2025-04-02 15:04:34,989 [DEBUG] chestbuddy.core.table_state_manager: TableStateManager initialized
+2025-04-02 15:04:34,989 [INFO] minimal_data_view_test: TableStateManager created
+2025-04-02 15:04:34,989 [INFO] minimal_data_view_test: Creating DataView
+2025-04-02 15:04:34,994 [INFO] chestbuddy.ui.data_view: Installed event filter on table view
+2025-04-02 15:04:34,994 [INFO] chestbuddy.ui.data_view: Registered Ctrl+C shortcut for copying
+2025-04-02 15:04:34,994 [INFO] chestbuddy.ui.data_view: Registered Ctrl+V shortcut for pasting
+2025-04-02 15:04:34,994 [DEBUG] chestbuddy.ui.data_view: Applying table styling in DataView
+2025-04-02 15:04:34,995 [DEBUG] chestbuddy.ui.data_view: Disabled alternating row colors to prevent highlighting issues
+2025-04-02 15:04:34,995 [DEBUG] chestbuddy.ui.data_view: Set default item foreground color to white
+2025-04-02 15:04:34,996 [DEBUG] chestbuddy.ui.data_view: Populated column selector with 5 columns
+2025-04-02 15:04:34,996 [DEBUG] chestbuddy.ui.data_view: Connecting import button clicked signal to _on_import_clicked handler
+2025-04-02 15:04:34,997 [DEBUG] chestbuddy.ui.data_view: Connecting export button clicked signal to _on_export_clicked handler
+2025-04-02 15:04:34,997 [DEBUG] chestbuddy.ui.data_view: Connected filter text Enter key to apply filter
+2025-04-02 15:04:34,997 [INFO] chestbuddy.ui.data_view: Connected custom context menu
+2025-04-02 15:04:34,997 [INFO] chestbuddy.ui.data_view: Connected double-click handler for direct editing
+2025-04-02 15:04:34,997 [DEBUG] chestbuddy.ui.data_view: Connected refresh button
+2025-04-02 15:04:35,018 [DEBUG] chestbuddy.ui.data_view: Added STATUS_COLUMN to columns list: ['PLAYER', 'CHEST', 'SOURCE', 'SCORE', 'CLAN', 'STATUS']
+2025-04-02 15:04:35,018 [DEBUG] chestbuddy.ui.data_view: Temporarily setting proxy model's source model to None
+2025-04-02 15:04:35,018 [DEBUG] chestbuddy.ui.data_view: Starting chunked population: 4 rows, 6 columns
+2025-04-02 15:04:35,019 [DEBUG] chestbuddy.ui.data_view: Populating chunk from 0 to 4 of 4 rows
+2025-04-02 15:04:35,022 [DEBUG] chestbuddy.ui.data_view: Chunk population complete: 4 rows processed
+2025-04-02 15:04:35,022 [DEBUG] chestbuddy.ui.data_view: Finalizing data population
+2025-04-02 15:04:35,022 [DEBUG] chestbuddy.ui.data_view: Reconnecting proxy model to source model during finalization
+2025-04-02 15:04:35,022 [DEBUG] chestbuddy.ui.data_view: Set PLAYER column (index 0) width to 200px
+2025-04-02 15:04:35,023 [DEBUG] chestbuddy.ui.data_view: Set CHEST column (index 1) width to 200px
+2025-04-02 15:04:35,023 [DEBUG] chestbuddy.ui.data_view: Set SOURCE column (index 2) width to 200px
+2025-04-02 15:04:35,023 [DEBUG] chestbuddy.ui.data_view: Set SCORE column (index 3) width to 80px
+2025-04-02 15:04:35,023 [DEBUG] chestbuddy.ui.data_view: Set CLAN column (index 4) width to 80px
+2025-04-02 15:04:35,023 [DEBUG] chestbuddy.ui.data_view: Set STATUS column (index 5) width to 60px
+2025-04-02 15:04:35,023 [DEBUG] chestbuddy.ui.data_view: Set STATUS column (index 5) width to 60px
+2025-04-02 15:04:35,023 [DEBUG] chestbuddy.ui.data_view: Status updated: Showing all 4 rows
+2025-04-02 15:04:35,023 [DEBUG] chestbuddy.ui.data_view: Data population completed successfully
+2025-04-02 15:04:35,023 [INFO] minimal_data_view_test: DataView created with ID: 2335070700032
+2025-04-02 15:04:35,023 [INFO] minimal_data_view_test: Setting TableStateManager on DataView
+2025-04-02 15:04:35,023 [DEBUG] chestbuddy.ui.data_view: ==== DataView.set_table_state_manager called ====
+2025-04-02 15:04:35,023 [DEBUG] chestbuddy.ui.data_view: TableStateManager reference set in DataView
+2025-04-02 15:04:35,023 [DEBUG] chestbuddy.ui.data_view: Connected to TableStateManager.state_changed signal successfully
+2025-04-02 15:04:35,023 [DEBUG] chestbuddy.ui.data_view: TableStateManager integration with DataView complete
+2025-04-02 15:04:35,023 [DEBUG] chestbuddy.ui.data_view: Current cell states: 0 invalid, 0 correctable, 0 corrected
+2025-04-02 15:04:35,023 [INFO] minimal_data_view_test: TableStateManager set on DataView
+2025-04-02 15:04:35,023 [INFO] minimal_data_view_test: Adding DataView to layout
+2025-04-02 15:04:35,023 [INFO] minimal_data_view_test: DataView added to layout
+2025-04-02 15:04:35,518 [INFO] minimal_data_view_test: Populating table...
+2025-04-02 15:04:35,518 [INFO] minimal_data_view_test: Calling populate_table on DataView
+2025-04-02 15:04:35,518 [DEBUG] chestbuddy.ui.data_view: Added STATUS_COLUMN to columns list: ['PLAYER', 'CHEST', 'SOURCE', 'SCORE', 'CLAN', 'STATUS']
+2025-04-02 15:04:35,518 [DEBUG] chestbuddy.ui.data_view: Temporarily setting proxy model's source model to None
+2025-04-02 15:04:35,519 [DEBUG] chestbuddy.ui.data_view: Starting chunked population: 4 rows, 6 columns
+2025-04-02 15:04:35,520 [DEBUG] chestbuddy.ui.data_view: Populating chunk from 0 to 4 of 4 rows
+2025-04-02 15:04:35,520 [DEBUG] chestbuddy.ui.data_view: Chunk population complete: 4 rows processed
+2025-04-02 15:04:35,520 [DEBUG] chestbuddy.ui.data_view: Finalizing data population
+2025-04-02 15:04:35,521 [DEBUG] chestbuddy.ui.data_view: Reconnecting proxy model to source model during finalization
+2025-04-02 15:04:35,521 [DEBUG] chestbuddy.ui.data_view: Set PLAYER column (index 0) width to 200px
+2025-04-02 15:04:35,521 [DEBUG] chestbuddy.ui.data_view: Set CHEST column (index 1) width to 200px
+2025-04-02 15:04:35,521 [DEBUG] chestbuddy.ui.data_view: Set SOURCE column (index 2) width to 200px
+2025-04-02 15:04:35,521 [DEBUG] chestbuddy.ui.data_view: Set SCORE column (index 3) width to 80px
+2025-04-02 15:04:35,521 [DEBUG] chestbuddy.ui.data_view: Set CLAN column (index 4) width to 80px
+2025-04-02 15:04:35,521 [DEBUG] chestbuddy.ui.data_view: Set STATUS column (index 5) width to 60px
+2025-04-02 15:04:35,521 [DEBUG] chestbuddy.ui.data_view: Set STATUS column (index 5) width to 60px
+2025-04-02 15:04:35,521 [DEBUG] chestbuddy.ui.data_view: Status updated: Showing all 4 rows
+2025-04-02 15:04:35,521 [DEBUG] chestbuddy.ui.data_view: Data population completed successfully
+2025-04-02 15:04:35,524 [INFO] minimal_data_view_test: populate_table called
+2025-04-02 15:04:35,524 [INFO] minimal_data_view_test: DataView table model row count: 4
+2025-04-02 15:04:35,524 [INFO] minimal_data_view_test: DataView table model column count: 6
+2025-04-02 15:04:36,522 [INFO] minimal_data_view_test: Adding validation states...
+2025-04-02 15:04:36,522 [INFO] minimal_data_view_test: Updating cell states from validation
+2025-04-02 15:04:36,522 [DEBUG] chestbuddy.core.table_state_manager: ==== TableStateManager.update_cell_states_from_validation called ====
+2025-04-02 15:04:36,522 [DEBUG] chestbuddy.core.table_state_manager: Validation status DataFrame shape: (3, 3)
+2025-04-02 15:04:36,522 [DEBUG] chestbuddy.core.table_state_manager: Validation status columns: ['ROW_IDX', 'COL_IDX', 'STATUS']
+2025-04-02 15:04:36,527 [DEBUG] chestbuddy.core.table_state_manager: Sample validation data (first 3 rows):
+   ROW_IDX  COL_IDX   STATUS
+0        0        0  invalid
+1        1        1  invalid
+2        2        2  invalid
+2025-04-02 15:04:36,527 [DEBUG] chestbuddy.core.table_state_manager: Reset 0 existing validation states
+2025-04-02 15:04:36,527 [DEBUG] chestbuddy.core.table_state_manager: Using standard validation status format with ROW_IDX, COL_IDX, STATUS
+2025-04-02 15:04:36,527 [DEBUG] chestbuddy.core.table_state_manager: Cell (0, 0) state set to INVALID
+2025-04-02 15:04:36,527 [DEBUG] chestbuddy.core.table_state_manager: Set cell (0, 0) to INVALID state
+2025-04-02 15:04:36,527 [DEBUG] chestbuddy.core.table_state_manager: Cell (1, 1) state set to INVALID
+2025-04-02 15:04:36,527 [DEBUG] chestbuddy.core.table_state_manager: Set cell (1, 1) to INVALID state
+2025-04-02 15:04:36,527 [DEBUG] chestbuddy.core.table_state_manager: Cell (2, 2) state set to INVALID
+2025-04-02 15:04:36,527 [DEBUG] chestbuddy.core.table_state_manager: Set cell (2, 2) to INVALID state
+2025-04-02 15:04:36,527 [DEBUG] chestbuddy.core.table_state_manager: Updated 3 cells using standard format
+2025-04-02 15:04:36,527 [DEBUG] chestbuddy.core.table_state_manager: Emitting state_changed signal after updating validation states
+2025-04-02 15:04:36,528 [DEBUG] chestbuddy.ui.data_view: ==== DataView.update_cell_highlighting_from_state called ====
+2025-04-02 15:04:36,528 [DEBUG] chestbuddy.ui.data_view: Updating cell highlighting from table state manager
+2025-04-02 15:04:36,528 [DEBUG] chestbuddy.ui.data_view: Found cells to highlight: 3 invalid, 0 correctable, 0 corrected, 0 processing
+2025-04-02 15:04:36,528 [DEBUG] chestbuddy.ui.data_view: Sample invalid cells (first 3): [(0, 0), (1, 1), (2, 2)]
+2025-04-02 15:04:36,528 [DEBUG] chestbuddy.ui.data_view: Highlighting invalid cell at (0, 0)
+2025-04-02 15:04:36,528 [DEBUG] chestbuddy.ui.data_view: _highlight_cell called for (0, 0) with color #ffb6b6
+2025-04-02 15:04:36,528 [DEBUG] chestbuddy.ui.data_view: Current table dimensions: 4 rows x 6 columns
+2025-04-02 15:04:36,528 [DEBUG] chestbuddy.ui.data_view: Source index: row=0, col=0, valid=True
+2025-04-02 15:04:36,528 [DEBUG] chestbuddy.ui.data_view: Found item for cell (0, 0): <PySide6.QtGui.QStandardItem object at 0x0000021FAD10CF00>
+2025-04-02 15:04:36,528 [DEBUG] chestbuddy.ui.data_view: Before setting color - background role data: None
+2025-04-02 15:04:36,528 [DEBUG] chestbuddy.ui.data_view: Item changed at (3, 0) - column 'PLAYER': 'player1'
+2025-04-02 15:04:36,529 [DEBUG] chestbuddy.core.state.data_state: DataState updated: 4 rows, 5 columns
+2025-04-02 15:04:36,530 [DEBUG] chestbuddy.core.models.chest_data_model: Emitting data_changed signal with DataState.
+2025-04-02 15:04:36,530 [DEBUG] chestbuddy.ui.data_view: DataView received _on_data_changed. DataState: DataState(rows=4, columns=5, hash=c63551ab)
+2025-04-02 15:04:36,530 [DEBUG] chestbuddy.ui.data_view: Added STATUS_COLUMN to columns list: ['PLAYER', 'CHEST', 'SOURCE', 'SCORE', 'CLAN', 'STATUS']
+2025-04-02 15:04:36,530 [DEBUG] chestbuddy.ui.data_view: Temporarily setting proxy model's source model to None
+2025-04-02 15:04:36,530 [DEBUG] chestbuddy.ui.data_view: Starting chunked population: 4 rows, 6 columns
+2025-04-02 15:04:36,531 [DEBUG] chestbuddy.ui.data_view: Populating chunk from 0 to 4 of 4 rows
+2025-04-02 15:04:36,532 [DEBUG] chestbuddy.ui.data_view: Chunk population complete: 4 rows processed
+2025-04-02 15:04:36,532 [DEBUG] chestbuddy.ui.data_view: Finalizing data population
+2025-04-02 15:04:36,532 [DEBUG] chestbuddy.ui.data_view: Reconnecting proxy model to source model during finalization
+2025-04-02 15:04:36,532 [DEBUG] chestbuddy.ui.data_view: Set PLAYER column (index 0) width to 200px
+2025-04-02 15:04:36,532 [DEBUG] chestbuddy.ui.data_view: Set CHEST column (index 1) width to 200px
+2025-04-02 15:04:36,532 [DEBUG] chestbuddy.ui.data_view: Set SOURCE column (index 2) width to 200px
+2025-04-02 15:04:36,532 [DEBUG] chestbuddy.ui.data_view: Set SCORE column (index 3) width to 80px
+2025-04-02 15:04:36,532 [DEBUG] chestbuddy.ui.data_view: Set CLAN column (index 4) width to 80px
+2025-04-02 15:04:36,532 [DEBUG] chestbuddy.ui.data_view: Set STATUS column (index 5) width to 60px
+2025-04-02 15:04:36,532 [DEBUG] chestbuddy.ui.data_view: Set STATUS column (index 5) width to 60px
+2025-04-02 15:04:36,532 [DEBUG] chestbuddy.ui.data_view: Status updated: Showing all 4 rows
+2025-04-02 15:04:36,532 [DEBUG] chestbuddy.ui.data_view: Data population completed successfully
+2025-04-02 15:04:36,538 [DEBUG] chestbuddy.ui.data_view: After setting color - background role data: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.713726, 0.713726, 1.000000)
+2025-04-02 15:04:36,538 [DEBUG] chestbuddy.ui.data_view: Applied highlighting to cell (0, 0) with color #ffb6b6

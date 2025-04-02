@@ -1,0 +1,320 @@
+D:\Projekte\ChestBuddy\chestbuddy\utils\signal_manager.py:25: UserWarning: signal_tracer is a debugging utility and should not be used in production code.
+  from chestbuddy.utils.signal_tracer import signal_tracer
+2025-04-02 15:08:03,924 [INFO] minimal_data_view_test: === Setting up minimal test ===
+2025-04-02 15:08:03,924 [INFO] minimal_data_view_test: Creating sample data
+2025-04-02 15:08:03,925 [INFO] minimal_data_view_test: Sample data created with shape: (4, 5)
+2025-04-02 15:08:03,925 [INFO] minimal_data_view_test: Creating data model
+2025-04-02 15:08:03,927 [DEBUG] chestbuddy.utils.config: Loaded existing configuration from: C:\Users\schrd\AppData\Roaming\ChestBuddy\config.ini
+2025-04-02 15:08:03,927 [DEBUG] chestbuddy.utils.config: Config get: General.version = 1.1
+2025-04-02 15:08:03,927 [DEBUG] chestbuddy.core.models.chest_data_model: Updated data hash to: 1d4f9f63b040166415e97d034fc84c19
+2025-04-02 15:08:03,928 [DEBUG] chestbuddy.core.state.data_state: DataState updated: 0 rows, 6 columns
+2025-04-02 15:08:03,930 [INFO] minimal_data_view_test: Data model created, is_empty: False
+2025-04-02 15:08:03,930 [INFO] minimal_data_view_test: Creating TableStateManager
+2025-04-02 15:08:03,930 [DEBUG] chestbuddy.core.table_state_manager: TableStateManager initialized
+2025-04-02 15:08:03,930 [INFO] minimal_data_view_test: TableStateManager created
+2025-04-02 15:08:03,930 [INFO] minimal_data_view_test: Creating DataView
+2025-04-02 15:08:03,934 [INFO] chestbuddy.ui.data_view: Installed event filter on table view
+2025-04-02 15:08:03,934 [INFO] chestbuddy.ui.data_view: Registered Ctrl+C shortcut for copying
+2025-04-02 15:08:03,934 [INFO] chestbuddy.ui.data_view: Registered Ctrl+V shortcut for pasting
+2025-04-02 15:08:03,934 [DEBUG] chestbuddy.ui.data_view: Applying table styling in DataView
+2025-04-02 15:08:03,934 [DEBUG] chestbuddy.ui.data_view: Disabled alternating row colors to prevent highlighting issues
+2025-04-02 15:08:03,934 [DEBUG] chestbuddy.ui.data_view: Set default item foreground color to white
+2025-04-02 15:08:03,937 [DEBUG] chestbuddy.ui.data_view: Populated column selector with 5 columns
+2025-04-02 15:08:03,937 [DEBUG] chestbuddy.ui.data_view: Connecting import button clicked signal to _on_import_clicked handler
+2025-04-02 15:08:03,937 [DEBUG] chestbuddy.ui.data_view: Connecting export button clicked signal to _on_export_clicked handler
+2025-04-02 15:08:03,938 [DEBUG] chestbuddy.ui.data_view: Connected filter text Enter key to apply filter
+2025-04-02 15:08:03,938 [INFO] chestbuddy.ui.data_view: Connected custom context menu
+2025-04-02 15:08:03,938 [INFO] chestbuddy.ui.data_view: Connected double-click handler for direct editing
+2025-04-02 15:08:03,938 [DEBUG] chestbuddy.ui.data_view: Connected refresh button
+2025-04-02 15:08:03,959 [DEBUG] chestbuddy.ui.data_view: Added STATUS_COLUMN to columns list: ['PLAYER', 'CHEST', 'SOURCE', 'SCORE', 'CLAN', 'STATUS']
+2025-04-02 15:08:03,959 [DEBUG] chestbuddy.ui.data_view: Temporarily setting proxy model's source model to None
+2025-04-02 15:08:03,959 [DEBUG] chestbuddy.ui.data_view: Starting chunked population: 4 rows, 6 columns
+2025-04-02 15:08:03,960 [DEBUG] chestbuddy.ui.data_view: Populating chunk from 0 to 4 of 4 rows
+2025-04-02 15:08:03,962 [DEBUG] chestbuddy.ui.data_view: Chunk population complete: 4 rows processed
+2025-04-02 15:08:03,962 [DEBUG] chestbuddy.ui.data_view: Finalizing data population
+2025-04-02 15:08:03,962 [DEBUG] chestbuddy.ui.data_view: Reconnecting proxy model to source model during finalization
+2025-04-02 15:08:03,963 [DEBUG] chestbuddy.ui.data_view: Set PLAYER column (index 0) width to 200px
+2025-04-02 15:08:03,963 [DEBUG] chestbuddy.ui.data_view: Set CHEST column (index 1) width to 200px
+2025-04-02 15:08:03,963 [DEBUG] chestbuddy.ui.data_view: Set SOURCE column (index 2) width to 200px
+2025-04-02 15:08:03,963 [DEBUG] chestbuddy.ui.data_view: Set SCORE column (index 3) width to 80px
+2025-04-02 15:08:03,963 [DEBUG] chestbuddy.ui.data_view: Set CLAN column (index 4) width to 80px
+2025-04-02 15:08:03,963 [DEBUG] chestbuddy.ui.data_view: Set STATUS column (index 5) width to 60px
+2025-04-02 15:08:03,963 [DEBUG] chestbuddy.ui.data_view: Set STATUS column (index 5) width to 60px
+2025-04-02 15:08:03,964 [DEBUG] chestbuddy.ui.data_view: Status updated: Showing all 4 rows
+2025-04-02 15:08:03,964 [DEBUG] chestbuddy.ui.data_view: Data population completed successfully
+2025-04-02 15:08:03,964 [INFO] minimal_data_view_test: DataView created with ID: 2948828011456
+2025-04-02 15:08:03,964 [INFO] minimal_data_view_test: Setting TableStateManager on DataView
+2025-04-02 15:08:03,964 [DEBUG] chestbuddy.ui.data_view: ==== DataView.set_table_state_manager called ====
+2025-04-02 15:08:03,964 [DEBUG] chestbuddy.ui.data_view: TableStateManager reference set in DataView
+2025-04-02 15:08:03,964 [DEBUG] chestbuddy.ui.data_view: Connected to TableStateManager.state_changed signal successfully
+2025-04-02 15:08:03,964 [DEBUG] chestbuddy.ui.data_view: TableStateManager integration with DataView complete
+2025-04-02 15:08:03,964 [DEBUG] chestbuddy.ui.data_view: Current cell states: 0 invalid, 0 correctable, 0 corrected
+2025-04-02 15:08:03,964 [INFO] minimal_data_view_test: TableStateManager set on DataView
+2025-04-02 15:08:03,964 [INFO] minimal_data_view_test: Adding DataView to layout
+2025-04-02 15:08:03,964 [INFO] minimal_data_view_test: DataView added to layout
+2025-04-02 15:08:04,015 [DEBUG] minimal_data_view_test: UpdateLater event on QWidget
+2025-04-02 15:08:04,016 [DEBUG] minimal_data_view_test: UpdateLater event on QTableView
+2025-04-02 15:08:04,016 [DEBUG] minimal_data_view_test: UpdateLater event on DataView
+2025-04-02 15:08:04,026 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:04,027 [DEBUG] minimal_data_view_test: Paint event on QTableView
+2025-04-02 15:08:04,028 [DEBUG] minimal_data_view_test: Paint event on QWidget
+2025-04-02 15:08:04,456 [INFO] minimal_data_view_test: Populating table...
+2025-04-02 15:08:04,456 [INFO] minimal_data_view_test: Calling populate_table on DataView
+2025-04-02 15:08:04,456 [DEBUG] chestbuddy.ui.data_view: Added STATUS_COLUMN to columns list: ['PLAYER', 'CHEST', 'SOURCE', 'SCORE', 'CLAN', 'STATUS']
+2025-04-02 15:08:04,456 [DEBUG] chestbuddy.ui.data_view: Temporarily setting proxy model's source model to None
+2025-04-02 15:08:04,457 [DEBUG] chestbuddy.ui.data_view: Starting chunked population: 4 rows, 6 columns
+2025-04-02 15:08:04,457 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:04,457 [DEBUG] minimal_data_view_test: Paint event on QTableView
+2025-04-02 15:08:04,458 [DEBUG] minimal_data_view_test: Paint event on QWidget
+2025-04-02 15:08:04,458 [DEBUG] chestbuddy.ui.data_view: Populating chunk from 0 to 4 of 4 rows
+2025-04-02 15:08:04,459 [DEBUG] chestbuddy.ui.data_view: Chunk population complete: 4 rows processed
+2025-04-02 15:08:04,459 [DEBUG] chestbuddy.ui.data_view: Finalizing data population
+2025-04-02 15:08:04,459 [DEBUG] chestbuddy.ui.data_view: Reconnecting proxy model to source model during finalization
+2025-04-02 15:08:04,460 [DEBUG] chestbuddy.ui.data_view: Set PLAYER column (index 0) width to 200px
+2025-04-02 15:08:04,460 [DEBUG] chestbuddy.ui.data_view: Set CHEST column (index 1) width to 200px
+2025-04-02 15:08:04,460 [DEBUG] chestbuddy.ui.data_view: Set SOURCE column (index 2) width to 200px
+2025-04-02 15:08:04,460 [DEBUG] chestbuddy.ui.data_view: Set SCORE column (index 3) width to 80px
+2025-04-02 15:08:04,460 [DEBUG] chestbuddy.ui.data_view: Set CLAN column (index 4) width to 80px
+2025-04-02 15:08:04,460 [DEBUG] chestbuddy.ui.data_view: Set STATUS column (index 5) width to 60px
+2025-04-02 15:08:04,460 [DEBUG] chestbuddy.ui.data_view: Set STATUS column (index 5) width to 60px
+2025-04-02 15:08:04,460 [DEBUG] chestbuddy.ui.data_view: Status updated: Showing all 4 rows
+2025-04-02 15:08:04,460 [DEBUG] chestbuddy.ui.data_view: Data population completed successfully
+2025-04-02 15:08:04,461 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:04,461 [DEBUG] minimal_data_view_test: Paint event on QTableView
+2025-04-02 15:08:04,461 [DEBUG] minimal_data_view_test: Paint event on QWidget
+2025-04-02 15:08:04,464 [INFO] minimal_data_view_test: populate_table called
+2025-04-02 15:08:04,464 [INFO] minimal_data_view_test: DataView table model row count: 4
+2025-04-02 15:08:04,464 [INFO] minimal_data_view_test: DataView table model column count: 6
+2025-04-02 15:08:05,469 [INFO] minimal_data_view_test: Adding validation states...
+2025-04-02 15:08:05,470 [INFO] minimal_data_view_test: Updating cell states from validation
+2025-04-02 15:08:05,470 [DEBUG] chestbuddy.core.table_state_manager: ==== TableStateManager.update_cell_states_from_validation called ====
+2025-04-02 15:08:05,470 [DEBUG] chestbuddy.core.table_state_manager: Validation status DataFrame shape: (3, 3)
+2025-04-02 15:08:05,470 [DEBUG] chestbuddy.core.table_state_manager: Validation status columns: ['ROW_IDX', 'COL_IDX', 'STATUS']
+2025-04-02 15:08:05,475 [DEBUG] chestbuddy.core.table_state_manager: Sample validation data (first 3 rows):
+   ROW_IDX  COL_IDX   STATUS
+0        0        0  invalid
+1        1        1  invalid
+2        2        2  invalid
+2025-04-02 15:08:05,475 [DEBUG] chestbuddy.core.table_state_manager: Reset 0 existing validation states
+2025-04-02 15:08:05,475 [DEBUG] chestbuddy.core.table_state_manager: Using standard validation status format with ROW_IDX, COL_IDX, STATUS
+2025-04-02 15:08:05,475 [DEBUG] chestbuddy.core.table_state_manager: Cell (0, 0) state set to INVALID
+2025-04-02 15:08:05,475 [DEBUG] chestbuddy.core.table_state_manager: Set cell (0, 0) to INVALID state
+2025-04-02 15:08:05,475 [DEBUG] chestbuddy.core.table_state_manager: Cell (1, 1) state set to INVALID
+2025-04-02 15:08:05,475 [DEBUG] chestbuddy.core.table_state_manager: Set cell (1, 1) to INVALID state
+2025-04-02 15:08:05,475 [DEBUG] chestbuddy.core.table_state_manager: Cell (2, 2) state set to INVALID
+2025-04-02 15:08:05,475 [DEBUG] chestbuddy.core.table_state_manager: Set cell (2, 2) to INVALID state
+2025-04-02 15:08:05,475 [DEBUG] chestbuddy.core.table_state_manager: Updated 3 cells using standard format
+2025-04-02 15:08:05,475 [DEBUG] chestbuddy.core.table_state_manager: Emitting state_changed signal after updating validation states
+2025-04-02 15:08:05,475 [DEBUG] chestbuddy.ui.data_view: ==== DataView.update_cell_highlighting_from_state called ====
+2025-04-02 15:08:05,475 [DEBUG] chestbuddy.ui.data_view: Updating cell highlighting from table state manager
+2025-04-02 15:08:05,475 [DEBUG] chestbuddy.ui.data_view: Found cells to highlight: 3 invalid, 0 correctable, 0 corrected, 0 processing
+2025-04-02 15:08:05,475 [DEBUG] chestbuddy.ui.data_view: Sample invalid cells (first 3): [(0, 0), (1, 1), (2, 2)]
+2025-04-02 15:08:05,475 [DEBUG] chestbuddy.ui.data_view: Highlighting invalid cell at (0, 0)
+2025-04-02 15:08:05,475 [DEBUG] chestbuddy.ui.data_view: _highlight_cell called for (0, 0) with color #ffb6b6
+2025-04-02 15:08:05,475 [DEBUG] chestbuddy.ui.data_view: Current table dimensions: 4 rows x 6 columns
+2025-04-02 15:08:05,475 [DEBUG] chestbuddy.ui.data_view: Source index: row=0, col=0, valid=True
+2025-04-02 15:08:05,476 [DEBUG] chestbuddy.ui.data_view: Found item for cell (0, 0): <PySide6.QtGui.QStandardItem object at 0x000002AE99FD3900>
+2025-04-02 15:08:05,476 [DEBUG] chestbuddy.ui.data_view: Before setting color - background role data: None
+2025-04-02 15:08:05,476 [DEBUG] chestbuddy.ui.data_view: Temporarily blocking table model signals
+2025-04-02 15:08:05,476 [DEBUG] chestbuddy.ui.data_view: Restored table model signals to: False
+2025-04-02 15:08:05,476 [DEBUG] chestbuddy.ui.data_view: After setting color - background role data: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.713726, 0.713726, 1.000000)
+2025-04-02 15:08:05,476 [DEBUG] chestbuddy.ui.data_view: Applied highlighting to cell (0, 0) with color #ffb6b6
+2025-04-02 15:08:05,476 [DEBUG] chestbuddy.ui.data_view: Mapped to proxy index: valid=True, row=3, col=0
+2025-04-02 15:08:05,476 [DEBUG] chestbuddy.ui.data_view: Updated view at proxy index (3, 0)
+2025-04-02 15:08:05,476 [DEBUG] chestbuddy.ui.data_view: Highlighting invalid cell at (1, 1)
+2025-04-02 15:08:05,476 [DEBUG] chestbuddy.ui.data_view: _highlight_cell called for (1, 1) with color #ffb6b6
+2025-04-02 15:08:05,476 [DEBUG] chestbuddy.ui.data_view: Current table dimensions: 4 rows x 6 columns
+2025-04-02 15:08:05,476 [DEBUG] chestbuddy.ui.data_view: Source index: row=1, col=1, valid=True
+2025-04-02 15:08:05,476 [DEBUG] chestbuddy.ui.data_view: Found item for cell (1, 1): <PySide6.QtGui.QStandardItem object at 0x000002AE99FD3C80>
+2025-04-02 15:08:05,476 [DEBUG] chestbuddy.ui.data_view: Before setting color - background role data: None
+2025-04-02 15:08:05,476 [DEBUG] chestbuddy.ui.data_view: Temporarily blocking table model signals
+2025-04-02 15:08:05,476 [DEBUG] chestbuddy.ui.data_view: Restored table model signals to: False
+2025-04-02 15:08:05,476 [DEBUG] chestbuddy.ui.data_view: After setting color - background role data: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.713726, 0.713726, 1.000000)
+2025-04-02 15:08:05,476 [DEBUG] chestbuddy.ui.data_view: Applied highlighting to cell (1, 1) with color #ffb6b6
+2025-04-02 15:08:05,476 [DEBUG] chestbuddy.ui.data_view: Mapped to proxy index: valid=True, row=2, col=1
+2025-04-02 15:08:05,476 [DEBUG] chestbuddy.ui.data_view: Updated view at proxy index (2, 1)
+2025-04-02 15:08:05,476 [DEBUG] chestbuddy.ui.data_view: Highlighting invalid cell at (2, 2)
+2025-04-02 15:08:05,476 [DEBUG] chestbuddy.ui.data_view: _highlight_cell called for (2, 2) with color #ffb6b6
+2025-04-02 15:08:05,476 [DEBUG] chestbuddy.ui.data_view: Current table dimensions: 4 rows x 6 columns
+2025-04-02 15:08:05,476 [DEBUG] chestbuddy.ui.data_view: Source index: row=2, col=2, valid=True
+2025-04-02 15:08:05,476 [DEBUG] chestbuddy.ui.data_view: Found item for cell (2, 2): <PySide6.QtGui.QStandardItem object at 0x000002AE99D621C0>
+2025-04-02 15:08:05,476 [DEBUG] chestbuddy.ui.data_view: Before setting color - background role data: None
+2025-04-02 15:08:05,476 [DEBUG] chestbuddy.ui.data_view: Temporarily blocking table model signals
+2025-04-02 15:08:05,476 [DEBUG] chestbuddy.ui.data_view: Restored table model signals to: False
+2025-04-02 15:08:05,476 [DEBUG] chestbuddy.ui.data_view: After setting color - background role data: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.713726, 0.713726, 1.000000)
+2025-04-02 15:08:05,476 [DEBUG] chestbuddy.ui.data_view: Applied highlighting to cell (2, 2) with color #ffb6b6
+2025-04-02 15:08:05,476 [DEBUG] chestbuddy.ui.data_view: Mapped to proxy index: valid=True, row=1, col=2
+2025-04-02 15:08:05,476 [DEBUG] chestbuddy.ui.data_view: Updated view at proxy index (1, 2)
+2025-04-02 15:08:05,476 [DEBUG] chestbuddy.ui.data_view: Successfully highlighted 3 cells out of 3 total
+2025-04-02 15:08:05,476 [DEBUG] chestbuddy.ui.data_view: Forcing table view update after highlighting
+2025-04-02 15:08:05,476 [DEBUG] chestbuddy.ui.data_view: Cell highlighting update complete
+2025-04-02 15:08:05,476 [DEBUG] chestbuddy.core.table_state_manager: After updating: 3 cells marked as INVALID, 0 cells marked as CORRECTABLE
+2025-04-02 15:08:05,477 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:05,477 [DEBUG] minimal_data_view_test: Paint event on QTableView
+2025-04-02 15:08:05,477 [DEBUG] minimal_data_view_test: Paint event on QWidget
+2025-04-02 15:08:05,983 [INFO] minimal_data_view_test: TableStateManager invalid cells: [(0, 0), (1, 1), (2, 2)]
+2025-04-02 15:08:05,983 [INFO] minimal_data_view_test: Cell (0, 0) background role: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.713726, 0.713726, 1.000000)
+2025-04-02 15:08:05,983 [INFO] minimal_data_view_test: Cell (1, 1) background role: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.713726, 0.713726, 1.000000)
+2025-04-02 15:08:05,983 [INFO] minimal_data_view_test: Cell (2, 2) background role: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.713726, 0.713726, 1.000000)
+2025-04-02 15:08:06,331 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:06,349 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:06,381 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:06,413 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:06,445 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:06,454 [INFO] minimal_data_view_test: Adding correction states...
+2025-04-02 15:08:06,454 [INFO] minimal_data_view_test: Updating cell states from correction
+2025-04-02 15:08:06,454 [DEBUG] chestbuddy.core.table_state_manager: Processing correction status with 2 corrected cells
+Traceback (most recent call last):
+  File "D:\Projekte\ChestBuddy\scripts\minimal_data_view_test.py", line 272, in add_correction_states
+    self.table_state_manager.update_cell_states_from_correction(correction_status)
+  File "D:\Projekte\ChestBuddy\chestbuddy\core\table_state_manager.py", line 523, in update_cell_states_from_correction
+    for row, col in corrected_cells:
+        ^^^^^^^^
+ValueError: too many values to unpack (expected 2)
+2025-04-02 15:08:06,477 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:06,498 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:06,509 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:06,541 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:06,573 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:06,606 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:06,637 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:06,669 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:06,701 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:06,732 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:06,765 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:06,797 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:06,828 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:06,861 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:06,893 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:06,912 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:06,916 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:06,924 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:06,936 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:06,957 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:06,986 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:06,988 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:07,021 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:07,053 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:07,085 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:07,117 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:07,132 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:07,199 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:07,252 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:07,269 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:07,287 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:07,318 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:07,336 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:07,350 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:07,358 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:07,366 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:07,375 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:07,382 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:07,414 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:07,447 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:07,455 [INFO] minimal_data_view_test: === Application State ===
+Traceback (most recent call last):
+  File "D:\Projekte\ChestBuddy\scripts\minimal_data_view_test.py", line 279, in log_application_state
+    logger.info(f"Data model data shape: {self.data_model.get_data().shape}")
+                                          ^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChestDataModel' object has no attribute 'get_data'
+2025-04-02 15:08:07,478 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:07,510 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:07,543 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:07,574 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:07,606 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:07,638 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:07,670 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:07,702 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:07,735 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:07,766 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:07,798 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:07,831 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:07,847 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:08,850 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:08,866 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:08,899 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:08,926 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:08,931 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:08,962 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:08,994 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:09,026 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:09,058 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:09,075 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:10,069 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:10,079 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:10,085 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:10,094 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:10,117 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:10,146 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:10,149 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:10,181 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:10,214 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:10,245 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:10,277 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:10,309 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:10,341 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:10,374 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:10,406 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:10,437 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:10,469 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:10,501 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:10,534 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:10,566 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:10,581 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:11,298 [INFO] minimal_data_view_test: === Testing Direct Cell Highlighting ===
+2025-04-02 15:08:11,298 [DEBUG] chestbuddy.ui.data_view: _highlight_cell called for (0, 0) with color #ff0000
+2025-04-02 15:08:11,298 [DEBUG] chestbuddy.ui.data_view: Current table dimensions: 4 rows x 6 columns
+2025-04-02 15:08:11,298 [DEBUG] chestbuddy.ui.data_view: Source index: row=0, col=0, valid=True
+2025-04-02 15:08:11,298 [DEBUG] chestbuddy.ui.data_view: Found item for cell (0, 0): <PySide6.QtGui.QStandardItem object at 0x000002AE99FD3900>
+2025-04-02 15:08:11,298 [DEBUG] chestbuddy.ui.data_view: Before setting color - background role data: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.713726, 0.713726, 1.000000)
+2025-04-02 15:08:11,298 [DEBUG] chestbuddy.ui.data_view: Temporarily blocking table model signals
+2025-04-02 15:08:11,298 [DEBUG] chestbuddy.ui.data_view: Restored table model signals to: False
+2025-04-02 15:08:11,298 [DEBUG] chestbuddy.ui.data_view: After setting color - background role data: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.000000, 0.000000, 1.000000)
+2025-04-02 15:08:11,298 [DEBUG] chestbuddy.ui.data_view: Applied highlighting to cell (0, 0) with color #ff0000
+2025-04-02 15:08:11,298 [DEBUG] chestbuddy.ui.data_view: Mapped to proxy index: valid=True, row=3, col=0
+2025-04-02 15:08:11,298 [DEBUG] chestbuddy.ui.data_view: Updated view at proxy index (3, 0)
+2025-04-02 15:08:11,298 [DEBUG] chestbuddy.ui.data_view: _highlight_cell called for (1, 1) with color #00ff00
+2025-04-02 15:08:11,298 [DEBUG] chestbuddy.ui.data_view: Current table dimensions: 4 rows x 6 columns
+2025-04-02 15:08:11,298 [DEBUG] chestbuddy.ui.data_view: Source index: row=1, col=1, valid=True
+2025-04-02 15:08:11,298 [DEBUG] chestbuddy.ui.data_view: Found item for cell (1, 1): <PySide6.QtGui.QStandardItem object at 0x000002AE99FD3C80>
+2025-04-02 15:08:11,299 [DEBUG] chestbuddy.ui.data_view: Before setting color - background role data: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.713726, 0.713726, 1.000000)
+2025-04-02 15:08:11,299 [DEBUG] chestbuddy.ui.data_view: Temporarily blocking table model signals
+2025-04-02 15:08:11,299 [DEBUG] chestbuddy.ui.data_view: Restored table model signals to: False
+2025-04-02 15:08:11,299 [DEBUG] chestbuddy.ui.data_view: After setting color - background role data: PySide6.QtGui.QColor.fromRgbF(0.000000, 1.000000, 0.000000, 1.000000)
+2025-04-02 15:08:11,299 [DEBUG] chestbuddy.ui.data_view: Applied highlighting to cell (1, 1) with color #00ff00
+2025-04-02 15:08:11,299 [DEBUG] chestbuddy.ui.data_view: Mapped to proxy index: valid=True, row=2, col=1
+2025-04-02 15:08:11,299 [DEBUG] chestbuddy.ui.data_view: Updated view at proxy index (2, 1)
+2025-04-02 15:08:11,299 [DEBUG] chestbuddy.ui.data_view: _highlight_cell called for (2, 2) with color #0000ff
+2025-04-02 15:08:11,299 [DEBUG] chestbuddy.ui.data_view: Current table dimensions: 4 rows x 6 columns
+2025-04-02 15:08:11,299 [DEBUG] chestbuddy.ui.data_view: Source index: row=2, col=2, valid=True
+2025-04-02 15:08:11,299 [DEBUG] chestbuddy.ui.data_view: Found item for cell (2, 2): <PySide6.QtGui.QStandardItem object at 0x000002AE99D621C0>
+2025-04-02 15:08:11,299 [DEBUG] chestbuddy.ui.data_view: Before setting color - background role data: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.713726, 0.713726, 1.000000)
+2025-04-02 15:08:11,299 [DEBUG] chestbuddy.ui.data_view: Temporarily blocking table model signals
+2025-04-02 15:08:11,299 [DEBUG] chestbuddy.ui.data_view: Restored table model signals to: False
+2025-04-02 15:08:11,299 [DEBUG] chestbuddy.ui.data_view: After setting color - background role data: PySide6.QtGui.QColor.fromRgbF(0.000000, 0.000000, 1.000000, 1.000000)
+2025-04-02 15:08:11,299 [DEBUG] chestbuddy.ui.data_view: Applied highlighting to cell (2, 2) with color #0000ff
+2025-04-02 15:08:11,299 [DEBUG] chestbuddy.ui.data_view: Mapped to proxy index: valid=True, row=1, col=2
+2025-04-02 15:08:11,299 [DEBUG] chestbuddy.ui.data_view: Updated view at proxy index (1, 2)
+2025-04-02 15:08:11,299 [INFO] minimal_data_view_test: Direct highlighting succeeded for 3 of 3 cells
+2025-04-02 15:08:11,299 [INFO] minimal_data_view_test: Forced viewport update
+2025-04-02 15:08:11,299 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:11,300 [DEBUG] minimal_data_view_test: Paint event on QTableView
+2025-04-02 15:08:11,300 [DEBUG] minimal_data_view_test: Paint event on QWidget
+2025-04-02 15:08:12,409 [INFO] minimal_data_view_test: === Testing Model Changes ===
+Traceback (most recent call last):
+  File "D:\Projekte\ChestBuddy\scripts\minimal_data_view_test.py", line 332, in test_model_changes
+    original_data = self.data_model.get_data().copy()
+                    ^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChestDataModel' object has no attribute 'get_data'
+2025-04-02 15:08:13,106 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:13,382 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:14,538 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:14,699 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:14,791 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:14,791 [INFO] chestbuddy.ui.data_view: Refresh button clicked
+2025-04-02 15:08:14,791 [DEBUG] chestbuddy.ui.data_view: Populated column selector with 5 columns
+2025-04-02 15:08:14,791 [DEBUG] minimal_data_view_test: Paint event on DataView
+2025-04-02 15:08:14,792 [DEBUG] chestbuddy.ui.data_view: Skipping population since update or population is in progress
+2025-04-02 15:08:15,012 [DEBUG] minimal_data_view_test: Paint event on DataView
+DataView._update_view: Starting update
+DataView._update_view: Update complete

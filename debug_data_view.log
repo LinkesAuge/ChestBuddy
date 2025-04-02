@@ -1,0 +1,111 @@
+2025-04-02 15:03:39,315 [INFO] debug_data_view: === Setting up debug application ===
+2025-04-02 15:03:39,315 [INFO] debug_data_view: Creating sample data
+2025-04-02 15:03:39,316 [INFO] debug_data_view: Sample data created with shape: (4, 5)
+2025-04-02 15:03:39,316 [INFO] debug_data_view: Creating data model
+2025-04-02 15:03:39,318 [DEBUG] chestbuddy.utils.config: Loaded existing configuration from: C:\Users\schrd\AppData\Roaming\ChestBuddy\config.ini
+2025-04-02 15:03:39,318 [DEBUG] chestbuddy.utils.config: Config get: General.version = 1.1
+2025-04-02 15:03:39,319 [DEBUG] chestbuddy.core.models.chest_data_model: Updated data hash to: 1d4f9f63b040166415e97d034fc84c19
+2025-04-02 15:03:39,319 [DEBUG] chestbuddy.core.state.data_state: DataState updated: 0 rows, 6 columns
+2025-04-02 15:03:39,321 [INFO] debug_data_view: Data model created, is_empty: False
+2025-04-02 15:03:39,321 [INFO] debug_data_view: Creating TableStateManager
+2025-04-02 15:03:39,321 [DEBUG] chestbuddy.core.table_state_manager: TableStateManager initialized
+2025-04-02 15:03:39,321 [INFO] debug_data_view: TableStateManager created
+2025-04-02 15:03:39,322 [INFO] debug_data_view: Creating DataView
+2025-04-02 15:03:39,328 [INFO] chestbuddy.ui.data_view: Installed event filter on table view
+2025-04-02 15:03:39,328 [INFO] chestbuddy.ui.data_view: Registered Ctrl+C shortcut for copying
+2025-04-02 15:03:39,328 [INFO] chestbuddy.ui.data_view: Registered Ctrl+V shortcut for pasting
+2025-04-02 15:03:39,328 [DEBUG] chestbuddy.ui.data_view: Applying table styling in DataView
+2025-04-02 15:03:39,329 [DEBUG] chestbuddy.ui.data_view: Disabled alternating row colors to prevent highlighting issues
+2025-04-02 15:03:39,329 [DEBUG] chestbuddy.ui.data_view: Set default item foreground color to white
+2025-04-02 15:03:39,331 [DEBUG] chestbuddy.ui.data_view: Populated column selector with 5 columns
+2025-04-02 15:03:39,331 [DEBUG] chestbuddy.ui.data_view: Connecting import button clicked signal to _on_import_clicked handler
+2025-04-02 15:03:39,331 [DEBUG] chestbuddy.ui.data_view: Connecting export button clicked signal to _on_export_clicked handler
+2025-04-02 15:03:39,332 [DEBUG] chestbuddy.ui.data_view: Connected filter text Enter key to apply filter
+2025-04-02 15:03:39,332 [INFO] chestbuddy.ui.data_view: Connected custom context menu
+2025-04-02 15:03:39,332 [INFO] chestbuddy.ui.data_view: Connected double-click handler for direct editing
+2025-04-02 15:03:39,332 [DEBUG] chestbuddy.ui.data_view: Connected refresh button
+2025-04-02 15:03:39,335 [DEBUG] chestbuddy.ui.data_view: Added STATUS_COLUMN to columns list: ['PLAYER', 'CHEST', 'SOURCE', 'SCORE', 'CLAN', 'STATUS']
+2025-04-02 15:03:39,335 [DEBUG] chestbuddy.ui.data_view: Temporarily setting proxy model's source model to None
+2025-04-02 15:03:39,335 [DEBUG] chestbuddy.ui.data_view: Starting chunked population: 4 rows, 6 columns
+2025-04-02 15:03:39,336 [DEBUG] chestbuddy.ui.data_view: Populating chunk from 0 to 4 of 4 rows
+2025-04-02 15:03:39,338 [DEBUG] chestbuddy.ui.data_view: Chunk population complete: 4 rows processed
+2025-04-02 15:03:39,339 [DEBUG] chestbuddy.ui.data_view: Finalizing data population
+2025-04-02 15:03:39,339 [DEBUG] chestbuddy.ui.data_view: Reconnecting proxy model to source model during finalization
+2025-04-02 15:03:39,340 [DEBUG] chestbuddy.ui.data_view: Set PLAYER column (index 0) width to 200px
+2025-04-02 15:03:39,340 [DEBUG] chestbuddy.ui.data_view: Set CHEST column (index 1) width to 200px
+2025-04-02 15:03:39,340 [DEBUG] chestbuddy.ui.data_view: Set SOURCE column (index 2) width to 200px
+2025-04-02 15:03:39,340 [DEBUG] chestbuddy.ui.data_view: Set SCORE column (index 3) width to 80px
+2025-04-02 15:03:39,340 [DEBUG] chestbuddy.ui.data_view: Set CLAN column (index 4) width to 80px
+2025-04-02 15:03:39,340 [DEBUG] chestbuddy.ui.data_view: Set STATUS column (index 5) width to 60px
+2025-04-02 15:03:39,341 [DEBUG] chestbuddy.ui.data_view: Set STATUS column (index 5) width to 60px
+2025-04-02 15:03:39,341 [DEBUG] chestbuddy.ui.data_view: Status updated: Showing all 4 rows
+2025-04-02 15:03:39,341 [DEBUG] chestbuddy.ui.data_view: Data population completed successfully
+2025-04-02 15:03:39,341 [INFO] debug_data_view: DataView created with ID: 2020281658048
+2025-04-02 15:03:39,341 [INFO] debug_data_view: Creating DataViewAdapter
+2025-04-02 15:03:39,341 [DEBUG] chestbuddy.ui.views.data_view_adapter: Creating DataView instance
+2025-04-02 15:03:39,344 [INFO] chestbuddy.ui.data_view: Installed event filter on table view
+2025-04-02 15:03:39,344 [INFO] chestbuddy.ui.data_view: Registered Ctrl+C shortcut for copying
+2025-04-02 15:03:39,344 [INFO] chestbuddy.ui.data_view: Registered Ctrl+V shortcut for pasting
+2025-04-02 15:03:39,344 [DEBUG] chestbuddy.ui.data_view: Applying table styling in DataView
+2025-04-02 15:03:39,345 [DEBUG] chestbuddy.ui.data_view: Disabled alternating row colors to prevent highlighting issues
+2025-04-02 15:03:39,345 [DEBUG] chestbuddy.ui.data_view: Set default item foreground color to white
+2025-04-02 15:03:39,346 [DEBUG] chestbuddy.ui.data_view: Populated column selector with 5 columns
+2025-04-02 15:03:39,347 [DEBUG] chestbuddy.ui.data_view: Connecting import button clicked signal to _on_import_clicked handler
+2025-04-02 15:03:39,347 [DEBUG] chestbuddy.ui.data_view: Connecting export button clicked signal to _on_export_clicked handler
+2025-04-02 15:03:39,348 [DEBUG] chestbuddy.ui.data_view: Connected filter text Enter key to apply filter
+2025-04-02 15:03:39,348 [INFO] chestbuddy.ui.data_view: Connected custom context menu
+2025-04-02 15:03:39,348 [INFO] chestbuddy.ui.data_view: Connected double-click handler for direct editing
+2025-04-02 15:03:39,348 [DEBUG] chestbuddy.ui.data_view: Connected refresh button
+2025-04-02 15:03:39,349 [DEBUG] chestbuddy.ui.data_view: Added STATUS_COLUMN to columns list: ['PLAYER', 'CHEST', 'SOURCE', 'SCORE', 'CLAN', 'STATUS']
+2025-04-02 15:03:39,349 [DEBUG] chestbuddy.ui.data_view: Temporarily setting proxy model's source model to None
+2025-04-02 15:03:39,349 [DEBUG] chestbuddy.ui.data_view: Starting chunked population: 4 rows, 6 columns
+2025-04-02 15:03:39,350 [DEBUG] chestbuddy.ui.data_view: Populating chunk from 0 to 4 of 4 rows
+2025-04-02 15:03:39,350 [DEBUG] chestbuddy.ui.data_view: Chunk population complete: 4 rows processed
+2025-04-02 15:03:39,351 [DEBUG] chestbuddy.ui.data_view: Finalizing data population
+2025-04-02 15:03:39,351 [DEBUG] chestbuddy.ui.data_view: Reconnecting proxy model to source model during finalization
+2025-04-02 15:03:39,351 [DEBUG] chestbuddy.ui.data_view: Set PLAYER column (index 0) width to 200px
+2025-04-02 15:03:39,351 [DEBUG] chestbuddy.ui.data_view: Set CHEST column (index 1) width to 200px
+2025-04-02 15:03:39,351 [DEBUG] chestbuddy.ui.data_view: Set SOURCE column (index 2) width to 200px
+2025-04-02 15:03:39,352 [DEBUG] chestbuddy.ui.data_view: Set SCORE column (index 3) width to 80px
+2025-04-02 15:03:39,352 [DEBUG] chestbuddy.ui.data_view: Set CLAN column (index 4) width to 80px
+2025-04-02 15:03:39,352 [DEBUG] chestbuddy.ui.data_view: Set STATUS column (index 5) width to 60px
+2025-04-02 15:03:39,352 [DEBUG] chestbuddy.ui.data_view: Set STATUS column (index 5) width to 60px
+2025-04-02 15:03:39,352 [DEBUG] chestbuddy.ui.data_view: Status updated: Showing all 4 rows
+2025-04-02 15:03:39,352 [DEBUG] chestbuddy.ui.data_view: Data population completed successfully
+2025-04-02 15:03:39,352 [DEBUG] chestbuddy.ui.views.data_view_adapter: Created DataView instance with ID: 2020281590848
+2025-04-02 15:03:39,353 [DEBUG] chestbuddy.ui.views.data_view_adapter: Connected to validation_changed signal
+2025-04-02 15:03:39,353 [DEBUG] chestbuddy.ui.views.data_view_adapter: Connected to correction_applied signal
+2025-04-02 15:03:39,354 [DEBUG] chestbuddy.ui.views.data_view_adapter: Setting up DataView (ID: 2020281590848) in adapter
+2025-04-02 15:03:39,354 [INFO] chestbuddy.ui.data_view: DataView auto-update disabled
+2025-04-02 15:03:39,354 [DEBUG] chestbuddy.ui.views.data_view_adapter: Disabled auto-update on DataView
+2025-04-02 15:03:39,354 [DEBUG] chestbuddy.ui.views.data_view_adapter: Added DataView to adapter's layout
+2025-04-02 15:03:39,354 [DEBUG] chestbuddy.ui.views.data_view_adapter: Layout has 1 widgets
+2025-04-02 15:03:39,354 [DEBUG] chestbuddy.ui.views.data_view_adapter: Widget 0 type: DataView, ID: 2020281590848
+2025-04-02 15:03:39,355 [ERROR] chestbuddy.ui.views.data_view_adapter: Error initializing DataViewAdapter: 'DataViewAdapter' object has no attribute '_connect_view_signals'
+2025-04-02 15:03:39,356 [ERROR] chestbuddy.ui.views.data_view_adapter: Traceback (most recent call last):
+  File "D:\Projekte\ChestBuddy\chestbuddy\ui\views\data_view_adapter.py", line 96, in __init__
+    self._connect_view_signals()
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'DataViewAdapter' object has no attribute '_connect_view_signals'. Did you mean: '_connect_ui_signals'?
+
+2025-04-02 15:03:39,357 [INFO] debug_data_view: Original DataViewAdapter's DataView ID: 2020281590848
+2025-04-02 15:03:39,357 [INFO] debug_data_view: DataViewAdapter's DataView replaced with ID: 2020281658048
+2025-04-02 15:03:39,357 [INFO] debug_data_view: Setting TableStateManager on DataView
+2025-04-02 15:03:39,357 [DEBUG] chestbuddy.ui.data_view: ==== DataView.set_table_state_manager called ====
+2025-04-02 15:03:39,357 [DEBUG] chestbuddy.ui.data_view: TableStateManager reference set in DataView
+2025-04-02 15:03:39,357 [DEBUG] chestbuddy.ui.data_view: Connected to TableStateManager.state_changed signal successfully
+2025-04-02 15:03:39,358 [DEBUG] chestbuddy.ui.data_view: TableStateManager integration with DataView complete
+2025-04-02 15:03:39,358 [DEBUG] chestbuddy.ui.data_view: Current cell states: 0 invalid, 0 correctable, 0 corrected
+2025-04-02 15:03:39,358 [INFO] debug_data_view: TableStateManager set on DataView
+2025-04-02 15:03:39,358 [INFO] debug_data_view: Setting TableStateManager on DataViewAdapter
+2025-04-02 15:03:39,358 [DEBUG] chestbuddy.ui.data_view: ==== DataView.set_table_state_manager called ====
+2025-04-02 15:03:39,358 [DEBUG] chestbuddy.ui.data_view: TableStateManager reference set in DataView
+2025-04-02 15:03:39,358 [DEBUG] chestbuddy.ui.data_view: Connected to TableStateManager.state_changed signal successfully
+2025-04-02 15:03:39,358 [DEBUG] chestbuddy.ui.data_view: TableStateManager integration with DataView complete
+2025-04-02 15:03:39,359 [DEBUG] chestbuddy.ui.data_view: Current cell states: 0 invalid, 0 correctable, 0 corrected
+2025-04-02 15:03:39,359 [INFO] chestbuddy.ui.views.data_view_adapter: TableStateManager passed to wrapped DataView
+2025-04-02 15:03:39,359 [INFO] chestbuddy.ui.views.data_view_adapter: Connected to TableStateManager's state_changed signal
+2025-04-02 15:03:39,359 [INFO] debug_data_view: TableStateManager set on DataViewAdapter
+2025-04-02 15:03:39,359 [INFO] debug_data_view: Creating DataViewController
+2025-04-02 15:03:39,359 [DEBUG] chestbuddy.core.controllers.base_controller: Initialized DataViewController with SignalManager
+2025-04-02 15:03:39,359 [DEBUG] chestbuddy.core.controllers.base_controller: DataViewController connected to model: ChestDataModel

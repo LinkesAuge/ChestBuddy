@@ -28,6 +28,8 @@ ChestBuddy is currently undergoing a major architectural update, transitioning f
 - Validation visualization system now correctly displays all validation statuses
 - Proper integration between validation service and data view
 - Enhanced validation status delegate to prioritize and color-code statuses
+- Fixed DataView Cell Highlighting Issue
+- Fixed DataViewAdapter Connection Issue
 
 ## Currently Being Worked On
 - UI architecture update from tab-based to view-based
@@ -279,3 +281,21 @@ ChestBuddy is currently undergoing a major architectural update, transitioning f
 - 🔄 Batch processing with progress dialog
 - ⏳ Recursive correction implementation
 - ⏳ Selection-based correction
+
+## Recent Milestones
+
+### Week of April 1, 2025
+
+1. **Fixed DataView Cell Highlighting Issue**: 
+   - Problem: Cell highlighting in the DataView wasn't persisting due to unwanted signal chain reactions
+   - Solution: Modified `_highlight_cell` method to temporarily block signals when setting background colors
+   - Impact: Validation and correction highlighting now displays properly, improving data quality visualization
+
+2. **Fixed DataViewAdapter Connection Issue**:
+   - Problem: DataViewAdapter failed to initialize properly due to a method name mismatch
+   - Solution: Updated the code to call the correct `_connect_signals()` method
+   - Impact: DataView now displays correctly in the application, enabling users to see and interact with their data
+
+### Week of March 24, 2025
+
+// ... existing code ...

@@ -93,7 +93,7 @@ class DataViewAdapter(UpdatableView):
 
             # Set up the adapter
             self._setup_adapted_view()
-            self._connect_view_signals()
+            self._connect_signals()
 
             # Get update manager if available
             self._try_get_update_manager()
@@ -123,6 +123,18 @@ class DataViewAdapter(UpdatableView):
             # Re-enable update handling if it was previously enabled
             if was_enabled and hasattr(self, "enable_auto_update"):
                 self.enable_auto_update()
+
+            # As a last resort, if the content widget doesn't contain the DataView,
+            # directly make it the central widget
+            if hasattr(self, "centralWidget") and self._data_view.parent() is None:
+                logger.info("FALLBACK: Setting DataView as central widget of adapter")
+                layout = QVBoxLayout()
+                layout.setContentsMargins(0, 0, 0, 0)
+                layout.addWidget(self._data_view)
+
+                central_widget = QWidget()
+                central_widget.setLayout(layout)
+                self.setCentralWidget(central_widget)
 
             logger.info("DataViewAdapter initialized successfully")
         except Exception as e:
@@ -301,48 +313,74 @@ class DataViewAdapter(UpdatableView):
 
     def _setup_adapted_view(self) -> None:
         """Set up the adapted view in the content area."""
-        # Get the content widget
-        content_widget = self.get_content_widget()
-        if not content_widget:
-            logger.error("Cannot set up adapted view: content widget is not available")
-            return
+        try:
+            # Get the content widget
+            content_widget = self.get_content_widget()
+            if not content_widget:
+                logger.error("Cannot set up adapted view: content widget is not available")
+                return
 
-        # Set content layout
-        layout = QVBoxLayout(content_widget)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
+            # Clear any existing layout to prevent the "widget already has a layout" error
+            if content_widget.layout():
+                logger.debug("Removing existing layout from content widget")
+                existing_layout = content_widget.layout()
+                # Remove all widgets from the existing layout
+                while existing_layout and existing_layout.count():
+                    item = existing_layout.takeAt(0)
+                    if item.widget():
+                        item.widget().setParent(None)
+                # Safely delete the old layout
+                QWidget().setLayout(existing_layout)
 
-        # Check if the DataView exists and is valid
-        if not hasattr(self, "_data_view") or self._data_view is None:
-            logger.error("Cannot set up adapted view: DataView is not available")
-            error_label = QLabel("Error: Data view not available")
-            error_label.setStyleSheet("color: red; padding: 20px;")
-            layout.addWidget(error_label)
-            return
+            # Create a new layout
+            layout = QVBoxLayout(content_widget)
+            layout.setContentsMargins(0, 0, 0, 0)
+            layout.setSpacing(0)
 
-        logger.debug(f"Setting up DataView (ID: {self._data_view_id}) in adapter")
+            # Check if the DataView exists and is valid
+            if not hasattr(self, "_data_view") or self._data_view is None:
+                logger.error("Cannot set up adapted view: DataView is not available")
+                error_label = QLabel("Error: Data view not available")
+                error_label.setStyleSheet("color: red; padding: 20px;")
+                layout.addWidget(error_label)
+                return
 
-        # Disable the data view's auto-update to prevent double updates
-        if hasattr(self._data_view, "disable_auto_update"):
-            self._data_view.disable_auto_update()
-            logger.debug("Disabled auto-update on DataView")
+            logger.debug(f"Setting up DataView (ID: {self._data_view_id}) in adapter")
 
-        # Add the data view to the layout
-        layout.addWidget(self._data_view)
-        logger.debug("Added DataView to adapter's layout")
+            # Ensure DataView is visible and has correct parent
+            self._data_view.setVisible(True)
+            self._data_view.setParent(content_widget)
 
-        # Verify layout setup
-        if layout.count() == 0:
-            logger.warning("DataView was not added to layout - layout is empty")
-        else:
-            logger.debug(f"Layout has {layout.count()} widgets")
-            for i in range(layout.count()):
-                widget = layout.itemAt(i).widget()
-                logger.debug(f"Widget {i} type: {type(widget).__name__}, ID: {id(widget)}")
+            # Disable the data view's auto-update to prevent double updates
+            if hasattr(self._data_view, "disable_auto_update"):
+                self._data_view.disable_auto_update()
+                logger.info("DataView auto-update disabled")
 
-        # Set title
-        self.set_title("Data View")
-        self.setObjectName("DataViewAdapter")
+            # Add the data view to the layout with stretch
+            layout.addWidget(self._data_view, 1)  # Add with stretch to fill the available space
+            logger.debug("Added DataView to adapter's layout with stretch")
+
+            # Force layout update
+            content_widget.setLayout(layout)
+            content_widget.updateGeometry()
+
+            # Verify layout setup
+            if layout.count() == 0:
+                logger.warning("DataView was not added to layout - layout is empty")
+            else:
+                logger.debug(f"Layout has {layout.count()} widgets")
+                for i in range(layout.count()):
+                    widget = layout.itemAt(i).widget()
+                    logger.debug(f"Widget {i} type: {type(widget).__name__}, ID: {id(widget)}")
+
+            # Set title
+            self.set_title("Data View")
+            self.setObjectName("DataViewAdapter")
+        except Exception as e:
+            logger.error(f"Error setting up adapted view: {e}")
+            import traceback
+
+            logger.error(traceback.format_exc())
 
     def _connect_signals(self):
         """Connect signals and slots using standardized pattern."""
@@ -567,31 +605,29 @@ class DataViewAdapter(UpdatableView):
         Args:
             data_state: The DataState object containing information about the change
         """
-        logger.debug("DataViewAdapter: Data model changed, requesting update")
-
-        # Mark as needing population
-        self._needs_population = True
-
-        # Try to update directly if update manager isn't available
         try:
-            # Use the standardized update mechanism
-            self.request_update()
+            logger.debug("DataViewAdapter: Data model changed, requesting update")
 
-            # As a fallback, try to populate directly if update_manager isn't working
-            if data_state and hasattr(data_state, "row_count") and data_state.row_count > 0:
-                logger.debug("DataViewAdapter: Direct population fallback")
-                self.populate_table()
-            elif not self._data_model.is_empty and hasattr(self._data_view, "populate_table"):
-                logger.debug("DataViewAdapter: Direct population fallback")
-                self.populate_table()
-        except Exception as e:
-            logger.error(f"Error handling data changed: {e}")
-            # Still try direct population as last resort
-            if not self._data_model.is_empty and hasattr(self._data_view, "populate_table"):
-                try:
+            # Mark as needing population
+            self._needs_population = True
+
+            # Don't try to access has_data on data_state since it might not exist
+            # Always force population if the data model has data
+            if self._data_model and not self._data_model.is_empty:
+                logger.debug("DataViewAdapter: Data model has data, forcing population")
+                # Direct population as most reliable method
+                if hasattr(self._data_view, "populate_table"):
+                    logger.debug("DataViewAdapter: Directly calling populate_table on DataView")
                     self._data_view.populate_table()
-                except Exception as inner_e:
-                    logger.error(f"Error in last resort population: {inner_e}")
+                    self._needs_population = False
+
+            # Use the standardized update mechanism as backup
+            self.request_update()
+        except Exception as e:
+            logger.error(f"Error handling data changed in DataViewAdapter: {e}")
+            import traceback
+
+            logger.error(traceback.format_exc())
 
     def _update_data_state(self):
         """Update our tracking of the data state to detect changes."""
@@ -665,36 +701,32 @@ class DataViewAdapter(UpdatableView):
         This is used for initial population and when data changes completely.
         """
         try:
-            # Check if population is already in progress in the underlying DataView
-            if (
-                hasattr(self._data_view, "_population_in_progress")
-                and self._data_view._population_in_progress
-            ):
-                logger.debug(
-                    "DataViewAdapter: Skipping population (already in progress in DataView)"
-                )
-                # Still mark as not needing population since we detected it's already happening
-                self._needs_population = False
-                return
+            logger.info("DataViewAdapter.populate_table: Directly populating DataView")
 
-            # First try using the controller
-            if self._controller and not self._data_model.is_empty:
-                logger.debug("DataViewAdapter: Populating table via controller")
-                self._controller.populate_table()
-            # If controller didn't work or isn't available, call directly on the DataView
-            elif hasattr(self._data_view, "populate_table") and not self._data_model.is_empty:
-                logger.debug("DataViewAdapter: Directly calling populate_table on DataView")
+            # Skip checks and directly call populate_table on DataView
+            if hasattr(self._data_view, "populate_table"):
+                logger.info(f"Calling populate_table on DataView ID: {id(self._data_view)}")
                 self._data_view.populate_table()
-            else:
-                logger.debug("DataViewAdapter: Skipping population (no controller or empty data)")
+                logger.info("DataView.populate_table called successfully")
 
-            # Update our state tracking
-            self._update_data_state()
-            self._needs_population = False
+                # Force the DataView to be visible
+                self._data_view.setVisible(True)
+
+                # If there's a parent QWidget, make sure it's also visible
+                if self._data_view.parent():
+                    self._data_view.parent().setVisible(True)
+
+                # Update our state tracking
+                self._update_data_state()
+                self._needs_population = False
+                logger.info("Table population completed successfully")
+            else:
+                logger.error("DataView doesn't have populate_table method")
         except Exception as e:
-            logger.error(f"Error populating table: {e}")
-            # Reset the needs_population flag even on error to avoid getting stuck
-            self._needs_population = False
+            logger.error(f"Error in DataViewAdapter.populate_table: {e}")
+            import traceback
+
+            logger.error(traceback.format_exc())
 
     def enable_auto_update(self) -> None:
         """Enable automatic updates when data changes."""
@@ -771,3 +803,12 @@ class DataViewAdapter(UpdatableView):
         # Request update from the UpdateManager
         self.request_update()
         logger.debug("Handled correction applied signal")
+
+    def _try_get_update_manager(self):
+        """Try to get the update manager from utils, if available."""
+        try:
+            self._update_manager = get_update_manager()
+            logger.debug("Successfully retrieved update manager")
+        except Exception as e:
+            logger.debug(f"Could not get update manager: {e}")
+            self._update_manager = None

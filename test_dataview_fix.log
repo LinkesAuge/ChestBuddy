@@ -1,0 +1,497 @@
+2025-04-02 15:16:41,639 [INFO] test_dataview_fix: Setting up test components
+2025-04-02 15:16:41,640 [INFO] test_dataview_fix: Created sample data with shape: (4, 6)
+2025-04-02 15:16:41,643 [DEBUG] chestbuddy.utils.config: Loaded existing configuration from: C:\Users\schrd\AppData\Roaming\ChestBuddy\config.ini
+2025-04-02 15:16:41,643 [DEBUG] chestbuddy.utils.config: Config get: General.version = 1.1
+2025-04-02 15:16:41,644 [DEBUG] chestbuddy.core.models.chest_data_model: Updated data hash to: 1d4f9f63b040166415e97d034fc84c19
+2025-04-02 15:16:41,644 [DEBUG] chestbuddy.core.state.data_state: DataState updated: 0 rows, 6 columns
+2025-04-02 15:16:41,647 [DEBUG] chestbuddy.core.models.chest_data_model: Updated data hash to: abb57376d30beef57e04794e1b6cf097
+2025-04-02 15:16:41,647 [DEBUG] chestbuddy.core.table_state_manager: TableStateManager initialized
+2025-04-02 15:16:41,653 [INFO] chestbuddy.ui.data_view: Installed event filter on table view
+2025-04-02 15:16:41,653 [INFO] chestbuddy.ui.data_view: Registered Ctrl+C shortcut for copying
+2025-04-02 15:16:41,653 [INFO] chestbuddy.ui.data_view: Registered Ctrl+V shortcut for pasting
+2025-04-02 15:16:41,653 [DEBUG] chestbuddy.ui.data_view: Applying table styling in DataView
+2025-04-02 15:16:41,654 [DEBUG] chestbuddy.ui.data_view: Disabled alternating row colors to prevent highlighting issues
+2025-04-02 15:16:41,654 [DEBUG] chestbuddy.ui.data_view: Set default item foreground color to white
+2025-04-02 15:16:41,656 [DEBUG] chestbuddy.ui.data_view: Populated column selector with 6 columns
+2025-04-02 15:16:41,657 [DEBUG] chestbuddy.ui.data_view: Connecting import button clicked signal to _on_import_clicked handler
+2025-04-02 15:16:41,657 [DEBUG] chestbuddy.ui.data_view: Connecting export button clicked signal to _on_export_clicked handler
+2025-04-02 15:16:41,657 [DEBUG] chestbuddy.ui.data_view: Connected filter text Enter key to apply filter
+2025-04-02 15:16:41,657 [INFO] chestbuddy.ui.data_view: Connected custom context menu
+2025-04-02 15:16:41,657 [INFO] chestbuddy.ui.data_view: Connected double-click handler for direct editing
+2025-04-02 15:16:41,658 [DEBUG] chestbuddy.ui.data_view: Connected refresh button
+2025-04-02 15:16:41,681 [DEBUG] chestbuddy.ui.data_view: Added STATUS_COLUMN to columns list: ['PLAYER', 'CHEST', 'SOURCE', 'SCORE', 'CLAN', 'DATE', 'STATUS']
+2025-04-02 15:16:41,682 [DEBUG] chestbuddy.ui.data_view: Temporarily setting proxy model's source model to None
+2025-04-02 15:16:41,682 [DEBUG] chestbuddy.ui.data_view: Starting chunked population: 4 rows, 7 columns
+2025-04-02 15:16:41,683 [DEBUG] chestbuddy.ui.data_view: Populating chunk from 0 to 4 of 4 rows
+2025-04-02 15:16:41,686 [DEBUG] chestbuddy.ui.data_view: Chunk population complete: 4 rows processed
+2025-04-02 15:16:41,686 [DEBUG] chestbuddy.ui.data_view: Finalizing data population
+2025-04-02 15:16:41,686 [DEBUG] chestbuddy.ui.data_view: Reconnecting proxy model to source model during finalization
+2025-04-02 15:16:41,687 [DEBUG] chestbuddy.ui.data_view: Set PLAYER column (index 0) width to 200px
+2025-04-02 15:16:41,687 [DEBUG] chestbuddy.ui.data_view: Set CHEST column (index 1) width to 200px
+2025-04-02 15:16:41,687 [DEBUG] chestbuddy.ui.data_view: Set SOURCE column (index 2) width to 200px
+2025-04-02 15:16:41,687 [DEBUG] chestbuddy.ui.data_view: Set SCORE column (index 3) width to 80px
+2025-04-02 15:16:41,687 [DEBUG] chestbuddy.ui.data_view: Set CLAN column (index 4) width to 80px
+2025-04-02 15:16:41,687 [DEBUG] chestbuddy.ui.data_view: Set STATUS column (index 6) width to 60px
+2025-04-02 15:16:41,688 [DEBUG] chestbuddy.ui.data_view: Set STATUS column (index 6) width to 60px
+2025-04-02 15:16:41,688 [DEBUG] chestbuddy.ui.data_view: Status updated: Showing all 4 rows
+2025-04-02 15:16:41,688 [DEBUG] chestbuddy.ui.data_view: Data population completed successfully
+2025-04-02 15:16:41,688 [DEBUG] chestbuddy.ui.data_view: ==== DataView.set_table_state_manager called ====
+2025-04-02 15:16:41,689 [DEBUG] chestbuddy.ui.data_view: TableStateManager reference set in DataView
+2025-04-02 15:16:41,689 [DEBUG] chestbuddy.ui.data_view: Connected to TableStateManager.state_changed signal successfully
+2025-04-02 15:16:41,689 [DEBUG] chestbuddy.ui.data_view: TableStateManager integration with DataView complete
+2025-04-02 15:16:41,689 [DEBUG] chestbuddy.ui.data_view: Current cell states: 0 invalid, 0 correctable, 0 corrected
+2025-04-02 15:16:41,689 [INFO] test_dataview_fix: Components initialized successfully
+2025-04-02 15:16:42,191 [INFO] test_dataview_fix: Populating DataView with sample data
+2025-04-02 15:16:42,191 [DEBUG] chestbuddy.ui.data_view: Added STATUS_COLUMN to columns list: ['PLAYER', 'CHEST', 'SOURCE', 'SCORE', 'CLAN', 'DATE', 'STATUS']
+2025-04-02 15:16:42,191 [DEBUG] chestbuddy.ui.data_view: Temporarily setting proxy model's source model to None
+2025-04-02 15:16:42,192 [DEBUG] chestbuddy.ui.data_view: Starting chunked population: 4 rows, 7 columns
+2025-04-02 15:16:42,193 [DEBUG] chestbuddy.ui.data_view: Populating chunk from 0 to 4 of 4 rows
+2025-04-02 15:16:42,194 [DEBUG] chestbuddy.ui.data_view: Chunk population complete: 4 rows processed
+2025-04-02 15:16:42,194 [DEBUG] chestbuddy.ui.data_view: Finalizing data population
+2025-04-02 15:16:42,194 [DEBUG] chestbuddy.ui.data_view: Reconnecting proxy model to source model during finalization
+2025-04-02 15:16:42,195 [DEBUG] chestbuddy.ui.data_view: Set PLAYER column (index 0) width to 200px
+2025-04-02 15:16:42,195 [DEBUG] chestbuddy.ui.data_view: Set CHEST column (index 1) width to 200px
+2025-04-02 15:16:42,195 [DEBUG] chestbuddy.ui.data_view: Set SOURCE column (index 2) width to 200px
+2025-04-02 15:16:42,195 [DEBUG] chestbuddy.ui.data_view: Set SCORE column (index 3) width to 80px
+2025-04-02 15:16:42,195 [DEBUG] chestbuddy.ui.data_view: Set CLAN column (index 4) width to 80px
+2025-04-02 15:16:42,195 [DEBUG] chestbuddy.ui.data_view: Set STATUS column (index 6) width to 60px
+2025-04-02 15:16:42,196 [DEBUG] chestbuddy.ui.data_view: Set STATUS column (index 6) width to 60px
+2025-04-02 15:16:42,196 [DEBUG] chestbuddy.ui.data_view: Status updated: Showing all 4 rows
+2025-04-02 15:16:42,196 [DEBUG] chestbuddy.ui.data_view: Data population completed successfully
+2025-04-02 15:16:42,200 [INFO] test_dataview_fix: DataView populated successfully
+2025-04-02 15:16:43,189 [INFO] test_dataview_fix: Applying validation highlighting
+2025-04-02 15:16:43,189 [DEBUG] chestbuddy.core.table_state_manager: ==== TableStateManager.update_cell_states_from_validation called ====
+2025-04-02 15:16:43,189 [DEBUG] chestbuddy.core.table_state_manager: Validation status DataFrame shape: (3, 3)
+2025-04-02 15:16:43,190 [DEBUG] chestbuddy.core.table_state_manager: Validation status columns: ['ROW_IDX', 'COL_IDX', 'STATUS']
+2025-04-02 15:16:43,194 [DEBUG] chestbuddy.core.table_state_manager: Sample validation data (first 3 rows):
+   ROW_IDX  COL_IDX   STATUS
+0        0        0  invalid
+1        1        1  invalid
+2        2        2  invalid
+2025-04-02 15:16:43,194 [DEBUG] chestbuddy.core.table_state_manager: Reset 0 existing validation states
+2025-04-02 15:16:43,194 [DEBUG] chestbuddy.core.table_state_manager: Using standard validation status format with ROW_IDX, COL_IDX, STATUS
+2025-04-02 15:16:43,194 [DEBUG] chestbuddy.core.table_state_manager: Cell (0, 0) state set to INVALID
+2025-04-02 15:16:43,195 [DEBUG] chestbuddy.core.table_state_manager: Set cell (0, 0) to INVALID state
+2025-04-02 15:16:43,195 [DEBUG] chestbuddy.core.table_state_manager: Cell (1, 1) state set to INVALID
+2025-04-02 15:16:43,195 [DEBUG] chestbuddy.core.table_state_manager: Set cell (1, 1) to INVALID state
+2025-04-02 15:16:43,195 [DEBUG] chestbuddy.core.table_state_manager: Cell (2, 2) state set to INVALID
+2025-04-02 15:16:43,195 [DEBUG] chestbuddy.core.table_state_manager: Set cell (2, 2) to INVALID state
+2025-04-02 15:16:43,195 [DEBUG] chestbuddy.core.table_state_manager: Updated 3 cells using standard format
+2025-04-02 15:16:43,195 [DEBUG] chestbuddy.core.table_state_manager: Emitting state_changed signal after updating validation states
+2025-04-02 15:16:43,195 [DEBUG] chestbuddy.ui.data_view: ==== DataView.update_cell_highlighting_from_state called ====
+2025-04-02 15:16:43,196 [DEBUG] chestbuddy.ui.data_view: Updating cell highlighting from table state manager
+2025-04-02 15:16:43,196 [DEBUG] chestbuddy.ui.data_view: Found cells to highlight: 3 invalid, 0 correctable, 0 corrected, 0 processing
+2025-04-02 15:16:43,196 [DEBUG] chestbuddy.ui.data_view: Sample invalid cells (first 3): [(0, 0), (1, 1), (2, 2)]
+2025-04-02 15:16:43,196 [DEBUG] chestbuddy.ui.data_view: Highlighting invalid cell at (0, 0)
+2025-04-02 15:16:43,196 [DEBUG] chestbuddy.ui.data_view: _highlight_cell called for (0, 0) with color #ffb6b6
+2025-04-02 15:16:43,196 [DEBUG] chestbuddy.ui.data_view: Current table dimensions: 4 rows x 7 columns
+
+2025-04-02 15:16:43,196 [DEBUG] chestbuddy.ui.data_view: Source index: row=0, col=0, valid=True
+2025-04-02 15:16:43,196 [DEBUG] chestbuddy.ui.data_view: Found item for cell (0, 0): <PySide6.QtGui.QStandardItem object at 0x000001CC84E7F5C0>
+2025-04-02 15:16:43,197 [DEBUG] chestbuddy.ui.data_view: Before setting color - background role data: None
+2025-04-02 15:16:43,197 [DEBUG] chestbuddy.ui.data_view: Temporarily blocking table model signals
+2025-04-02 15:16:43,197 [DEBUG] chestbuddy.ui.data_view: Restored table model signals to: False
+2025-04-02 15:16:43,197 [DEBUG] chestbuddy.ui.data_view: After setting color - background role data: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.713726, 0.713726, 1.000000)
+2025-04-02 15:16:43,197 [DEBUG] chestbuddy.ui.data_view: Mapped to proxy index: valid=True, row=3, col=0
+2025-04-02 15:16:43,197 [DEBUG] chestbuddy.ui.data_view: Updated view at proxy index (3, 0)
+2025-04-02 15:16:43,197 [DEBUG] chestbuddy.ui.data_view: Applied highlighting to cell (0, 0) with color #ffb6b6
+2025-04-02 15:16:43,198 [DEBUG] chestbuddy.ui.data_view: Highlighting invalid cell at (1, 1)
+2025-04-02 15:16:43,198 [DEBUG] chestbuddy.ui.data_view: _highlight_cell called for (1, 1) with color #ffb6b6
+2025-04-02 15:16:43,198 [DEBUG] chestbuddy.ui.data_view: Current table dimensions: 4 rows x 7 columns
+
+2025-04-02 15:16:43,198 [DEBUG] chestbuddy.ui.data_view: Source index: row=1, col=1, valid=True
+2025-04-02 15:16:43,199 [DEBUG] chestbuddy.ui.data_view: Found item for cell (1, 1): <PySide6.QtGui.QStandardItem object at 0x000001CC8B0E51C0>
+2025-04-02 15:16:43,199 [DEBUG] chestbuddy.ui.data_view: Before setting color - background role data: None
+2025-04-02 15:16:43,199 [DEBUG] chestbuddy.ui.data_view: Temporarily blocking table model signals
+2025-04-02 15:16:43,199 [DEBUG] chestbuddy.ui.data_view: Restored table model signals to: False
+2025-04-02 15:16:43,199 [DEBUG] chestbuddy.ui.data_view: After setting color - background role data: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.713726, 0.713726, 1.000000)
+2025-04-02 15:16:43,199 [DEBUG] chestbuddy.ui.data_view: Mapped to proxy index: valid=True, row=2, col=1
+2025-04-02 15:16:43,199 [DEBUG] chestbuddy.ui.data_view: Updated view at proxy index (2, 1)
+2025-04-02 15:16:43,199 [DEBUG] chestbuddy.ui.data_view: Applied highlighting to cell (1, 1) with color #ffb6b6
+2025-04-02 15:16:43,200 [DEBUG] chestbuddy.ui.data_view: Highlighting invalid cell at (2, 2)
+2025-04-02 15:16:43,200 [DEBUG] chestbuddy.ui.data_view: _highlight_cell called for (2, 2) with color #ffb6b6
+2025-04-02 15:16:43,200 [DEBUG] chestbuddy.ui.data_view: Current table dimensions: 4 rows x 7 columns
+
+2025-04-02 15:16:43,200 [DEBUG] chestbuddy.ui.data_view: Source index: row=2, col=2, valid=True
+2025-04-02 15:16:43,200 [DEBUG] chestbuddy.ui.data_view: Found item for cell (2, 2): <PySide6.QtGui.QStandardItem object at 0x000001CC8B0E4E00>
+2025-04-02 15:16:43,200 [DEBUG] chestbuddy.ui.data_view: Before setting color - background role data: None
+2025-04-02 15:16:43,200 [DEBUG] chestbuddy.ui.data_view: Temporarily blocking table model signals
+2025-04-02 15:16:43,200 [DEBUG] chestbuddy.ui.data_view: Restored table model signals to: False
+2025-04-02 15:16:43,200 [DEBUG] chestbuddy.ui.data_view: After setting color - background role data: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.713726, 0.713726, 1.000000)
+2025-04-02 15:16:43,201 [DEBUG] chestbuddy.ui.data_view: Mapped to proxy index: valid=True, row=1, col=2
+2025-04-02 15:16:43,201 [DEBUG] chestbuddy.ui.data_view: Updated view at proxy index (1, 2)
+2025-04-02 15:16:43,201 [DEBUG] chestbuddy.ui.data_view: Applied highlighting to cell (2, 2) with color #ffb6b6
+2025-04-02 15:16:43,201 [DEBUG] chestbuddy.ui.data_view: Successfully highlighted 3 cells out of 3 total
+2025-04-02 15:16:43,201 [DEBUG] chestbuddy.ui.data_view: Forcing table view update after highlighting
+2025-04-02 15:16:43,201 [DEBUG] chestbuddy.ui.data_view: Cell highlighting update complete
+2025-04-02 15:16:43,201 [DEBUG] chestbuddy.core.table_state_manager: After updating: 3 cells marked as INVALID, 0 cells marked as CORRECTABLE
+2025-04-02 15:16:43,201 [DEBUG] chestbuddy.ui.data_view: ==== DataView.update_cell_highlighting_from_state called ====
+2025-04-02 15:16:43,202 [DEBUG] chestbuddy.ui.data_view: Updating cell highlighting from table state manager
+2025-04-02 15:16:43,202 [DEBUG] chestbuddy.ui.data_view: Found cells to highlight: 3 invalid, 0 correctable, 0 corrected, 0 processing
+2025-04-02 15:16:43,202 [DEBUG] chestbuddy.ui.data_view: Sample invalid cells (first 3): [(0, 0), (1, 1), (2, 2)]
+2025-04-02 15:16:43,202 [DEBUG] chestbuddy.ui.data_view: Highlighting invalid cell at (0, 0)
+2025-04-02 15:16:43,202 [DEBUG] chestbuddy.ui.data_view: _highlight_cell called for (0, 0) with color #ffb6b6
+2025-04-02 15:16:43,202 [DEBUG] chestbuddy.ui.data_view: Current table dimensions: 4 rows x 7 columns
+
+2025-04-02 15:16:43,202 [DEBUG] chestbuddy.ui.data_view: Source index: row=0, col=0, valid=True
+2025-04-02 15:16:43,202 [DEBUG] chestbuddy.ui.data_view: Found item for cell (0, 0): <PySide6.QtGui.QStandardItem object at 0x000001CC84E7F5C0>
+2025-04-02 15:16:43,202 [DEBUG] chestbuddy.ui.data_view: Before setting color - background role data: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.713726, 0.713726, 1.000000)
+2025-04-02 15:16:43,203 [DEBUG] chestbuddy.ui.data_view: Temporarily blocking table model signals
+2025-04-02 15:16:43,203 [DEBUG] chestbuddy.ui.data_view: Restored table model signals to: False
+2025-04-02 15:16:43,203 [DEBUG] chestbuddy.ui.data_view: After setting color - background role data: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.713726, 0.713726, 1.000000)
+2025-04-02 15:16:43,203 [DEBUG] chestbuddy.ui.data_view: Mapped to proxy index: valid=True, row=3, col=0
+2025-04-02 15:16:43,203 [DEBUG] chestbuddy.ui.data_view: Updated view at proxy index (3, 0)
+2025-04-02 15:16:43,203 [DEBUG] chestbuddy.ui.data_view: Applied highlighting to cell (0, 0) with color #ffb6b6
+2025-04-02 15:16:43,203 [DEBUG] chestbuddy.ui.data_view: Highlighting invalid cell at (1, 1)
+2025-04-02 15:16:43,203 [DEBUG] chestbuddy.ui.data_view: _highlight_cell called for (1, 1) with color #ffb6b6
+2025-04-02 15:16:43,203 [DEBUG] chestbuddy.ui.data_view: Current table dimensions: 4 rows x 7 columns
+
+2025-04-02 15:16:43,203 [DEBUG] chestbuddy.ui.data_view: Source index: row=1, col=1, valid=True
+2025-04-02 15:16:43,204 [DEBUG] chestbuddy.ui.data_view: Found item for cell (1, 1): <PySide6.QtGui.QStandardItem object at 0x000001CC8B0E51C0>
+2025-04-02 15:16:43,204 [DEBUG] chestbuddy.ui.data_view: Before setting color - background role data: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.713726, 0.713726, 1.000000)
+2025-04-02 15:16:43,204 [DEBUG] chestbuddy.ui.data_view: Temporarily blocking table model signals
+2025-04-02 15:16:43,204 [DEBUG] chestbuddy.ui.data_view: Restored table model signals to: False
+2025-04-02 15:16:43,204 [DEBUG] chestbuddy.ui.data_view: After setting color - background role data: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.713726, 0.713726, 1.000000)
+2025-04-02 15:16:43,204 [DEBUG] chestbuddy.ui.data_view: Mapped to proxy index: valid=True, row=2, col=1
+2025-04-02 15:16:43,204 [DEBUG] chestbuddy.ui.data_view: Updated view at proxy index (2, 1)
+2025-04-02 15:16:43,204 [DEBUG] chestbuddy.ui.data_view: Applied highlighting to cell (1, 1) with color #ffb6b6
+2025-04-02 15:16:43,204 [DEBUG] chestbuddy.ui.data_view: Highlighting invalid cell at (2, 2)
+2025-04-02 15:16:43,205 [DEBUG] chestbuddy.ui.data_view: _highlight_cell called for (2, 2) with color #ffb6b6
+2025-04-02 15:16:43,205 [DEBUG] chestbuddy.ui.data_view: Current table dimensions: 4 rows x 7 columns
+
+2025-04-02 15:16:43,205 [DEBUG] chestbuddy.ui.data_view: Source index: row=2, col=2, valid=True
+2025-04-02 15:16:43,205 [DEBUG] chestbuddy.ui.data_view: Found item for cell (2, 2): <PySide6.QtGui.QStandardItem object at 0x000001CC8B0E4E00>
+2025-04-02 15:16:43,205 [DEBUG] chestbuddy.ui.data_view: Before setting color - background role data: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.713726, 0.713726, 1.000000)
+2025-04-02 15:16:43,205 [DEBUG] chestbuddy.ui.data_view: Temporarily blocking table model signals
+2025-04-02 15:16:43,205 [DEBUG] chestbuddy.ui.data_view: Restored table model signals to: False
+2025-04-02 15:16:43,205 [DEBUG] chestbuddy.ui.data_view: After setting color - background role data: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.713726, 0.713726, 1.000000)
+2025-04-02 15:16:43,206 [DEBUG] chestbuddy.ui.data_view: Mapped to proxy index: valid=True, row=1, col=2
+2025-04-02 15:16:43,206 [DEBUG] chestbuddy.ui.data_view: Updated view at proxy index (1, 2)
+2025-04-02 15:16:43,206 [DEBUG] chestbuddy.ui.data_view: Applied highlighting to cell (2, 2) with color #ffb6b6
+2025-04-02 15:16:43,206 [DEBUG] chestbuddy.ui.data_view: Successfully highlighted 3 cells out of 3 total
+2025-04-02 15:16:43,206 [DEBUG] chestbuddy.ui.data_view: Forcing table view update after highlighting
+2025-04-02 15:16:43,206 [DEBUG] chestbuddy.ui.data_view: Cell highlighting update complete
+2025-04-02 15:16:43,206 [INFO] test_dataview_fix: Applied validation highlighting to 3 cells
+2025-04-02 15:16:44,201 [INFO] test_dataview_fix: Checking if highlights persist
+2025-04-02 15:16:44,201 [INFO] test_dataview_fix: Cell (0, 0) has background color: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.713726, 0.713726, 1.000000)
+2025-04-02 15:16:44,201 [INFO] test_dataview_fix: Cell (1, 1) has background color: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.713726, 0.713726, 1.000000)
+2025-04-02 15:16:44,201 [INFO] test_dataview_fix: Cell (2, 2) has background color: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.713726, 0.713726, 1.000000)
+2025-04-02 15:16:44,202 [WARNING] test_dataview_fix: Cell (0, 1) has NO background color!
+2025-04-02 15:16:44,202 [WARNING] test_dataview_fix: Cell (1, 2) has NO background color!
+2025-04-02 15:16:44,202 [INFO] test_dataview_fix: Signal counts: data_changed=0, validation_changed=0, correction_applied=0
+2025-04-02 15:16:46,744 [INFO] test_dataview_fix: Testing direct cell highlighting
+2025-04-02 15:16:46,744 [DEBUG] chestbuddy.ui.data_view: _highlight_cell called for (0, 0) with color #ff0000
+2025-04-02 15:16:46,745 [DEBUG] chestbuddy.ui.data_view: Current table dimensions: 4 rows x 7 columns
+
+2025-04-02 15:16:46,745 [DEBUG] chestbuddy.ui.data_view: Source index: row=0, col=0, valid=True
+2025-04-02 15:16:46,745 [DEBUG] chestbuddy.ui.data_view: Found item for cell (0, 0): <PySide6.QtGui.QStandardItem object at 0x000001CC84E7F5C0>
+2025-04-02 15:16:46,745 [DEBUG] chestbuddy.ui.data_view: Before setting color - background role data: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.713726, 0.713726, 1.000000)
+2025-04-02 15:16:46,745 [DEBUG] chestbuddy.ui.data_view: Temporarily blocking table model signals
+2025-04-02 15:16:46,745 [DEBUG] chestbuddy.ui.data_view: Restored table model signals to: False
+2025-04-02 15:16:46,745 [DEBUG] chestbuddy.ui.data_view: After setting color - background role data: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.000000, 0.000000, 1.000000)
+2025-04-02 15:16:46,746 [DEBUG] chestbuddy.ui.data_view: Mapped to proxy index: valid=True, row=3, col=0
+2025-04-02 15:16:46,746 [DEBUG] chestbuddy.ui.data_view: Updated view at proxy index (3, 0)
+2025-04-02 15:16:46,746 [DEBUG] chestbuddy.ui.data_view: Applied highlighting to cell (0, 0) with color #ff0000
+2025-04-02 15:16:46,746 [DEBUG] chestbuddy.ui.data_view: _highlight_cell called for (1, 1) with color #00ff00
+2025-04-02 15:16:46,746 [DEBUG] chestbuddy.ui.data_view: Current table dimensions: 4 rows x 7 columns
+
+2025-04-02 15:16:46,746 [DEBUG] chestbuddy.ui.data_view: Source index: row=1, col=1, valid=True
+2025-04-02 15:16:46,746 [DEBUG] chestbuddy.ui.data_view: Found item for cell (1, 1): <PySide6.QtGui.QStandardItem object at 0x000001CC8B0E51C0>
+2025-04-02 15:16:46,746 [DEBUG] chestbuddy.ui.data_view: Before setting color - background role data: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.713726, 0.713726, 1.000000)
+2025-04-02 15:16:46,747 [DEBUG] chestbuddy.ui.data_view: Temporarily blocking table model signals
+2025-04-02 15:16:46,747 [DEBUG] chestbuddy.ui.data_view: Restored table model signals to: False
+2025-04-02 15:16:46,747 [DEBUG] chestbuddy.ui.data_view: After setting color - background role data: PySide6.QtGui.QColor.fromRgbF(0.000000, 1.000000, 0.000000, 1.000000)
+2025-04-02 15:16:46,747 [DEBUG] chestbuddy.ui.data_view: Mapped to proxy index: valid=True, row=2, col=1
+2025-04-02 15:16:46,747 [DEBUG] chestbuddy.ui.data_view: Updated view at proxy index (2, 1)
+2025-04-02 15:16:46,747 [DEBUG] chestbuddy.ui.data_view: Applied highlighting to cell (1, 1) with color #00ff00
+2025-04-02 15:16:46,747 [DEBUG] chestbuddy.ui.data_view: _highlight_cell called for (2, 2) with color #0000ff
+2025-04-02 15:16:46,747 [DEBUG] chestbuddy.ui.data_view: Current table dimensions: 4 rows x 7 columns
+
+2025-04-02 15:16:46,747 [DEBUG] chestbuddy.ui.data_view: Source index: row=2, col=2, valid=True
+2025-04-02 15:16:46,748 [DEBUG] chestbuddy.ui.data_view: Found item for cell (2, 2): <PySide6.QtGui.QStandardItem object at 0x000001CC8B0E4E00>
+2025-04-02 15:16:46,748 [DEBUG] chestbuddy.ui.data_view: Before setting color - background role data: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.713726, 0.713726, 1.000000)
+2025-04-02 15:16:46,748 [DEBUG] chestbuddy.ui.data_view: Temporarily blocking table model signals
+2025-04-02 15:16:46,748 [DEBUG] chestbuddy.ui.data_view: Restored table model signals to: False
+2025-04-02 15:16:46,748 [DEBUG] chestbuddy.ui.data_view: After setting color - background role data: PySide6.QtGui.QColor.fromRgbF(0.000000, 0.000000, 1.000000, 1.000000)
+2025-04-02 15:16:46,748 [DEBUG] chestbuddy.ui.data_view: Mapped to proxy index: valid=True, row=1, col=2
+2025-04-02 15:16:46,748 [DEBUG] chestbuddy.ui.data_view: Updated view at proxy index (1, 2)
+2025-04-02 15:16:46,748 [DEBUG] chestbuddy.ui.data_view: Applied highlighting to cell (2, 2) with color #0000ff
+2025-04-02 15:16:46,748 [INFO] test_dataview_fix: Direct highlighting triggered data_changed: False
+2025-04-02 15:16:47,897 [INFO] test_dataview_fix: Checking if highlights persist
+2025-04-02 15:16:47,898 [INFO] test_dataview_fix: Cell (0, 0) has background color: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.000000, 0.000000, 1.000000)
+2025-04-02 15:16:47,898 [INFO] test_dataview_fix: Cell (1, 1) has background color: PySide6.QtGui.QColor.fromRgbF(0.000000, 1.000000, 0.000000, 1.000000)
+2025-04-02 15:16:47,898 [INFO] test_dataview_fix: Cell (2, 2) has background color: PySide6.QtGui.QColor.fromRgbF(0.000000, 0.000000, 1.000000, 1.000000)
+2025-04-02 15:16:47,898 [WARNING] test_dataview_fix: Cell (0, 1) has NO background color!
+2025-04-02 15:16:47,898 [WARNING] test_dataview_fix: Cell (1, 2) has NO background color!
+2025-04-02 15:16:47,898 [INFO] test_dataview_fix: Signal counts: data_changed=0, validation_changed=0, correction_applied=0
+2025-04-02 15:16:48,990 [INFO] test_dataview_fix: Applying validation highlighting
+2025-04-02 15:16:48,990 [DEBUG] chestbuddy.core.table_state_manager: ==== TableStateManager.update_cell_states_from_validation called ====
+2025-04-02 15:16:48,991 [DEBUG] chestbuddy.core.table_state_manager: Validation status DataFrame shape: (3, 3)
+2025-04-02 15:16:48,991 [DEBUG] chestbuddy.core.table_state_manager: Validation status columns: ['ROW_IDX', 'COL_IDX', 'STATUS']
+2025-04-02 15:16:48,992 [DEBUG] chestbuddy.core.table_state_manager: Sample validation data (first 3 rows):
+   ROW_IDX  COL_IDX   STATUS
+0        0        0  invalid
+1        1        1  invalid
+2        2        2  invalid
+2025-04-02 15:16:48,993 [DEBUG] chestbuddy.core.table_state_manager: Cell (0, 0) state reset to NORMAL
+2025-04-02 15:16:48,993 [DEBUG] chestbuddy.core.table_state_manager: Cell (1, 1) state reset to NORMAL
+2025-04-02 15:16:48,993 [DEBUG] chestbuddy.core.table_state_manager: Cell (2, 2) state reset to NORMAL
+2025-04-02 15:16:48,993 [DEBUG] chestbuddy.core.table_state_manager: Reset 3 existing validation states
+2025-04-02 15:16:48,993 [DEBUG] chestbuddy.core.table_state_manager: Using standard validation status format with ROW_IDX, COL_IDX, STATUS
+2025-04-02 15:16:48,993 [DEBUG] chestbuddy.core.table_state_manager: Cell (0, 0) state set to INVALID
+2025-04-02 15:16:48,994 [DEBUG] chestbuddy.core.table_state_manager: Set cell (0, 0) to INVALID state
+2025-04-02 15:16:48,994 [DEBUG] chestbuddy.core.table_state_manager: Cell (1, 1) state set to INVALID
+2025-04-02 15:16:48,994 [DEBUG] chestbuddy.core.table_state_manager: Set cell (1, 1) to INVALID state
+2025-04-02 15:16:48,994 [DEBUG] chestbuddy.core.table_state_manager: Cell (2, 2) state set to INVALID
+2025-04-02 15:16:48,994 [DEBUG] chestbuddy.core.table_state_manager: Set cell (2, 2) to INVALID state
+2025-04-02 15:16:48,994 [DEBUG] chestbuddy.core.table_state_manager: Updated 3 cells using standard format
+2025-04-02 15:16:48,994 [DEBUG] chestbuddy.core.table_state_manager: Emitting state_changed signal after updating validation states
+2025-04-02 15:16:48,995 [DEBUG] chestbuddy.ui.data_view: ==== DataView.update_cell_highlighting_from_state called ====
+2025-04-02 15:16:48,995 [DEBUG] chestbuddy.ui.data_view: Updating cell highlighting from table state manager
+2025-04-02 15:16:48,995 [DEBUG] chestbuddy.ui.data_view: Found cells to highlight: 3 invalid, 0 correctable, 0 corrected, 0 processing
+2025-04-02 15:16:48,995 [DEBUG] chestbuddy.ui.data_view: Sample invalid cells (first 3): [(0, 0), (1, 1), (2, 2)]
+2025-04-02 15:16:48,995 [DEBUG] chestbuddy.ui.data_view: Highlighting invalid cell at (0, 0)
+2025-04-02 15:16:48,995 [DEBUG] chestbuddy.ui.data_view: _highlight_cell called for (0, 0) with color #ffb6b6
+2025-04-02 15:16:48,995 [DEBUG] chestbuddy.ui.data_view: Current table dimensions: 4 rows x 7 columns
+
+2025-04-02 15:16:48,996 [DEBUG] chestbuddy.ui.data_view: Source index: row=0, col=0, valid=True
+2025-04-02 15:16:48,996 [DEBUG] chestbuddy.ui.data_view: Found item for cell (0, 0): <PySide6.QtGui.QStandardItem object at 0x000001CC84E7F5C0>
+2025-04-02 15:16:48,996 [DEBUG] chestbuddy.ui.data_view: Before setting color - background role data: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.000000, 0.000000, 1.000000)
+2025-04-02 15:16:48,996 [DEBUG] chestbuddy.ui.data_view: Temporarily blocking table model signals
+2025-04-02 15:16:48,996 [DEBUG] chestbuddy.ui.data_view: Restored table model signals to: False
+2025-04-02 15:16:48,996 [DEBUG] chestbuddy.ui.data_view: After setting color - background role data: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.713726, 0.713726, 1.000000)
+2025-04-02 15:16:48,996 [DEBUG] chestbuddy.ui.data_view: Mapped to proxy index: valid=True, row=3, col=0
+2025-04-02 15:16:48,996 [DEBUG] chestbuddy.ui.data_view: Updated view at proxy index (3, 0)
+2025-04-02 15:16:48,997 [DEBUG] chestbuddy.ui.data_view: Applied highlighting to cell (0, 0) with color #ffb6b6
+2025-04-02 15:16:48,997 [DEBUG] chestbuddy.ui.data_view: Highlighting invalid cell at (1, 1)
+2025-04-02 15:16:48,997 [DEBUG] chestbuddy.ui.data_view: _highlight_cell called for (1, 1) with color #ffb6b6
+2025-04-02 15:16:48,997 [DEBUG] chestbuddy.ui.data_view: Current table dimensions: 4 rows x 7 columns
+
+2025-04-02 15:16:48,997 [DEBUG] chestbuddy.ui.data_view: Source index: row=1, col=1, valid=True
+2025-04-02 15:16:48,997 [DEBUG] chestbuddy.ui.data_view: Found item for cell (1, 1): <PySide6.QtGui.QStandardItem object at 0x000001CC8B0E51C0>
+2025-04-02 15:16:48,997 [DEBUG] chestbuddy.ui.data_view: Before setting color - background role data: PySide6.QtGui.QColor.fromRgbF(0.000000, 1.000000, 0.000000, 1.000000)
+2025-04-02 15:16:48,997 [DEBUG] chestbuddy.ui.data_view: Temporarily blocking table model signals
+2025-04-02 15:16:48,998 [DEBUG] chestbuddy.ui.data_view: Restored table model signals to: False
+2025-04-02 15:16:48,998 [DEBUG] chestbuddy.ui.data_view: After setting color - background role data: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.713726, 0.713726, 1.000000)
+2025-04-02 15:16:48,998 [DEBUG] chestbuddy.ui.data_view: Mapped to proxy index: valid=True, row=2, col=1
+2025-04-02 15:16:48,998 [DEBUG] chestbuddy.ui.data_view: Updated view at proxy index (2, 1)
+2025-04-02 15:16:48,999 [DEBUG] chestbuddy.ui.data_view: Applied highlighting to cell (1, 1) with color #ffb6b6
+2025-04-02 15:16:48,999 [DEBUG] chestbuddy.ui.data_view: Highlighting invalid cell at (2, 2)
+2025-04-02 15:16:48,999 [DEBUG] chestbuddy.ui.data_view: _highlight_cell called for (2, 2) with color #ffb6b6
+2025-04-02 15:16:48,999 [DEBUG] chestbuddy.ui.data_view: Current table dimensions: 4 rows x 7 columns
+
+2025-04-02 15:16:48,999 [DEBUG] chestbuddy.ui.data_view: Source index: row=2, col=2, valid=True
+2025-04-02 15:16:48,999 [DEBUG] chestbuddy.ui.data_view: Found item for cell (2, 2): <PySide6.QtGui.QStandardItem object at 0x000001CC8B0E4E00>
+2025-04-02 15:16:48,999 [DEBUG] chestbuddy.ui.data_view: Before setting color - background role data: PySide6.QtGui.QColor.fromRgbF(0.000000, 0.000000, 1.000000, 1.000000)
+2025-04-02 15:16:48,999 [DEBUG] chestbuddy.ui.data_view: Temporarily blocking table model signals
+2025-04-02 15:16:48,999 [DEBUG] chestbuddy.ui.data_view: Restored table model signals to: False
+2025-04-02 15:16:48,999 [DEBUG] chestbuddy.ui.data_view: After setting color - background role data: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.713726, 0.713726, 1.000000)
+2025-04-02 15:16:49,000 [DEBUG] chestbuddy.ui.data_view: Mapped to proxy index: valid=True, row=1, col=2
+2025-04-02 15:16:49,000 [DEBUG] chestbuddy.ui.data_view: Updated view at proxy index (1, 2)
+2025-04-02 15:16:49,000 [DEBUG] chestbuddy.ui.data_view: Applied highlighting to cell (2, 2) with color #ffb6b6
+2025-04-02 15:16:49,000 [DEBUG] chestbuddy.ui.data_view: Successfully highlighted 3 cells out of 3 total
+2025-04-02 15:16:49,000 [DEBUG] chestbuddy.ui.data_view: Forcing table view update after highlighting
+2025-04-02 15:16:49,000 [DEBUG] chestbuddy.ui.data_view: Cell highlighting update complete
+2025-04-02 15:16:49,000 [DEBUG] chestbuddy.core.table_state_manager: After updating: 3 cells marked as INVALID, 0 cells marked as CORRECTABLE
+2025-04-02 15:16:49,000 [DEBUG] chestbuddy.ui.data_view: ==== DataView.update_cell_highlighting_from_state called ====
+2025-04-02 15:16:49,000 [DEBUG] chestbuddy.ui.data_view: Updating cell highlighting from table state manager
+2025-04-02 15:16:49,001 [DEBUG] chestbuddy.ui.data_view: Found cells to highlight: 3 invalid, 0 correctable, 0 corrected, 0 processing
+2025-04-02 15:16:49,001 [DEBUG] chestbuddy.ui.data_view: Sample invalid cells (first 3): [(0, 0), (1, 1), (2, 2)]
+2025-04-02 15:16:49,001 [DEBUG] chestbuddy.ui.data_view: Highlighting invalid cell at (0, 0)
+2025-04-02 15:16:49,001 [DEBUG] chestbuddy.ui.data_view: _highlight_cell called for (0, 0) with color #ffb6b6
+2025-04-02 15:16:49,001 [DEBUG] chestbuddy.ui.data_view: Current table dimensions: 4 rows x 7 columns
+
+2025-04-02 15:16:49,001 [DEBUG] chestbuddy.ui.data_view: Source index: row=0, col=0, valid=True
+2025-04-02 15:16:49,001 [DEBUG] chestbuddy.ui.data_view: Found item for cell (0, 0): <PySide6.QtGui.QStandardItem object at 0x000001CC84E7F5C0>
+2025-04-02 15:16:49,001 [DEBUG] chestbuddy.ui.data_view: Before setting color - background role data: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.713726, 0.713726, 1.000000)
+2025-04-02 15:16:49,002 [DEBUG] chestbuddy.ui.data_view: Temporarily blocking table model signals
+2025-04-02 15:16:49,002 [DEBUG] chestbuddy.ui.data_view: Restored table model signals to: False
+2025-04-02 15:16:49,002 [DEBUG] chestbuddy.ui.data_view: After setting color - background role data: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.713726, 0.713726, 1.000000)
+2025-04-02 15:16:49,002 [DEBUG] chestbuddy.ui.data_view: Mapped to proxy index: valid=True, row=3, col=0
+2025-04-02 15:16:49,002 [DEBUG] chestbuddy.ui.data_view: Updated view at proxy index (3, 0)
+2025-04-02 15:16:49,002 [DEBUG] chestbuddy.ui.data_view: Applied highlighting to cell (0, 0) with color #ffb6b6
+2025-04-02 15:16:49,002 [DEBUG] chestbuddy.ui.data_view: Highlighting invalid cell at (1, 1)
+2025-04-02 15:16:49,002 [DEBUG] chestbuddy.ui.data_view: _highlight_cell called for (1, 1) with color #ffb6b6
+2025-04-02 15:16:49,003 [DEBUG] chestbuddy.ui.data_view: Current table dimensions: 4 rows x 7 columns
+
+2025-04-02 15:16:49,003 [DEBUG] chestbuddy.ui.data_view: Source index: row=1, col=1, valid=True
+2025-04-02 15:16:49,003 [DEBUG] chestbuddy.ui.data_view: Found item for cell (1, 1): <PySide6.QtGui.QStandardItem object at 0x000001CC8B0E51C0>
+2025-04-02 15:16:49,003 [DEBUG] chestbuddy.ui.data_view: Before setting color - background role data: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.713726, 0.713726, 1.000000)
+2025-04-02 15:16:49,003 [DEBUG] chestbuddy.ui.data_view: Temporarily blocking table model signals
+2025-04-02 15:16:49,003 [DEBUG] chestbuddy.ui.data_view: Restored table model signals to: False
+2025-04-02 15:16:49,003 [DEBUG] chestbuddy.ui.data_view: After setting color - background role data: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.713726, 0.713726, 1.000000)
+2025-04-02 15:16:49,003 [DEBUG] chestbuddy.ui.data_view: Mapped to proxy index: valid=True, row=2, col=1
+2025-04-02 15:16:49,004 [DEBUG] chestbuddy.ui.data_view: Updated view at proxy index (2, 1)
+2025-04-02 15:16:49,004 [DEBUG] chestbuddy.ui.data_view: Applied highlighting to cell (1, 1) with color #ffb6b6
+2025-04-02 15:16:49,004 [DEBUG] chestbuddy.ui.data_view: Highlighting invalid cell at (2, 2)
+2025-04-02 15:16:49,004 [DEBUG] chestbuddy.ui.data_view: _highlight_cell called for (2, 2) with color #ffb6b6
+2025-04-02 15:16:49,004 [DEBUG] chestbuddy.ui.data_view: Current table dimensions: 4 rows x 7 columns
+
+2025-04-02 15:16:49,004 [DEBUG] chestbuddy.ui.data_view: Source index: row=2, col=2, valid=True
+2025-04-02 15:16:49,004 [DEBUG] chestbuddy.ui.data_view: Found item for cell (2, 2): <PySide6.QtGui.QStandardItem object at 0x000001CC8B0E4E00>
+2025-04-02 15:16:49,004 [DEBUG] chestbuddy.ui.data_view: Before setting color - background role data: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.713726, 0.713726, 1.000000)
+2025-04-02 15:16:49,004 [DEBUG] chestbuddy.ui.data_view: Temporarily blocking table model signals
+2025-04-02 15:16:49,005 [DEBUG] chestbuddy.ui.data_view: Restored table model signals to: False
+2025-04-02 15:16:49,005 [DEBUG] chestbuddy.ui.data_view: After setting color - background role data: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.713726, 0.713726, 1.000000)
+2025-04-02 15:16:49,005 [DEBUG] chestbuddy.ui.data_view: Mapped to proxy index: valid=True, row=1, col=2
+2025-04-02 15:16:49,005 [DEBUG] chestbuddy.ui.data_view: Updated view at proxy index (1, 2)
+2025-04-02 15:16:49,005 [DEBUG] chestbuddy.ui.data_view: Applied highlighting to cell (2, 2) with color #ffb6b6
+2025-04-02 15:16:49,005 [DEBUG] chestbuddy.ui.data_view: Successfully highlighted 3 cells out of 3 total
+2025-04-02 15:16:49,005 [DEBUG] chestbuddy.ui.data_view: Forcing table view update after highlighting
+2025-04-02 15:16:49,005 [DEBUG] chestbuddy.ui.data_view: Cell highlighting update complete
+2025-04-02 15:16:49,005 [INFO] test_dataview_fix: Applied validation highlighting to 3 cells
+2025-04-02 15:16:50,016 [INFO] test_dataview_fix: Applying correction highlighting
+2025-04-02 15:16:50,016 [DEBUG] chestbuddy.core.table_state_manager: Processing correction status with 2 corrected cells
+2025-04-02 15:16:50,016 [DEBUG] chestbuddy.core.table_state_manager: Cell (0, 1) state set to CORRECTED
+2025-04-02 15:16:50,016 [DEBUG] chestbuddy.core.table_state_manager: Set cell (0, 1) to CORRECTED state with detail: Corrected from 'gold' to 'Gold'
+2025-04-02 15:16:50,017 [DEBUG] chestbuddy.core.table_state_manager: Cell (1, 2) state set to CORRECTED
+2025-04-02 15:16:50,017 [DEBUG] chestbuddy.core.table_state_manager: Set cell (1, 2) to CORRECTED state with detail: Corrected from 'quest' to 'Quest'
+2025-04-02 15:16:50,017 [DEBUG] chestbuddy.core.table_state_manager: Emitting state_changed signal after updating 2 corrected cells
+2025-04-02 15:16:50,017 [DEBUG] chestbuddy.ui.data_view: ==== DataView.update_cell_highlighting_from_state called ====
+2025-04-02 15:16:50,017 [DEBUG] chestbuddy.ui.data_view: Updating cell highlighting from table state manager
+2025-04-02 15:16:50,017 [DEBUG] chestbuddy.ui.data_view: Found cells to highlight: 3 invalid, 0 correctable, 2 corrected, 0 processing
+2025-04-02 15:16:50,017 [DEBUG] chestbuddy.ui.data_view: Sample invalid cells (first 3): [(0, 0), (1, 1), (2, 2)]
+2025-04-02 15:16:50,017 [DEBUG] chestbuddy.ui.data_view: Sample corrected cells (first 3): [(0, 1), (1, 2)]
+2025-04-02 15:16:50,017 [DEBUG] chestbuddy.ui.data_view: Highlighting invalid cell at (0, 0)
+2025-04-02 15:16:50,017 [DEBUG] chestbuddy.ui.data_view: _highlight_cell called for (0, 0) with color #ffb6b6
+2025-04-02 15:16:50,018 [DEBUG] chestbuddy.ui.data_view: Current table dimensions: 4 rows x 7 columns
+
+2025-04-02 15:16:50,018 [DEBUG] chestbuddy.ui.data_view: Source index: row=0, col=0, valid=True
+2025-04-02 15:16:50,018 [DEBUG] chestbuddy.ui.data_view: Found item for cell (0, 0): <PySide6.QtGui.QStandardItem object at 0x000001CC84E7F5C0>
+2025-04-02 15:16:50,018 [DEBUG] chestbuddy.ui.data_view: Before setting color - background role data: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.713726, 0.713726, 1.000000)
+2025-04-02 15:16:50,018 [DEBUG] chestbuddy.ui.data_view: Temporarily blocking table model signals
+2025-04-02 15:16:50,018 [DEBUG] chestbuddy.ui.data_view: Restored table model signals to: False
+2025-04-02 15:16:50,018 [DEBUG] chestbuddy.ui.data_view: After setting color - background role data: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.713726, 0.713726, 1.000000)
+2025-04-02 15:16:50,018 [DEBUG] chestbuddy.ui.data_view: Mapped to proxy index: valid=True, row=3, col=0
+2025-04-02 15:16:50,018 [DEBUG] chestbuddy.ui.data_view: Updated view at proxy index (3, 0)
+2025-04-02 15:16:50,018 [DEBUG] chestbuddy.ui.data_view: Applied highlighting to cell (0, 0) with color #ffb6b6
+2025-04-02 15:16:50,019 [DEBUG] chestbuddy.ui.data_view: Highlighting invalid cell at (1, 1)
+2025-04-02 15:16:50,019 [DEBUG] chestbuddy.ui.data_view: _highlight_cell called for (1, 1) with color #ffb6b6
+2025-04-02 15:16:50,019 [DEBUG] chestbuddy.ui.data_view: Current table dimensions: 4 rows x 7 columns
+
+2025-04-02 15:16:50,019 [DEBUG] chestbuddy.ui.data_view: Source index: row=1, col=1, valid=True
+2025-04-02 15:16:50,019 [DEBUG] chestbuddy.ui.data_view: Found item for cell (1, 1): <PySide6.QtGui.QStandardItem object at 0x000001CC8B0E51C0>
+2025-04-02 15:16:50,019 [DEBUG] chestbuddy.ui.data_view: Before setting color - background role data: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.713726, 0.713726, 1.000000)
+2025-04-02 15:16:50,019 [DEBUG] chestbuddy.ui.data_view: Temporarily blocking table model signals
+2025-04-02 15:16:50,019 [DEBUG] chestbuddy.ui.data_view: Restored table model signals to: False
+2025-04-02 15:16:50,019 [DEBUG] chestbuddy.ui.data_view: After setting color - background role data: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.713726, 0.713726, 1.000000)
+2025-04-02 15:16:50,020 [DEBUG] chestbuddy.ui.data_view: Mapped to proxy index: valid=True, row=2, col=1
+2025-04-02 15:16:50,020 [DEBUG] chestbuddy.ui.data_view: Updated view at proxy index (2, 1)
+2025-04-02 15:16:50,020 [DEBUG] chestbuddy.ui.data_view: Applied highlighting to cell (1, 1) with color #ffb6b6
+2025-04-02 15:16:50,020 [DEBUG] chestbuddy.ui.data_view: Highlighting invalid cell at (2, 2)
+2025-04-02 15:16:50,020 [DEBUG] chestbuddy.ui.data_view: _highlight_cell called for (2, 2) with color #ffb6b6
+2025-04-02 15:16:50,020 [DEBUG] chestbuddy.ui.data_view: Current table dimensions: 4 rows x 7 columns
+
+2025-04-02 15:16:50,020 [DEBUG] chestbuddy.ui.data_view: Source index: row=2, col=2, valid=True
+2025-04-02 15:16:50,020 [DEBUG] chestbuddy.ui.data_view: Found item for cell (2, 2): <PySide6.QtGui.QStandardItem object at 0x000001CC8B0E4E00>
+2025-04-02 15:16:50,020 [DEBUG] chestbuddy.ui.data_view: Before setting color - background role data: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.713726, 0.713726, 1.000000)
+2025-04-02 15:16:50,020 [DEBUG] chestbuddy.ui.data_view: Temporarily blocking table model signals
+2025-04-02 15:16:50,021 [DEBUG] chestbuddy.ui.data_view: Restored table model signals to: False
+2025-04-02 15:16:50,021 [DEBUG] chestbuddy.ui.data_view: After setting color - background role data: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.713726, 0.713726, 1.000000)
+2025-04-02 15:16:50,021 [DEBUG] chestbuddy.ui.data_view: Mapped to proxy index: valid=True, row=1, col=2
+2025-04-02 15:16:50,021 [DEBUG] chestbuddy.ui.data_view: Updated view at proxy index (1, 2)
+2025-04-02 15:16:50,021 [DEBUG] chestbuddy.ui.data_view: Applied highlighting to cell (2, 2) with color #ffb6b6
+2025-04-02 15:16:50,021 [DEBUG] chestbuddy.ui.data_view: Highlighting corrected cell at (0, 1)
+2025-04-02 15:16:50,021 [DEBUG] chestbuddy.ui.data_view: _highlight_cell called for (0, 1) with color #b6ffb6
+2025-04-02 15:16:50,021 [DEBUG] chestbuddy.ui.data_view: Current table dimensions: 4 rows x 7 columns
+
+2025-04-02 15:16:50,021 [DEBUG] chestbuddy.ui.data_view: Source index: row=0, col=1, valid=True
+2025-04-02 15:16:50,022 [DEBUG] chestbuddy.ui.data_view: Found item for cell (0, 1): <PySide6.QtGui.QStandardItem object at 0x000001CC84E8B440>
+2025-04-02 15:16:50,022 [DEBUG] chestbuddy.ui.data_view: Before setting color - background role data: None
+2025-04-02 15:16:50,022 [DEBUG] chestbuddy.ui.data_view: Temporarily blocking table model signals
+2025-04-02 15:16:50,022 [DEBUG] chestbuddy.ui.data_view: Restored table model signals to: False
+2025-04-02 15:16:50,022 [DEBUG] chestbuddy.ui.data_view: After setting color - background role data: PySide6.QtGui.QColor.fromRgbF(0.713726, 1.000000, 0.713726, 1.000000)
+2025-04-02 15:16:50,022 [DEBUG] chestbuddy.ui.data_view: Mapped to proxy index: valid=True, row=3, col=1
+2025-04-02 15:16:50,022 [DEBUG] chestbuddy.ui.data_view: Updated view at proxy index (3, 1)
+2025-04-02 15:16:50,022 [DEBUG] chestbuddy.ui.data_view: Applied highlighting to cell (0, 1) with color #b6ffb6
+2025-04-02 15:16:50,023 [DEBUG] chestbuddy.ui.data_view: Highlighting corrected cell at (1, 2)
+2025-04-02 15:16:50,023 [DEBUG] chestbuddy.ui.data_view: _highlight_cell called for (1, 2) with color #b6ffb6
+2025-04-02 15:16:50,023 [DEBUG] chestbuddy.ui.data_view: Current table dimensions: 4 rows x 7 columns
+
+2025-04-02 15:16:50,023 [DEBUG] chestbuddy.ui.data_view: Source index: row=1, col=2, valid=True
+2025-04-02 15:16:50,023 [DEBUG] chestbuddy.ui.data_view: Found item for cell (1, 2): <PySide6.QtGui.QStandardItem object at 0x000001CC8B0E5240>
+2025-04-02 15:16:50,023 [DEBUG] chestbuddy.ui.data_view: Before setting color - background role data: None
+2025-04-02 15:16:50,024 [DEBUG] chestbuddy.ui.data_view: Temporarily blocking table model signals
+2025-04-02 15:16:50,024 [DEBUG] chestbuddy.ui.data_view: Restored table model signals to: False
+2025-04-02 15:16:50,024 [DEBUG] chestbuddy.ui.data_view: After setting color - background role data: PySide6.QtGui.QColor.fromRgbF(0.713726, 1.000000, 0.713726, 1.000000)
+2025-04-02 15:16:50,024 [DEBUG] chestbuddy.ui.data_view: Mapped to proxy index: valid=True, row=2, col=2
+2025-04-02 15:16:50,024 [DEBUG] chestbuddy.ui.data_view: Updated view at proxy index (2, 2)
+2025-04-02 15:16:50,024 [DEBUG] chestbuddy.ui.data_view: Applied highlighting to cell (1, 2) with color #b6ffb6
+2025-04-02 15:16:50,024 [DEBUG] chestbuddy.ui.data_view: Successfully highlighted 5 cells out of 5 total
+2025-04-02 15:16:50,025 [DEBUG] chestbuddy.ui.data_view: Forcing table view update after highlighting
+2025-04-02 15:16:50,025 [DEBUG] chestbuddy.ui.data_view: Cell highlighting update complete
+2025-04-02 15:16:50,025 [DEBUG] chestbuddy.core.table_state_manager: Updated cell states from correction status: 2 cells marked as corrected
+2025-04-02 15:16:50,025 [DEBUG] chestbuddy.ui.data_view: ==== DataView.update_cell_highlighting_from_state called ====
+2025-04-02 15:16:50,025 [DEBUG] chestbuddy.ui.data_view: Updating cell highlighting from table state manager
+2025-04-02 15:16:50,025 [DEBUG] chestbuddy.ui.data_view: Found cells to highlight: 3 invalid, 0 correctable, 2 corrected, 0 processing
+2025-04-02 15:16:50,025 [DEBUG] chestbuddy.ui.data_view: Sample invalid cells (first 3): [(0, 0), (1, 1), (2, 2)]
+2025-04-02 15:16:50,025 [DEBUG] chestbuddy.ui.data_view: Sample corrected cells (first 3): [(0, 1), (1, 2)]
+2025-04-02 15:16:50,025 [DEBUG] chestbuddy.ui.data_view: Highlighting invalid cell at (0, 0)
+2025-04-02 15:16:50,026 [DEBUG] chestbuddy.ui.data_view: _highlight_cell called for (0, 0) with color #ffb6b6
+2025-04-02 15:16:50,026 [DEBUG] chestbuddy.ui.data_view: Current table dimensions: 4 rows x 7 columns
+
+2025-04-02 15:16:50,026 [DEBUG] chestbuddy.ui.data_view: Source index: row=0, col=0, valid=True
+2025-04-02 15:16:50,026 [DEBUG] chestbuddy.ui.data_view: Found item for cell (0, 0): <PySide6.QtGui.QStandardItem object at 0x000001CC84E7F5C0>
+2025-04-02 15:16:50,026 [DEBUG] chestbuddy.ui.data_view: Before setting color - background role data: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.713726, 0.713726, 1.000000)
+2025-04-02 15:16:50,026 [DEBUG] chestbuddy.ui.data_view: Temporarily blocking table model signals
+2025-04-02 15:16:50,027 [DEBUG] chestbuddy.ui.data_view: Restored table model signals to: False
+2025-04-02 15:16:50,027 [DEBUG] chestbuddy.ui.data_view: After setting color - background role data: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.713726, 0.713726, 1.000000)
+2025-04-02 15:16:50,027 [DEBUG] chestbuddy.ui.data_view: Mapped to proxy index: valid=True, row=3, col=0
+2025-04-02 15:16:50,027 [DEBUG] chestbuddy.ui.data_view: Updated view at proxy index (3, 0)
+2025-04-02 15:16:50,027 [DEBUG] chestbuddy.ui.data_view: Applied highlighting to cell (0, 0) with color #ffb6b6
+2025-04-02 15:16:50,027 [DEBUG] chestbuddy.ui.data_view: Highlighting invalid cell at (1, 1)
+2025-04-02 15:16:50,027 [DEBUG] chestbuddy.ui.data_view: _highlight_cell called for (1, 1) with color #ffb6b6
+2025-04-02 15:16:50,027 [DEBUG] chestbuddy.ui.data_view: Current table dimensions: 4 rows x 7 columns
+
+2025-04-02 15:16:50,027 [DEBUG] chestbuddy.ui.data_view: Source index: row=1, col=1, valid=True
+2025-04-02 15:16:50,028 [DEBUG] chestbuddy.ui.data_view: Found item for cell (1, 1): <PySide6.QtGui.QStandardItem object at 0x000001CC8B0E51C0>
+2025-04-02 15:16:50,028 [DEBUG] chestbuddy.ui.data_view: Before setting color - background role data: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.713726, 0.713726, 1.000000)
+2025-04-02 15:16:50,028 [DEBUG] chestbuddy.ui.data_view: Temporarily blocking table model signals
+2025-04-02 15:16:50,028 [DEBUG] chestbuddy.ui.data_view: Restored table model signals to: False
+2025-04-02 15:16:50,028 [DEBUG] chestbuddy.ui.data_view: After setting color - background role data: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.713726, 0.713726, 1.000000)
+2025-04-02 15:16:50,028 [DEBUG] chestbuddy.ui.data_view: Mapped to proxy index: valid=True, row=2, col=1
+2025-04-02 15:16:50,028 [DEBUG] chestbuddy.ui.data_view: Updated view at proxy index (2, 1)
+2025-04-02 15:16:50,028 [DEBUG] chestbuddy.ui.data_view: Applied highlighting to cell (1, 1) with color #ffb6b6
+2025-04-02 15:16:50,028 [DEBUG] chestbuddy.ui.data_view: Highlighting invalid cell at (2, 2)
+2025-04-02 15:16:50,029 [DEBUG] chestbuddy.ui.data_view: _highlight_cell called for (2, 2) with color #ffb6b6
+2025-04-02 15:16:50,029 [DEBUG] chestbuddy.ui.data_view: Current table dimensions: 4 rows x 7 columns
+
+2025-04-02 15:16:50,029 [DEBUG] chestbuddy.ui.data_view: Source index: row=2, col=2, valid=True
+2025-04-02 15:16:50,029 [DEBUG] chestbuddy.ui.data_view: Found item for cell (2, 2): <PySide6.QtGui.QStandardItem object at 0x000001CC8B0E4E00>
+2025-04-02 15:16:50,029 [DEBUG] chestbuddy.ui.data_view: Before setting color - background role data: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.713726, 0.713726, 1.000000)
+2025-04-02 15:16:50,029 [DEBUG] chestbuddy.ui.data_view: Temporarily blocking table model signals
+2025-04-02 15:16:50,029 [DEBUG] chestbuddy.ui.data_view: Restored table model signals to: False
+2025-04-02 15:16:50,029 [DEBUG] chestbuddy.ui.data_view: After setting color - background role data: PySide6.QtGui.QColor.fromRgbF(1.000000, 0.713726, 0.713726, 1.000000)
+2025-04-02 15:16:50,029 [DEBUG] chestbuddy.ui.data_view: Mapped to proxy index: valid=True, row=1, col=2
+2025-04-02 15:16:50,029 [DEBUG] chestbuddy.ui.data_view: Updated view at proxy index (1, 2)
+2025-04-02 15:16:50,029 [DEBUG] chestbuddy.ui.data_view: Applied highlighting to cell (2, 2) with color #ffb6b6
+2025-04-02 15:16:50,030 [DEBUG] chestbuddy.ui.data_view: Highlighting corrected cell at (0, 1)
+2025-04-02 15:16:50,030 [DEBUG] chestbuddy.ui.data_view: _highlight_cell called for (0, 1) with color #b6ffb6
+2025-04-02 15:16:50,030 [DEBUG] chestbuddy.ui.data_view: Current table dimensions: 4 rows x 7 columns
+
+2025-04-02 15:16:50,030 [DEBUG] chestbuddy.ui.data_view: Source index: row=0, col=1, valid=True
+2025-04-02 15:16:50,030 [DEBUG] chestbuddy.ui.data_view: Found item for cell (0, 1): <PySide6.QtGui.QStandardItem object at 0x000001CC84E8B440>
+2025-04-02 15:16:50,030 [DEBUG] chestbuddy.ui.data_view: Before setting color - background role data: PySide6.QtGui.QColor.fromRgbF(0.713726, 1.000000, 0.713726, 1.000000)
+2025-04-02 15:16:50,030 [DEBUG] chestbuddy.ui.data_view: Temporarily blocking table model signals
+2025-04-02 15:16:50,030 [DEBUG] chestbuddy.ui.data_view: Restored table model signals to: False
+2025-04-02 15:16:50,030 [DEBUG] chestbuddy.ui.data_view: After setting color - background role data: PySide6.QtGui.QColor.fromRgbF(0.713726, 1.000000, 0.713726, 1.000000)
+2025-04-02 15:16:50,030 [DEBUG] chestbuddy.ui.data_view: Mapped to proxy index: valid=True, row=3, col=1
+2025-04-02 15:16:50,030 [DEBUG] chestbuddy.ui.data_view: Updated view at proxy index (3, 1)
+2025-04-02 15:16:50,031 [DEBUG] chestbuddy.ui.data_view: Applied highlighting to cell (0, 1) with color #b6ffb6
+2025-04-02 15:16:50,031 [DEBUG] chestbuddy.ui.data_view: Highlighting corrected cell at (1, 2)
+2025-04-02 15:16:50,031 [DEBUG] chestbuddy.ui.data_view: _highlight_cell called for (1, 2) with color #b6ffb6
+2025-04-02 15:16:50,031 [DEBUG] chestbuddy.ui.data_view: Current table dimensions: 4 rows x 7 columns
+
+2025-04-02 15:16:50,031 [DEBUG] chestbuddy.ui.data_view: Source index: row=1, col=2, valid=True
+2025-04-02 15:16:50,031 [DEBUG] chestbuddy.ui.data_view: Found item for cell (1, 2): <PySide6.QtGui.QStandardItem object at 0x000001CC8B0E5240>
+2025-04-02 15:16:50,031 [DEBUG] chestbuddy.ui.data_view: Before setting color - background role data: PySide6.QtGui.QColor.fromRgbF(0.713726, 1.000000, 0.713726, 1.000000)
+2025-04-02 15:16:50,031 [DEBUG] chestbuddy.ui.data_view: Temporarily blocking table model signals
+2025-04-02 15:16:50,031 [DEBUG] chestbuddy.ui.data_view: Restored table model signals to: False
+2025-04-02 15:16:50,032 [DEBUG] chestbuddy.ui.data_view: After setting color - background role data: PySide6.QtGui.QColor.fromRgbF(0.713726, 1.000000, 0.713726, 1.000000)
+2025-04-02 15:16:50,032 [DEBUG] chestbuddy.ui.data_view: Mapped to proxy index: valid=True, row=2, col=2
+2025-04-02 15:16:50,032 [DEBUG] chestbuddy.ui.data_view: Updated view at proxy index (2, 2)
+2025-04-02 15:16:50,032 [DEBUG] chestbuddy.ui.data_view: Applied highlighting to cell (1, 2) with color #b6ffb6
+2025-04-02 15:16:50,032 [DEBUG] chestbuddy.ui.data_view: Successfully highlighted 5 cells out of 5 total
+2025-04-02 15:16:50,032 [DEBUG] chestbuddy.ui.data_view: Forcing table view update after highlighting
+2025-04-02 15:16:50,032 [DEBUG] chestbuddy.ui.data_view: Cell highlighting update complete
+2025-04-02 15:16:50,032 [INFO] test_dataview_fix: Applied correction highlighting to 2 cells
