@@ -455,6 +455,7 @@ class TableStateManager(QObject):
                     if col_idx >= 0 and status_str in (
                         "invalid",
                         "validation_status.invalid",
+                        "validationstatus.invalid",
                         "false",
                         "0",
                     ):
@@ -469,6 +470,7 @@ class TableStateManager(QObject):
                     if col_idx >= 0 and status_str in (
                         "correctable",
                         "validation_status.correctable",
+                        "validationstatus.correctable",
                     ):
                         self.set_cell_state(data_row_idx, col_idx, CellState.CORRECTABLE)
                         self.set_cell_detail(
