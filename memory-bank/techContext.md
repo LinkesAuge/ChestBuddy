@@ -1,5 +1,196 @@
 # Technical Context: ChestBuddy
 
+## DataView Refactoring Technical Details
+
+### Overview
+The DataView refactoring project is a comprehensive overhaul of the core data display component of the ChestBuddy application. This section details the technical aspects of this refactoring effort.
+
+### Technology Stack
+The refactored DataView uses these key technologies:
+
+- **PySide6/Qt6**: Core UI framework for all visual components
+- **pandas**: Data manipulation backend
+- **pytest/pytest-qt**: Testing framework for all components
+- **Qt Delegates**: Custom cell rendering mechanism
+- **Qt Model/View Architecture**: Core paradigm for data display
+
+### Project Structure
+The refactored DataView follows this directory structure:
+
+```
+chestbuddy/
+├── ui/
+│   ├── data/                       # DataView-specific components
+│   │   ├── models/                 # Data models
+│   │   │   ├── __init__.py
+│   │   │   ├── data_view_model.py  # Main ViewModel for DataView
+│   │   │   └── filter_model.py     # Filter proxy model
+│   │   ├── views/                  # View components
+│   │   │   ├── __init__.py
+│   │   │   ├── data_table_view.py  # Main DataView component
+│   │   │   └── header_view.py      # Custom header view
+│   │   ├── delegates/              # Cell rendering delegates
+│   │   │   ├── __init__.py
+│   │   │   ├── cell_delegate.py    # Base cell delegate
+│   │   │   ├── validation_delegate.py  # Validation visualization delegate
+│   │   │   └── correction_delegate.py  # Correction visualization delegate
+│   │   ├── adapters/               # Adapter components
+│   │   │   ├── __init__.py
+│   │   │   ├── validation_adapter.py   # Validation system adapter
+│   │   │   └── correction_adapter.py   # Correction system adapter
+│   │   ├── menus/                  # Context menus
+│   │   │   ├── __init__.py
+│   │   │   ├── context_menu.py     # Main context menu
+│   │   │   └── correction_menu.py  # Correction-specific menu items
+│   │   ├── widgets/                # Supporting UI widgets
+│   │   │   ├── __init__.py
+│   │   │   ├── filter_widget.py    # Data filtering widget
+│   │   │   └── toolbar_widget.py   # DataView toolbar
+│   │   ├── __init__.py
+│   │   └── data_view.py            # Composite view combining components
+├── tests/
+    ├── ui/
+    │   ├── data/                   # Tests for DataView components
+```
+
+### Key Components
+
+#### Models
+
+- **DataViewModel** (`data_view_model.py`): 
+  - Core view model adapting ChestDataModel for display
+  - Implements Qt's QAbstractTableModel
+  - Handles data access, modification, and event propagation
+  - Manages row/column mapping and data transformation
+
+- **FilterModel** (`filter_model.py`):
+  - Implements Qt's QSortFilterProxyModel
+  - Provides sorting and filtering capabilities
+  - Manages column visibility and custom sorting logic
+
+#### Views
+
+- **DataTableView** (`data_table_view.py`):
+  - Main table view component extending QTableView
+  - Handles mouse/keyboard interaction
+  - Manages selection behavior and context menu integration
+  - Connects with delegates for cell rendering
+
+- **HeaderView** (`header_view.py`):
+  - Custom header implementation extending QHeaderView
+  - Provides enhanced column operations
+  - Supports drag-and-drop column reordering
+  - Includes column-specific context menu
+
+#### Delegates
+
+- **CellDelegate** (`cell_delegate.py`):
+  - Base delegate for all cell rendering extending QStyledItemDelegate
+  - Provides common rendering functionality
+  - Handles editor creation and data committal
+
+- **ValidationDelegate** (`validation_delegate.py`):
+  - Visualizes validation status (valid, invalid, correctable)
+  - Renders status indicators and background colors
+  - Provides tooltips with validation information
+
+- **CorrectionDelegate** (`correction_delegate.py`):
+  - Visualizes correction options
+  - Provides UI for applying corrections
+  - Renders correction indicators and dropdown controls
+
+#### Menus
+
+- **ContextMenu** (`context_menu.py`):
+  - Dynamic context menu with selection-aware content
+  - Supports standard and specialized actions
+  - Integrates with validation and correction workflows
+
+#### Adapters
+
+- **ValidationAdapter** (`validation_adapter.py`):
+  - Connects ValidationService to the UI layer
+  - Transforms validation results for UI consumption
+  - Manages validation state updates
+
+- **CorrectionAdapter** (`correction_adapter.py`):
+  - Connects CorrectionService to the UI layer
+  - Manages correction application and state tracking
+  - Provides UI-friendly correction suggestions
+
+### Technical Implementation Details
+
+#### Data Flow
+The data flow in the refactored DataView follows this pattern:
+
+1. **Data Source** → **DataViewModel** → **FilterModel** → **DataTableView**
+2. **ValidationService** → **ValidationAdapter** → **ValidationStates** → **ValidationDelegate**
+3. **CorrectionService** → **CorrectionAdapter** → **CorrectionStates** → **CorrectionDelegate**
+4. **User Interaction** → **ContextMenu** → **Actions** → **Services**
+
+#### Qt Model Roles
+Custom data roles are defined for specialized data access:
+
+```python
+# Data roles for accessing specific data types
+ValidationRole = Qt.UserRole + 1  # Role for validation status
+CorrectionRole = Qt.UserRole + 2  # Role for correction information
+OriginalValueRole = Qt.UserRole + 3  # Role for original unformatted value
+FormattedValueRole = Qt.UserRole + 4  # Role for formatted display value
+MetadataRole = Qt.UserRole + 5  # Role for cell metadata
+```
+
+#### Validation Status Visualization
+Validation status is visualized using color coding and icons:
+
+| Status | Background Color | Icon | Description |
+|--------|------------------|------|-------------|
+| VALID | White (#ffffff) | None | Valid cell |
+| INVALID | Light Red (#ffb6b6) | ✗ | Invalid cell |
+| CORRECTABLE | Light Yellow (#fff3b6) | ▼ | Cell with correction available |
+| WARNING | Light Orange (#ffe4b6) | ! | Cell with warning |
+| INFO | Light Blue (#b6e4ff) | ℹ | Cell with information |
+
+#### Performance Optimizations
+Several techniques are used to optimize performance:
+
+1. **Lazy Loading**: Only load visible data
+2. **Viewport Rendering**: Optimize rendering for visible area
+3. **Cached State**: Cache validation and correction states
+4. **Background Processing**: Process validation in background threads
+5. **Chunked Updates**: Update UI in chunks to maintain responsiveness
+
+### Testing Strategy
+The DataView refactoring includes a comprehensive testing strategy:
+
+#### Unit Tests
+- Test each component in isolation
+- Mock dependencies for true unit testing
+- Test edge cases and error handling
+
+#### Integration Tests
+- Test interactions between components
+- Verify data flow and state management
+- Test signal-slot connections
+
+#### UI Tests
+- Test rendering and visualization
+- Test user interactions (clicks, context menus)
+- Test keyboard navigation
+
+#### Performance Tests
+- Test with large datasets (10,000+ rows)
+- Measure rendering performance
+- Test memory usage and efficiency
+
+### Integration with Existing Codebase
+The refactored DataView will integrate with the existing ChestBuddy codebase through:
+
+1. **Clear API**: Well-defined interfaces for interaction
+2. **Adapter Pattern**: Adapters for service integration
+3. **Backwards Compatibility**: Maintaining existing connection points
+4. **Gradual Migration**: Replacing components incrementally
+
 ## Final Technical Stack
 
 The ChestBuddy application is built using the following technologies:

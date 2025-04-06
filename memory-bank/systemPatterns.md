@@ -1,9 +1,233 @@
 ---
 title: System Patterns - ChestBuddy Application
-date: 2023-04-02
+date: 2024-08-05
 ---
 
 # System Patterns - ChestBuddy Application
+
+## DataView Refactoring Architecture
+
+The DataView refactoring implements several key architectural patterns to create a more robust, maintainable, and feature-rich component. This section outlines the specific patterns being applied in this refactoring effort.
+
+### Core Architectural Principles
+
+The refactored DataView follows these architectural principles:
+
+1. **Separation of Concerns**: Clear boundaries between data management, presentation, and business logic.
+2. **Composability**: Components that can be composed to build more complex functionality.
+3. **Testability**: Design that facilitates comprehensive testing.
+4. **Single Responsibility**: Each component has one primary responsibility.
+5. **Open/Closed**: Components open for extension but closed for modification.
+
+### Component Architecture
+
+The DataView is structured around these key component types:
+
+#### Data Layer Components
+- **DataViewModel**: Adapts the ChestDataModel for display in the UI
+- **FilterModel**: Provides sorting and filtering capabilities
+- **SelectionModel**: Manages selection state and operations
+
+#### Presentation Layer Components
+- **DataTableView**: Core table view component
+- **DataHeaderView**: Custom header for advanced column operations
+- **CellDelegate**: Base rendering delegate for cells
+
+#### Specialized Delegates
+- **ValidationDelegate**: Specialized rendering for validation status
+- **CorrectionDelegate**: Specialized rendering for correction options
+- **DateDelegate**, **NumericDelegate**, etc.: Type-specific rendering
+
+#### Context Menu Components
+- **ContextMenu**: Main context menu framework
+- **MenuFactory**: Creates context-specific menu items
+- **ActionProviders**: Supply actions based on selection context
+
+#### Integration Adapters
+- **ValidationAdapter**: Connects ValidationService to UI
+- **CorrectionAdapter**: Connects CorrectionService to UI
+
+### Key Design Patterns in DataView Refactoring
+
+#### 1. Composite Pattern
+The DataView uses the Composite pattern to build complex UI structures from simpler components:
+
+```python
+class DataView:
+    """Main composite view combining all DataView components."""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._setup_ui()
+        
+    def _setup_ui(self):
+        # Create layout
+        layout = QtWidgets.QVBoxLayout(self)
+        
+        # Create toolbar
+        self._toolbar = ToolbarWidget(self)
+        layout.addWidget(self._toolbar)
+        
+        # Create filter widget
+        self._filter_widget = FilterWidget(self)
+        layout.addWidget(self._filter_widget)
+        
+        # Create main table view
+        self._table_view = DataTableView(self)
+        layout.addWidget(self._table_view)
+        
+        # Set up model
+        self._model = DataViewModel(self)
+        self._filter_model = FilterModel(self)
+        self._filter_model.setSourceModel(self._model)
+        self._table_view.setModel(self._filter_model)
+```
+
+#### 2. Delegate Pattern
+The DataView uses the Delegate pattern extensively for customized cell rendering:
+
+```python
+class CellDelegate(QtWidgets.QStyledItemDelegate):
+    """Base delegate for all cell rendering."""
+    
+    def paint(self, painter, option, index):
+        """Paint the cell with custom styling."""
+        # Default implementation
+        super().paint(painter, option, index)
+        
+    def createEditor(self, parent, option, index):
+        """Create custom editor for cell."""
+        return super().createEditor(parent, option, index)
+        
+class ValidationDelegate(CellDelegate):
+    """Specialized delegate for validation status visualization."""
+    
+    def paint(self, painter, option, index):
+        """Paint the cell with validation status indicators."""
+        # Get validation status
+        status = index.data(ValidationRole)
+        
+        # Apply background color based on status
+        if status == ValidationStatus.INVALID:
+            painter.fillRect(option.rect, self.INVALID_COLOR)
+        elif status == ValidationStatus.CORRECTABLE:
+            painter.fillRect(option.rect, self.CORRECTABLE_COLOR)
+            
+        # Draw basic cell content
+        super().paint(painter, option, index)
+        
+        # Draw status indicator icon if needed
+        if status != ValidationStatus.VALID:
+            self._draw_status_icon(painter, option, status)
+```
+
+#### 3. Adapter Pattern
+The DataView uses the Adapter pattern to connect core services with UI components:
+
+```python
+class ValidationAdapter:
+    """Adapts ValidationService for UI integration."""
+    
+    def __init__(self, validation_service):
+        self._validation_service = validation_service
+        self._connect_signals()
+        
+    def _connect_signals(self):
+        self._validation_service.validation_completed.connect(
+            self._on_validation_completed)
+            
+    def _on_validation_completed(self, results):
+        """Transform validation results for UI consumption."""
+        ui_friendly_results = self._transform_results(results)
+        self.validation_results_available.emit(ui_friendly_results)
+        
+    def _transform_results(self, results):
+        """Convert service results to UI-friendly format."""
+        # Implementation...
+```
+
+#### 4. Factory Pattern
+The DataView uses the Factory pattern for creating context-specific menu items:
+
+```python
+class MenuFactory:
+    """Factory for creating context-specific menu items."""
+    
+    @staticmethod
+    def create_menu(selection, parent=None):
+        """Create a context menu based on selection."""
+        menu = ContextMenu(parent)
+        
+        # Add standard edit actions
+        menu.add_action(CopyAction(selection))
+        menu.add_action(PasteAction(selection))
+        menu.add_action(DeleteAction(selection))
+        
+        # Add selection-specific actions
+        if selection.has_invalid_cells():
+            menu.add_action(ValidationErrorAction(selection))
+            
+        if selection.has_correctable_cells():
+            menu.add_action(ApplyCorrectionAction(selection))
+            
+        return menu
+```
+
+#### 5. Strategy Pattern
+The DataView uses the Strategy pattern for different rendering strategies:
+
+```python
+class CellRenderingStrategy:
+    """Base strategy for cell rendering."""
+    
+    def render(self, painter, option, index):
+        """Render the cell."""
+        raise NotImplementedError("Subclasses must implement this method")
+        
+class ValidationRenderingStrategy(CellRenderingStrategy):
+    """Strategy for rendering validation status."""
+    
+    def render(self, painter, option, index):
+        """Render validation status."""
+        # Implementation...
+        
+class CorrectionRenderingStrategy(CellRenderingStrategy):
+    """Strategy for rendering correction options."""
+    
+    def render(self, painter, option, index):
+        """Render correction options."""
+        # Implementation...
+```
+
+#### 6. Observer Pattern
+The DataView uses the Observer pattern extensively through Qt's signal-slot mechanism:
+
+```python
+class DataViewModel(QtCore.QAbstractTableModel):
+    """Model for DataView."""
+    
+    # Define signals
+    validation_state_changed = Signal(object)
+    correction_state_changed = Signal(object)
+    selection_changed = Signal(object)
+    
+    def update_validation_state(self, new_state):
+        """Update validation state and notify observers."""
+        self._validation_state = new_state
+        self.validation_state_changed.emit(new_state)
+        self.dataChanged.emit(QModelIndex(), QModelIndex())
+```
+
+### Component Interactions
+
+The components interact primarily through these mechanisms:
+
+1. **Signal/Slot**: Using Qt's signal/slot for loose coupling
+2. **Event Propagation**: Propagating events up the widget hierarchy
+3. **Model/View Updates**: Using standard Qt model/view mechanisms
+4. **Delegate Rendering**: Custom rendering through the delegate system
+
+This architecture provides a robust foundation for the DataView, addressing the key requirements while maintaining clear separation of concerns and high testability.
 
 ## Final Architecture Overview
 

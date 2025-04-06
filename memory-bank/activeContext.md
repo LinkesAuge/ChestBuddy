@@ -1,430 +1,253 @@
 ---
 title: Active Context - ChestBuddy Application
-date: 2024-08-02
+date: 2024-08-05
 ---
+
+# Active Context: DataView Refactoring
+
+Last Updated: 2024-08-05
+
+## Current Focus
+We are currently implementing a comprehensive refactoring of the DataView component, which is the central data display mechanism in ChestBuddy. This refactoring aims to enhance modularity, improve performance, and add new capabilities for data visualization and interaction.
+
+## Key Objectives
+
+1. **Component Architecture**: Implement a modular component architecture that separates concerns between data models, views, delegates, and adapters
+2. **Enhanced Validation**: Improve visual feedback for data validation with clear status indicators
+3. **Correction Integration**: Seamlessly integrate the correction system with the DataView UI
+4. **Performance Optimization**: Ensure high performance with large datasets through optimized rendering
+5. **Comprehensive Testing**: Maintain high test coverage throughout the refactoring
+
+## Recent Changes
+
+- Created architectural design for new DataView component structure
+- Designed delegate pattern for cell rendering and interaction
+- Established core API contracts between components
+- Defined data flow patterns and component interactions
+
+## Implementation Plan
+
+### Phase 1: Core Models and Views (Current)
+- Implement the DataViewModel and FilterModel
+- Create the DataTableView and HeaderView components
+- Establish basic interaction patterns and behaviors
+
+### Phase 2: Delegate System
+- Implement the CellDelegate base class
+- Create specialized delegates for validation and correction
+- Connect delegates to the data view components
+
+### Phase 3: Adapter Integration
+- Implement ValidationAdapter for validation service integration
+- Create CorrectionAdapter for correction service integration
+- Connect adapters to the relevant delegates
+
+### Phase 4: Context Menus and Actions
+- Implement context menu system for data cells
+- Create specialized actions for common operations
+- Connect menu system to services via adapters
+
+### Phase 5: Performance Optimization
+- Implement lazy loading and viewport rendering
+- Add caching for validation and correction states
+- Optimize data transformation and rendering
+
+### Phase 6: Testing and Integration
+- Develop comprehensive test suite for components
+- Test integration with existing services
+- Verify backward compatibility with current implementations
+
+## Active Decisions
+
+1. **Component Granularity**: We've decided to use fine-grained components with clear responsibilities to enhance maintainability and testability
+2. **Adapter Pattern**: We're using adapters to connect the UI layer with domain services to maintain clean separation
+3. **Delegate Approach**: We're using a delegate-based approach for cell rendering to support diverse cell types and behaviors
+4. **Qt Model Roles**: Using custom Qt model roles for specialized data access to maintain separation between presentation and data
+5. **Context Menu Strategy**: Using dynamic context menus based on selection state and available actions
+
+## Technical Constraints
+
+1. **Qt Framework**: The UI components must be built with PySide6/Qt6 to align with the existing codebase
+2. **Performance Requirements**: The system must maintain performance with datasets of 10,000+ rows
+3. **Backward Compatibility**: The refactored components must maintain API compatibility with existing integrations
+4. **Cross-Platform Support**: All components must work correctly on Windows, macOS, and Linux
+
+## Next Steps
+
+1. Implement core DataViewModel with fundamental capabilities
+2. Develop FilterModel with sorting and filtering capabilities
+3. Create basic DataTableView with essential display and interaction
+4. Begin implementation of the delegate system
+5. Start developing tests for the initial components
+
+## Open Questions
+
+1. How should we handle custom data types in the delegate system?
+2. What's the best approach for optimizing large dataset rendering?
+3. How should the context menu handle multiple selection scenarios?
+4. What's the optimal strategy for background validation processing?
+
+## Relevant Documentation
+
+- [Qt Model/View Programming](https://doc.qt.io/qt-6/model-view-programming.html)
+- [Qt Delegate Documentation](https://doc.qt.io/qt-6/qstyleditemdelegate.html)
+- [ChestBuddy Validation Service API](link_to_internal_docs)
+- [ChestBuddy Correction Service API](link_to_internal_docs)
 
 # Active Development Context
 
-## Active Context - August 2, 2024
+## Active Context - August 5, 2024
+
+### DataView Refactoring Project Initiation
+
+We are initiating a comprehensive refactoring of the DataView component, which is a central element of the ChestBuddy application responsible for displaying, validating, and allowing interaction with chest data. The current implementation has shown limitations in handling validation statuses, providing effective user interaction through context menus, and supporting advanced data manipulation features.
+
+#### Refactoring Goals
+
+1. **Implement a robust validation status display**:
+   - Clear visual indicators for different validation statuses
+   - Consistent mapping between validation results and cell states
+   - Improved tooltip information for validation issues
+
+2. **Enhance context menu functionality**:
+   - Support for context-sensitive actions
+   - Efficient handling of multi-selection operations
+   - Integration with correction and validation workflows
+   - Support for adding entries to correction and validation lists
+
+3. **Improve data interaction**:
+   - Support for bulk operations
+   - Enhanced copy/paste functionality
+   - Efficient cell editing workflow
+   - Support for data import and export
+
+4. **Refine architecture and performance**:
+   - Clearer component boundaries
+   - Improved performance with large datasets
+   - Reduced code duplication
+   - Better testability
+
+#### Project Structure
+
+The refactored DataView will follow a clear and logical folder structure:
+
+```
+chestbuddy/
+├── ui/
+│   ├── data/                       # DataView-specific components
+│   │   ├── models/                 # Data models
+│   │   ├── views/                  # View components
+│   │   ├── delegates/              # Cell rendering delegates
+│   │   ├── adapters/               # Adapter components
+│   │   ├── menus/                  # Context menus
+│   │   ├── widgets/                # Supporting UI widgets
+│   │   └── data_view.py            # Composite view combining components
+├── tests/
+    ├── ui/
+    │   ├── data/                   # Tests for DataView components
+```
+
+#### Implementation Strategy
+
+The implementation will follow a phased approach:
+
+1. **Phase 1: Core DataView Implementation**
+   - Establish new folder structure
+   - Implement base classes (DataViewModel, DataTableView)
+   - Add core functionality (data loading, selection, columns)
+
+2. **Phase 2: Context Menu Implementation**
+   - Design context menu architecture
+   - Implement standard actions
+   - Add advanced functionality
+
+3. **Phase 3: Validation and Correction Integration**
+   - Implement validation status display
+   - Connect to correction system
+   - Add inline correction suggestions
+
+4. **Phase 4: Import/Export and Advanced Features**
+   - Implement import/export
+   - Add search and filter
+   - Optimize performance
+
+#### Key Components Being Developed
+
+1. **DataViewModel**: Adapts the core ChestDataModel for display in the UI
+2. **DataTableView**: Main table view component with enhanced functionality
+3. **CellDelegate**: Base rendering delegate with specialized subclasses
+4. **ValidationDelegate**: Delegate for validation visualization
+5. **CorrectionDelegate**: Delegate for displaying correction options
+6. **ContextMenu**: Main right-click context menu with dynamic content
+7. **ValidationAdapter**: Connect to ValidationService with UI integration
+8. **CorrectionAdapter**: Connect to CorrectionService with UI integration
+
+#### Current Status
+
+We are currently in the planning and documentation phase, with the following items completed:
+
+- ✅ Project overview documentation
+- ✅ UI mockups for main view, context menu, validation, and correction integration
+- ✅ Project structure documentation
+- ✅ File structure specifications
+- ✅ Testing strategy documentation (unit, integration, UI, performance)
+
+The next immediate steps are:
+
+1. Establish the new folder structure
+2. Implement the base model classes
+3. Implement the base view classes
+4. Create initial unit tests for core components
 
-### Correction System Improvements: Phases 3 & 4 Complete
+This refactoring project represents a significant improvement to the ChestBuddy application's data handling capabilities and will address multiple limitations in the current implementation.
 
-We have successfully completed two key phases of our correction system improvement plan:
+#### Detailed Testing Strategy
 
-#### Phase 3: Correctable Status Detection
+Our testing approach for the DataView refactoring includes:
 
-We've implemented a solution to identify invalid cells that can be automatically corrected based on available correction rules.
+1. **Unit Testing**:
+   - Test each component in isolation with mocked dependencies
+   - Verify component behavior against specifications
+   - Test edge cases and error handling
+   - Aim for 95% code coverage
 
-1. **Implementation Highlights**:
-   - Added two new test methods in `test_correction_service.py`:
-     - `test_get_correctable_cells` - Verifies that the service correctly identifies invalid cells with matching correction rules
-     - `test_check_correctable_status_method` - Verifies the service properly calls the validation service to update correctable status
-   - Enhanced the `CorrectionService` class to filter for invalid cells with matching rules
-   - Implemented proper integration with the validation service to mark cells as correctable
+2. **Integration Testing**:
+   - Test interactions between components
+   - Verify signal/slot connections
+   - Test data flow between components
+   - Validate state management across component boundaries
 
-2. **Key Features**:
-   - The `get_cells_with_available_corrections` method now correctly filters for invalid cells that have matching correction rules
-   - The `check_correctable_status` method properly integrates with the validation service
-   - Correctable cells are visually distinguished with an orange background in the data view
+3. **UI Testing**:
+   - Test rendering accuracy
+   - Verify user interaction handling
+   - Test keyboard navigation
+   - Validate accessibility features
 
-3. **Test Coverage**:
-   - Tests verified both the core functionality and the integration with validation services
-   - All tests are passing, confirming the implementation works correctly
+4. **Performance Testing**:
+   - Benchmark with large datasets (10,000+ rows)
+   - Measure rendering performance
+   - Test memory usage
+   - Verify responsive UI during intensive operations
 
-#### Phase 4: Auto-Correction Options
+We have developed comprehensive testing plans for each component, with detailed test cases and coverage targets. All tests will use pytest with pytest-qt for Qt-specific testing.
 
-We've implemented auto-correction options to allow automatic application of corrections after validation and on data import.
+#### Visualization and User Experience
 
-1. **Implementation Highlights**:
-   - Added configuration options in `ConfigManager`:
-     - Added default settings in `_init_defaults()` method with both options defaulting to False
-     - Implemented getter/setter methods for both options:
-       - `get_auto_correct_on_validation()` / `set_auto_correct_on_validation()`
-       - `get_auto_correct_on_import()` / `set_auto_correct_on_import()`
+The refactored DataView will provide enhanced visual cues for validation status:
 
-2. **Integration Points**:
-   - Found that core functionality was already implemented in `CorrectionController`:
-     - `auto_correct_after_validation()` - Checks configuration and applies corrections
-     - `auto_correct_on_import()` - Checks configuration and applies corrections
-   - Signal connections already exist in `DataViewController`:
-     - `_on_validation_completed()` calls the auto-correction method
-     - `_validate_after_import()` calls the import auto-correction method
+- **Valid cells**: White background
+- **Invalid cells**: Light red background with error indicator
+- **Correctable cells**: Light yellow background with correction indicator
+- **Warning cells**: Light orange background with warning indicator
+- **Info cells**: Light blue background with info indicator
 
-3. **Verification**:
-   - All ConfigManager unit tests pass, indicating the new configuration options work correctly
-   - The implementation integrates seamlessly with the existing code structure
+The context menu will be context-sensitive, displaying different options based on:
+- Current selection (single/multiple cells)
+- Cell state (valid/invalid/correctable)
+- Selected content type (text/number/date)
 
-#### Next Steps
+These visual improvements will significantly enhance the user's ability to identify and address data issues efficiently.
 
-With Phases 3 and 4 complete, our next focus will be on:
+## Previous Active Contexts
 
-1. **Phase 1: Recursive Correction** - Implementing functionality to recursively apply corrections until no more changes occur
-2. **Phase 2: Selection-Based Correction** - Enhancing the correction system to only apply corrections to selected cells
-
-These implementations will follow the same test-driven development approach we've used successfully for Phases 3 and 4.
-
-## Active Context - August 1, 2024
-
-### Validation Visualization System Fix
-
-We've successfully fixed a critical issue with the validation visualization system in ChestBuddy. Despite the validation service correctly identifying invalid entries (with 12,694 issues found according to the validation tab), none of these were being visually highlighted in the data view.
-
-#### Diagnostic Approach
-
-1. **Systematic Debugging**:
-   - Added comprehensive debug logging across multiple components
-   - Traced the validation status from creation to display
-   - Identified disconnects between validation service, data view, and validation delegate
-
-2. **Key Issues Discovered**:
-   - Validation service was creating a validation status DataFrame but not setting correct enum values
-   - Data view was not properly processing the validation status values
-   - Validation delegate had issues with status detection and visualization priorities
-
-3. **Validation Status Flow Analysis**:
-   - Traced how validation status enums are created in ValidationService
-   - Tracked how they're passed through signals to the DataView
-   - Examined how they're stored in the model and retrieved by the delegate
-
-#### Implemented Solutions
-
-1. **Validation Service Improvements**:
-   - Fixed ValidationService._update_validation_status to properly set status enum values
-   - Added detailed logging to track validation issue counts and types
-   - Enhanced the detection of correctable entries
-
-2. **Data View Enhancements**:
-   - Updated DataView._highlight_invalid_rows to correctly process validation statuses
-   - Improved storage of validation status values in the model (Qt.UserRole + 2)
-   - Added comprehensive logging for debugging status processing
-
-3. **Delegate Visualization Fixes**:
-   - Enhanced ValidationStatusDelegate.paint to better prioritize statuses:
-     1. CORRECTABLE has highest priority
-     2. INVALID has second priority
-     3. Row status is considered last
-   - Improved color coding for different statuses
-   - Added detailed comments to clarify status handling
-
-#### Results
-
-The validation visualization system now correctly displays all three types of validation statuses:
-
-- **Valid cells**: Light green background
-- **Invalid cells**: Deep red background with black border
-- **Correctable cells**: Orange background with darker orange border
-
-This improvement ensures that users receive accurate visual feedback about validation issues, making it easier to identify and fix data problems.
-
-#### Next Steps
-
-1. Consider further visual enhancements to make status differences more apparent
-2. Implement additional validation visualization options (e.g., icon-based indicators)
-3. Add validation summary features to provide statistics on validation results
-4. Enhance the integration between validation and correction systems
-
-The validation visualization fix is a key step in our correction system improvements, as it enables users to easily identify which entries need correction and which have automatic corrections available.
-
-## Active Context - July 23, 2024
-
-### CorrectionView Test Coverage Improvements
-
-We have successfully implemented comprehensive tests for the CorrectionView component in the ChestBuddy application. The test coverage for this component has significantly improved, now reaching 52% coverage of the CorrectionView implementation, and an impressive 96% coverage of the test file itself.
-
-#### Test Improvements Summary
-
-1. **Implemented Test Structure**:
-   - Created a robust `MockSignal` class to handle Qt signals in tests
-   - Set up fixtures for all necessary dependencies and mock components
-   - Implemented comprehensive test cases covering core functionality
-
-2. **Key Test Areas Covered**:
-   - Initialization and configuration
-   - Controller connection and setup
-   - View content updates and error handling
-   - Status message display
-   - Action button handling
-   - Corrections application
-   - History request handling
-   - Error state management
-   - UI component creation and management
-
-3. **Testing Patterns Applied**:
-   - Used MockSignal for safe signal connections without access violations
-   - Applied proper patching of UI components and methods
-   - Carefully mocked class methods to track calls and verify behavior
-   - Tested both success and error scenarios
-
-4. **Challenges Overcome**:
-   - Fixed initialization issues related to BaseView attributes
-   - Properly mocked signal connections to prevent access violations
-   - Addressed issues with method patching for UI components
-   - Ensured proper testing of signal emissions and handling
-
-#### Next Steps
-
-1. Consider expanding test coverage to additional edge cases
-2. Apply similar patterns to other view components with low coverage
-3. Continue refining the MockSignal pattern for UI testing
-4. Document these approaches in the testing best practices
-
-This work follows our successful ValidationTabView test improvements and continues our progress toward our goal of 95% test coverage across the application.
-
-## Active Context - May 16, 2024
-
-### ValidationTabView Test Coverage Improvements
-
-We have significantly improved the test coverage for the ValidationTabView component in the ChestBuddy application. The coverage has increased from 29% to 80%, which is a substantial improvement.
-
-#### Test Improvements Summary
-
-1. **Identified Key Uncovered Sections**:
-   - Exception handling in ValidationTabView's initialization (lines 73-75)
-   - Signal connection and disconnection logic (lines 452-564)
-   - Validation logic and UI updates (lines 595-602)
-   - Checkbox state changes and preferences (lines 615-619)
-
-2. **Added Comprehensive Tests**:
-   - Created tests for error handling during initialization
-   - Implemented tests for signal connection logic and disconnect handling
-   - Added tests for validation result processing
-   - Created tests for preference updates through checkbox toggling
-   - Added tests for edge cases like missing models and widget styling
-
-3. **Implemented Test Patterns**:
-   - Used MockSignal class to avoid PySide6 Signal connection issues
-   - Applied proper patching techniques for UI components
-   - Improved test fixtures to better represent real-world usage
-   - Used assert_any_call to handle multiple status bar updates
-
-4. **Challenges Overcome**:
-   - Fixed issues with PySide6 signal handling in tests
-   - Addressed UI component testing challenges by using real QWidgets where necessary
-   - Implemented proper exception testing for components that catch exceptions internally
-   - Created more robust tests that don't break from implementation changes
-
-#### Next Steps
-
-1. Apply similar test improvement patterns to other view components
-2. Update documentation on best practices for Qt UI testing
-3. Consider adding more integration tests between ValidationTabView and other components
-4. Implement better test organization for future UI component tests
-
-This work brings us closer to our goal of 95% test coverage for all components in the application.
-
-### Recent Codebase Cleanup
-- Added deprecation warnings to `chestbuddy/ui/correction_tab.py`, `chestbuddy/ui/chart_tab.py`, `chestbuddy/ui/views/correction_view_adapter.py`, marking these components as legacy
-- Added deprecation warnings to `chestbuddy/ui/views/chart_view_adapter.py`, noting that it will be replaced by a future ChartView component
-- Implemented new `ChartView` component to replace `ChartViewAdapter` and `ChartTab`, following the same pattern as `CorrectionView`
-- Removed `chestbuddy/core/service_locator.py` and consolidated to `chestbuddy/utils/service_locator.py`
-- Deleted `chestbuddy/ui/validation_tab.py` as it's been fully replaced by ValidationTabView
-- Documented migration status of UI components in `codebase_cleanup.md`
-- Updated `tests/test_main_window.py` to work with the new MainWindow constructor, fixing test failures
-- Created comprehensive tests for `ChartView` in `tests/unit/ui/views/test_chart_view.py`
-
-### Key Tasks in Progress
-1. Modernizing the UI architecture from tab-based to view-based design
-2. ✅ Updated MainWindow to use ChartView directly instead of ChartViewAdapter
-3. ✅ Created tests for the new ChartView component
-4. ✅ Improved test coverage for ValidationTabView from 29% to 80%
-5. Update remaining tests to use the new view-based components directly
-
-## Recent Codebase Cleanup
-
-We have performed a cleanup of redundant code in the ChestBuddy application:
-
-1. **Removed redundant service_locator.py** from the core directory, as it duplicated functionality in utils/service_locator.py
-2. **Added deprecation warnings** to legacy UI components that are being phased out:
-   - correction_tab.py
-   - chart_tab.py
-   - correction_view_adapter.py (identified that MainWindow already uses CorrectionView directly)
-   - chart_view_adapter.py (identified that it will need a ChartView replacement)
-3. **Deleted legacy UI component** no longer in use:
-   - validation_tab.py (replaced by ValidationTabView)
-   - Updated test_ui_components.py to use ValidationTabView
-4. **Implemented new modern components**:
-   - Created ChartView to replace ChartViewAdapter and ChartTab
-   - Maintained API compatibility for smooth transition
-5. **Marked signal_tracer.py** as a debug-only utility
-6. **Created documentation** for future cleanup tasks in memory-bank/codebase_cleanup.md
-7. **Documented migration status** of UI components in codebase_cleanup.md
-8. **Created tests** for the new ChartView component in tests/unit/ui/views/test_chart_view.py
-
-These changes are part of our ongoing effort to modernize the codebase by moving from the tab-based UI to a view-based architecture. The next step is to update remaining tests to use the new view components, followed by the removal of the deprecated adapter and legacy tab components.
-
-## UI Architecture Modernization Progress
-
-### Completed
-- ✅ ValidationTab → ValidationTabView: Component deleted and replaced
-- ✅ CorrectionTab → CorrectionView: MainWindow now uses CorrectionView directly
-- ✅ ChartView implementation: Created modern replacement for ChartTab/ChartViewAdapter
-- ✅ Updated MainWindow to use ChartView directly
-- ✅ Created comprehensive tests for ChartView
-
-### In Progress
-- 🔄 Updating remaining tests to use view-based components
-- 🔄 Preparing for removal of legacy components
-
-### Next Steps
-1. Update remaining ChartTab and ChartViewAdapter tests to use ChartView
-2. Remove deprecated adapter classes and legacy tab components
-3. Clean up any remaining references to legacy components
-
-## Current Focus: Complete CorrectionView UI Implementation
-
-We are currently focused on completing the UI implementation for the correction feature in the ChestBuddy application, specifically the CorrectionView. This involves implementing the remaining UI elements according to the mockup design and ensuring proper integration with the existing functionality.
-
-### Implemented Features
-
-- ✅ Status bar in CorrectionRuleView showing rule counts (Total: X | Enabled: Y | Disabled: Z)
-- ✅ Color legend in DataView explaining the different highlight colors for cells
-- ✅ Consistent cell highlighting with colors matching the legend
-- ✅ Update mechanism for cell highlighting via update_cell_highlighting method
-- ✅ Import/Export buttons in the header of CorrectionRuleView
-- ✅ Fixed deletion issues where the wrong rules were being deleted
-- ✅ Simplified CorrectionRule data structure by removing redundant 'order' and 'description' fields
-
-### Missing Features
-
-- 🔄 Context menu for data cells with options for individual and batch correction
-- 🔄 Enhanced Import/Export dialog with file format selection and preview
-- 🔄 Improved batch correction dialog with better pattern recognition
-- 🔄 Settings panel with configuration options
-
-### Current Tasks
-
-1. Implement context menu for DataView cells with the following options:
-   - Apply correction rules to selected cells
-   - Apply specific rule to selected cells
-   - Batch correction for similar values
-   - View validation details
-
-2. Enhance Import/Export dialog with:
-   - File format selection (CSV, Excel, JSON)
-   - Preview of rules before importing
-   - Options for handling duplicates
-   - Filtering options for export
-
-3. Improve batch correction dialog:
-   - Better pattern recognition for similar errors
-   - Preview of validation results
-   - Auto-correction suggestions
-   - Optimization for multiple cell selection
-
-4. Add settings panel with configuration checkboxes for:
-   - Auto-correction preferences
-   - Validation options
-   - Display settings
-
-### Next Steps
-
-1. Implement context menu for rule table with quick actions
-2. Connect settings to ConfigManager for persistence
-3. Enhance filter controls with additional options
-4. Create unit tests for new UI components
-
-### Key Decisions
-
-1. Replaced MainWindow status bar with dedicated QStatusBar in CorrectionView
-2. Implementation of file dialog integration for rule import/export
-3. Use of Test-Driven Development (TDD) for remaining features
-4. Follow UI component style guidelines from mockup
-5. Prioritize user experience with responsive feedback
-6. Simplified CorrectionRule data structure by removing 'order' field and implementing implicit ordering
-7. Further simplified CorrectionRule by removing unused 'description' field
-8. Added robust error handling for all rule operations
-
-## Recent Model Changes
-
-We've made important simplifications to the correction rule data model:
-
-1. **Removed Order Field**: The 'order' field has been removed from CorrectionRule. Rules are now ordered implicitly by their position in the list, making the code more intuitive and removing redundancy.
-
-2. **Removed Description Field**: The 'description' field has been removed as it was unused and added unnecessary complexity to the data structure.
-
-3. **Fixed Deletion Issues**: Implemented a more robust approach to rule deletion that prevents multiple rules from being deleted accidentally.
-
-These changes have significantly simplified the data structure and made the correction feature more maintainable.
-
-## DataView Integration
-
-The integration between the DataView and correction components is a critical part of the implementation, focusing on user experience and visual feedback.
-
-### Current Integration Work
-
-1. Context Menu Integration
-   - Adding context menu for cells to perform corrections
-   - Connecting menu actions to the controller
-   - Handling selection states for contextual options
-
-2. Visual Feedback
-   - Cell highlighting based on correction status
-   - Color-coded cells for different states
-   - Tooltips providing details on cell status
-
-3. Controller Enhancements
-   - Adding methods to apply corrections to selections
-   - Implementing batch correction operations
-   - Optimizing validation and correction workflows
-
-## Active Context - April 1, 2024
-
-### Correction System Improvements: TableStateManager Implementation
-
-We are implementing a new TableStateManager to improve cell state handling and correction visualization:
-
-#### Core Components
-
-1. **TableStateManager**:
-   - Integrated as a property of DataView
-   - Manages cell states and validation history
-   - Handles batch processing (100 rows per batch)
-   - Tracks corrections and errors
-   - Provides correction summaries
-
-2. **Progress Dialog**:
-   - Shows overall progress bar
-   - Displays correction details:
-     - Original value
-     - Corrected value
-     - Correction type
-   - Shows total corrections count
-   - Presents error summaries
-
-3. **Integration Points**:
-   - DataView integration for state management
-   - ValidationService for validation status
-   - CorrectionService for applying corrections
-   - Import/Export system integration
-
-#### Implementation Approach
-
-1. **Error Handling**:
-   - Continue on non-critical errors
-   - Aggregate errors for end summary
-   - Critical errors defined as data read/write failures
-   - Comprehensive error logging
-
-2. **Validation & Correction**:
-   - Independent validation and correction processes
-   - Consider active corrections during validation
-   - Auto-validation before auto-correction when both enabled
-   - Targeted updates for affected cells/rows
-
-#### Next Steps
-
-1. Implement CellState enum and TableStateManager
-2. Create ValidationProgressDialog
-3. Modify DataView for TableStateManager integration
-4. Update validation/correction code for batch processing
-5. Add comprehensive test coverage
-
-## Current Status (04/02/2025)
-
-### Recent Fixes
-
-1. **DataView Cell Highlighting Issue**: Fixed a critical bug where cell highlighting in the DataView was not persisting. The issue occurred because setting the background color triggered an `itemChanged` signal, which propagated to the data model causing a complete table repopulation that wiped out all highlighting. The fix involved temporarily blocking signals in the `_highlight_cell` method while setting background colors.
-
-2. **DataViewAdapter Connection Issue**: Fixed an initialization error in the DataViewAdapter where it was trying to call a non-existent method `_connect_view_signals()`. The fix was to call the correct existing method `_connect_signals()` instead. This resolved issues with the DataView not being visible in the main application.
-
-### Current Work
+[Note: Previous context entries are preserved but abbreviated here for focus] 

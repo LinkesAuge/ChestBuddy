@@ -636,4 +636,179 @@ The configuration system enhancements will be considered successfully tested whe
 1. All automated tests pass
 2. At least 90% of manual tests pass
 3. Any failures are documented and assessed for severity
-4. Critical functionality (persistence, reset, error recovery) works as expected 
+4. Critical functionality (persistence, reset, error recovery) works as expected
+
+# Testing Documentation
+
+Last updated: 2024-08-05
+
+## DataView Refactoring Testing Strategy
+
+### Overview
+This section outlines the testing approach for the DataView refactoring project. The testing strategy is designed to ensure comprehensive coverage and maintain quality throughout the implementation.
+
+### Testing Structure
+Tests for the DataView components will follow this directory structure:
+
+```
+tests/
+├── ui/
+│   ├── data/
+│   │   ├── models/
+│   │   │   ├── test_data_view_model.py
+│   │   │   └── test_filter_model.py
+│   │   ├── views/
+│   │   │   ├── test_data_table_view.py
+│   │   │   └── test_header_view.py
+│   │   ├── delegates/
+│   │   │   ├── test_cell_delegate.py
+│   │   │   ├── test_validation_delegate.py
+│   │   │   └── test_correction_delegate.py
+│   │   ├── adapters/
+│   │   │   ├── test_validation_adapter.py
+│   │   │   └── test_correction_adapter.py
+│   │   ├── menus/
+│   │   │   ├── test_context_menu.py
+│   │   │   └── test_correction_menu.py
+│   │   ├── widgets/
+│   │   │   ├── test_filter_widget.py
+│   │   │   └── test_toolbar_widget.py
+│   │   └── test_data_view.py
+```
+
+### Testing Types
+
+#### Unit Tests
+Each component will have dedicated unit tests:
+
+- **Models:**
+  - Test data retrieval and manipulation
+  - Test role-based data access
+  - Test row/column handling
+  - Test signal emissions
+
+- **Views:**
+  - Test selection behavior
+  - Test interaction patterns
+  - Test signal handling
+  - Test appearance properties
+
+- **Delegates:**
+  - Test rendering behavior
+  - Test editor handling
+  - Test data committal
+  - Test state visualization
+
+- **Adapters:**
+  - Test data transformation
+  - Test integration with services
+  - Test state management
+  - Test event handling
+
+- **Menus:**
+  - Test menu construction
+  - Test action triggering
+  - Test dynamic content
+  - Test state handling
+
+#### Integration Tests
+Integration tests will focus on component interactions:
+
+- Models → Views
+- Views → Delegates
+- Adapters → Delegates
+- Menus → Adapters
+
+#### UI Tests
+UI tests will verify user interactions and visual appearance:
+
+- Rendering tests
+- Mouse interaction tests
+- Keyboard navigation tests
+- Context menu interaction tests
+
+### Testing Frameworks and Tools
+
+- **pytest**: Main testing framework
+- **pytest-qt**: Qt-specific testing utilities
+- **pytest-cov**: Test coverage reports
+- **pytest-mock**: Mocking capabilities
+- **QTest**: Qt's testing framework for UI interactions
+
+### Test Data
+
+Sample test data will include:
+
+- Small datasets (10-100 rows)
+- Medium datasets (1,000 rows)
+- Large datasets (10,000+ rows)
+- Datasets with various data types
+- Datasets with validation issues
+- Datasets with correction options
+
+### Performance Testing
+
+Performance tests will measure:
+
+- Rendering time for various dataset sizes
+- Memory usage patterns
+- Interaction responsiveness
+- Filter/sort operation speed
+
+### Best Practices
+
+1. **Isolation**: Test components in isolation with mocked dependencies
+2. **Comprehensive**: Aim for high test coverage (>90%)
+3. **Edge Cases**: Test boundary conditions and error handling
+4. **Parameterization**: Use pytest's parameterized tests for comprehensive coverage
+5. **Fixtures**: Use fixtures for test setup and data preparation
+6. **Markers**: Use markers to categorize tests (unit, integration, UI)
+
+### Example Test Pattern
+
+```python
+import pytest
+from PySide6.QtCore import Qt
+
+def test_data_view_model_data_retrieval(qtbot):
+    # Arrange
+    model = DataViewModel()
+    model.setData(create_test_dataframe())
+    
+    # Act
+    display_value = model.data(model.index(0, 0), Qt.DisplayRole)
+    validation_status = model.data(model.index(0, 0), ValidationRole)
+    
+    # Assert
+    assert display_value == "Expected Value"
+    assert validation_status == ValidationStatus.VALID
+```
+
+### Continuous Integration
+
+The testing workflow for DataView components includes:
+
+1. Run unit tests on every commit
+2. Run integration tests on PR creation
+3. Run UI tests on PR targeting main branch
+4. Generate coverage reports
+5. Performance benchmarks on significant changes
+
+### Acceptance Criteria
+
+DataView components will be considered ready for integration when:
+
+- Unit test coverage exceeds 90%
+- All identified edge cases are tested
+- UI tests confirm expected behavior
+- Performance tests show acceptable metrics
+- All tests pass in the CI pipeline
+
+### Test-Driven Development Approach
+
+The DataView refactoring will follow a test-driven development approach:
+
+1. Write tests for the component behavior
+2. Implement the minimal code to pass tests
+3. Refactor while maintaining test coverage
+4. Repeat for each component feature 
