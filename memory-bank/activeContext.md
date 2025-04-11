@@ -24,6 +24,25 @@ We are currently implementing a comprehensive refactoring of the DataView compon
 - Designed delegate pattern for cell rendering and interaction
 - Established core API contracts between components
 - Defined data flow patterns and component interactions
+- Implemented `AddToCorrectionListAction` with a placeholder `execute` method
+- Created `AddCorrectionRuleDialog` for user input
+- Integrated `AddCorrectionRuleDialog` into `AddToCorrectionListAction.execute`
+- Added and updated tests for `AddToCorrectionListAction`, mocking the dialog interaction
+- Fixed several issues in tests related to mock models and assertions
+- Implemented `ApplyCorrectionAction` (applies first suggestion)
+- Implemented `ViewErrorAction`
+- Implemented standard edit actions (`CopyAction`, `PasteAction`, `CutAction`, `DeleteAction`)
+- Created base action framework (`base_action.py`, `ActionContext`)
+- Created `ContextMenuFactory`
+- Implemented `AddToValidationListAction`
+- Created `AddValidationEntryDialog`
+- Added tests for `AddValidationEntryDialog`
+- Integrated `ValidationService` call (via ActionContext) into `AddToValidationListAction` (mocked)
+- Integrated `CorrectionService` call (via ActionContext) into `AddToCorrectionListAction` (mocked)
+- Added and updated tests for actions and dialogs for batch processing.
+- Implemented standard edit actions (`CopyAction`, `PasteAction`, `CutAction`, `DeleteAction`) and tests.
+- Implemented `EditCellAction` (F2) and tests.
+- Implemented `ShowEditDialogAction` with placeholder `ComplexEditDialog` and tests.
 
 ## Implementation Plan
 
@@ -94,9 +113,22 @@ We are between **Phase 2 (Delegates)** and **Phase 3 (Adapters)**.
 
 #### Next Steps
 
-1.  **Refine Adapters & State Manager**: Define `TableStateManager` update API and implement proper transformation logic in `ValidationAdapter` and `CorrectionAdapter`.
-2.  **Implement Phase 1 Items**: Address data loading, column handling, basic UI controls.
-3.  **Advanced Context Menu**: Implement context-specific actions.
+1.  **Connect Edit Actions:** Add `EditCellAction` and `ShowEditDialogAction` to the `ContextMenuFactory`.
+2.  **Start Phase 3**: Begin integrating validation/correction visualizations with delegates (`ValidationDelegate`, `CorrectionDelegate`) and connecting real services.
+3.  **Refine `ComplexEditDialog`**: Make the dialog context-aware (different editors for different columns/data types).
+4.  **Implement Validation During Editing**: Modify the `QStyledItemDelegate` to perform validation during the editing process.
+4.  **Refine Adapters & State Manager**: Define `TableStateManager` update API and implement proper transformation logic in `ValidationAdapter` and `CorrectionAdapter`.
+5.  **Implement Phase 1 Items**: Address data loading, column handling, basic UI controls.
+6.  **Advanced Context Menu**: Implement context-specific actions.
+7.  **Define `CorrectionService` Interface:** Specify the method signature for adding a rule (e.g., `add_rule(from_value: str, to_value: str, category: str, enabled: bool) -> bool`).
+8.  **Update `ActionContext`:** Add a property or mechanism to access the `CorrectionService` (e.g., `context.correction_service`).
+9.  **Modify `AddToCorrectionListAction`:** Replace the simulated `_call_correction_service_add` with a call to `context.correction_service.add_rule`.
+10. **Update Tests:** Mock the `CorrectionService` passed via the context in the action tests.
+11. **Implement the `AddToValidationListAction` similarly.
+12. **Implement Batch Actions:** Enhance `AddToCorrectionListAction` and `AddToValidationListAction` to handle multi-cell selections, possibly introducing batch dialogs.
+13. **Integrate Real Services:** Replace mocked service calls with actual implementations (requires `CorrectionService` and `ValidationService` to be ready).
+14. **Refine Service Injection:** Decide on the strategy for providing service instances to `ActionContext`.
+15. **Populate Dialog Categories/Lists:** Use real data sources for dropdowns in dialogs.
 
 This refactoring project represents a significant improvement to the ChestBuddy application's data handling capabilities and will address multiple limitations in the current implementation.
 
@@ -106,6 +138,9 @@ This refactoring project represents a significant improvement to the ChestBuddy 
 2. What's the best approach for optimizing large dataset rendering?
 3. How should the context menu handle multiple selection scenarios?
 4. What's the optimal strategy for background validation processing?
+5. How should the `CorrectionService` (and other services) be made available to the `ActionContext`? Dependency injection into the `ContextMenuFactory`? A central service registry?
+6. What are the exact categories for correction rules? Should they come from an Enum?
+7. How should multi-cell selection be handled for "Add to Correction List"? (Currently shows a warning).
 
 ## Relevant Documentation
 

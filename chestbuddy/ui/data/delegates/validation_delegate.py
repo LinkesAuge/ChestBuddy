@@ -6,7 +6,13 @@ Delegate responsible for visualizing validation status in cells.
 
 from PySide6.QtWidgets import QStyledItemDelegate, QStyleOptionViewItem
 from PySide6.QtCore import QModelIndex, Qt
-from PySide6.QtGui import QPainter, QColor, QIcon
+from PySide6.QtGui import QPainter, QColor, QIcon, QHelpEvent
+from PySide6.QtWidgets import (
+    QStyledItemDelegate,
+    QStyleOptionViewItem,
+    QToolTip,
+    QApplication,
+)
 
 from .cell_delegate import CellDelegate
 
@@ -39,12 +45,14 @@ class ValidationDelegate(CellDelegate):
         ValidationStatus.WARNING: QColor("#ffe4b6"),  # Light Orange
         ValidationStatus.INFO: QColor("#b6e4ff"),  # Light Blue
     }
-    # STATUS_ICONS = {
-    #     ValidationStatus.INVALID: QIcon(":/icons/invalid.png"),
-    #     ValidationStatus.CORRECTABLE: QIcon(":/icons/correctable.png"),
-    #     ValidationStatus.WARNING: QIcon(":/icons/warning.png"),
-    #     ValidationStatus.INFO: QIcon(":/icons/info.png"),
-    # }
+    STATUS_ICONS = {
+        ValidationStatus.INVALID: QIcon("icons:error.svg"),  # Example using resource path
+        # ValidationStatus.CORRECTABLE: QIcon("icons:correction_available.svg"), # CorrectionDelegate handles this
+        ValidationStatus.WARNING: QIcon("icons:warning.svg"),
+        ValidationStatus.INFO: QIcon("icons:info.svg"),
+    }
+
+    ICON_SIZE = 16  # Size for the status icons
 
     def __init__(self, parent=None):
         """
@@ -76,9 +84,46 @@ class ValidationDelegate(CellDelegate):
         # Call the base class paint method to draw text and standard elements
         super().paint(painter, option, index)
 
-        # TODO: Draw status icon if status is not VALID
-        # if validation_status and validation_status != ValidationStatus.VALID:
-        #     icon = self.STATUS_ICONS.get(validation_status)
-        #     if icon:
-        #         icon_rect = QRect(option.rect.right() - 18, option.rect.top() + (option.rect.height() - 16) // 2, 16, 16)
-        #         icon.paint(painter, icon_rect)
+        # Draw status icon if status is not VALID or CORRECTABLE
+        if validation_status and validation_status not in [
+            ValidationStatus.VALID,
+            ValidationStatus.CORRECTABLE,
+        ]:
+            icon = self.STATUS_ICONS.get(validation_status)
+            if icon:
+                # Calculate icon position (e.g., top-right corner)
+                icon_margin = 2
+                icon_rect = option.rect.adjusted(0, 0, 0, 0)  # Copy rect
+                icon_rect.setLeft(option.rect.right() - self.ICON_SIZE - icon_margin)
+                icon_rect.setTop(option.rect.top() + (option.rect.height() - self.ICON_SIZE) // 2)
+                icon_rect.setWidth(self.ICON_SIZE)
+                icon_rect.setHeight(self.ICON_SIZE)
+                # Draw icon respecting the application style
+                icon.paint(painter, icon_rect, Qt.AlignRight | Qt.AlignVCenter)
+
+    def sizeHint(self, option: QStyleOptionViewItem, index: QModelIndex) -> QSize:
+        """Provides size hint, potentially adding space for icons."""
+        hint = super().sizeHint(option, index)
+        # Add space if an icon might be drawn
+        validation_status = index.data(DataViewModel.ValidationStateRole)
+        if validation_status and validation_status != ValidationStatus.VALID:
+            # Add width for icon and margin
+            hint.setWidth(hint.width() + self.ICON_SIZE + 4)
+        return hint
+
+    # Override helpEvent to show detailed tooltips
+    def helpEvent(self, event: QHelpEvent, view, option: QStyleOptionViewItem, index: QModelIndex):
+        """Handles tooltip events to show detailed error messages."""
+        if event.type() == QHelpEvent.ToolTip and index.isValid():
+            error_details = index.data(DataViewModel.ErrorDetailsRole)
+            if error_details:
+                QToolTip.showText(event.globalPos(), str(error_details), view)
+                return True  # Event handled
+            else:
+                # Fallback to default tooltip if no specific details
+                default_tooltip = index.data(Qt.ToolTipRole)
+                if default_tooltip:
+                    QToolTip.showText(event.globalPos(), str(default_tooltip), view)
+                    return True
+
+        return super().helpEvent(event, view, option, index)

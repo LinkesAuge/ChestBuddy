@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
     QMessageBox,
+    QAbstractItemView,
 )
 from PySide6.QtCore import (
     Qt,
@@ -120,6 +121,15 @@ class DataTableView(QWidget):
         table_view.setSortingEnabled(True)
         table_view.setContextMenuPolicy(Qt.CustomContextMenu)
         table_view.verticalHeader().setVisible(False)
+
+        # Enable column reordering
+        header = table_view.horizontalHeader()
+        header.setSectionsMovable(True)
+
+        # Enable header context menu
+        header.setContextMenuPolicy(Qt.CustomContextMenu)
+        header.customContextMenuRequested.connect(self._show_header_context_menu)
+
         table_view.setItemDelegate(CorrectionDelegate(table_view))
         table_view.customContextMenuRequested.connect(self._show_context_menu)
 
@@ -165,6 +175,37 @@ class DataTableView(QWidget):
         global_pos = self.table_view.viewport().mapToGlobal(position)
         menu.exec(global_pos)
 
+    @Slot(QPoint)
+    def _show_header_context_menu(self, position):
+        """Show context menu for the horizontal header."""
+        header = self.table_view.horizontalHeader()
+        menu = QMenu(self)
+
+        # Add actions for each column
+        for logical_index in range(self.table_view.model().columnCount()):
+            visual_index = header.visualIndex(logical_index)
+            if visual_index < 0:  # Column might be hidden by moveSection
+                continue
+
+            column_name = self.table_view.model().headerData(logical_index, Qt.Horizontal)
+            action = QAction(column_name, self)
+            action.setCheckable(True)
+            action.setChecked(not self.table_view.isColumnHidden(logical_index))
+            action.triggered.connect(
+                lambda checked, col=logical_index: self.setColumnVisible(col, checked)
+            )
+            menu.addAction(action)
+
+        # Add separator and other header actions if needed
+        menu.addSeparator()
+        # Example: Action to resize columns to fit content
+        resize_action = QAction("Resize Columns to Contents", self)
+        resize_action.triggered.connect(self.table_view.resizeColumnsToContents)
+        menu.addAction(resize_action)
+
+        global_pos = header.mapToGlobal(position)
+        menu.exec(global_pos)
+
     # --- Action Slots ---
     # Remove old slots as execute logic is now in Action classes
     # @Slot()
@@ -204,5 +245,13 @@ class DataTableView(QWidget):
 
     def clearSelection(self):
         self.table_view.clearSelection()
+
+    def setColumnVisible(self, column_index: int, visible: bool):
+        """Shows or hides the specified column."""
+        self.table_view.setColumnHidden(column_index, not visible)
+
+    def isColumnVisible(self, column_index: int) -> bool:
+        """Returns True if the specified column is visible."""
+        return not self.table_view.isColumnHidden(column_index)
 
     # Delegate other necessary QTableView methods...

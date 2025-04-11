@@ -5,10 +5,10 @@ Delegate responsible for visualizing correction status and handling correction a
 """
 
 from PySide6.QtWidgets import QStyleOptionViewItem
-from PySide6.QtCore import QModelIndex, Qt, QRect
+from PySide6.QtCore import QModelIndex, Qt, QRect, QSize
 from PySide6.QtGui import QPainter, QIcon, QColor
 
-from .validation_delegate import ValidationDelegate
+from .validation_delegate import ValidationDelegate, ValidationStatus
 
 # Assuming DataViewModel provides CorrectionInfoRole or similar
 from ..models.data_view_model import DataViewModel
@@ -31,9 +31,9 @@ class CorrectionDelegate(ValidationDelegate):
     """
 
     # Define icons or visual elements for correction
-    # For testing, we can use a colored rect instead of a real icon
-    CORRECTION_INDICATOR_COLOR = QColor(Qt.GlobalColor.yellow)  # Example color
-    INDICATOR_SIZE = 8  # Small square indicator
+    # Example using a resource path for the icon
+    CORRECTION_INDICATOR_ICON = QIcon("icons:correction_available.svg")
+    ICON_SIZE = 16  # Shared icon size
 
     def __init__(self, parent=None):
         """Initialize the CorrectionDelegate."""
@@ -53,33 +53,52 @@ class CorrectionDelegate(ValidationDelegate):
         super().paint(painter, option, index)
 
         # Retrieve correction info from the model
-        # Use CorrectionStateRole which is defined in DataViewModel
-        correction_state = index.data(DataViewModel.CorrectionStateRole)
+        # Use CorrectionSuggestionsRole which is defined in DataViewModel
+        suggestions = index.data(DataViewModel.CorrectionSuggestionsRole)
+        is_correctable = (
+            index.data(DataViewModel.ValidationStateRole) == ValidationStatus.CORRECTABLE
+        )
 
-        # If correction state exists (and indicates correctability), draw indicator
-        # The exact check depends on what CorrectionStateRole returns
-        # Assuming non-None means correctable for now
-        if correction_state:
+        # If the cell is marked as correctable, draw the indicator
+        if is_correctable:
             self._paint_correction_indicator(painter, option)
 
     def _paint_correction_indicator(self, painter: QPainter, option: QStyleOptionViewItem):
         """
-        Paint a simple indicator for correctable cells.
+        Paint the correction indicator icon.
 
         Args:
             painter: The QPainter to use for drawing.
             option: Style options for the item.
         """
-        painter.save()
-        # Position indicator in top-right corner (adjust as needed)
-        indicator_rect = QRect(
-            option.rect.right() - self.INDICATOR_SIZE - 2,
-            option.rect.top() + 2,
-            self.INDICATOR_SIZE,
-            self.INDICATOR_SIZE,
-        )
-        painter.fillRect(indicator_rect, self.CORRECTION_INDICATOR_COLOR)
-        painter.restore()
+        icon = self.CORRECTION_INDICATOR_ICON
+        if not icon.isNull():
+            icon_margin = 2
+            icon_rect = option.rect.adjusted(0, 0, 0, 0)
+            icon_rect.setLeft(option.rect.right() - self.ICON_SIZE - icon_margin)
+            icon_rect.setTop(option.rect.top() + (option.rect.height() - self.ICON_SIZE) // 2)
+            icon_rect.setWidth(self.ICON_SIZE)
+            icon_rect.setHeight(self.ICON_SIZE)
+            icon.paint(painter, icon_rect, Qt.AlignRight | Qt.AlignVCenter)
 
-    # TODO: Potentially override createEditor, setEditorData, setModelData
-    # to integrate correction suggestions or actions directly into editing.
+    def sizeHint(self, option: QStyleOptionViewItem, index: QModelIndex) -> QSize:
+        """Provides size hint, potentially adding space for icons."""
+        # Get hint from ValidationDelegate (which considers its icons)
+        hint = super().sizeHint(option, index)
+        # Add space if correction icon might be drawn (only if not already added by validation)
+        validation_status = index.data(DataViewModel.ValidationStateRole)
+        is_correctable = validation_status == ValidationStatus.CORRECTABLE
+        # If correctable AND no validation icon is shown, add space
+        if is_correctable and validation_status not in [
+            ValidationStatus.INVALID,
+            ValidationStatus.WARNING,
+            ValidationStatus.INFO,
+        ]:
+            hint.setWidth(hint.width() + self.ICON_SIZE + 4)
+        # If correctable AND a validation icon is already shown, the space is likely sufficient
+        # This logic assumes correction indicator might overlap or replace validation icon
+        # If they need separate space, adjust logic here.
+        return hint
+
+    # TODO: Override editorEvent or add button handling to show suggestions
+    # when the indicator area is clicked.

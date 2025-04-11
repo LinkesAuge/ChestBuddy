@@ -8,6 +8,7 @@ for the DataView context.
 import typing
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QIcon, QKeySequence, QGuiApplication
+from PySide6.QtWidgets import QMessageBox, QDialog, QVBoxLayout, QTextEdit, QDialogButtonBox, QLabel
 
 from .base_action import AbstractContextAction
 
@@ -251,3 +252,171 @@ class CutAction(AbstractContextAction):
         CopyAction().execute(context)  # Copy first
         DeleteAction().execute(context)  # Then delete
         print(f"CutAction executed.")  # Debug
+
+
+# --- Direct Cell Editing Action ---
+
+
+class EditCellAction(AbstractContextAction):
+    """Action to trigger editing of the selected cell."""
+
+    @property
+    def id(self) -> str:
+        return "edit_cell"
+
+    @property
+    def text(self) -> str:
+        return "Edit Cell"
+
+    @property
+    def icon(self) -> QIcon:
+        # Use a standard edit icon
+        return QIcon.fromTheme("document-edit", QIcon(":/icons/edit.png"))
+
+    @property
+    def shortcut(self) -> typing.Optional[QKeySequence]:
+        # Standard shortcut for editing
+        return QKeySequence(Qt.Key_F2)
+
+    def is_applicable(self, context: ActionContext) -> bool:
+        # Applicable if there is a model and exactly one cell selected
+        return context.model is not None and len(context.selection) == 1
+
+    def is_enabled(self, context: ActionContext) -> bool:
+        # Enabled if the selected cell is editable
+        if len(context.selection) != 1:
+            return False
+        index = context.selection[0]
+        return bool(context.model.flags(index) & Qt.ItemIsEditable)
+
+    def execute(self, context: ActionContext) -> None:
+        """Triggers the edit operation on the selected cell in the parent view."""
+        if not self.is_applicable(context) or not self.is_enabled(context):
+            print("EditCellAction: Cannot execute, not applicable or enabled.")
+            return
+
+        index_to_edit = context.selection[0]
+        parent_view = context.parent_widget  # Assuming parent_widget is the QTableView
+
+        if parent_view and hasattr(parent_view, "edit"):
+            print(
+                f"EditCellAction: Triggering edit for index {index_to_edit.row()},{index_to_edit.column()})"
+            )
+            # Call the view's edit slot
+            parent_view.edit(index_to_edit)
+        else:
+            # Remove debug print
+            # print(f"EditCellAction: In else block. parent_view is {parent_view}")
+            print("EditCellAction: Parent widget is not a view or does not support edit().")
+            QMessageBox.warning(
+                context.parent_widget,
+                self.text,
+                "Cannot initiate edit operation on the current view.",
+            )
+
+
+# --- Placeholder Complex Edit Dialog ---
+
+
+class ComplexEditDialog(QDialog):
+    """A placeholder dialog for more complex cell editing."""
+
+    def __init__(self, initial_value: str, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Edit Value")
+        self._initial_value = initial_value
+        self._new_value: typing.Optional[str] = None
+
+        layout = QVBoxLayout(self)
+        layout.addWidget(QLabel("Edit the cell value:"))
+
+        self.text_edit = QTextEdit()  # Use QTextEdit for potential multi-line
+        self.text_edit.setText(self._initial_value)
+        layout.addWidget(self.text_edit)
+
+        self.button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        layout.addWidget(self.button_box)
+
+        self.button_box.accepted.connect(self.accept)
+        self.button_box.rejected.connect(self.reject)
+
+    def accept(self):
+        self._new_value = self.text_edit.toPlainText()
+        super().accept()
+
+    def get_new_value(self) -> typing.Optional[str]:
+        """Execute the dialog and return the new value if accepted."""
+        if self.exec() == QDialog.Accepted:
+            return self._new_value
+        return None
+
+
+# --- Action to Show Complex Edit Dialog ---
+
+# Patch path for the new dialog
+COMPLEX_EDIT_DIALOG_PATH = "chestbuddy.ui.data.actions.edit_actions.ComplexEditDialog"
+
+
+class ShowEditDialogAction(AbstractContextAction):
+    """Action to show a dedicated dialog for editing a cell."""
+
+    @property
+    def id(self) -> str:
+        return "show_edit_dialog"
+
+    @property
+    def text(self) -> str:
+        return "Edit in Dialog..."
+
+    @property
+    def icon(self) -> QIcon:
+        # Maybe a different edit icon?
+        return QIcon.fromTheme("document-edit-symbolic", QIcon(":/icons/edit-dialog.png"))
+
+    # No default shortcut for this one initially
+
+    def is_applicable(self, context: ActionContext) -> bool:
+        # Applicable if there is a model and exactly one cell selected
+        # Same logic as EditCellAction for now
+        return context.model is not None and len(context.selection) == 1
+
+    def is_enabled(self, context: ActionContext) -> bool:
+        # Enabled if applicable and the cell is editable
+        # Same logic as EditCellAction for now
+        if not self.is_applicable(context):
+            return False
+        index = context.selection[0]
+        return bool(context.model.flags(index) & Qt.ItemIsEditable)
+
+    def execute(self, context: ActionContext) -> None:
+        """Shows a dialog to edit the selected cell's content."""
+        if not self.is_applicable(context) or not self.is_enabled(context):
+            print("ShowEditDialogAction: Cannot execute, not applicable or enabled.")
+            return
+
+        index_to_edit = context.selection[0]
+        current_value = str(context.model.data(index_to_edit, Qt.DisplayRole) or "")
+
+        # --- Show Dialog --- (Using placeholder for now)
+        dialog = ComplexEditDialog(current_value, context.parent_widget)
+        new_value = dialog.get_new_value()
+
+        # --- Handle Dialog Result ---
+        if new_value is not None and new_value != current_value:
+            print(
+                f"ShowEditDialogAction: Setting new value '{new_value}' for index {index_to_edit.row()},{index_to_edit.column()}"
+            )
+            # Use EditRole for setData
+            success = context.model.setData(index_to_edit, new_value, Qt.EditRole)
+            if not success:
+                print("ShowEditDialogAction: setData failed.")
+                QMessageBox.warning(
+                    context.parent_widget, self.text, "Failed to update cell value."
+                )
+            else:
+                print("ShowEditDialogAction: setData succeeded.")
+                # Optionally show success message or rely on view update
+        elif new_value is None:
+            print("ShowEditDialogAction: Edit cancelled by user.")
+        else:
+            print("ShowEditDialogAction: Value not changed.")

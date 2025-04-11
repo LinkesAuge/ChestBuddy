@@ -2,11 +2,18 @@ import typing
 from PySide6.QtGui import QIcon
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QMessageBox, QMenu
+from unittest.mock import patch  # Temporary for simulation
 
 from .base_action import AbstractContextAction
 from ..context.action_context import ActionContext
 from ..models.data_view_model import DataViewModel
 from chestbuddy.core.table_state_manager import CellState
+from chestbuddy.ui.dialogs.add_correction_rule_dialog import AddCorrectionRuleDialog
+from chestbuddy.ui.dialogs.batch_add_correction_dialog import BatchAddCorrectionDialog
+# Placeholder for future dialog and service
+# from ...dialogs.add_correction_rule_dialog import AddCorrectionRuleDialog
+# from ....core.services.correction_service import CorrectionService
+
 
 # Placeholder for CorrectionSuggestion structure
 CorrectionSuggestion = typing.NewType("CorrectionSuggestion", object)
@@ -101,3 +108,148 @@ class ApplyCorrectionAction(AbstractContextAction):
             )
 
         print(f"ApplyCorrectionAction executed.")  # Debug
+
+
+class AddToCorrectionListAction(AbstractContextAction):
+    """Action to add selected cell value(s) to the correction list."""
+
+    @property
+    def id(self) -> str:
+        return "add_correction"
+
+    @property
+    def text(self) -> str:
+        return "Add to Correction List"
+
+    @property
+    def icon(self) -> QIcon:
+        return QIcon.fromTheme("list-add", QIcon(":/icons/list-add.png"))
+
+    def is_applicable(self, context: ActionContext) -> bool:
+        return context.model is not None
+
+    def is_enabled(self, context: ActionContext) -> bool:
+        return len(context.selection) > 0
+
+    def execute(self, context: ActionContext) -> None:
+        """Adds the selected cell data to the correction list."""
+        if not context.selection:
+            print("AddToCorrectionListAction: No cells selected.")
+            QMessageBox.information(context.parent_widget, self.text, "No cell selected.")
+            return
+
+        if not context.model:
+            return
+
+        selected_values = []
+        for index in context.selection:
+            if index.isValid():
+                data = context.model.data(index, Qt.DisplayRole)
+                selected_values.append(str(data) if data is not None else "")
+
+        unique_values = sorted(list(set(val for val in selected_values if val)))
+
+        if not unique_values:
+            print("AddToCorrectionListAction: No non-empty values selected.")
+            QMessageBox.information(
+                context.parent_widget, self.text, "No non-empty values selected to add."
+            )
+            return
+
+        # --- Get Service from Context (check early) ---
+        if not context.correction_service:
+            print("Error: CorrectionService not available in context.")
+            QMessageBox.critical(
+                context.parent_widget,
+                self.text,
+                "Correction service is unavailable. Cannot add rules.",
+            )
+            return
+
+        # --- Choose Dialog based on selection count ---
+        details = None
+        is_batch = len(unique_values) > 1  # Or maybe len(context.selection) > 1?
+        # Using unique_values seems better.
+
+        if is_batch:
+            print(f"AddToCorrectionListAction: Using Batch Dialog for {len(unique_values)} values.")
+            dialog = BatchAddCorrectionDialog(unique_values, context.parent_widget)
+            details = dialog.get_batch_details()
+        else:
+            print(f"AddToCorrectionListAction: Using Single Rule Dialog for 1 value.")
+            # For single selection, use the first unique value as default 'from'
+            default_from = unique_values[0]
+            dialog = AddCorrectionRuleDialog(
+                default_from_value=default_from, parent=context.parent_widget
+            )
+            details = dialog.get_rule_details()
+
+        # --- Handle Dialog Result ---
+        if not details:
+            print("AddToCorrectionListAction: Rule addition cancelled by user.")
+            return
+
+        # --- Call Service ---
+        success_count = 0
+        total_rules_attempted = 0
+        error_occurred = False
+
+        try:
+            if is_batch:
+                from_values = details["from_values"]
+                to_value = details["to_value"]
+                category = details["category"]
+                enabled = details["enabled"]
+                total_rules_attempted = len(from_values)
+
+                print(f"Attempting to add {total_rules_attempted} batch rules...")
+                # Call add_rule for each unique value
+                for from_val in from_values:
+                    if context.correction_service.add_rule(
+                        from_value=from_val, to_value=to_value, category=category, enabled=enabled
+                    ):
+                        success_count += 1
+            else:  # Single rule
+                from_value = details["from_value"]
+                to_value = details["to_value"]
+                category = details["category"]
+                enabled = details["enabled"]
+                total_rules_attempted = 1
+
+                print(f"Attempting to add 1 rule...")
+                if context.correction_service.add_rule(
+                    from_value=from_value, to_value=to_value, category=category, enabled=enabled
+                ):
+                    success_count += 1
+
+        except Exception as e:
+            print(f"Error calling CorrectionService.add_rule(s): {e}")
+            error_occurred = True
+            QMessageBox.critical(
+                context.parent_widget, self.text, f"An error occurred while adding rule(s): {e}"
+            )
+            # Don't return yet, show partial success if any
+
+        # --- Show Result Message ---
+        if error_occurred:
+            # Error message already shown
+            if success_count > 0:
+                QMessageBox.warning(
+                    context.parent_widget,
+                    self.text,
+                    f"An error occurred, but {success_count} out of {total_rules_attempted} rule(s) might have been added successfully.",
+                )
+        elif success_count == total_rules_attempted:
+            QMessageBox.information(
+                context.parent_widget, self.text, f"Successfully added {success_count} rule(s)."
+            )
+            print(f"AddToCorrectionListAction: {success_count} rule(s) added successfully.")
+        else:  # Partial success without exception (e.g., service returned False)
+            QMessageBox.warning(
+                context.parent_widget,
+                self.text,
+                f"Successfully added {success_count} out of {total_rules_attempted} rule(s). Some failed.",
+            )
+            print(
+                f"AddToCorrectionListAction: Added {success_count}/{total_rules_attempted} rules."
+            )

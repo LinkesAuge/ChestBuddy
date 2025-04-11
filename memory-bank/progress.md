@@ -130,6 +130,13 @@ ChestBuddy is currently focused on a comprehensive refactoring of the DataView c
 | Create extensible action framework       | ✅ Completed  | Base class and edit actions implemented     |
 | Implement standard actions               | 🟢 In Progress | Copy/Paste/Cut/Delete logic moved to actions |
 | Add unit tests for context menu structure| ✅ Completed  | Tests for factory and actions added        |
+| **Advanced Context Menu Functionality**  | 🟢 In Progress | Actions for add/edit implemented           |
+| Implement selection-aware menu customization | 🟡 Planned    |                                            |
+| Implement correction list integration    | ✅ Completed  | Add action and tests done                  |
+| Implement validation list entry addition | ✅ Completed  | Add action and tests done                  |
+| Implement batch correction/validation options | ✅ Completed  | Batch dialogs and actions done             |
+| Implement cell editing                   | ✅ Completed  | Direct edit, dialog edit actions done      |
+| Add unit tests for advanced actions      | ✅ Completed  | Tests for add/edit/correction/validation added |
 
 ### Phase 5: Validation and Correction Integration (Was Phase 4)
 
@@ -141,6 +148,12 @@ ChestBuddy is currently focused on a comprehensive refactoring of the DataView c
 | **Correction System Integration** | 🟡 Planned | Basic delegate done       |
 | Implement correction workflow | 🟡 Planned | Needs Adapter refinement  |
 | Implement inline correction suggestions | 🟡 Planned | Needs Adapter refinement  |
+|   - ValidationDelegate    | 3           | 3       | ~50%     | Initialization, paint logic verified                                  |
+|   - CorrectionDelegate    | 3           | 3       | ~50%     | Initialization, paint logic verified                                  |
+|   - ValidationAdapter     | 5           | 5       | ~70%     | Initialization, signal handling, basic transform verified             |
+|   - CorrectionAdapter     | 5           | 5       | ~70%     | Initialization, signal handling, basic transform verified             |
+|   - Edit Actions          | 29          | 29      | TBD      | Copy, Paste, Cut, Delete, Edit, ShowDialog tests covered              |
+| *Total Refactored*        | **73**      | **73**  | **~TBD** | Coverage estimate, exact number TBD                                     |
 
 ### Phase 6: Import/Export and Advanced Features (Was Phase 5)
 
@@ -204,7 +217,8 @@ ChestBuddy is currently focused on a comprehensive refactoring of the DataView c
 |   - CorrectionDelegate    | 3           | 3       | ~50%     | Initialization, paint logic verified                                  |
 |   - ValidationAdapter     | 5           | 5       | ~70%     | Initialization, signal handling, basic transform verified             |
 |   - CorrectionAdapter     | 5           | 5       | ~70%     | Initialization, signal handling, basic transform verified             |
-| *Total Refactored*        | **44**      | **44**  | **~50%** | Coverage estimate, exact number TBD                                     |
+|   - Edit Actions          | 29          | 29      | TBD      | Copy, Paste, Cut, Delete, Edit, ShowDialog tests covered              |
+| *Total Refactored*        | **73**      | **73**  | **~TBD** | Coverage estimate, exact number TBD                                     |
 
 ### DataView Component Test Plan
 
@@ -223,3 +237,61 @@ ChestBuddy is currently focused on a comprehensive refactoring of the DataView c
 ## Implementation Progress
 
 The DataView refactoring has completed the basic implementation of the core view, model, delegates, and adapters. Focus is shifting towards refining adapter logic and integrating with the state manager.
+
+## Overall Project Status
+
+- DataView Refactoring: In Progress (Phase 2 - Advanced Context Menu)
+
+## Completed Work (DataView Refactoring)
+
+- **Phase 2: Context Menu Implementation**
+    - **Core Context Menu Structure:**
+        - [x] Extensible action framework created (`base_action.py`, `ActionContext`).
+        - [x] `ContextMenuFactory` implemented to dynamically create menus.
+        - [x] Unit tests for factory structure added.
+    - **Standard Actions:**
+        - [x] `CopyAction`, `PasteAction`, `CutAction`, `DeleteAction` implemented.
+        - [x] Unit tests for standard actions added.
+    - **Advanced Context Menu Functionality:**
+        - [x] `ViewErrorAction` implemented.
+        - [x] `ApplyCorrectionAction` implemented (applies first suggestion).
+        - [x] `AddToCorrectionListAction` created with dialog integration & service call (mocked).
+        - [x] `AddCorrectionRuleDialog` created and tested.
+        - [x] `AddToValidationListAction` created with dialog integration & service call (mocked).
+        - [x] `AddValidationEntryDialog` created and tested.
+        - [x] Unit tests for `ViewErrorAction`, `ApplyCorrectionAction`, `AddToCorrectionListAction`, `AddToValidationListAction` added/updated.
+        - [x] Implement **Batch Correction/Validation Options**.
+        - [x] **Cell Editing:** `EditCellAction`, `ShowEditDialogAction` implemented.
+        - [x] Add unit tests for remaining actions (Batch actions, Cell Editing).
+    - **Cell Editing Actions:**
+        - [ ] Implement **Cell Editing** actions.
+
+## Remaining Work (DataView Refactoring)
+
+- **Phase 2: Context Menu Implementation**
+    - Integrate `CorrectionService` into `AddToCorrectionListAction`.
+    - Implement `AddToValidationListAction` (including dialog and service integration).
+    - Implement batch correction options in the context menu.
+    - Implement cell editing actions.
+    - Refine selection-aware menu customization.
+- **Phase 3: Validation and Correction Integration**
+    - Implement visual indicators for validation/correction states via delegates.
+    - Connect `ValidationService` and `CorrectionService` to the view/state management.
+    - Implement inline correction suggestions UI.
+- **Phase 4: Import/Export and Advanced Features**
+    - Implement relevant actions and integrate services.
+    - Implement search/filter model and widget.
+- **Testing and QA:**
+    - Complete unit tests (aiming for 95% coverage).
+    - Implement integration tests.
+    - Implement UI tests.
+- **Documentation and Cleanup:**
+    - Add docstrings and update external documentation.
+    - Final code reviews and cleanup.
+
+## Known Issues/Blocked Tasks
+
+- `AddToCorrectionListAction` and `AddToValidationListAction` still use simulated service calls.
+- Multi-cell selection for adding rules/list entries is not yet implemented.
+- Actual visual rendering of validation/correction states via delegates is not implemented.
+- Decision needed on how services are provided to `ActionContext` (see `activeContext.md`).

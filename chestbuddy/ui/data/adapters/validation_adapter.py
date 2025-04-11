@@ -9,14 +9,14 @@ import pandas as pd
 import typing
 
 # Placeholder imports - adjust based on actual locations
-# from chestbuddy.core.services import ValidationService
-# from chestbuddy.core.managers import TableStateManager
-# from chestbuddy.core.enums import ValidationStatus
+from chestbuddy.core.services import ValidationService
+from chestbuddy.core.managers.table_state_manager import TableStateManager, CellFullState
+from chestbuddy.core.enums.validation_enums import ValidationStatus
 
 # Placeholder types for clarity
-ValidationService = typing.NewType("ValidationService", QObject)
-TableStateManager = typing.NewType("TableStateManager", QObject)
-ValidationStatus = typing.NewType("ValidationStatus", str)  # Assuming enum/str
+# ValidationService = typing.NewType("ValidationService", QObject)
+# TableStateManager = typing.NewType("TableStateManager", QObject)
+# ValidationStatus = typing.NewType("ValidationStatus", str)  # Assuming enum/str
 
 
 class ValidationAdapter(QObject):
@@ -78,15 +78,46 @@ class ValidationAdapter(QObject):
             print("Validation results are None or not a DataFrame, skipping update.")  # Debug print
             return
 
-        # Directly pass the results DataFrame to the TableStateManager
+        # Transform the results DataFrame into the format needed by TableStateManager
+        # Assuming validation_results DataFrame has columns like 'ColumnName_status'
+        # and potentially 'ColumnName_details'.
+        state_changes: typing.Dict[typing.Tuple[int, int], CellFullState] = {}
+        num_rows = len(validation_results)
+        col_map = {name: i for i, name in enumerate(self._table_state_manager.get_column_names())}
+
+        for row_idx in range(num_rows):
+            for col_name, col_idx in col_map.items():
+                status_col = f"{col_name}_status"
+                details_col = f"{col_name}_details"
+
+                status = validation_results.iloc[row_idx].get(status_col, ValidationStatus.VALID)
+                details = validation_results.iloc[row_idx].get(details_col, None)
+
+                # We only need to store changes from the default VALID state
+                if status != ValidationStatus.VALID or details:
+                    # Fetch existing state to merge, preserving correction info
+                    existing_state = self._table_state_manager.get_full_cell_state(
+                        row_idx, col_idx
+                    )  # Assume this method exists
+                    if not existing_state:
+                        existing_state = CellFullState()
+
+                    state_changes[(row_idx, col_idx)] = CellFullState(
+                        validation_status=status,
+                        error_details=details,
+                        correction_suggestions=existing_state.correction_suggestions,  # Preserve suggestions
+                    )
+
+        # Update the TableStateManager with the transformed changes
         try:
-            # Assuming TableStateManager handles the transformation internally
-            self._table_state_manager.update_cell_states_from_validation(validation_results)
-            print(f"Passed validation results DataFrame to TableStateManager.")  # Debug print
+            # Assuming TableStateManager has an update_states method
+            if state_changes:
+                self._table_state_manager.update_states(state_changes)
+                print(f"Sent {len(state_changes)} state updates to TableStateManager.")  # Debug
+            else:
+                print("No validation state changes detected.")  # Debug
         except AttributeError:
-            print(
-                f"Error: TableStateManager object has no method 'update_cell_states_from_validation'"
-            )  # Debug print
+            print(f"Error: TableStateManager object has no method 'update_states'")  # Debug print
         except Exception as e:
             print(f"Error updating TableStateManager: {e}")  # Debug print
 

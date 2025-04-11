@@ -4,7 +4,7 @@ Tests for the CorrectionAdapter class.
 
 import pytest
 from PySide6.QtCore import QObject, Signal
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, call
 
 from chestbuddy.ui.data.adapters.correction_adapter import CorrectionAdapter
 

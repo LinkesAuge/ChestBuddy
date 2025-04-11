@@ -1,0 +1,19 @@
+Add ApplyCorrectionAction and AddToCorrectionListAction.
+
+- Implement ApplyCorrectionAction to apply first suggestion.
+- Add AddToCorrectionListAction.
+- Create AddCorrectionRuleDialog and integrate into action.
+- Integrate CorrectionService call (via ActionContext) into AddToCorrectionListAction.
+- Add AddToValidationListAction.
+- Create AddValidationEntryDialog and integrate into action.
+- Integrate ValidationService call (via ActionContext) into AddToValidationListAction.
+- Add BatchAddCorrectionDialog and BatchAddValidationDialog.
+- Update AddToCorrectionListAction and AddToValidationListAction to use batch dialogs for multi-selection.
+- Add/update tests for actions, dialogs, and service integration (mocked), including batch scenarios.
+- Fix imports and test mocks related to action framework and mock models.
+- Fix ViewErrorAction tests related to role definition.
+- Add EditCellAction to trigger direct cell editing (F2 shortcut).
+- Add ShowEditDialogAction to trigger dialog-based cell editing.
+- Add placeholder ComplexEditDialog.
+- Add tests for EditCellAction and ShowEditDialogAction.
+- Fix mock context factory in edit action tests. 

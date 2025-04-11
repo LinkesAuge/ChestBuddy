@@ -13,6 +13,7 @@ from PySide6.QtCore import (
 )
 from PySide6.QtWidgets import QTableView, QMenu
 from PySide6.QtTest import QTest
+from unittest.mock import MagicMock, patch
 
 from chestbuddy.ui.data.views.data_table_view import DataTableView
 from chestbuddy.ui.data.models.data_view_model import DataViewModel
@@ -144,3 +145,197 @@ class TestDataTableView:
         menu_actions = [action.text() for action in returned_menu.actions() if action.text()]
         assert len(menu_actions) > 0, "Context menu had no actions."
         assert "Copy" in menu_actions
+
+    def test_set_model(self, qapp):
+        """Test setting the model on the view."""
+        mock_model = MagicMock(spec=QAbstractItemModel)
+        view = DataTableView()
+        view.setModel(mock_model)
+        assert view.model() == mock_model
+        mock_model.setParent.assert_called_once_with(view.table_view)  # Parent should be table_view
+
+    # --- Column Visibility Tests --- #
+
+    def test_column_visibility_methods(self, qapp, mock_chest_data_model):
+        """Test setColumnVisible and isColumnVisible methods."""
+        model = DataViewModel(mock_chest_data_model, None)
+        view = DataTableView()
+        view.setModel(model)
+
+        # Verify initial visibility
+        assert view.isColumnVisible(1) is True
+        assert not view.table_view.isColumnHidden(1)
+
+        # Hide column 1
+        view.setColumnVisible(1, False)
+        assert view.isColumnVisible(1) is False
+        assert view.table_view.isColumnHidden(1)
+
+        # Show column 1 again
+        view.setColumnVisible(1, True)
+        assert view.isColumnVisible(1) is True
+        assert not view.table_view.isColumnHidden(1)
+
+    def test_header_context_menu_shows(self, qapp, mock_chest_data_model, qtbot, monkeypatch):
+        """Test that right-clicking the header shows the context menu."""
+        model = DataViewModel(mock_chest_data_model, None)
+        view = DataTableView()
+        view.setModel(model)
+        qtbot.addWidget(view)
+
+        header = view.table_view.horizontalHeader()
+
+        # Mock QMenu.exec to prevent actual menu display and track it
+        menu_shown = False
+
+        def mock_exec(*args, **kwargs):
+            nonlocal menu_shown
+            menu_shown = True
+            return None  # Don't return an action
+
+        monkeypatch.setattr(QMenu, "exec", mock_exec)
+
+        # Simulate right-click on header (section 0)
+        header_pos = header.sectionViewportPosition(0)
+        click_point = QPoint(header_pos + 5, header.height() // 2)
+        qtbot.mouseClick(header, Qt.RightButton, pos=click_point)
+
+        # Verify the menu was triggered
+        assert menu_shown
+
+    def test_header_context_menu_content(self, qapp, mock_chest_data_model, qtbot, monkeypatch):
+        """Test the content of the header context menu."""
+        mock_chest_data_model.columnCount.return_value = 3
+        mock_chest_data_model.headerData.side_effect = (
+            lambda sec, orient, role: f"Col {sec}" if role == Qt.DisplayRole else None
+        )
+        model = DataViewModel(mock_chest_data_model, None)
+        view = DataTableView()
+        view.setModel(model)
+        qtbot.addWidget(view)
+
+        header = view.table_view.horizontalHeader()
+        menu_actions = []
+
+        # Mock QMenu.exec to capture actions
+        def mock_exec(self, *args, **kwargs):
+            nonlocal menu_actions
+            menu_actions = self.actions()
+            return None
+
+        monkeypatch.setattr(QMenu, "exec", mock_exec)
+
+        # Simulate right-click on header
+        qtbot.mouseClick(header, Qt.RightButton, pos=QPoint(10, 10))
+
+        # Verify actions for each column exist
+        assert len(menu_actions) >= 3  # At least 3 column actions + separator + resize
+        col_action_texts = {a.text() for a in menu_actions if a.isCheckable()}
+        assert "Col 0" in col_action_texts
+        assert "Col 1" in col_action_texts
+        assert "Col 2" in col_action_texts
+        assert "Resize Columns to Contents" in {
+            a.text() for a in menu_actions if not a.isSeparator()
+        }
+
+        # Verify actions are checkable and checked initially
+        for action in menu_actions:
+            if action.isCheckable():
+                assert action.isCheckable()
+                assert action.isChecked()
+
+    def test_header_context_menu_toggle_visibility(
+        self, qapp, mock_chest_data_model, qtbot, monkeypatch
+    ):
+        """Test toggling column visibility via the header context menu."""
+        model = DataViewModel(mock_chest_data_model, None)
+        view = DataTableView()
+        view.setModel(model)
+        qtbot.addWidget(view)
+
+        header = view.table_view.horizontalHeader()
+        captured_actions = []
+
+        # Mock QMenu.exec to capture actions
+        def mock_exec(self, *args, **kwargs):
+            nonlocal captured_actions
+            captured_actions = self.actions()
+            return None
+
+        monkeypatch.setattr(QMenu, "exec", mock_exec)
+
+        # Show the menu
+        qtbot.mouseClick(header, Qt.RightButton, pos=QPoint(10, 10))
+
+        # Find the action for column 1 (assuming it exists)
+        action_col1 = None
+        for action in captured_actions:
+            if action.text() == mock_chest_data_model.headerData(
+                1, Qt.Horizontal
+            ):  # Use mocked header data
+                action_col1 = action
+                break
+
+        assert action_col1 is not None
+        assert action_col1.isChecked()  # Should be visible initially
+        assert view.isColumnVisible(1) is True
+
+        # Simulate unchecking the action to hide the column
+        # Directly trigger the action with checked=False
+        action_col1.triggered.emit(False)
+        qtbot.wait(50)  # Wait for potential UI updates
+
+        # Verify column is now hidden
+        assert view.isColumnVisible(1) is False
+
+        # Show the menu again
+        qtbot.mouseClick(header, Qt.RightButton, pos=QPoint(10, 10))
+
+        # Find the action again and verify it's unchecked
+        action_col1_updated = None
+        for action in captured_actions:
+            if action.text() == mock_chest_data_model.headerData(1, Qt.Horizontal):
+                action_col1_updated = action
+                break
+        assert action_col1_updated is not None
+        assert not action_col1_updated.isChecked()
+
+        # Simulate checking the action to show the column
+        action_col1_updated.triggered.emit(True)
+        qtbot.wait(50)
+
+        # Verify column is visible again
+        assert view.isColumnVisible(1) is True
+
+    def test_column_reordering(self, qapp, mock_chest_data_model, qtbot):
+        """Test that columns can be reordered by dragging header."""
+        model = DataViewModel(mock_chest_data_model, None)
+        view = DataTableView()
+        view.setModel(model)
+        qtbot.addWidget(view)
+
+        header = view.table_view.horizontalHeader()
+
+        # Initial visual order: 0, 1, 2, ...
+        assert header.visualIndex(0) == 0
+        assert header.visualIndex(1) == 1
+        assert header.visualIndex(2) == 2
+
+        # Simulate dragging header section 0 to position 2
+        source_pos = header.sectionViewportPosition(0)
+        target_pos = header.sectionViewportPosition(2)
+        center_y = header.height() // 2
+
+        # Press on header 0
+        qtbot.mousePress(header, Qt.LeftButton, pos=QPoint(source_pos + 5, center_y))
+        # Drag to position 2
+        qtbot.mouseMove(header, pos=QPoint(target_pos + 5, center_y))
+        # Release
+        qtbot.mouseRelease(header, Qt.LeftButton, pos=QPoint(target_pos + 5, center_y))
+        qtbot.wait(100)  # Allow time for move
+
+        # Verify new visual order (e.g., 1, 2, 0)
+        # The exact order depends on Qt's handling, but 0 should not be at index 0
+        assert header.visualIndex(0) != 0
+        # It's hard to predict exact final order reliably in tests, but we know 0 moved
+        assert header.logicalIndex(0) != 0  # Check that logical 0 is no longer visual 0

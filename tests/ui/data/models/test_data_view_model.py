@@ -5,8 +5,11 @@ Tests for the DataViewModel class.
 import pytest
 from PySide6.QtCore import Qt, QModelIndex
 from PySide6.QtGui import QColor
+from unittest.mock import MagicMock
 
 from chestbuddy.ui.data.models.data_view_model import DataViewModel
+from chestbuddy.core.table_state_manager import TableStateManager
+from chestbuddy.core.enums.validation_enums import ValidationStatus
 
 # Fixtures like mock_chest_data_model and mock_table_state_manager
 # are now expected to be loaded from tests/ui/data/conftest.py
@@ -102,40 +105,116 @@ class TestDataViewModel:
         mock_table_state_manager.get_cell_state.assert_called_with(3, 3)
 
     def test_header_data(self, mock_chest_data_model):
-        """Test headerData delegates to the source model."""
-        model = DataViewModel(mock_chest_data_model)
-        assert model.headerData(0, Qt.Horizontal, Qt.DisplayRole) == "Header"
+        """Test headerData retrieves header from source model."""
+        mock_chest_data_model.headerData.return_value = "Test Header"
+        model = DataViewModel(mock_chest_data_model, None)  # No state manager needed
+        assert model.headerData(0, Qt.Horizontal, Qt.DisplayRole) == "Test Header"
         mock_chest_data_model.headerData.assert_called_with(0, Qt.Horizontal, Qt.DisplayRole)
 
     def test_flags(self, mock_chest_data_model):
-        """Test flags returns editable flags combined with source flags."""
-        model = DataViewModel(mock_chest_data_model)
-        test_index = model.createIndex(0, 0)
-        expected_flags = Qt.ItemIsEnabled | Qt.ItemIsSelectable | Qt.ItemIsEditable
-        assert model.flags(test_index) == expected_flags
-        # Verify source model's flags was called
-        mock_chest_data_model.flags.assert_called_with(test_index)
+        """Test flags includes default flags plus editable."""
+        mock_chest_data_model.flags.return_value = Qt.ItemIsSelectable | Qt.ItemIsEnabled
+        model = DataViewModel(mock_chest_data_model, None)
+        index = model.index(0, 0)
+        flags = model.flags(index)
+        assert flags & Qt.ItemIsSelectable
+        assert flags & Qt.ItemIsEnabled
+        assert flags & Qt.ItemIsEditable  # Should be added by default
+        mock_chest_data_model.flags.assert_called_with(index)
 
-    def test_set_data(self, mock_chest_data_model, qtbot):
-        """Test setData delegates to the source model and emits dataChanged."""
-        model = DataViewModel(mock_chest_data_model)
-        test_index = model.createIndex(0, 0)
-        new_value = "new_data"
+    def test_set_data_success(self, mock_chest_data_model, qtbot):
+        """Test setData successfully updates source model and emits signal."""
+        mock_chest_data_model.setData.return_value = True
+        model = DataViewModel(mock_chest_data_model, None)
+        index = model.index(0, 0)
 
-        # Use waitSignal to check if dataChanged is emitted
-        # timeout=0 ensures it checks immediately if signal was emitted synchronously
-        with qtbot.waitSignal(model.dataChanged, timeout=100, raising=True) as blocker:
-            result = model.setData(test_index, new_value, Qt.EditRole)
+        with qtbot.waitSignal(model.dataChanged) as blocker:
+            success = model.setData(index, "new_value", Qt.EditRole)
 
-        assert result is True
-        mock_chest_data_model.setData.assert_called_with(test_index, new_value, Qt.EditRole)
-        # Check that the signal was emitted correctly via the blocker
-        assert blocker.signal_triggered
-        # Arguments are emitted as a list within blocker.args
-        assert len(blocker.args) == 3
-        assert blocker.args[0] == test_index  # topLeft
-        assert blocker.args[1] == test_index  # bottomRight
-        assert blocker.args[2] == [Qt.EditRole]  # roles
+        assert success
+        mock_chest_data_model.setData.assert_called_with(index, "new_value", Qt.EditRole)
+        assert blocker.args == [index, index, [Qt.EditRole]]
+
+    def test_set_data_failure(self, mock_chest_data_model, qtbot):
+        """Test setData returns False if source model fails."""
+        mock_chest_data_model.setData.return_value = False
+        model = DataViewModel(mock_chest_data_model, None)
+        index = model.index(0, 0)
+
+        with qtbot.assertNotEmitted(model.dataChanged):
+            success = model.setData(index, "new_value", Qt.EditRole)
+
+        assert not success
+        mock_chest_data_model.setData.assert_called_with(index, "new_value", Qt.EditRole)
+
+    def test_set_data_invalid_role(self, mock_chest_data_model, qtbot):
+        """Test setData returns False for roles other than EditRole."""
+        model = DataViewModel(mock_chest_data_model, None)
+        index = model.index(0, 0)
+
+        with qtbot.assertNotEmitted(model.dataChanged):
+            success = model.setData(index, "new_value", Qt.DisplayRole)
+
+        assert not success
+        mock_chest_data_model.setData.assert_not_called()
+
+    # --- Sorting Tests --- #
+
+    def test_sort_delegates_to_source(self, mock_chest_data_model, qtbot):
+        """Test sort calls source model's sort_data method."""
+        mock_chest_data_model.headerData.return_value = "ColumnA"  # Mock header name
+        # Ensure source model has the sort_data method
+        mock_chest_data_model.sort_data = MagicMock()
+
+        model = DataViewModel(mock_chest_data_model, None)
+
+        with qtbot.waitSignals([model.layoutAboutToBeChanged, model.layoutChanged]):
+            model.sort(0, Qt.AscendingOrder)
+
+        mock_chest_data_model.sort_data.assert_called_once_with("ColumnA", True)
+        assert model.current_sort_column() == 0
+        assert model.current_sort_order() == Qt.AscendingOrder
+
+    def test_sort_descending(self, mock_chest_data_model, qtbot):
+        """Test sort with descending order."""
+        mock_chest_data_model.headerData.return_value = "ColumnB"
+        mock_chest_data_model.sort_data = MagicMock()
+        model = DataViewModel(mock_chest_data_model, None)
+
+        with qtbot.waitSignals([model.layoutAboutToBeChanged, model.layoutChanged]):
+            model.sort(1, Qt.DescendingOrder)
+
+        mock_chest_data_model.sort_data.assert_called_once_with("ColumnB", False)
+        assert model.current_sort_column() == 1
+        assert model.current_sort_order() == Qt.DescendingOrder
+
+    def test_sort_invalid_column(self, mock_chest_data_model, qtbot):
+        """Test sort does nothing if header data is not found."""
+        mock_chest_data_model.headerData.return_value = None  # Simulate header not found
+        mock_chest_data_model.sort_data = MagicMock()
+        model = DataViewModel(mock_chest_data_model, None)
+
+        with qtbot.assertNotEmitted(model.layoutAboutToBeChanged):
+            with qtbot.assertNotEmitted(model.layoutChanged):
+                model.sort(99, Qt.AscendingOrder)  # Invalid column index
+
+        mock_chest_data_model.sort_data.assert_not_called()
+        assert model.current_sort_column() == -1  # Should remain default
+
+    def test_sort_no_source_method(self, mock_chest_data_model, qtbot):
+        """Test sort does nothing if source model lacks sort_data method."""
+        mock_chest_data_model.headerData.return_value = "ColumnA"
+        # Ensure source model *does not* have sort_data
+        if hasattr(mock_chest_data_model, "sort_data"):
+            del mock_chest_data_model.sort_data
+
+        model = DataViewModel(mock_chest_data_model, None)
+
+        with qtbot.assertNotEmitted(model.layoutAboutToBeChanged):
+            with qtbot.assertNotEmitted(model.layoutChanged):
+                model.sort(0, Qt.AscendingOrder)
+
+        assert model.current_sort_column() == -1  # Should remain default
 
     def test_data_for_edit_role(self, mock_chest_data_model):
         """Test data returns the correct value for EditRole (delegated)."""

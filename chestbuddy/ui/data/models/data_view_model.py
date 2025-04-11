@@ -37,6 +37,10 @@ class DataViewModel(QAbstractTableModel):
     CorrectionStateRole = Qt.UserRole + 2
     ErrorDetailsRole = Qt.UserRole + 3
     CorrectionSuggestionsRole = Qt.UserRole + 4  # Role for suggestions
+    ValidationErrorRole = Qt.UserRole + 5  # Add role for error details
+
+    # Signals
+    validation_updated = Signal()
 
     def __init__(self, source_model: ChestDataModel, state_manager: TableStateManager, parent=None):
         """
@@ -52,6 +56,10 @@ class DataViewModel(QAbstractTableModel):
         self._state_manager = state_manager
 
         self._connect_source_model_signals()
+
+        # Sort state
+        self._sort_column = -1
+        self._sort_order = Qt.AscendingOrder
 
     def _connect_source_model_signals(self):
         """Connect signals from the source ChestDataModel."""
@@ -246,6 +254,7 @@ class DataViewModel(QAbstractTableModel):
         # The underlying _source_model is assumed to be updated already
         self.endResetModel()
 
+    @Slot(dict)
     def on_cell_states_changed(self, changes: dict):
         """
         Slot to handle updates from the TableStateManager.
@@ -271,7 +280,14 @@ class DataViewModel(QAbstractTableModel):
 
         # Emit dataChanged for the affected range and relevant roles
         # (ValidationStateRole, BackgroundRole, ToolTipRole, etc.)
-        roles_to_update = [DataViewModel.ValidationStateRole, Qt.BackgroundRole, Qt.ToolTipRole]
+        roles_to_update = [
+            DataViewModel.ValidationStateRole,
+            DataViewModel.CorrectionStateRole,  # Add if used
+            DataViewModel.ErrorDetailsRole,
+            DataViewModel.CorrectionSuggestionsRole,
+            Qt.BackgroundRole,
+            Qt.ToolTipRole,
+        ]
         self.dataChanged.emit(top_left_index, bottom_right_index, roles_to_update)
 
         # print(f"DataViewModel received state changes: {changes}")
@@ -288,9 +304,45 @@ class DataViewModel(QAbstractTableModel):
     ) -> typing.Optional[typing.List[CorrectionSuggestion]]:
         """Gets correction suggestions for a cell."""
         # Assuming state_manager has a method to get suggestions
-        if self._state_manager and hasattr(self._state_manager, "get_cell_suggestions"):
-            return self._state_manager.get_cell_suggestions(row, col)
+        if self._state_manager and hasattr(self._state_manager, "get_cell_correction_suggestions"):
+            return self._state_manager.get_cell_correction_suggestions(row, col)
         return None
+
+    # --- Sorting --- #
+
+    def sort(self, column: int, order: Qt.SortOrder = Qt.AscendingOrder):
+        """
+        Sort the model by the specified column and order.
+
+        Args:
+            column (int): The column index to sort by.
+            order (Qt.SortOrder): The sort order (Ascending or Descending).
+        """
+        if self._source_model and hasattr(self._source_model, "sort_data"):
+            column_name = self.headerData(column, Qt.Horizontal)
+            if column_name:
+                self.layoutAboutToBeChanged.emit()
+                self._sort_column = column
+                self._sort_order = order
+                try:
+                    # Delegate sorting to the source model if possible
+                    self._source_model.sort_data(column_name, order == Qt.AscendingOrder)
+                except Exception as e:
+                    print(f"Error sorting source model: {e}")
+                # Emit layoutChanged signal after sorting
+                self.layoutChanged.emit()
+            else:
+                print(f"Could not get header data for column {column}")
+        else:
+            print("Source model does not support sorting or is not set.")
+
+    def current_sort_column(self) -> int:
+        """Returns the index of the column currently used for sorting."""
+        return self._sort_column
+
+    def current_sort_order(self) -> Qt.SortOrder:
+        """Returns the current sort order."""
+        return self._sort_order
 
     # TODO: Add methods for sorting and filtering support
     # def sort(self, column: int, order: Qt.SortOrder = Qt.AscendingOrder):

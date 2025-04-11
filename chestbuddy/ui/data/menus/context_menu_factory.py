@@ -19,70 +19,45 @@ from chestbuddy.core.table_state_manager import CellState  # Import real enum
 
 # Import Action classes (adjust path as needed)
 from ..actions.base_action import AbstractContextAction
-from ..actions.edit_actions import CopyAction, PasteAction, CutAction, DeleteAction
+from ..actions.edit_actions import (
+    CopyAction,
+    PasteAction,
+    CutAction,
+    DeleteAction,
+    EditCellAction,
+    ShowEditDialogAction,
+)
 
 # Import future action classes here
 from ..actions.validation_actions import ViewErrorAction  # Import real action
 from ..actions.correction_actions import ApplyCorrectionAction  # Import real action
 
+# Import AddToCorrectionListAction from correct path
+from ..actions.correction_actions import AddToCorrectionListAction
+
 # Import real ActionContext
 from ..context.action_context import ActionContext
 
 
-@dataclass
-class ActionContext:
-    """Information needed to build the context menu and execute actions."""
+# --- Remove Placeholder Actions ---
 
-    clicked_index: QModelIndex
-    selection: typing.List[QModelIndex]
-    model: typing.Optional[DataViewModel]
-    parent_widget: QWidget  # Needed for QMenu parent and potentially for action execution
-    # Add other context if needed by actions (e.g., view object, state manager)
-
-
-# --- Placeholder Actions for now ---
-# Keep placeholders for actions not yet implemented
-
-
-class AddToCorrectionListAction(AbstractContextAction):
-    @property
-    def id(self) -> str:
-        return "add_correction"
-
-    @property
-    def text(self) -> str:
-        return "Add to Correction List (TODO)"
-
-    def is_applicable(self, context: ActionContext) -> bool:
-        return True  # Always show for now
-
-    def is_enabled(self, context: ActionContext) -> bool:
-        return len(context.selection) > 0  # Enable if selection exists
-
-    def execute(self, context: ActionContext) -> None:
-        print(f"TODO: Execute {self.id}")
-
-
-class AddToValidationListAction(AbstractContextAction):
-    @property
-    def id(self) -> str:
-        return "add_validation"
-
-    @property
-    def text(self) -> str:
-        return "Add to Validation List (TODO)"
-
-    def is_applicable(self, context: ActionContext) -> bool:
-        return True  # Always show for now
-
-    def is_enabled(self, context: ActionContext) -> bool:
-        return len(context.selection) > 0  # Enable if selection exists
-
-    def execute(self, context: ActionContext) -> None:
-        print(f"TODO: Execute {self.id}")
-
-
-# --- End Placeholder Actions ---
+# class AddToCorrectionListAction(AbstractContextAction):
+#     @property
+#     def id(self) -> str:
+#         return "add_correction"
+#
+#     @property
+#     def text(self) -> str:
+#         return "Add to Correction List (TODO)"
+#
+#     def is_applicable(self, context: ActionContext) -> bool:
+#         return True  # Always show for now
+#
+#     def is_enabled(self, context: ActionContext) -> bool:
+#         return len(context.selection) > 0  # Enable if selection exists
+#
+#     def execute(self, context: ActionContext) -> None:
+#         print(f"TODO: Execute {self.id}")
 
 
 class ContextMenuFactory:
@@ -99,11 +74,13 @@ class ContextMenuFactory:
         CutAction,
         DeleteAction,
         # Separator needed here
+        EditCellAction,
+        ShowEditDialogAction,
+        # Separator needed here
         ViewErrorAction,
         ApplyCorrectionAction,
         # Separator needed here
         AddToCorrectionListAction,
-        AddToValidationListAction,
     ]
 
     @staticmethod
@@ -135,6 +112,7 @@ class ContextMenuFactory:
                 print(f"Error instantiating action {ActionClass.__name__}: {e}")
 
         # Add standard edit actions first
+        # These are generally applicable regardless of selection count
         edit_action_ids = {"copy", "paste", "cut", "delete"}
         for action_instance in action_instances:
             if action_instance.id in edit_action_ids:
@@ -157,7 +135,31 @@ class ContextMenuFactory:
             menu.addSeparator()
             needs_separator = False
 
+        # Add Direct/Dialog Edit Actions
+        # Applicable only for single cell selection (usually)
+        edit_action_ids = {"edit_cell", "show_edit_dialog"}
+        for action_instance in action_instances:
+            if action_instance.id in edit_action_ids:
+                if action_instance.is_applicable(info):
+                    qaction = QAction(
+                        action_instance.icon, action_instance.text, info.parent_widget
+                    )
+                    qaction.setShortcut(action_instance.shortcut or QKeySequence())
+                    qaction.setToolTip(action_instance.tooltip)
+                    qaction.setEnabled(action_instance.is_enabled(info))
+                    qaction.triggered.connect(
+                        lambda bound_action=action_instance: bound_action.execute(info)
+                    )
+                    menu.addAction(qaction)
+                    created_qactions[action_instance.id] = qaction
+                    needs_separator = True  # Separator before next group
+
+        if needs_separator:
+            menu.addSeparator()
+            needs_separator = False
+
         # Add context-specific actions (Validation/Correction)
+        # Applicability might depend on single cell state
         context_action_ids = {"view_error", "apply_correction"}
         for action_instance in action_instances:
             if action_instance.id in context_action_ids:
@@ -176,12 +178,8 @@ class ContextMenuFactory:
                     needs_separator = True  # Assume separator needed before next group
 
         # Add 'Add to List' actions
-        # This grouping logic could be improved (e.g., define groups in actions)
-        if needs_separator:
-            menu.addSeparator()
-            needs_separator = False
-
-        list_action_ids = {"add_correction", "add_validation"}
+        # Applicability might depend on selection count (e.g., enable batch add for >1)
+        list_action_ids = {"add_correction"}
         for action_instance in action_instances:
             if action_instance.id in list_action_ids:
                 if action_instance.is_applicable(info):

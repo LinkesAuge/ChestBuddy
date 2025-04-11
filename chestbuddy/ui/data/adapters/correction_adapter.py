@@ -8,15 +8,16 @@ from PySide6.QtCore import QObject, Slot
 import typing
 
 # Placeholder imports - adjust based on actual locations
-# from chestbuddy.core.services import CorrectionService
-# from chestbuddy.core.managers import TableStateManager
+from chestbuddy.core.services import CorrectionService
+from chestbuddy.core.managers.table_state_manager import TableStateManager, CellFullState
+from chestbuddy.core.enums.validation_enums import ValidationStatus
 
 # Placeholder types for clarity
-CorrectionService = typing.NewType("CorrectionService", QObject)
-TableStateManager = typing.NewType("TableStateManager", QObject)
-CorrectionState = typing.NewType(
-    "CorrectionState", object
-)  # Type depends on what state manager needs
+# CorrectionService = typing.NewType("CorrectionService", QObject)
+# TableStateManager = typing.NewType("TableStateManager", QObject)
+# CorrectionState = typing.NewType(
+#     "CorrectionState", object
+# )  # Type depends on what state manager needs
 
 
 class CorrectionAdapter(QObject):
@@ -81,29 +82,40 @@ class CorrectionAdapter(QObject):
             )  # Debug print
             return
 
-        # Transform suggestions into a list of (row, col) tuples for cells with suggestions
-        correctable_cells = [
-            (row, col)
-            for (row, col), suggestions in correction_suggestions.items()
-            if suggestions  # Only include if there are actual suggestions
-        ]
+        # Transform suggestions into the state_changes dict format
+        state_changes: typing.Dict[typing.Tuple[int, int], CellFullState] = {}
 
-        if not correctable_cells:
-            print("No cells found with correctable suggestions.")  # Debug print
-            return
+        for (row, col), suggestions in correction_suggestions.items():
+            # Fetch existing state to merge, preserving validation info
+            existing_state = self._table_state_manager.get_full_cell_state(
+                row, col
+            )  # Assume this method exists
+            if not existing_state:
+                existing_state = CellFullState()
 
-        # Update TableStateManager using the specific method for marking cells correctable
+            # Update state: Mark as CORRECTABLE and store suggestions
+            state_changes[(row, col)] = CellFullState(
+                validation_status=ValidationStatus.CORRECTABLE,
+                error_details=existing_state.error_details,  # Preserve validation details
+                correction_suggestions=suggestions,
+            )
+
+        # Update TableStateManager using the update_states method
         try:
-            self._table_state_manager.update_cell_states_from_correctable(correctable_cells)
-            print(
-                f"Updating TableStateManager marking {len(correctable_cells)} cells as correctable."
-            )  # Debug print
+            if state_changes:
+                self._table_state_manager.update_states(state_changes)
+                print(
+                    f"Sent {len(state_changes)} correction state updates to TableStateManager."
+                )  # Debug
+            else:
+                print("No correction state changes detected.")  # Debug
+
         except AttributeError:
-            print(
-                f"Error: TableStateManager object has no method 'update_cell_states_from_correctable'"
-            )  # Debug print
+            print(f"Error: TableStateManager object has no method 'update_states'")  # Debug print
         except Exception as e:
-            print(f"Error updating TableStateManager with correctable cells: {e}")  # Debug print
+            print(
+                f"Error updating TableStateManager with correction state updates: {e}"
+            )  # Debug print
 
     def disconnect_signals(self):
         """Disconnect signals to prevent issues during cleanup."""
