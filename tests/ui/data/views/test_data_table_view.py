@@ -11,7 +11,7 @@ from PySide6.QtCore import (
     QItemSelection,
     QItemSelectionModel,
 )
-from PySide6.QtWidgets import QTableView
+from PySide6.QtWidgets import QTableView, QMenu
 from PySide6.QtTest import QTest
 
 from chestbuddy.ui.data.views.data_table_view import DataTableView
@@ -112,3 +112,35 @@ class TestDataTableView:
         # Check if the correct indices are in the list (order might vary)
         rows_cols = sorted([(idx.row(), idx.column()) for idx in selected_indices])
         assert rows_cols == [(0, 0), (1, 1)]
+
+    def test_context_menu_basic(self, qapp, view_model, qtbot, monkeypatch, mocker):
+        """Test that a basic context menu is shown on right-click."""
+        view = DataTableView()
+        view.setModel(view_model)
+        view.show()
+        qtbot.addWidget(view)
+
+        # Spy on the slot that creates the menu
+        show_menu_spy = mocker.spy(view, "_show_context_menu")
+
+        # Mock the exec_ method on the QMenu class globally initially,
+        # just to prevent it from blocking if the spy doesn't work as expected.
+        monkeypatch.setattr("PySide6.QtWidgets.QMenu.exec_", lambda *args: None)
+
+        # Simulate right-click by directly emitting the signal
+        index_to_click = view.model().index(0, 0)
+        click_pos = view.visualRect(index_to_click).center()
+        # qtbot.mouseClick(view.viewport(), Qt.RightButton, pos=click_pos) # Don't simulate click
+        view.customContextMenuRequested.emit(click_pos)  # Emit signal directly
+
+        # Check that our slot was called
+        assert show_menu_spy.call_count == 1, "_show_context_menu slot was not called."
+
+        # Get the menu that was created and returned by the slot
+        returned_menu = show_menu_spy.spy_return
+        assert isinstance(returned_menu, QMenu), "_show_context_menu did not return a QMenu."
+
+        # Check the actions on the actual returned menu
+        menu_actions = [action.text() for action in returned_menu.actions() if action.text()]
+        assert len(menu_actions) > 0, "Context menu had no actions."
+        assert "Copy" in menu_actions

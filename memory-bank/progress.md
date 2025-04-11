@@ -16,17 +16,19 @@ Last updated: 2024-08-06
 - ✅ Base DataViewModel implemented and tested
 - ✅ Base DataTableView implemented and tested
 - ✅ Selection change signal added to DataTableView
+- ✅ Basic context menu creation implemented and tested
+- ✅ Base CellDelegate implemented and tested
 - ✅ Fixtures moved to conftest.py
 
 ### In Progress
-- 🔄 Core DataViewModel implementation (~80%)
-- 🔄 Basic DataTableView implementation (~60%)
+- 🔄 Core DataViewModel implementation (~85%)
+- 🔄 Basic DataTableView implementation (~75%)
 - 🔄 FilterModel initial implementation (20%)
-- 🔄 Context menu implementation (starting)
+- 🔄 Context menu implementation (basic done)
+- 🔄 Delegate System implementation (starting)
 
 ### Upcoming
 - ⏳ Custom HeaderView implementation
-- ⏳ CellDelegate base class development
 - ⏳ ValidationDelegate implementation
 - ⏳ CorrectionDelegate implementation
 - ⏳ ValidationAdapter development
@@ -93,17 +95,26 @@ ChestBuddy is currently focused on a comprehensive refactoring of the DataView c
 | Set up test directory structure       | ✅ Completed  |                                        |
 | Implement base model class            | ✅ Completed  | DataViewModel implemented              |
 | Implement base view class             | ✅ Completed  | DataTableView implemented              |
-| **Basic Functionality**               | 🟢 In Progress |                                        |
+| **Basic Functionality**               | ✅ Completed  |                                        |
 | Implement data loading                | 🟡 Planned    |                                        |
 | Implement column handling             | 🟡 Planned    |                                        |
 | Implement selection handling          | ✅ Completed  | Custom signal implemented and tested   |
-| Implement basic UI controls           | 🟡 Planned    |                                        |
+| Implement basic UI controls           | 🔄 In Progress | Basic context menu done                |
 
-### Phase 2: Context Menu Implementation
+### Phase 2: Delegate System
+
+| Task                                         | Status        | Notes                     |
+|----------------------------------------------|---------------|---------------------------|
+| Implement the CellDelegate base class        | ✅ Completed  | Base methods tested       |
+| Create specialized delegates for validation  | 🟡 Planned    |                           |
+| Create specialized delegates for correction  | 🟡 Planned    |                           |
+| Connect delegates to the data view components| 🟡 Planned    |                           |
+
+### Phase 3: Context Menu Implementation (Renamed from Phase 2)
 
 | Task                                     | Status        | Notes                     |
 |------------------------------------------|---------------|---------------------------|
-| **Core Context Menu Structure**          | 🔄 In Progress | Starting basic implementation |
+| **Core Context Menu Structure**          | 🟢 In Progress | Basic menu created        |
 | Design context menu architecture         | ✅ Completed  |                           |
 | Implement menu factory pattern           | 🟡 Planned    |                           |
 | Create extensible action framework       | 🟡 Planned    |                           |
@@ -113,7 +124,7 @@ ChestBuddy is currently focused on a comprehensive refactoring of the DataView c
 | Implement correction list integration    | 🟡 Planned    |                           |
 | Implement cell editing                 | 🟡 Planned    |                           |
 
-### Phase 3: Validation and Correction Integration
+### Phase 4: Validation and Correction Integration
 
 | Task | Status | Notes |
 |------|--------|-------|
@@ -124,7 +135,7 @@ ChestBuddy is currently focused on a comprehensive refactoring of the DataView c
 | Implement correction workflow | 🟡 Planned | |
 | Implement inline correction suggestions | 🟡 Planned | |
 
-### Phase 4: Import/Export and Advanced Features
+### Phase 5: Import/Export and Advanced Features
 
 | Task | Status | Notes |
 |------|--------|-------|
@@ -138,15 +149,15 @@ ChestBuddy is currently focused on a comprehensive refactoring of the DataView c
 
 ### Testing and Quality Assurance
 
-| Task                         | Status        | Notes                                  |
-|------------------------------|---------------|----------------------------------------|
-| **Automated Testing**        | 🟢 In Progress |                                        |
-| Complete unit testing        | 🟢 In Progress | Core models/views tested, target 95%    |
-| Implement integration testing| 🟡 Planned    |                                        |
-| Implement UI testing         | 🟡 Planned    |                                        |
-| **Manual Testing and Validation**| 🟡 Planned    |                                        |
-| Perform manual testing       | 🟡 Planned    |                                        |
-| Conduct usability testing    | 🟡 Planned    |                                        |
+| Task                         | Status        | Notes                                   |
+|------------------------------|---------------|-----------------------------------------|
+| **Automated Testing**        | 🟢 In Progress |                                         |
+| Complete unit testing        | 🟢 In Progress | Core models/views/delegates tested, target 95% |
+| Implement integration testing| 🟡 Planned    |                                         |
+| Implement UI testing         | 🟡 Planned    |                                         |
+| **Manual Testing and Validation**| 🟡 Planned    |                                         |
+| Perform manual testing       | 🟡 Planned    |                                         |
+| Conduct usability testing    | 🟡 Planned    |                                         |
 
 ## What Works (Existing Functionality)
 - Core data model and data handling
@@ -164,10 +175,11 @@ ChestBuddy is currently focused on a comprehensive refactoring of the DataView c
 - Enhanced validation status delegate to prioritize and color-code statuses
 
 ## What's Next
-1. Implement basic context menu logic (`_show_context_menu`).
-2. Add tests for context menu behavior (basic menu structure).
-3. Begin implementation of the base `CellDelegate`.
-4. Add tests for `CellDelegate` base class.
+1. Begin implementation of the `ValidationDelegate`.
+2. Add tests for `ValidationDelegate` painting logic.
+3. Implement `CorrectionDelegate`.
+4. Implement `ValidationAdapter` and `CorrectionAdapter`.
+5. Add advanced context menu features.
 
 ## Known Issues
 - Current DataView limitations (as documented before refactoring)
@@ -175,13 +187,14 @@ ChestBuddy is currently focused on a comprehensive refactoring of the DataView c
 
 ## Testing Status
 
-| Component Type            | Total Tests | Passing | Coverage | Notes                                  |
-|---------------------------|-------------|---------|----------|----------------------------------------|
-| Current UI Components     | 78          | 63      | Varies   | View tests need updates                |
-| DataView New Components   | 21          | 21      | ~35%     | DataViewModel, DataTableView           |
-|   - DataViewModel         | 17          | 17      | ~80%     | Basic functionality covered            |
-|   - DataTableView         | 4           | 4       | ~30%     | Basic setup & selection signal covered |
-| *Total Refactored*        | **21**      | **21**  | **~35%** |                                        |
+| Component Type            | Total Tests | Passing | Coverage | Notes                                          |
+|---------------------------|-------------|---------|----------|------------------------------------------------|
+| Current UI Components     | 78          | 63      | Varies   | View tests need updates                        |
+| DataView New Components   | 27          | 27      | ~40%     | DataViewModel, DataTableView, CellDelegate     |
+|   - DataViewModel         | 17          | 17      | ~80%     | Basic functionality covered                    |
+|   - DataTableView         | 5           | 5       | ~40%     | Basic setup, selection, context menu covered |
+|   - CellDelegate          | 6           | 6       | ~60%     | Base method calls verified                     |
+| *Total Refactored*        | **27**      | **27**  | **~40%** |                                                |
 
 ### DataView Component Test Plan
 

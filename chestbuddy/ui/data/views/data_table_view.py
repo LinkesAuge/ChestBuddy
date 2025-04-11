@@ -5,7 +5,7 @@ A specialized table view for displaying chest data with validation
 and correction visualizations.
 """
 
-from PySide6.QtWidgets import QTableView, QHeaderView
+from PySide6.QtWidgets import QTableView, QHeaderView, QMenu
 from PySide6.QtCore import (
     Qt,
     Signal,
@@ -15,9 +15,10 @@ from PySide6.QtCore import (
     QItemSelectionModel,
     QAbstractItemModel,
 )
+import typing
 
 # Placeholder imports - adjust as needed when models/delegates are implemented
-# from ..delegates.cell_delegate import CellDelegate
+from ..delegates.cell_delegate import CellDelegate
 # from ..models.data_view_model import DataViewModel
 
 
@@ -70,6 +71,7 @@ class DataTableView(QTableView):
         # Set a default delegate (placeholder until custom delegates are ready)
         # from PySide6.QtWidgets import QStyledItemDelegate
         # self.setItemDelegate(QStyledItemDelegate(self))
+        self.setItemDelegate(CellDelegate(self))
 
         # Enable custom context menus (to be implemented later)
         self.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -92,11 +94,32 @@ class DataTableView(QTableView):
         self.selection_changed.emit(selected_indices)
 
     @Slot(QPoint)
-    def _show_context_menu(self, position):
-        """Placeholder for showing the context menu."""
-        # Actual context menu logic will be implemented later
-        print(f"Context menu requested at: {position}")  # Basic feedback for now
-        pass
+    def _show_context_menu(self, position) -> typing.Optional[QMenu]:
+        """Shows a context menu at the given position and returns the menu.
+
+        Note: Returning the menu is primarily for testing purposes.
+        """
+        # Get the index under the cursor
+        index = self.indexAt(position)
+
+        # Create the menu
+        menu = QMenu(self)
+
+        # Add basic actions (will be expanded later)
+        copy_action = menu.addAction("Copy")
+        # paste_action = menu.addAction("Paste")
+        # delete_action = menu.addAction("Delete")
+
+        # TODO: Connect actions to actual slots
+        # copy_action.triggered.connect(self._copy_selection)
+
+        # TODO: Add context-specific actions based on index and selection
+
+        # Show the menu at the global position
+        global_pos = self.viewport().mapToGlobal(position)
+        menu.exec_(global_pos)
+
+        return menu  # Return the created menu for testing
 
     # --- Public API (Example) ---
 
