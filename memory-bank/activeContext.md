@@ -184,20 +184,24 @@ The implementation will follow a phased approach:
 
 #### Current Status
 
-We are currently in the planning and documentation phase, with the following items completed:
+We are currently in **Phase 1: Core DataView Implementation**, wrapping up basic view features and moving towards context menu implementation.
 
 - ✅ Project overview documentation
 - ✅ UI mockups for main view, context menu, validation, and correction integration
 - ✅ Project structure documentation
 - ✅ File structure specifications
 - ✅ Testing strategy documentation (unit, integration, UI, performance)
+- ✅ Base DataViewModel implemented and tested
+- ✅ Base DataTableView implemented and tested
+- ✅ Selection change signal added to DataTableView and tested
+- ✅ Fixtures moved to conftest.py
 
-The next immediate steps are:
+#### Next Steps
 
-1. Establish the new folder structure
-2. Implement the base model classes
-3. Implement the base view classes
-4. Create initial unit tests for core components
+1. Implement basic context menu logic (`_show_context_menu`).
+2. Add tests for context menu behavior (basic menu structure).
+3. Begin implementation of the base `CellDelegate`.
+4. Add tests for `CellDelegate` base class.
 
 This refactoring project represents a significant improvement to the ChestBuddy application's data handling capabilities and will address multiple limitations in the current implementation.
 
