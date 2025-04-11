@@ -5,7 +5,7 @@ This module contains the DataViewModel class, which serves as an adapter between
 the ChestDataModel and the DataTableView, providing data access, sorting, and filtering.
 """
 
-from PySide6.QtCore import QAbstractTableModel, Qt, QModelIndex
+from PySide6.QtCore import QAbstractTableModel, Qt, QModelIndex, Signal, Slot
 from PySide6.QtGui import QColor
 import typing
 

@@ -121,17 +121,17 @@ ChestBuddy is currently focused on a comprehensive refactoring of the DataView c
 
 ### Phase 4: Context Menu Implementation (Was Phase 3)
 
-| Task                                     | Status        | Notes                     |
-|------------------------------------------|---------------|---------------------------|
-| **Core Context Menu Structure**          | 🟢 In Progress | Basic menu created        |
-| Design context menu architecture         | ✅ Completed  |                           |
-| Implement menu factory pattern           | 🟡 Planned    |                           |
-| Create extensible action framework       | 🟡 Planned    |                           |
-| Implement standard actions               | 🟡 Planned    |                           |
-| **Advanced Context Menu Functionality**  | 🟡 Planned    |                           |
-| Implement selection-aware menu customization | 🟡 Planned    |                           |
-| Implement correction list integration    | 🟡 Planned    |                           |
-| Implement cell editing                 | 🟡 Planned    |                           |
+| Task                                     | Status        | Notes                                |
+|------------------------------------------|---------------|--------------------------------------|
+| **Core Context Menu Structure**          | 🟢 In Progress | Factory created and tested         |
+| Design context menu architecture         | ✅ Completed  |                                      |
+| Implement menu factory pattern           | ✅ Completed  |                                      |
+| Create extensible action framework       | 🟡 Planned    |                                      |
+| Implement standard actions               | 🔄 In Progress | Copy/Paste/Cut/Delete slots added    |
+| **Advanced Context Menu Functionality**  | 🟡 Planned    |                                      |
+| Implement selection-aware menu customization | 🟡 Planned    |                                      |
+| Implement correction list integration    | 🟡 Planned    |                                      |
+| Implement cell editing                 | 🟡 Planned    |                                      |
 
 ### Phase 5: Validation and Correction Integration (Was Phase 4)
 
