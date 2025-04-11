@@ -19,6 +19,9 @@ from chestbuddy.core.table_state_manager import TableStateManager, CellState
 ChestDataModel = typing.NewType("ChestDataModel", object)  # Placeholder type
 TableStateManager = typing.NewType("TableStateManager", object)  # Placeholder type
 
+# Placeholder for CorrectionSuggestion structure
+CorrectionSuggestion = typing.NewType("CorrectionSuggestion", object)
+
 
 class DataViewModel(QAbstractTableModel):
     """
@@ -33,6 +36,7 @@ class DataViewModel(QAbstractTableModel):
     ValidationStateRole = Qt.UserRole + 1
     CorrectionStateRole = Qt.UserRole + 2
     ErrorDetailsRole = Qt.UserRole + 3
+    CorrectionSuggestionsRole = Qt.UserRole + 4  # Role for suggestions
 
     def __init__(self, source_model: ChestDataModel, state_manager: TableStateManager, parent=None):
         """
@@ -160,6 +164,9 @@ class DataViewModel(QAbstractTableModel):
         elif role == DataViewModel.ErrorDetailsRole:
             # Use the new method
             return self.get_cell_details(index.row(), index.column())
+        elif role == DataViewModel.CorrectionSuggestionsRole:
+            # Use the new method
+            return self.get_correction_suggestions(index.row(), index.column())
 
         # Handle other roles as needed
 
@@ -274,6 +281,15 @@ class DataViewModel(QAbstractTableModel):
         """Gets detailed information (like error messages) for a cell."""
         if self._state_manager and hasattr(self._state_manager, "get_cell_details"):
             return self._state_manager.get_cell_details(row, col)
+        return None
+
+    def get_correction_suggestions(
+        self, row: int, col: int
+    ) -> typing.Optional[typing.List[CorrectionSuggestion]]:
+        """Gets correction suggestions for a cell."""
+        # Assuming state_manager has a method to get suggestions
+        if self._state_manager and hasattr(self._state_manager, "get_cell_suggestions"):
+            return self._state_manager.get_cell_suggestions(row, col)
         return None
 
     # TODO: Add methods for sorting and filtering support

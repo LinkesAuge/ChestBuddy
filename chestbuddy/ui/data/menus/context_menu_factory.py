@@ -23,7 +23,7 @@ from ..actions.edit_actions import CopyAction, PasteAction, CutAction, DeleteAct
 
 # Import future action classes here
 from ..actions.validation_actions import ViewErrorAction  # Import real action
-# from ..actions.correction_actions import ApplyCorrectionAction
+from ..actions.correction_actions import ApplyCorrectionAction  # Import real action
 
 # Import real ActionContext
 from ..context.action_context import ActionContext
@@ -42,32 +42,6 @@ class ActionContext:
 
 # --- Placeholder Actions for now ---
 # Keep placeholders for actions not yet implemented
-class ApplyCorrectionAction(AbstractContextAction):
-    @property
-    def id(self) -> str:
-        return "apply_correction"
-
-    @property
-    def text(self) -> str:
-        return "Apply Correction"
-
-    @property
-    def icon(self) -> QIcon:
-        return QIcon.fromTheme("edit-fix")
-
-    def is_applicable(self, context: ActionContext) -> bool:
-        state = (
-            context.model.data(context.clicked_index, DataViewModel.ValidationStateRole)
-            if context.clicked_index.isValid()
-            else None
-        )
-        return state == CellState.CORRECTABLE
-
-    def is_enabled(self, context: ActionContext) -> bool:
-        return True
-
-    def execute(self, context: ActionContext) -> None:
-        print(f"TODO: Execute {self.id}")
 
 
 class AddToCorrectionListAction(AbstractContextAction):

@@ -12,6 +12,7 @@ from PySide6.QtGui import QAction, QGuiApplication
 
 from chestbuddy.ui.data.menus.context_menu_factory import ContextMenuFactory, ActionContext
 from chestbuddy.core.table_state_manager import CellState
+from chestbuddy.ui.data.models.data_view_model import DataViewModel
 
 # --- Mock Objects ---
 
@@ -22,28 +23,39 @@ class MockModel:
     def __init__(self, is_editable=True, validation_state=None):
         self._is_editable = is_editable
         self._validation_state = validation_state
+        # Simple data store
+        self._data = {(r, c): f"Data({r},{c})" for r in range(2) for c in range(2)}
 
     def index(self, row, col, parent=QModelIndex()):
+        # Return a valid MagicMock for QModelIndex
         mock_index = MagicMock(spec=QModelIndex)
         mock_index.row.return_value = row
         mock_index.column.return_value = col
-        mock_index.isValid.return_value = True
+        mock_index.isValid.return_value = True  # Ensure it's valid
+        # Add mock parent() if needed, returning QModelIndex() for top-level
+        mock_index.parent.return_value = QModelIndex()
         return mock_index
 
-    def flags(self, index):
+    def data(self, index, role):
         if not index or not index.isValid():
-            return Qt.NoItemFlags
+            return None
+        if role == DataViewModel.ValidationStateRole:
+            return self._validation_state
+        return f"Data({index.row()},{index.column()})"  # Return something for data role
+
+    def flags(self, index):
         flags = Qt.ItemIsEnabled | Qt.ItemIsSelectable
         if self._is_editable:
             flags |= Qt.ItemIsEditable
         return flags
 
-    def data(self, index, role):
-        if not index or not index.isValid():
-            return None
-        if role == Qt.UserRole + 1:  # ValidationStateRole
-            return self._validation_state
-        return f"Data({index.row()},{index.column()})"
+    # Add mock get_correction_suggestions
+    def get_correction_suggestions(self, row, col):
+        # Return empty list by default for testing enablement
+        if self._validation_state == CellState.CORRECTABLE:
+            # Can return mock suggestions here if needed for specific tests
+            return ["mock_suggestion"]  # Return something to enable the action
+        return []
 
 
 @pytest.fixture
