@@ -9,15 +9,17 @@ import pytest
 from unittest.mock import MagicMock, patch
 from pathlib import Path
 
-from PySide6.QtWidgets import QAction, QApplication, QFileDialog, QMessageBox
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QAction
+from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox
 
+# from chestbuddy.controllers.file_operations_controller import FileOperationsController # Commented out - controller not found
 from chestbuddy.ui.main_window import MainWindow
-from chestbuddy.controllers.file_operations_controller import FileOperationsController
-from chestbuddy.controllers.view_state_controller import ViewStateController
-from chestbuddy.controllers.ui_state_controller import UIStateController
-from chestbuddy.controllers.data_view_controller import DataViewController
-from chestbuddy.controllers.progress_controller import ProgressController
+
+# from chestbuddy.controllers.view_state_controller import ViewStateController # Commented out
+# from chestbuddy.controllers.ui_state_controller import UIStateController # Commented out
+# from chestbuddy.controllers.data_view_controller import DataViewController # Commented out
+# from chestbuddy.controllers.progress_controller import ProgressController # Commented out
 
 
 # Helper class for catching signals

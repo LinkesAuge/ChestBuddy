@@ -59,26 +59,46 @@ We are currently implementing a comprehensive refactoring of the DataView compon
 
 ## Active Decisions
 
-1. **Component Granularity**: We've decided to use fine-grained components with clear responsibilities to enhance maintainability and testability
-2. **Adapter Pattern**: We're using adapters to connect the UI layer with domain services to maintain clean separation
-3. **Delegate Approach**: We're using a delegate-based approach for cell rendering to support diverse cell types and behaviors
-4. **Qt Model Roles**: Using custom Qt model roles for specialized data access to maintain separation between presentation and data
-5. **Context Menu Strategy**: Using dynamic context menus based on selection state and available actions
+1. **Component Granularity**: Fine-grained components for maintainability.
+2. **Adapter Pattern**: Used to connect UI layer with domain services.
+3. **Delegate Approach**: Used for cell rendering and interaction.
+4. **Qt Model Roles**: Custom roles for specialized data (ValidationState, CorrectionState).
+5. **Context Menu Strategy**: Dynamic menus based on selection/state.
+6. **State Management**: Adapters update a central `TableStateManager` (details TBD).
 
 ## Technical Constraints
+1. **Qt Framework**: PySide6/Qt6.
+2. **Performance**: Handle 10,000+ rows efficiently.
+3. **Backward Compatibility**: Maintain API compatibility where possible.
+4. **Cross-Platform**: Windows, macOS, Linux.
 
-1. **Qt Framework**: The UI components must be built with PySide6/Qt6 to align with the existing codebase
-2. **Performance Requirements**: The system must maintain performance with datasets of 10,000+ rows
-3. **Backward Compatibility**: The refactored components must maintain API compatibility with existing integrations
-4. **Cross-Platform Support**: All components must work correctly on Windows, macOS, and Linux
+#### Current Status
 
-## Next Steps
+We are between **Phase 2 (Delegates)** and **Phase 3 (Adapters)**.
 
-1. Implement core DataViewModel with fundamental capabilities
-2. Develop FilterModel with sorting and filtering capabilities
-3. Create basic DataTableView with essential display and interaction
-4. Begin implementation of the delegate system
-5. Start developing tests for the initial components
+- ✅ Project overview documentation
+- ✅ UI mockups
+- ✅ Project structure documentation
+- ✅ File structure specifications
+- ✅ Testing strategy documentation
+- ✅ Base DataViewModel implemented and tested
+- ✅ Base DataTableView implemented and tested
+- ✅ Selection change signal added and tested
+- ✅ Basic context menu creation implemented and tested
+- ✅ Base CellDelegate implemented and tested
+- ✅ ValidationDelegate implemented and tested
+- ✅ CorrectionDelegate implemented and tested
+- ✅ ValidationAdapter base implemented and tested (placeholder logic)
+- ✅ CorrectionAdapter base implemented and tested (placeholder logic)
+- ✅ Fixtures moved to conftest.py
+
+#### Next Steps
+
+1.  **Refine Adapters & State Manager**: Define `TableStateManager` update API and implement proper transformation logic in `ValidationAdapter` and `CorrectionAdapter`.
+2.  **Implement Phase 1 Items**: Address data loading, column handling, basic UI controls.
+3.  **Advanced Context Menu**: Implement context-specific actions.
+
+This refactoring project represents a significant improvement to the ChestBuddy application's data handling capabilities and will address multiple limitations in the current implementation.
 
 ## Open Questions
 

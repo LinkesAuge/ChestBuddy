@@ -39,6 +39,8 @@ class CellDelegate(QStyledItemDelegate):
         # TODO: Add custom painting logic based on cell state (validation, etc.)
         # For now, just call the base implementation
         super().paint(painter, option, index)
+        # Call the superclass implementation directly to avoid issues with super() in tests
+        # QStyledItemDelegate.paint(self, painter, option, index)
 
     def createEditor(
         self, parent: QWidget, option: QStyleOptionViewItem, index: QModelIndex

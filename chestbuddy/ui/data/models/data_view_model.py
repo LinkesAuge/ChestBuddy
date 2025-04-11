@@ -41,6 +41,24 @@ class DataViewModel(QAbstractTableModel):
         self._data_model = data_model
         self._table_state_manager: typing.Optional[TableStateManager] = None
 
+        self._connect_source_model_signals()
+
+    def _connect_source_model_signals(self):
+        """Connect signals from the source ChestDataModel."""
+        if self._data_model and hasattr(self._data_model, "data_changed"):
+            try:
+                # Disconnect first to prevent duplicate connections if called again
+                try:
+                    self._data_model.data_changed.disconnect(self._on_source_data_changed)
+                except RuntimeError:
+                    pass  # Signal was not connected
+                self._data_model.data_changed.connect(self._on_source_data_changed)
+                print("Successfully connected source model data_changed signal.")  # Debug
+            except Exception as e:
+                print(f"Error connecting source model data_changed signal: {e}")  # Debug
+        else:
+            print("Source model does not have data_changed signal or is None.")  # Debug
+
     def source_model(self) -> ChestDataModel:
         """
         Returns the underlying source data model.
@@ -198,7 +216,22 @@ class DataViewModel(QAbstractTableModel):
             return True
         return False
 
-    # --- Placeholder methods for future implementation ---
+    @Slot(object)  # Assuming data_changed emits the DataState object
+    def _on_source_data_changed(self, data_state: object):
+        """
+        Slot to handle data changes in the source ChestDataModel.
+
+        Resets the model to reflect the changes.
+
+        Args:
+            data_state: The updated DataState object from the source model.
+        """
+        print(f"DataViewModel received source data_changed signal. Resetting model.")  # Debug
+        # Perform a full model reset to reflect the changes
+        # More granular updates can be implemented later if needed
+        self.beginResetModel()
+        # The underlying _data_model is assumed to be updated already
+        self.endResetModel()
 
     def on_cell_states_changed(self, changes: dict):
         """

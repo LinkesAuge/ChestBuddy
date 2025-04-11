@@ -15,7 +15,8 @@ from PySide6.QtCore import Qt, QObject, Signal, QTimer, QEventLoop
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QPushButton, QLabel
 
 from chestbuddy.core.models.chest_data_model import ChestDataModel
-from chestbuddy.core.models.chart_model import ChartModel
+
+# from chestbuddy.core.models.chart_model import ChartModel # Commented out - file not found
 from chestbuddy.core.services.csv_service import CSVService
 from chestbuddy.core.services.data_manager import DataManager
 from chestbuddy.core.services.chart_service import ChartService
@@ -251,7 +252,7 @@ def main_window(qtbot, app, data_model, validation_service, correction_service, 
             view_state_controller=view_state_controller,
             data_view_controller=data_view_controller,
             ui_state_controller=ui_state_controller,
-            config_manager=config_mock
+            config_manager=config_mock,
         )
         qtbot.addWidget(window)
         window.show()
@@ -317,14 +318,14 @@ class TestDataModel:
         # Load data
         data_model._data = test_data.copy()
         data_model._notify_change()
-        
+
         # Clear the model
         if hasattr(data_model, "clear"):
             data_model.clear()
         else:
             data_model._data = pd.DataFrame()
             data_model._notify_change()
-        
+
         # Check that the model is empty without relying on signal emission
         if hasattr(data_model, "is_empty"):
             assert data_model.is_empty, "Data model should be empty after clearing"
@@ -478,9 +479,7 @@ class TestQtInteractions:
 
 @pytest.mark.skip(reason="Issues with app_with_config fixture and file loading")
 @pytest.mark.integration
-def test_load_multiple_csv_files_integration(
-    app, data_model, main_window, csv_service, tmp_path
-):
+def test_load_multiple_csv_files_integration(app, data_model, main_window, csv_service, tmp_path):
     """Test loading multiple CSV files."""
     # Mock the load_multiple method to simulate loading multiple files
     original_load_multiple = csv_service.load_multiple

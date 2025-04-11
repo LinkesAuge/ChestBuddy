@@ -63,7 +63,38 @@ class TableStateManager(QObject):
         self._data_model = data_model
         self._cell_states = {}  # (row, col) -> CellState
         self._cell_details = {}  # (row, col) -> str (additional info/tooltip)
+        self._headers_map = self._create_headers_map()  # Create header map on init
         logger.debug("TableStateManager initialized")
+
+    def _create_headers_map(self) -> Dict[str, int]:
+        """Create a mapping from column names to column indices."""
+        headers_map = {}
+        if (
+            self._data_model
+            and hasattr(self._data_model, "columnCount")
+            and hasattr(self._data_model, "headerData")
+        ):
+            try:
+                num_cols = self._data_model.columnCount()
+                for col_idx in range(num_cols):
+                    # Assuming headerData with Qt.Horizontal orientation gives the name
+                    header_name = self._data_model.headerData(
+                        col_idx, Qt.Horizontal, Qt.DisplayRole
+                    )
+                    if header_name:
+                        headers_map[str(header_name)] = col_idx
+                logger.debug(f"Created headers map: {headers_map}")
+            except Exception as e:
+                logger.error(f"Failed to create headers map from data model: {e}")
+        else:
+            logger.warning("Data model not suitable for creating headers map in TableStateManager")
+        return headers_map
+
+    # Add a method to update the map if headers change
+    def update_headers_map(self) -> None:
+        """Update the internal headers map based on the current data model headers."""
+        self._headers_map = self._create_headers_map()
+        logger.info("TableStateManager headers map updated.")
 
     def set_cell_state(self, row: int, col: int, state: CellState) -> None:
         """
