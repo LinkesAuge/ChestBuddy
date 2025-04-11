@@ -4,21 +4,27 @@ cell_delegate.py
 Base delegate for rendering and editing cells in the DataTableView.
 """
 
-from PySide6.QtWidgets import QStyledItemDelegate, QStyleOptionViewItem, QWidget
-from PySide6.QtCore import Qt, QModelIndex, QAbstractItemModel
-from PySide6.QtGui import QPainter
+from PySide6.QtWidgets import QStyledItemDelegate, QStyleOptionViewItem, QWidget, QLineEdit
+from PySide6.QtCore import Qt, QModelIndex, QAbstractItemModel, Signal, QObject, QEvent
+from PySide6.QtGui import QPainter, QColor, QIcon
 import typing
+
+# Import role from view model
+from ..models.data_view_model import DataViewModel
 
 
 class CellDelegate(QStyledItemDelegate):
     """
-    Base class for custom cell delegates in the DataTableView.
-
-    Provides default rendering and editing behavior, which can be
-    extended by specialized delegates (e.g., ValidationDelegate).
+    Base delegate for rendering and editing cells in the DataTableView.
+    Handles basic rendering and editor creation.
+    Subclasses can override painting for specific states (validation, etc.).
     """
 
-    def __init__(self, parent=None):
+    # Signal emitted when editor data needs validation before committing
+    # Arguments: value (editor content), index (model index)
+    validationRequested = Signal(object, QModelIndex)
+
+    def __init__(self, parent: QObject | None = None):
         """
         Initialize the CellDelegate.
 
@@ -56,9 +62,9 @@ class CellDelegate(QStyledItemDelegate):
         Returns:
             Optional[QWidget]: The editor widget, or None if no editor is needed.
         """
-        # TODO: Create editors based on data type or column
-        # For now, use the default editor
-        return super().createEditor(parent, option, index)
+        # TODO: Create editors based on data type (e.g., QSpinBox for ints)
+        editor = QLineEdit(parent)
+        return editor
 
     def setEditorData(self, editor: QWidget, index: QModelIndex) -> None:
         """
@@ -68,20 +74,29 @@ class CellDelegate(QStyledItemDelegate):
             editor (QWidget): The editor widget.
             index (QModelIndex): The model index.
         """
-        # TODO: Handle custom data types or formatting for the editor
-        super().setEditorData(editor, index)
+        value = index.model().data(index, Qt.EditRole)
+        if isinstance(editor, QLineEdit):
+            editor.setText(str(value))
+        else:
+            super().setEditorData(editor, index)
 
     def setModelData(self, editor: QWidget, model: QAbstractItemModel, index: QModelIndex) -> None:
         """
-        Gets data from the editor widget and stores it in the data model item specified by index.
-
-        Args:
-            editor (QWidget): The editor widget.
-            model (QAbstractItemModel): The data model.
-            index (QModelIndex): The model index.
+        Get data from the editor and *request validation* before setting it to the model.
         """
-        # TODO: Handle custom data types or formatting from the editor
-        super().setModelData(editor, model, index)
+        value = None
+        if isinstance(editor, QLineEdit):
+            value = editor.text()
+        # TODO: Handle other editor types
+
+        if value is not None:
+            print(
+                f"CellDelegate: Emitting validationRequested for value '{value}' at index {index.row()},{index.column()}"
+            )  # Debug
+            # Emit signal instead of calling model.setData directly
+            self.validationRequested.emit(value, index)
+        # We do NOT call model.setData here. The handler for validationRequested will do it.
+        # super().setModelData(editor, model, index) # Don't call super, as it might call setData
 
     def updateEditorGeometry(
         self, editor: QWidget, option: QStyleOptionViewItem, index: QModelIndex
@@ -97,3 +112,16 @@ class CellDelegate(QStyledItemDelegate):
         super().updateEditorGeometry(editor, option, index)
 
     # --- Custom methods can be added here ---
+
+    # --- Helper Methods for Subclasses (Optional) ---
+    def _draw_background(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex):
+        # ... (existing _draw_background) ...
+        pass
+
+    def _draw_text(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex):
+        # ... (existing _draw_text) ...
+        pass
+
+    def _get_cell_state(self, index: QModelIndex):
+        # ... (existing _get_cell_state) ...
+        pass

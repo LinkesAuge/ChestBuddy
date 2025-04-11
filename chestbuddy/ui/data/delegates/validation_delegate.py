@@ -5,7 +5,7 @@ Delegate responsible for visualizing validation status in cells.
 """
 
 from PySide6.QtWidgets import QStyledItemDelegate, QStyleOptionViewItem
-from PySide6.QtCore import QModelIndex, Qt
+from PySide6.QtCore import QModelIndex, Qt, QSize
 from PySide6.QtGui import QPainter, QColor, QIcon, QHelpEvent
 from PySide6.QtWidgets import (
     QStyledItemDelegate,
@@ -19,15 +19,8 @@ from .cell_delegate import CellDelegate
 # Assuming DataViewModel provides the ValidationStateRole
 from ..models.data_view_model import DataViewModel
 
-
-# Placeholder for actual validation status enum/constants
-# from chestbuddy.core.enums import ValidationStatus
-class ValidationStatus:
-    VALID = "VALID"
-    INVALID = "INVALID"
-    CORRECTABLE = "CORRECTABLE"
-    WARNING = "WARNING"
-    INFO = "INFO"
+# Import the centralized CellState enum
+from chestbuddy.core.table_state_manager import CellState
 
 
 class ValidationDelegate(CellDelegate):
@@ -40,16 +33,16 @@ class ValidationDelegate(CellDelegate):
 
     # Define colors and icons for different states (customize as needed)
     STATUS_COLORS = {
-        ValidationStatus.INVALID: QColor("#ffb6b6"),  # Light Red
-        ValidationStatus.CORRECTABLE: QColor("#fff3b6"),  # Light Yellow
-        ValidationStatus.WARNING: QColor("#ffe4b6"),  # Light Orange
-        ValidationStatus.INFO: QColor("#b6e4ff"),  # Light Blue
+        CellState.INVALID: QColor("#ffb6b6"),  # Light Red
+        CellState.CORRECTABLE: QColor("#fff3b6"),  # Light Yellow
+        CellState.WARNING: QColor("#ffe4b6"),  # Light Orange
+        CellState.INFO: QColor("#b6e4ff"),  # Light Blue
     }
     STATUS_ICONS = {
-        ValidationStatus.INVALID: QIcon("icons:error.svg"),  # Example using resource path
-        # ValidationStatus.CORRECTABLE: QIcon("icons:correction_available.svg"), # CorrectionDelegate handles this
-        ValidationStatus.WARNING: QIcon("icons:warning.svg"),
-        ValidationStatus.INFO: QIcon("icons:info.svg"),
+        CellState.INVALID: QIcon("icons:error.svg"),  # Example using resource path
+        # CellState.CORRECTABLE: QIcon("icons:correction_available.svg"), # CorrectionDelegate handles this
+        CellState.WARNING: QIcon("icons:warning.svg"),
+        CellState.INFO: QIcon("icons:info.svg"),
     }
 
     ICON_SIZE = 16  # Size for the status icons
@@ -76,7 +69,7 @@ class ValidationDelegate(CellDelegate):
         validation_status = index.data(DataViewModel.ValidationStateRole)
 
         # Apply background color if status is not VALID
-        if validation_status and validation_status != ValidationStatus.VALID:
+        if validation_status and validation_status != CellState.VALID:
             color = self.STATUS_COLORS.get(validation_status)
             if color:
                 painter.fillRect(option.rect, color)
@@ -86,8 +79,8 @@ class ValidationDelegate(CellDelegate):
 
         # Draw status icon if status is not VALID or CORRECTABLE
         if validation_status and validation_status not in [
-            ValidationStatus.VALID,
-            ValidationStatus.CORRECTABLE,
+            CellState.VALID,
+            CellState.CORRECTABLE,
         ]:
             icon = self.STATUS_ICONS.get(validation_status)
             if icon:
@@ -106,7 +99,7 @@ class ValidationDelegate(CellDelegate):
         hint = super().sizeHint(option, index)
         # Add space if an icon might be drawn
         validation_status = index.data(DataViewModel.ValidationStateRole)
-        if validation_status and validation_status != ValidationStatus.VALID:
+        if validation_status and validation_status != CellState.VALID:
             # Add width for icon and margin
             hint.setWidth(hint.width() + self.ICON_SIZE + 4)
         return hint

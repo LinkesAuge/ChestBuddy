@@ -11,9 +11,9 @@ import pandas as pd
 from enum import Enum
 from typing import Dict, List, Any, Tuple
 
-from PySide6.QtCore import QObject, Signal
+from PySide6.QtCore import QObject, Signal, Qt
 
-from chestbuddy.core.table_state_manager import TableStateManager, CellState
+from chestbuddy.core.table_state_manager import TableStateManager, CellState, CellFullState
 
 
 class TestTableStateManager:
@@ -39,71 +39,186 @@ class TestTableStateManager:
         assert table_state_manager._cell_states == {}
         assert table_state_manager.BATCH_SIZE == 100
 
-    def test_cell_state_enum(self):
-        """Test that CellState enum has the expected values."""
-        assert CellState.NORMAL.value == 0
-        assert CellState.INVALID.value == 1
-        assert CellState.CORRECTABLE.value == 2
-        assert CellState.CORRECTED.value == 3
-        assert CellState.PROCESSING.value == 4
+    def test_update_states_new_state(self, table_state_manager, qtbot):
+        """Test update_states setting a new state for a cell."""
+        key = (0, 1)
+        new_state = CellFullState(validation_status=CellState.INVALID, error_details="Bad value")
 
-    def test_set_cell_state(self, table_state_manager):
-        """Test setting a cell state."""
-        # Set a cell state
-        table_state_manager.set_cell_state(0, 1, CellState.INVALID)
+        # Spy on the signal
+        signal_spy = qtbot.createSignalSpy(table_state_manager.state_changed)
 
-        # Verify the state was set
-        assert table_state_manager._cell_states.get((0, 1)) == CellState.INVALID
+        table_state_manager.update_states({key: new_state})
 
-        # Override with a new state
-        table_state_manager.set_cell_state(0, 1, CellState.CORRECTED)
-        assert table_state_manager._cell_states.get((0, 1)) == CellState.CORRECTED
+        # Verify internal state
+        assert key in table_state_manager._cell_states
+        assert table_state_manager._cell_states[key] == new_state
+        # Verify signal emission
+        assert signal_spy.count() == 1
+        assert signal_spy[0] == [{key}]  # Signal emits set of changed keys
 
-    def test_get_cell_state(self, table_state_manager):
-        """Test getting a cell state."""
-        # Initially cells should have NORMAL state
-        assert table_state_manager.get_cell_state(0, 1) == CellState.NORMAL
+    def test_update_states_modify_existing(self, table_state_manager, qtbot):
+        """Test update_states modifying different aspects of an existing state."""
+        key = (1, 0)
+        initial_state = CellFullState(
+            validation_status=CellState.INVALID, error_details="Initial error"
+        )
+        table_state_manager.update_states({key: initial_state})  # Set initial state
 
-        # Set a cell state
-        table_state_manager.set_cell_state(0, 1, CellState.INVALID)
+        # 1. Update only validation status
+        update1 = CellFullState(validation_status=CellState.CORRECTABLE)
+        signal_spy1 = qtbot.createSignalSpy(table_state_manager.state_changed)
+        table_state_manager.update_states({key: update1})
+        assert table_state_manager._cell_states[key].validation_status == CellState.CORRECTABLE
+        assert table_state_manager._cell_states[key].error_details == "Initial error"  # Unchanged
+        assert table_state_manager._cell_states[key].correction_suggestions == []  # Unchanged
+        assert signal_spy1.count() == 1
+        assert signal_spy1[0] == [{key}]
 
-        # Verify the state can be retrieved
-        assert table_state_manager.get_cell_state(0, 1) == CellState.INVALID
+        # 2. Update details and add suggestions
+        update2 = CellFullState(
+            error_details="Updated error", correction_suggestions=["Suggestion1"]
+        )
+        signal_spy2 = qtbot.createSignalSpy(table_state_manager.state_changed)
+        table_state_manager.update_states({key: update2})
+        assert (
+            table_state_manager._cell_states[key].validation_status == CellState.CORRECTABLE
+        )  # Unchanged
+        assert table_state_manager._cell_states[key].error_details == "Updated error"
+        assert table_state_manager._cell_states[key].correction_suggestions == ["Suggestion1"]
+        assert signal_spy2.count() == 1
+        assert signal_spy2[0] == [{key}]
 
-    def test_reset_cell_states(self, table_state_manager):
-        """Test resetting all cell states."""
-        # Set some cell states
-        table_state_manager.set_cell_state(0, 1, CellState.INVALID)
-        table_state_manager.set_cell_state(1, 0, CellState.CORRECTABLE)
+        # 3. Update multiple cells
+        key2 = (0, 0)
+        update3 = {
+            key: CellFullState(validation_status=CellState.VALID),  # Change status back
+            key2: CellFullState(validation_status=CellState.INFO, error_details="Just info"),
+        }
+        signal_spy3 = qtbot.createSignalSpy(table_state_manager.state_changed)
+        table_state_manager.update_states(update3)
+        assert table_state_manager._cell_states[key].validation_status == CellState.VALID
+        assert (
+            table_state_manager._cell_states[key].error_details == "Updated error"
+        )  # Should remain
+        assert table_state_manager._cell_states[key2].validation_status == CellState.INFO
+        assert table_state_manager._cell_states[key2].error_details == "Just info"
+        assert signal_spy3.count() == 1
+        assert signal_spy3[0] == [{key, key2}]  # Both keys in the set
 
-        # Verify states were set
-        assert table_state_manager.get_cell_state(0, 1) == CellState.INVALID
-        assert table_state_manager.get_cell_state(1, 0) == CellState.CORRECTABLE
+    def test_update_states_no_change(self, table_state_manager, qtbot):
+        """Test update_states when the new state is the same as the old."""
+        key = (0, 1)
+        state = CellFullState(validation_status=CellState.INVALID)
+        table_state_manager.update_states({key: state})  # Set initial
 
-        # Reset all states
+        signal_spy = qtbot.createSignalSpy(table_state_manager.state_changed)
+        table_state_manager.update_states({key: state})  # Update with same state
+
+        assert signal_spy.count() == 0  # Signal should not be emitted
+
+    def test_get_cell_state_and_full_state(self, table_state_manager):
+        """Test getting cell state (validation status only) and full state."""
+        key = (0, 1)
+        state = CellFullState(
+            validation_status=CellState.INVALID, error_details="Bad", correction_suggestions=["Fix"]
+        )
+        table_state_manager.update_states({key: state})
+
+        # Test get_cell_state (returns only validation status)
+        assert table_state_manager.get_cell_state(key[0], key[1]) == CellState.INVALID
+
+        # Test get_full_cell_state
+        full_state = table_state_manager.get_full_cell_state(key[0], key[1])
+        assert full_state == state
+
+        # Test default state for unset cell
+        assert table_state_manager.get_cell_state(1, 1) == CellState.NORMAL
+        assert table_state_manager.get_full_cell_state(1, 1) is None  # Default is no state object
+
+    def test_reset_cell_states(self, table_state_manager, qtbot):
+        """Test resetting all cell states and signal emission."""
+        key1 = (0, 1)
+        key2 = (1, 0)
+        table_state_manager.update_states(
+            {
+                key1: CellFullState(validation_status=CellState.INVALID),
+                key2: CellFullState(validation_status=CellState.CORRECTABLE),
+            }
+        )
+        assert key1 in table_state_manager._cell_states
+        assert key2 in table_state_manager._cell_states
+
+        signal_spy = qtbot.createSignalSpy(table_state_manager.state_changed)
         table_state_manager.reset_cell_states()
 
-        # Verify all states were reset
-        assert table_state_manager.get_cell_state(0, 1) == CellState.NORMAL
-        assert table_state_manager.get_cell_state(1, 0) == CellState.NORMAL
+        # Verify internal state is empty
+        assert table_state_manager._cell_states == {}
+        # Verify signal emitted with previously affected keys
+        assert signal_spy.count() == 1
+        assert signal_spy[0] == [{key1, key2}]
+
+    def test_reset_cell_state_single(self, table_state_manager, qtbot):
+        """Test resetting a single cell's state."""
+        key1 = (0, 1)
+        key2 = (1, 0)
+        table_state_manager.update_states(
+            {
+                key1: CellFullState(validation_status=CellState.INVALID),
+                key2: CellFullState(validation_status=CellState.CORRECTABLE),
+            }
+        )
+
+        signal_spy = qtbot.createSignalSpy(table_state_manager.state_changed)
+        table_state_manager.reset_cell_state(key1[0], key1[1])
+
+        assert key1 not in table_state_manager._cell_states
+        assert key2 in table_state_manager._cell_states  # Other state remains
+        assert signal_spy.count() == 1
+        assert signal_spy[0] == [{key1}]
+
+    def test_reset_rows(self, table_state_manager, qtbot):
+        """Test resetting states for specific rows."""
+        key00 = (0, 0)
+        key01 = (0, 1)
+        key10 = (1, 0)
+        table_state_manager.update_states(
+            {
+                key00: CellFullState(validation_status=CellState.INFO),
+                key01: CellFullState(validation_status=CellState.INVALID),
+                key10: CellFullState(validation_status=CellState.CORRECTABLE),
+            }
+        )
+
+        signal_spy = qtbot.createSignalSpy(table_state_manager.state_changed)
+        table_state_manager.reset_rows([0])  # Reset row 0
+
+        assert key00 not in table_state_manager._cell_states
+        assert key01 not in table_state_manager._cell_states
+        assert key10 in table_state_manager._cell_states  # Row 1 remains
+        assert signal_spy.count() == 1
+        assert signal_spy[0] == [{key00, key01}]
 
     def test_get_cells_by_state(self, table_state_manager):
-        """Test getting cells by state."""
-        # Set cell states
-        table_state_manager.set_cell_state(0, 1, CellState.INVALID)
-        table_state_manager.set_cell_state(1, 0, CellState.INVALID)
-        table_state_manager.set_cell_state(1, 1, CellState.CORRECTABLE)
-        table_state_manager.set_cell_state(2, 0, CellState.CORRECTED)
+        """Test getting cells by validation state."""
+        table_state_manager.update_states(
+            {
+                (0, 1): CellFullState(validation_status=CellState.INVALID),
+                (1, 0): CellFullState(validation_status=CellState.INVALID, error_details="Err"),
+                (1, 1): CellFullState(validation_status=CellState.CORRECTABLE),
+                (2, 0): CellFullState(validation_status=CellState.CORRECTED),
+                (2, 1): CellFullState(validation_status=CellState.INVALID),  # Another invalid
+            }
+        )
 
-        # Get cells by state
         invalid_cells = table_state_manager.get_cells_by_state(CellState.INVALID)
         correctable_cells = table_state_manager.get_cells_by_state(CellState.CORRECTABLE)
         corrected_cells = table_state_manager.get_cells_by_state(CellState.CORRECTED)
+        normal_cells = table_state_manager.get_cells_by_state(CellState.NORMAL)  # Should be empty
 
-        # Verify correct cells were returned
-        assert set(invalid_cells) == {(0, 1), (1, 0)}
+        assert set(invalid_cells) == {(0, 1), (1, 0), (2, 1)}
         assert set(correctable_cells) == {(1, 1)}
         assert set(corrected_cells) == {(2, 0)}
+        assert normal_cells == []  # No cells explicitly set to NORMAL
 
     def test_process_in_batches(self, table_state_manager):
         """Test processing data in batches."""
@@ -124,41 +239,22 @@ class TestTableStateManager:
         assert processed_rows == [0, 1, 2]
         assert result == [True, True, True]
 
-    def test_get_affected_rows_columns(self, table_state_manager, mock_data_model):
-        """Test getting affected rows and columns from DataFrame."""
+    def test_get_affected_rows_columns(self, table_state_manager):
+        """Test getting affected rows and columns from DataFrame comparison (mocked)."""
+        # Mock original data
+        original_data = pd.DataFrame({"PLAYER": ["A", "B"], "CHEST": ["G", "S"]})
+        # Mock current (modified) data in the model
+        current_data = pd.DataFrame(
+            {
+                "PLAYER": ["A", "X"],  # Modified
+                "CHEST": ["G", "Y"],  # Modified
+            }
+        )
+        table_state_manager._data_model.data = current_data
 
-        # Create a test function that modifies the DataFrame
-        def test_func():
-            # Simulate changes to the DataFrame
-            mock_data_model.data.loc[0, "PLAYER"] = "Modified Player"
-            mock_data_model.data.loc[1, "CHEST"] = "Modified Chest"
-
-        # Get original data snapshot
-        original_data = mock_data_model.data.copy()
-
-        # Run the function
-        test_func()
-
-        # Get affected rows and columns
+        # Use the internal _headers_map which should be {'PLAYER': 0, 'CHEST': 1}
         affected = table_state_manager.get_affected_rows_columns(original_data)
 
-        # Verify correct rows and columns were identified
-        assert set(affected["rows"]) == {0, 1}
+        # Only row 1 was changed in both columns
+        assert set(affected["rows"]) == {1}
         assert set(affected["columns"]) == {"PLAYER", "CHEST"}
-
-    def test_update_cell_states_from_validation(self, table_state_manager):
-        """Test updating cell states from validation status."""
-        # Create validation status dataframe
-        validation_status = pd.DataFrame(
-            {"ROW_IDX": [0, 1, 2], "COL_IDX": [0, 1, 0], "STATUS": ["invalid", "invalid", "valid"]}
-        )
-
-        # Update cell states from validation
-        table_state_manager.update_cell_states_from_validation(validation_status)
-
-        # Verify states were updated correctly
-        assert table_state_manager.get_cell_state(0, 0) == CellState.INVALID
-        assert table_state_manager.get_cell_state(1, 1) == CellState.INVALID
-        assert (
-            table_state_manager.get_cell_state(2, 0) == CellState.NORMAL
-        )  # Valid cells remain normal

@@ -144,6 +144,10 @@ class TestContextMenuFactory:
         assert actions_map["paste"].isEnabled()  # Has clipboard text and target is editable
         assert actions_map["cut"].isEnabled()
         assert actions_map["delete"].isEnabled()
+        assert "edit_cell" in actions_map
+        assert "show_edit_dialog" in actions_map
+        assert actions_map["edit_cell"].isEnabled()
+        assert actions_map["show_edit_dialog"].isEnabled()
 
     def test_create_menu_single_selection_not_editable(self, mock_qwidget, mock_clipboard):
         """Test menu state with a single non-editable cell selected."""
@@ -162,6 +166,33 @@ class TestContextMenuFactory:
         assert not actions_map["paste"].isEnabled()  # Target not editable
         assert not actions_map["cut"].isEnabled()  # Not editable
         assert not actions_map["delete"].isEnabled()  # Not editable
+        assert "edit_cell" in actions_map
+        assert "show_edit_dialog" in actions_map
+        assert not actions_map["edit_cell"].isEnabled()
+        assert not actions_map["show_edit_dialog"].isEnabled()
+
+    def test_create_menu_multi_selection(self, mock_model, mock_qwidget, mock_clipboard):
+        """Test menu state with multiple cells selected."""
+        mock_clipboard.text.return_value = "some text"
+        index1 = mock_model.index(0, 0)
+        index2 = mock_model.index(0, 1)
+        info = ActionContext(
+            clicked_index=index1,  # Clicked on the first cell
+            selection=[index1, index2],
+            model=mock_model,  # Editable by default
+            parent_widget=mock_qwidget,
+        )
+        menu, actions_map = ContextMenuFactory.create_context_menu(info)
+
+        # Edit actions should not be applicable/enabled for multi-selection
+        assert actions_map["copy"].isEnabled()  # Standard actions can be enabled
+        assert actions_map["delete"].isEnabled()
+
+        assert "edit_cell" not in actions_map  # Or should be disabled if present
+        assert "show_edit_dialog" not in actions_map  # Or should be disabled if present
+        # Note: Depending on implementation, actions might be added but disabled.
+        # Checking for presence OR disabled state might be more robust.
+        # For now, assume is_applicable=False means they aren't added.
 
     def test_create_menu_invalid_cell(self, mock_qwidget, mock_clipboard):
         """Test menu includes validation action for invalid cell."""

@@ -3,7 +3,7 @@ Common fixtures for DataView UI tests.
 """
 
 import pytest
-from PySide6.QtCore import Qt, QModelIndex
+from PySide6.QtCore import Qt, QModelIndex, QObject, Signal
 from PySide6.QtWidgets import QApplication
 
 # Placeholder types until actual classes are importable/defined
@@ -83,10 +83,37 @@ def mock_correction_service(mocker):
 
 @pytest.fixture
 def mock_table_state_manager(mocker):
-    """Create a mock TableStateManager for testing."""
-    manager = mocker.MagicMock(spec=TableStateManager)
-    manager.get_cell_state.return_value = "NORMAL"  # Default state
-    # Add other necessary methods if DataViewModel interacts with them
-    # manager.update_cell_states_from_validation = mocker.Mock()
-    # manager.cell_states_changed = Signal() # Need to mock signals if used
+    """Create a mock TableStateManager for testing with the new API."""
+    # Use MagicMock without spec to easily add attributes/methods
+    manager = mocker.MagicMock()
+
+    # Mock the state_changed signal
+    # We need a real QObject to host the signal
+    class SignalHost(QObject):
+        state_changed = Signal(set)
+
+    manager._signal_host = SignalHost()  # Keep reference
+    manager.state_changed = manager._signal_host.state_changed
+
+    # Mock get_full_cell_state method
+    # Default to returning None (no specific state)
+    manager.get_full_cell_state = mocker.Mock(return_value=None)
+
+    # Mock get_cell_state (can derive from get_full_cell_state mock if needed,
+    # but DataViewModel might not call it directly anymore)
+    manager.get_cell_state = mocker.Mock(return_value=CellState.NORMAL)
+
+    # Mock get_cell_details (similar to get_cell_state)
+    manager.get_cell_details = mocker.Mock(return_value="")
+
+    # Mock update_states (if needed by specific tests, can be spied on)
+    manager.update_states = mocker.Mock()
+
+    # Mock get_column_names (needed by adapters)
+    manager.get_column_names = mocker.Mock(return_value=["ColA", "ColB"])  # Example
+
     return manager
+
+
+# Make sure CellState is imported if used in mocks
+from chestbuddy.core.table_state_manager import CellState, CellFullState  # Add CellFullState

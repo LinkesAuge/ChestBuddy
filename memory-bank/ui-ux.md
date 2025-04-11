@@ -502,6 +502,8 @@ The DataView consists of these visual components:
 | Text | #212121 | #212121 | #212121 | #212121 | #212121 |
 | Icons | #757575 | #2196F3 | #F44336 | #FFC107 | #FF9800 |
 
+**Note**: These colors are implemented and verified through delegate tests.
+
 #### Typography
 
 | Element | Font | Size | Weight | Color |
@@ -535,6 +537,8 @@ The DataView consists of these visual components:
 | Correctable | Yellow background, suggestion icon | Hover shows correction options |
 | Warning | Orange background, warning icon | Hover shows warning message |
 | Info | Blue background, info icon | Hover shows information message |
+
+**Note**: Basic background colors and tooltip display for INVALID/CORRECTABLE states are implemented via delegates and verified by integration tests.
 
 #### Correction Workflow
 

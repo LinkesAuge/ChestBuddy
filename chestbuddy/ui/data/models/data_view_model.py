@@ -11,7 +11,7 @@ import typing
 import pandas as pd
 
 from chestbuddy.core.models import ChestDataModel  # Assuming this is the source model
-from chestbuddy.core.table_state_manager import TableStateManager, CellState
+from chestbuddy.core.table_state_manager import TableStateManager, CellState, CellFullState
 
 # Placeholder for ChestDataModel and TableStateManager if needed
 # from chestbuddy.core.models import ChestDataModel
@@ -40,7 +40,7 @@ class DataViewModel(QAbstractTableModel):
     ValidationErrorRole = Qt.UserRole + 5  # Add role for error details
 
     # Signals
-    validation_updated = Signal()
+    # validation_updated = Signal() # Might not be needed if using dataChanged
 
     def __init__(self, source_model: ChestDataModel, state_manager: TableStateManager, parent=None):
         """
@@ -56,6 +56,7 @@ class DataViewModel(QAbstractTableModel):
         self._state_manager = state_manager
 
         self._connect_source_model_signals()
+        self._connect_state_manager_signals()  # Connect to state manager
 
         # Sort state
         self._sort_column = -1
@@ -76,6 +77,24 @@ class DataViewModel(QAbstractTableModel):
                 print(f"Error connecting source model data_changed signal: {e}")  # Debug
         else:
             print("Source model does not have data_changed signal or is None.")  # Debug
+
+    def _connect_state_manager_signals(self):
+        """Connect signals from the TableStateManager."""
+        if self._state_manager and hasattr(self._state_manager, "state_changed"):
+            try:
+                # Disconnect first
+                try:
+                    self._state_manager.state_changed.disconnect(
+                        self._on_state_manager_state_changed
+                    )
+                except RuntimeError:
+                    pass
+                self._state_manager.state_changed.connect(self._on_state_manager_state_changed)
+                print("Successfully connected state_manager state_changed signal.")  # Debug
+            except Exception as e:
+                print(f"Error connecting state_manager state_changed signal: {e}")  # Debug
+        else:
+            print("State manager does not have state_changed signal or is None.")  # Debug
 
     def source_model(self) -> ChestDataModel:
         """
@@ -107,8 +126,10 @@ class DataViewModel(QAbstractTableModel):
         Returns:
             int: The number of rows.
         """
-        # Delegate to the source model's rowCount
-        return self._source_model.rowCount(parent) if self._source_model else 0
+        # Get row count from the source model's property
+        if self._source_model and hasattr(self._source_model, "row_count"):
+            return self._source_model.row_count
+        return 0
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
         """
@@ -120,8 +141,10 @@ class DataViewModel(QAbstractTableModel):
         Returns:
             int: The number of columns.
         """
-        # Delegate to the source model's columnCount
-        return self._source_model.columnCount(parent) if self._source_model else 0
+        # Get column names from the source model's property
+        if self._source_model and hasattr(self._source_model, "column_names"):
+            return len(self._source_model.column_names)
+        return 0
 
     def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> typing.Any:
         """
@@ -134,49 +157,58 @@ class DataViewModel(QAbstractTableModel):
         Returns:
             typing.Any: The data for the given index and role.
         """
-        if not index.isValid():
+        if not index.isValid() or not self._source_model:
             return None
 
-        if role == Qt.DisplayRole:
-            # Delegate to the source model's data for DisplayRole
-            return self._source_model.data(index, role)
-        elif role == Qt.EditRole:
-            # Delegate EditRole to source model as well (can be customized later)
-            return self._source_model.data(index, role)
-        elif role == DataViewModel.ValidationStateRole:
-            if self._state_manager:
-                # Retrieve validation state from the manager
-                # Placeholder: Actual implementation will depend on TableStateManager API
-                return self._state_manager.get_cell_state(index.row(), index.column())
-            return None  # Or a default state like 'UNKNOWN'
+        row = index.row()
+        col = index.column()
+
+        # Get column name for accessing source model
+        # Use the defined EXPECTED_COLUMNS order from ChestDataModel for consistency
+        expected_columns = self._source_model.EXPECTED_COLUMNS
+        if col >= len(expected_columns):
+            return None
+        column_name = expected_columns[col]
+
+        full_state = self._state_manager.get_full_cell_state(row, col)
+
+        if role == Qt.DisplayRole or role == Qt.EditRole:
+            # Get data from source model using its method
+            value = self._source_model.get_cell_value(row, column_name)
+            return value
+        elif role == self.ValidationStateRole:
+            return full_state.validation_status if full_state else CellState.NORMAL
+        elif role == self.CorrectionStateRole:
+            # Could return a specific state or bool indicating correctability
+            return bool(full_state and full_state.correction_suggestions)
+        elif role == self.ErrorDetailsRole:
+            return full_state.error_details if full_state else None
+        elif role == self.CorrectionSuggestionsRole:
+            return full_state.correction_suggestions if full_state else []
         elif role == Qt.BackgroundRole:
-            # Placeholder: Determine background color based on validation state
-            if self._state_manager:
-                state = self._state_manager.get_cell_state(index.row(), index.column())
-                # Example mapping (will need refinement based on actual states)
-                if state == "INVALID":
-                    return QColor("#ffb6b6")  # Light red
-                elif state == "CORRECTABLE":
-                    return QColor("#fff3b6")  # Light yellow
+            # Use full_state for background logic
+            status = full_state.validation_status if full_state else CellState.NORMAL
+            if status == CellState.INVALID:
+                return QColor("#ffb6b6")  # Light red
+            elif status == CellState.CORRECTABLE:
+                return QColor("#fff3b6")  # Light yellow
+            elif status == CellState.WARNING:
+                return QColor("#ffe4b6")  # Light orange
+            elif status == CellState.INFO:
+                return QColor("#b6e4ff")  # Light blue
             return None  # Default background
         elif role == Qt.ToolTipRole:
-            # Placeholder: Provide tooltips for validation/correction states
-            if self._state_manager:
-                state = self._state_manager.get_cell_state(index.row(), index.column())
-                # Example tooltips
-                if state == "INVALID":
-                    return f"Invalid data in cell ({index.row()}, {index.column()})"
-                elif state == "CORRECTABLE":
-                    return f"Correctable data in cell ({index.row()}, {index.column()})"
-            return None
-        elif role == DataViewModel.ErrorDetailsRole:
-            # Use the new method
-            return self.get_cell_details(index.row(), index.column())
-        elif role == DataViewModel.CorrectionSuggestionsRole:
-            # Use the new method
-            return self.get_correction_suggestions(index.row(), index.column())
-
-        # Handle other roles as needed
+            # Use full_state for tooltip logic
+            tooltip_parts = []
+            if full_state:
+                if full_state.error_details:
+                    tooltip_parts.append(f"Issue: {full_state.error_details}")
+                if full_state.correction_suggestions:
+                    # Maybe just indicate suggestions are available?
+                    tooltip_parts.append(
+                        f"Corrections Available ({len(full_state.correction_suggestions)})"
+                    )
+            return "\n".join(tooltip_parts) if tooltip_parts else None
 
         return None
 
@@ -194,8 +226,16 @@ class DataViewModel(QAbstractTableModel):
         Returns:
             typing.Any: The header data.
         """
-        # Delegate header data requests to the source model
-        return self._source_model.headerData(section, orientation, role)
+        if (
+            orientation == Qt.Horizontal
+            and role == Qt.DisplayRole
+            and self._source_model
+            and hasattr(self._source_model, "column_names")
+        ):
+            column_names = self._source_model.column_names
+            if 0 <= section < len(column_names):
+                return column_names[section]
+        return None
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         """
@@ -248,65 +288,54 @@ class DataViewModel(QAbstractTableModel):
         Resets the model to reflect the changes.
         """
         print(f"DataViewModel received source data_changed signal. Resetting model.")  # Debug
-        # Perform a full model reset to reflect the changes
-        # More granular updates can be implemented later if needed
         self.beginResetModel()
-        # The underlying _source_model is assumed to be updated already
+        # Optionally, update internal caches or states if needed
         self.endResetModel()
 
-    @Slot(dict)
-    def on_cell_states_changed(self, changes: dict):
+    @Slot(set)  # Expecting a set of (row, col) tuples
+    def _on_state_manager_state_changed(self, changed_indices: set):
         """
-        Slot to handle updates from the TableStateManager.
+        Slot to handle state changes from the TableStateManager.
 
-        Args:
-            changes (dict): Dictionary describing the state changes.
-                           Example: {(row, col): new_state, ...}
+        Emits dataChanged for the specific indices and relevant roles.
         """
-        # This needs to trigger updates for the affected cells/roles
-        # For simplicity, might initially trigger a layoutChanged or update specific indices
-
-        # Find min/max row/col for dataChanged signal
-        if not changes:
+        print(f"DataViewModel received state_changed for {len(changed_indices)} indices.")  # Debug
+        if not changed_indices:
             return
 
-        min_row = min(r for r, c in changes.keys())
-        max_row = max(r for r, c in changes.keys())
-        min_col = min(c for r, c in changes.keys())
-        max_col = max(c for r, c in changes.keys())
-
-        top_left_index = self.index(min_row, min_col)
-        bottom_right_index = self.index(max_row, max_col)
-
-        # Emit dataChanged for the affected range and relevant roles
-        # (ValidationStateRole, BackgroundRole, ToolTipRole, etc.)
-        roles_to_update = [
-            DataViewModel.ValidationStateRole,
-            DataViewModel.CorrectionStateRole,  # Add if used
-            DataViewModel.ErrorDetailsRole,
-            DataViewModel.CorrectionSuggestionsRole,
+        # Define roles affected by state changes
+        # These roles derive their data from the TableStateManager state
+        affected_roles = [
+            self.ValidationStateRole,
+            self.CorrectionStateRole,
+            self.ErrorDetailsRole,
+            self.CorrectionSuggestionsRole,
             Qt.BackgroundRole,
             Qt.ToolTipRole,
         ]
-        self.dataChanged.emit(top_left_index, bottom_right_index, roles_to_update)
 
-        # print(f"DataViewModel received state changes: {changes}")
-        # TODO: Implement more granular updates if needed
+        # Emit dataChanged for each affected index individually
+        # This explicitly tells the view which cells and roles need refreshing.
+        for r, c in changed_indices:
+            idx = self.index(r, c)
+            if idx.isValid():
+                self.dataChanged.emit(idx, idx, affected_roles)
 
+        # Emit a general signal if needed (though dataChanged is standard)
+        # self.validation_updated.emit()
+
+    # --- Direct access to state details (can be used by delegates/view) ---
     def get_cell_details(self, row: int, col: int) -> typing.Optional[str]:
-        """Gets detailed information (like error messages) for a cell."""
-        if self._state_manager and hasattr(self._state_manager, "get_cell_details"):
-            return self._state_manager.get_cell_details(row, col)
-        return None
+        """Get error details for a cell directly from the state manager."""
+        full_state = self._state_manager.get_full_cell_state(row, col)
+        return full_state.error_details if full_state else None
 
     def get_correction_suggestions(
         self, row: int, col: int
     ) -> typing.Optional[typing.List[CorrectionSuggestion]]:
-        """Gets correction suggestions for a cell."""
-        # Assuming state_manager has a method to get suggestions
-        if self._state_manager and hasattr(self._state_manager, "get_cell_correction_suggestions"):
-            return self._state_manager.get_cell_correction_suggestions(row, col)
-        return None
+        """Get correction suggestions for a cell directly from the state manager."""
+        full_state = self._state_manager.get_full_cell_state(row, col)
+        return full_state.correction_suggestions if full_state else []
 
     # --- Sorting --- #
 

@@ -181,8 +181,8 @@ For a complete overview of the project, see [overview.md](./overview.md).
   - [x] Document all tests
 - [ ] Implement integration testing
   - [ ] Test component interactions
-  - [ ] Test signal-slot connections
-  - [ ] Test data flow
+  - [x] Test signal-slot connections
+  - [x] Test data flow
   - [ ] Document integration tests
 - [ ] Implement UI testing
   - [ ] Test user workflows

@@ -13,8 +13,9 @@ import time
 from enum import Enum
 from typing import Dict, List, Tuple, Callable, Any, Set, Optional
 import pandas as pd
-from PySide6.QtCore import QObject, Signal, Slot
+from PySide6.QtCore import QObject, Signal, Slot, Qt
 from PySide6.QtWidgets import QApplication
+from dataclasses import dataclass, field
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -34,6 +35,23 @@ class CellState(Enum):
     CORRECTABLE = 4  # Invalid but can be corrected
     CORRECTED = 5  # Has been corrected
     PROCESSING = 6  # Currently being processed
+    WARNING = 7  # Indicates a potential issue, but data is valid
+    INFO = 8  # Informational state, data is valid
+
+
+# --- New Dataclass for Full Cell State ---
+@dataclass
+class CellFullState:
+    """Holds the complete state information for a single cell."""
+
+    validation_status: CellState = CellState.NORMAL
+    error_details: Optional[str] = None
+    # Using field to default to an empty list for suggestions
+    correction_suggestions: List[Any] = field(default_factory=list)
+
+    # You could add other state aspects here later, e.g.:
+    # is_dirty: bool = False
+    # formatting: Optional[dict] = None
 
 
 class TableStateManager(QObject):
@@ -49,7 +67,7 @@ class TableStateManager(QObject):
     """
 
     # Signals
-    state_changed = Signal()
+    state_changed = Signal(set)
 
     # Default batch size
     BATCH_SIZE = 100
@@ -63,9 +81,11 @@ class TableStateManager(QObject):
         """
         super().__init__()
         self._data_model = data_model
-        self._cell_states = {}  # (row, col) -> CellState
-        self._cell_details = {}  # (row, col) -> str (additional info/tooltip)
-        self._headers_map = self._create_headers_map()  # Create header map on init
+        # Store CellFullState objects instead of just CellState enum
+        self._cell_states: Dict[Tuple[int, int], CellFullState] = {}
+        # _cell_details is now part of CellFullState
+        # self._cell_details = {}
+        self._headers_map = self._create_headers_map()
         logger.debug("TableStateManager initialized")
 
     def _create_headers_map(self) -> Dict[str, int]:
@@ -99,106 +119,149 @@ class TableStateManager(QObject):
         logger.info("TableStateManager headers map updated.")
 
     def set_cell_state(self, row: int, col: int, state: CellState) -> None:
-        """
-        Set the state of a specific cell.
-
-        Args:
-            row: Row index
-            col: Column index
-            state: The cell state to set
-        """
+        """DEPRECATED - Use update_states. Sets only the validation status part of the state."""
+        logger.warning("set_cell_state is deprecated, use update_states for full state management.")
         key = (row, col)
-        self._cell_states[key] = state
-        logger.debug(f"Cell ({row}, {col}) state set to {state.name}")
+        current_full_state = self._cell_states.get(key, CellFullState())
+        if current_full_state.validation_status != state:
+            current_full_state.validation_status = state
+            self._cell_states[key] = current_full_state
+            self.state_changed.emit({key})
+            logger.debug(f"Cell ({row}, {col}) validation state set to {state.name}")
 
     def get_cell_state(self, row: int, col: int) -> CellState:
-        """
-        Get the state of a specific cell.
-
-        Args:
-            row: Row index
-            col: Column index
-
-        Returns:
-            CellState: The cell's current state (NORMAL if not set)
-        """
-        return self._cell_states.get((row, col), CellState.NORMAL)
+        """Gets only the validation status part of the cell's state."""
+        return self._cell_states.get((row, col), CellFullState()).validation_status
 
     def set_cell_detail(self, row: int, col: int, detail: str) -> None:
-        """
-        Set additional details for a cell (used for tooltips).
-
-        Args:
-            row: Row index
-            col: Column index
-            detail: Detail text
-        """
-        self._cell_details[(row, col)] = detail
+        """DEPRECATED - Use update_states. Sets only the error details part of the state."""
+        logger.warning(
+            "set_cell_detail is deprecated, use update_states for full state management."
+        )
+        key = (row, col)
+        current_full_state = self._cell_states.get(key, CellFullState())
+        if current_full_state.error_details != detail:
+            current_full_state.error_details = detail
+            self._cell_states[key] = current_full_state
+            self.state_changed.emit({key})
+            logger.debug(f"Cell ({row}, {col}) details set.")
 
     def get_cell_details(self, row: int, col: int) -> str:
-        """
-        Get the additional details for a cell.
+        """Gets only the error details part of the cell's state."""
+        return self._cell_states.get((row, col), CellFullState()).error_details or ""
 
-        Args:
-            row: Row index
-            col: Column index
+    def get_full_cell_state(self, row: int, col: int) -> Optional[CellFullState]:
+        """
+        Gets the full state object for a specific cell, including validation,
+        details, and correction info.
 
         Returns:
-            str: The cell's detail text (empty string if not set)
+            Optional[CellFullState]: The full state object, or None if no specific state is stored.
         """
-        return self._cell_details.get((row, col), "")
+        # Return a copy to prevent external modification?
+        # For performance, returning direct reference might be okay if callers are trusted.
+        return self._cell_states.get((row, col))
 
-    def reset_cell_states(self) -> None:
-        """Reset all cell states to NORMAL."""
-        self._cell_states = {}
-        self._cell_details = {}
-        logger.debug("All cell states reset to NORMAL")
-        self.state_changed.emit()
-
-    def reset_cell_state(self, row: int, col: int) -> None:
+    def update_states(self, changes: Dict[Tuple[int, int], CellFullState]) -> None:
         """
-        Reset a specific cell state to NORMAL.
+        Updates the state for multiple cells at once.
+
+        Merges the provided changes with the existing state for each cell.
+        Emits the state_changed signal *once* with the set of affected cells.
 
         Args:
-            row: Row index
-            col: Column index
+            changes: A dictionary where keys are (row, col) tuples and values
+                     are CellFullState objects containing the state aspects to update.
+                     If a state aspect in the value is None, it's ignored (not cleared).
+                     To clear details/suggestions, provide an empty string/list.
         """
-        if (row, col) in self._cell_states:
-            del self._cell_states[(row, col)]
-        if (row, col) in self._cell_details:
-            del self._cell_details[(row, col)]
-        logger.debug(f"Cell ({row}, {col}) state reset to NORMAL")
+        affected_cells: Set[Tuple[int, int]] = set()
+        for key, change_state in changes.items():
+            current_state = self._cell_states.get(key, CellFullState())
+            changed = False
+
+            # Merge validation status if provided in change
+            if change_state.validation_status != current_state.validation_status:
+                current_state.validation_status = change_state.validation_status
+                changed = True
+
+            # Merge error details if provided in change (allow setting to None/empty)
+            if change_state.error_details != current_state.error_details:
+                current_state.error_details = change_state.error_details
+                changed = True
+
+            # Merge correction suggestions if provided (allow setting to empty list)
+            if change_state.correction_suggestions != current_state.correction_suggestions:
+                current_state.correction_suggestions = change_state.correction_suggestions
+                changed = True
+
+            if changed:
+                self._cell_states[key] = current_state
+                affected_cells.add(key)
+            # Remove state entry if it's back to default normal state with no details/suggestions?
+            # Maybe add this later if memory becomes an issue.
+            # elif current_state == CellFullState(): # Check if default
+            #    if key in self._cell_states:
+            #        del self._cell_states[key]
+            #        affected_cells.add(key) # Still needs UI update
+
+        if affected_cells:
+            logger.debug(f"Updated state for {len(affected_cells)} cells.")
+            self.state_changed.emit(affected_cells)
+        else:
+            logger.debug("No state changes detected in update_states call.")
+
+    def reset_cell_states(self) -> None:
+        """Reset all cell states to default."""
+        # Get all previously affected cells to notify UI
+        affected_cells = set(self._cell_states.keys())
+        self._cell_states = {}
+        # self._cell_details = {} # Removed
+        logger.debug("All cell states reset")
+        if affected_cells:
+            self.state_changed.emit(affected_cells)
+
+    def reset_cell_state(self, row: int, col: int) -> None:
+        """Reset a specific cell state to default."""
+        key = (row, col)
+        if key in self._cell_states:
+            del self._cell_states[key]
+            # if key in self._cell_details: # Removed
+            #     del self._cell_details[key]
+            logger.debug(f"Cell ({row}, {col}) state reset")
+            self.state_changed.emit({key})
 
     def reset_rows(self, rows: List[int]) -> None:
         """
         Reset all cells in the specified rows.
-
-        Args:
-            rows: List of row indices to reset
         """
-        for key in list(self._cell_states.keys()):
+        affected_cells = set()
+        rows_set = set(rows)
+        for key in list(self._cell_states.keys()):  # Iterate over a copy of keys
             row, _ = key
-            if row in rows:
+            if row in rows_set:
                 del self._cell_states[key]
-                if key in self._cell_details:
-                    del self._cell_details[key]
+                affected_cells.add(key)
+                # if key in self._cell_details: # Removed
+                #     del self._cell_details[key]
         logger.debug(f"Reset states for rows: {rows}")
-        self.state_changed.emit()
+        if affected_cells:
+            self.state_changed.emit(affected_cells)
 
     def get_cells_by_state(self, state: CellState) -> List[Tuple[int, int]]:
         """
-        Get all cells with a specific state.
+        Get all cells with a specific validation state.
 
         Args:
-            state: The state to filter by
+            state: The validation state (CellState enum) to filter by
 
         Returns:
             List[Tuple[int, int]]: List of (row, col) tuples for cells with the given state
         """
         return [
-            (row, col)
-            for (row, col), cell_state in self._cell_states.items()
-            if cell_state == state
+            key
+            for key, full_state in self._cell_states.items()
+            if full_state.validation_status == state
         ]
 
     def process_in_batches(
@@ -306,268 +369,8 @@ class TableStateManager(QObject):
 
         return {"rows": list(affected_rows), "columns": list(affected_columns)}
 
-    def update_cell_states_from_validation(self, validation_status, validation_service_format=None):
-        """Update cell states based on validation status.
-
-        Args:
-            validation_status (pd.DataFrame): DataFrame containing validation status.
-            validation_service_format (bool, optional): Whether the validation status is in the
-                validation service format. Defaults to None to auto-detect.
-        """
-        # Log the validation status details
-        logger.debug("==== TableStateManager.update_cell_states_from_validation called ====")
-        logger.debug(f"Validation status DataFrame shape: {validation_status.shape}")
-        logger.debug(f"Validation status columns: {validation_status.columns.tolist()}")
-
-        if not validation_status.empty:
-            sample_rows = min(3, len(validation_status))
-            logger.debug(
-                f"Sample validation data (first {sample_rows} rows):\n{validation_status.head(sample_rows)}"
-            )
-
-        # Reset existing validation states
-        cells_to_reset = []
-        for (row, col), state in self._cell_states.items():
-            if state in [CellState.INVALID, CellState.CORRECTABLE]:
-                cells_to_reset.append((row, col))
-
-        for row, col in cells_to_reset:
-            self._cell_states[(row, col)] = CellState.NORMAL
-            logger.debug(f"Cell ({row}, {col}) state reset to NORMAL ")
-
-        logger.debug(f"Reset {len(cells_to_reset)} existing validation states")
-
-        # Check if the validation status is in the expected format
-        # Standard format should have ROW_IDX, COL_IDX, STATUS columns
-        if (
-            "ROW_IDX" in validation_status.columns
-            and "COL_IDX" in validation_status.columns
-            and "STATUS" in validation_status.columns
-        ):
-            # Process standard validation status format
-            for _, row in validation_status.iterrows():
-                row_idx = row["ROW_IDX"]
-                col_idx = row["COL_IDX"]
-                status = row["STATUS"]
-                status_str = str(status).lower()
-
-                # Check for invalid status
-                if (
-                    status_str
-                    in (
-                        "invalid",
-                        "validation_status.invalid",
-                        "validationstatus.invalid",
-                        "false",
-                        "0",
-                    )
-                    or hasattr(status, "name")
-                    and status.name == "INVALID"
-                ):
-                    self.set_cell_state(row_idx, col_idx, CellState.INVALID)
-
-                # Check for correctable status
-                elif (
-                    status_str
-                    in (
-                        "correctable",
-                        "validation_status.correctable",
-                        "validationstatus.correctable",
-                    )
-                    or hasattr(status, "name")
-                    and status.name == "CORRECTABLE"
-                ):
-                    self.set_cell_state(row_idx, col_idx, CellState.CORRECTABLE)
-
-            # Count updated cells
-            invalid_cells = sum(
-                1 for state in self._cell_states.values() if state == CellState.INVALID
-            )
-            correctable_cells = sum(
-                1 for state in self._cell_states.values() if state == CellState.CORRECTABLE
-            )
-
-            logger.debug(f"Updated {invalid_cells + correctable_cells} cells using standard format")
-
-        # Check if the validation status has *_status columns indicating a validation service format
-        elif any(col.endswith("_status") for col in validation_status.columns):
-            logger.debug("Converting from validation service format with *_status columns")
-
-            # Find status columns
-            status_columns = [col for col in validation_status.columns if col.endswith("_status")]
-            logger.debug(f"Found status columns: {status_columns}")
-
-            # Map column names to indices
-            column_to_index = {}
-
-            # Try to use _headers_map if available
-            if hasattr(self, "_headers_map") and self._headers_map:
-                for status_col in status_columns:
-                    if status_col == "_row_status":
-                        # Special case for row status
-                        column_to_index[status_col] = -1
-                    else:
-                        # Get the column name without '_status' suffix
-                        col_name = status_col[:-7]
-                        # Try to map to an index
-                        try:
-                            col_idx = self._headers_map.get(col_name)
-                            if col_idx is not None:
-                                column_to_index[status_col] = col_idx
-                                logger.debug(
-                                    f"Mapped status column {status_col} to index {col_idx}"
-                                )
-                        except Exception as e:
-                            logger.warning(
-                                f"Failed to map status column {status_col} to index: {e}"
-                            )
-            else:
-                # Fallback to default mapping for test scenarios
-                logger.debug("Using hardcoded column mapping for testing")
-                default_mapping = {
-                    "PLAYER_status": 1,  # Assuming PLAYER is column 1
-                    "CHEST_status": 3,  # Assuming CHEST is column 3
-                    "SOURCE_status": 2,  # Assuming SOURCE is column 2
-                    "SCORE_status": 4,  # Assuming SCORE is column 4
-                    "CLAN_status": 5,  # Assuming CLAN is column 5
-                }
-                column_to_index = default_mapping
-
-            # Process each row in the validation status
-            for row_idx, row in validation_status.iterrows():
-                for status_col, col_idx in column_to_index.items():
-                    if status_col in row:
-                        status = row[status_col]
-                        logger.debug(
-                            f"Processing cell ({row_idx}, {col_idx}) with status: {status}"
-                        )
-
-                        # Convert to string for comparison
-                        if status is not None:
-                            status_str = str(status).lower()
-                            logger.debug(f"Status value as string (lowercase): '{status_str}'")
-
-                            # Check for invalid status (both string and enum values)
-                            if col_idx >= 0 and (
-                                status_str
-                                in (
-                                    "invalid",
-                                    "validation_status.invalid",
-                                    "validationstatus.invalid",
-                                    "false",
-                                    "0",
-                                )
-                                or hasattr(status, "name")
-                                and status.name == "INVALID"
-                            ):
-                                self.set_cell_state(row_idx, col_idx, CellState.INVALID)
-                                logger.debug(f"Set cell ({row_idx}, {col_idx}) to INVALID")
-
-                            # Check for correctable status (both string and enum values)
-                            elif col_idx >= 0 and (
-                                status_str
-                                in (
-                                    "correctable",
-                                    "validation_status.correctable",
-                                    "validationstatus.correctable",
-                                )
-                                or hasattr(status, "name")
-                                and status.name == "CORRECTABLE"
-                            ):
-                                self.set_cell_state(row_idx, col_idx, CellState.CORRECTABLE)
-                                logger.debug(f"Set cell ({row_idx}, {col_idx}) to CORRECTABLE")
-
-            # Count updated cells
-            invalid_cells = sum(
-                1 for state in self._cell_states.values() if state == CellState.INVALID
-            )
-            correctable_cells = sum(
-                1 for state in self._cell_states.values() if state == CellState.CORRECTABLE
-            )
-
-            logger.debug(f"Processed {len(validation_status)} rows from validation status")
-            logger.debug(
-                f"Updated {invalid_cells + correctable_cells} cells using column-specific status format"
-            )
-
-        # Emit signal after updating validation states
-        logger.debug("Emitting state_changed signal after updating validation states")
-        self.state_changed.emit()
-
-        # Log the final counts
-        invalid_cells = sum(1 for state in self._cell_states.values() if state == CellState.INVALID)
-        correctable_cells = sum(
-            1 for state in self._cell_states.values() if state == CellState.CORRECTABLE
-        )
-        logger.debug(
-            f"After updating: {invalid_cells} cells marked as INVALID, {correctable_cells} cells marked as CORRECTABLE"
-        )
-
-    def update_cell_states_from_correction(self, correction_status: Dict[str, Any]) -> None:
-        """
-        Update cell states based on correction status.
-
-        Args:
-            correction_status: Dictionary with correction results containing keys:
-                              corrected_cells: List of (row, col) tuples
-                              original_values: Dict mapping "(row, col)" to original value
-                              new_values: Dict mapping "(row, col)" to new value
-        """
-        if not correction_status:
-            logger.debug("No correction status provided, nothing to update")
-            return
-
-        if "corrected_cells" not in correction_status:
-            logger.debug("Correction status missing 'corrected_cells' key, nothing to update")
-            return
-
-        corrected_cells = correction_status.get("corrected_cells", [])
-        original_values = correction_status.get("original_values", {})
-        new_values = correction_status.get("new_values", {})
-
-        logger.debug(f"Processing correction status with {len(corrected_cells)} corrected cells")
-
-        cells_updated = 0
-        for row, col in corrected_cells:
-            # Mark cell as corrected
-            self.set_cell_state(row, col, CellState.CORRECTED)
-
-            # Add details for tooltip
-            key = f"({row}, {col})"
-            if key in original_values and key in new_values:
-                detail = f"Corrected from '{original_values[key]}' to '{new_values[key]}'"
-                self.set_cell_detail(row, col, detail)
-                logger.debug(f"Set cell ({row}, {col}) to CORRECTED state with detail: {detail}")
-            else:
-                logger.debug(f"Set cell ({row}, {col}) to CORRECTED state")
-
-            cells_updated += 1
-
-        # Notify that states have changed
-        logger.debug(
-            f"Emitting state_changed signal after updating {cells_updated} corrected cells"
-        )
-        self.state_changed.emit()
-        logger.debug(
-            f"Updated cell states from correction status: "
-            f"{len(corrected_cells)} cells marked as corrected"
-        )
-
-    def update_cell_states_from_correctable(self, correctable_cells: List[Tuple[int, int]]) -> None:
-        """
-        Update cell states to mark cells as correctable.
-
-        Args:
-            correctable_cells: List of (row, col) tuples for cells that can be corrected
-        """
-        for row, col in correctable_cells:
-            # Only mark as correctable if not already corrected
-            if self.get_cell_state(row, col) != CellState.CORRECTED:
-                self.set_cell_state(row, col, CellState.CORRECTABLE)
-                self.set_cell_detail(row, col, "This value can be corrected automatically")
-
-        # Notify that states have changed
-        self.state_changed.emit()
-        logger.debug(
-            f"Updated correctable cell states: {len(correctable_cells)} cells marked as correctable"
-        )
+    # --- Add method for adapters to get column names --- #
+    def get_column_names(self) -> List[str]:
+        """Returns the list of current column names based on the headers map."""
+        # Sort by index to maintain order
+        return sorted(self._headers_map, key=self._headers_map.get)

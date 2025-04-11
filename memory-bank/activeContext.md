@@ -93,7 +93,7 @@ We are currently implementing a comprehensive refactoring of the DataView compon
 
 #### Current Status
 
-We are between **Phase 2 (Delegates)** and **Phase 3 (Adapters)**.
+We are now focused on **Phase 3 (Adapter Integration)** and **Phase 4 (Context Menu Actions)**.
 
 - ✅ Project overview documentation
 - ✅ UI mockups
@@ -110,25 +110,27 @@ We are between **Phase 2 (Delegates)** and **Phase 3 (Adapters)**.
 - ✅ ValidationAdapter base implemented and tested (placeholder logic)
 - ✅ CorrectionAdapter base implemented and tested (placeholder logic)
 - ✅ Fixtures moved to conftest.py
+- ✅ Context menu actions implemented (add/edit/standard)
+- ✅ Integration tests for DataViewModel/TableStateManager/Delegates (state propagation, paint, tooltips) passed
 
 #### Next Steps
 
 1.  **Connect Edit Actions:** Add `EditCellAction` and `ShowEditDialogAction` to the `ContextMenuFactory`.
-2.  **Start Phase 3**: Begin integrating validation/correction visualizations with delegates (`ValidationDelegate`, `CorrectionDelegate`) and connecting real services.
-3.  **Refine `ComplexEditDialog`**: Make the dialog context-aware (different editors for different columns/data types).
-4.  **Implement Validation During Editing**: Modify the `QStyledItemDelegate` to perform validation during the editing process.
-4.  **Refine Adapters & State Manager**: Define `TableStateManager` update API and implement proper transformation logic in `ValidationAdapter` and `CorrectionAdapter`.
-5.  **Implement Phase 1 Items**: Address data loading, column handling, basic UI controls.
-6.  **Advanced Context Menu**: Implement context-specific actions.
-7.  **Define `CorrectionService` Interface:** Specify the method signature for adding a rule (e.g., `add_rule(from_value: str, to_value: str, category: str, enabled: bool) -> bool`).
-8.  **Update `ActionContext`:** Add a property or mechanism to access the `CorrectionService` (e.g., `context.correction_service`).
-9.  **Modify `AddToCorrectionListAction`:** Replace the simulated `_call_correction_service_add` with a call to `context.correction_service.add_rule`.
-10. **Update Tests:** Mock the `CorrectionService` passed via the context in the action tests.
-11. **Implement the `AddToValidationListAction` similarly.
-12. **Implement Batch Actions:** Enhance `AddToCorrectionListAction` and `AddToValidationListAction` to handle multi-cell selections, possibly introducing batch dialogs.
-13. **Integrate Real Services:** Replace mocked service calls with actual implementations (requires `CorrectionService` and `ValidationService` to be ready).
-14. **Refine Service Injection:** Decide on the strategy for providing service instances to `ActionContext`.
-15. **Populate Dialog Categories/Lists:** Use real data sources for dropdowns in dialogs.
+2.  **Refine Adapters & State Manager**: Define `TableStateManager` update API and implement proper transformation logic in `ValidationAdapter` and `CorrectionAdapter`.
+3.  **Implement Remaining Integration Tests**: Cover full workflows and edge cases.
+4.  **Start Phase 5**: Begin integrating validation/correction visualizations with delegates (`ValidationDelegate`, `CorrectionDelegate`) and connecting real services.
+5.  **Refine `ComplexEditDialog`**: Make the dialog context-aware (different editors for different columns/data types).
+6.  **Implement Validation During Editing**: Modify the `QStyledItemDelegate` to perform validation during the editing process.
+7.  **Advanced Context Menu**: Implement context-specific actions.
+8.  **Define `CorrectionService` Interface:** Specify the method signature for adding a rule (e.g., `add_rule(from_value: str, to_value: str, category: str, enabled: bool) -> bool`).
+9.  **Update `ActionContext`:** Add a property or mechanism to access the `CorrectionService` (e.g., `context.correction_service`).
+10. **Modify `AddToCorrectionListAction`:** Replace the simulated `_call_correction_service_add` with a call to `context.correction_service.add_rule`.
+11. **Update Tests:** Mock the `CorrectionService` passed via the context in the action tests.
+12. **Implement the `AddToValidationListAction` similarly.
+13. **Implement Batch Actions:** Enhance `AddToCorrectionListAction` and `AddToValidationListAction` to handle multi-cell selections, possibly introducing batch dialogs.
+14. **Integrate Real Services:** Replace mocked service calls with actual implementations (requires `CorrectionService` and `ValidationService` to be ready).
+15. **Refine Service Injection:** Decide on the strategy for providing service instances to `ActionContext`.
+16. **Populate Dialog Categories/Lists:** Use real data sources for dropdowns in dialogs.
 
 This refactoring project represents a significant improvement to the ChestBuddy application's data handling capabilities and will address multiple limitations in the current implementation.
 
@@ -239,7 +241,7 @@ The implementation will follow a phased approach:
 
 #### Current Status
 
-We are currently in **Phase 1: Core DataView Implementation**, wrapping up basic view features and moving towards context menu and delegate implementation.
+We are currently in **Phase 3 (Adapter Integration)** and **Phase 4 (Context Menu Actions)**.
 
 - ✅ Project overview documentation
 - ✅ UI mockups for main view, context menu, validation, and correction integration
@@ -248,10 +250,13 @@ We are currently in **Phase 1: Core DataView Implementation**, wrapping up basic
 - ✅ Testing strategy documentation (unit, integration, UI, performance)
 - ✅ Base DataViewModel implemented and tested
 - ✅ Base DataTableView implemented and tested
-- ✅ Selection change signal added to DataTableView and tested
-- ✅ Basic context menu creation implemented and tested in DataTableView
 - ✅ Base CellDelegate implemented and tested
-- ✅ Fixtures moved to conftest.py
+- ✅ ValidationDelegate implemented and tested
+- ✅ CorrectionDelegate implemented and tested
+- ✅ ValidationAdapter base implemented and tested
+- ✅ CorrectionAdapter base implemented and tested
+- ✅ Context menu actions implemented (add/edit/standard)
+- ✅ Integration tests for core state propagation and delegate rendering passed
 
 #### Next Steps
 

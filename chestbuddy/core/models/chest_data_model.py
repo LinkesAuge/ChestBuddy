@@ -360,88 +360,61 @@ class ChestDataModel(QObject):
         Args:
             new_data: The new DataFrame to use as the chest data.
         """
+        print(
+            f"ChestDataModel.update_data called with DataFrame of shape: {new_data.shape if new_data is not None else 'None'}"
+        )
+
+        # Prevent recursive updates
+        if self._updating:
+            print("Canceling update as another update is in progress.")
+            logger.debug("Canceling update as another update is in progress.")
+            return
+
+        self._updating = True
+        signals_were_blocked = self.signalsBlocked()
         try:
-            print(
-                f"ChestDataModel.update_data called with DataFrame of shape: {new_data.shape if new_data is not None else 'None'}"
-            )
-
-            # Prevent recursive updates
-            if self._updating:
-                print("Canceling update as another update is in progress.")
-                logger.debug("Canceling update as another update is in progress.")
-                return
-
-            self._updating = True
-            print("Set _updating to True")
-
-            # Track if signals were already blocked
-            self._signals_already_blocked = self.signalsBlocked()
-            print(f"Signals already blocked: {self._signals_already_blocked}")
-
-            # Block signals if not already blocked
-            if not self._signals_already_blocked:
+            print(f"Set _updating to True. Signals were blocked: {signals_were_blocked}")
+            if not signals_were_blocked:
                 print("Blocking signals")
                 self.blockSignals(True)
 
-            try:
-                # Create a copy to avoid modifying the original
-                processed_data = new_data.copy()
+            # Create a copy to avoid modifying the original
+            processed_data = new_data.copy()
 
-                # Map column names based on common variations
-                column_mapping = {}
-                for col in processed_data.columns:
-                    if col in self.COLUMN_NAME_MAPPING:
-                        column_mapping[col] = self.COLUMN_NAME_MAPPING[col]
+            # --- Step 1: Standardize column names to uppercase --- #
+            processed_data.columns = [str(col).upper() for col in processed_data.columns]
 
-                if column_mapping:
-                    processed_data = processed_data.rename(columns=column_mapping)
+            # --- Step 2: Ensure all expected columns are present --- #
+            # EXPECTED_COLUMNS are already uppercase
+            for col in self.EXPECTED_COLUMNS:
+                if col not in processed_data.columns:
+                    # Handle potential type issues: assign NaN which pandas handles better than '' sometimes
+                    # Or stick with "" if that's the desired default for missing string cols
+                    processed_data[col] = (
+                        pd.NA if col == "SCORE" else ""
+                    )  # Use NA for numeric, '' for others
 
-                # Ensure all expected columns are present
-                for col in self.EXPECTED_COLUMNS:
-                    if col not in processed_data.columns:
-                        processed_data[col] = ""
+            # --- Step 3: Select final columns in the correct order --- #
+            self._data = processed_data[self.EXPECTED_COLUMNS].copy()
 
-                print(f"Setting data with columns: {', '.join(self.EXPECTED_COLUMNS)}")
-                # Keep only the expected columns in the specified order
-                self._data = processed_data[self.EXPECTED_COLUMNS].copy()
-                print(f"New data shape: {self._data.shape}")
+            # Initialize validation and correction status DataFrames
+            self._init_status_dataframes()
+            self._current_data_hash = None  # Force hash update for notification
 
-                # Initialize validation and correction status DataFrames
-                self._init_status_dataframes()
-            finally:
-                # Always unblock internal signals
-                self._signals_already_blocked = False
-
-            # Only notify change if we weren't already blocking signals
-            if not self._signals_already_blocked:
-                # Unblock signals before emitting
-                print("Unblocking signals before notifying")
-                self.blockSignals(False)
-
-            # Important change: Always clear the current hash to force notification
-            # This ensures that _notify_change will detect a change and emit the signal
-            print("Clearing current hash to force signal emission after update_data")
-            self._current_data_hash = None
-
-            print("Calling _notify_change to emit signals")
         except Exception as e:
-            # Ensure signals are unblocked on exception
-            if not self._signals_already_blocked:
-                self.blockSignals(False)
-            print(f"Error updating data: {e}")
+            print(f"Error during data processing: {e}")
             logger.error(f"Error updating data: {e}")
-            raise
+            # Optionally re-raise or handle
         finally:
-            # Ensure signals are unblocked if we blocked them
-            if not self._signals_already_blocked:
+            # Only unblock if this call blocked them
+            if not signals_were_blocked:
+                print("Unblocking signals")
                 self.blockSignals(False)
-
-            # Notify of changes
-            self._notify_change()
-
-            # Mark update as complete and notify if needed
+            # Mark update as complete *before* notifying
             self._updating = False
-            print("Data update complete, set _updating to False")
+            print("Data update complete, set _updating to False. Calling _notify_change.")
+            # Notify after update is complete and signals are unblocked
+            self._notify_change()
 
     def _calculate_hash_for_empty(self) -> str:
         """Calculate a hash for an empty DataFrame with the expected columns."""
@@ -563,8 +536,8 @@ class ChestDataModel(QObject):
                 logger.error(f"Invalid row or column: {row_idx}, {column_name}")
                 return None
 
-            # Return the cell value
-            return self._data.iloc[row_idx][column_name]
+            # Return the cell value using .loc for label-based access
+            return self._data.loc[row_idx, column_name]
         except Exception as e:
             logger.error(f"Error getting cell value: {e}")
             return None

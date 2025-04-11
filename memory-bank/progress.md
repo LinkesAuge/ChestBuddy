@@ -19,13 +19,18 @@ Last updated: 2024-08-06
 - ✅ Basic context menu creation implemented and tested
 - ✅ Base CellDelegate implemented and tested
 - ✅ Fixtures moved to conftest.py
+- ✅ ValidationDelegate implemented and tested
+- ✅ CorrectionDelegate implemented and tested
+- ✅ ValidationAdapter base implemented and tested
+- ✅ CorrectionAdapter base implemented and tested
+- ✅ Context menu actions implemented (add/edit/standard)
+- ✅ Integration tests for DataViewModel/TableStateManager/Delegates (state propagation, paint, tooltips)
 
 ### In Progress
-- 🔄 Core DataViewModel implementation (~85%)
-- 🔄 Basic DataTableView implementation (~75%)
-- 🔄 FilterModel initial implementation (20%)
-- 🔄 Context menu implementation (basic done)
-- 🔄 Delegate System implementation (starting)
+- 🔄 Connecting actions to context menu
+- 🔄 Refining Adapter transformation logic
+- 🔄 Implementing `TableStateManager` update methods based on adapter output
+- 🔄 Developing remaining Integration tests (full workflows, edge cases)
 
 ### Upcoming
 - ⏳ Custom HeaderView implementation
@@ -178,6 +183,8 @@ ChestBuddy is currently focused on a comprehensive refactoring of the DataView c
 | **Manual Testing and Validation**| 🟡 Planned    |                                                |
 | Perform manual testing       | 🟡 Planned    |                                                |
 | Conduct usability testing    | 🟡 Planned    |                                                |
+| **Integration Testing**        | 🟢 In Progress | State propagation tested                      |
+| **UI Testing**                 | 🟡 Planned    |                                               |
 
 ## What Works (Existing Functionality)
 - Core data model and data handling

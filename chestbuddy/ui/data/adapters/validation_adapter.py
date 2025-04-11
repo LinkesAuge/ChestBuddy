@@ -10,7 +10,7 @@ import typing
 
 # Placeholder imports - adjust based on actual locations
 from chestbuddy.core.services import ValidationService
-from chestbuddy.core.managers.table_state_manager import TableStateManager, CellFullState
+from chestbuddy.core.managers.table_state_manager import TableStateManager, CellFullState, CellState
 from chestbuddy.core.enums.validation_enums import ValidationStatus
 
 # Placeholder types for clarity
@@ -61,65 +61,125 @@ class ValidationAdapter(QObject):
         except Exception as e:
             print(f"Error connecting validation_complete signal: {e}")  # Debug print
 
-    @Slot(object)  # Adjust type hint based on actual signal payload (e.g., pd.DataFrame)
-    def _on_validation_complete(self, validation_results):
+    @Slot(object)
+    def _on_validation_complete(self, validation_results: pd.DataFrame):
         """
         Slot to handle the validation_complete signal from ValidationService.
 
-        Updates the TableStateManager with the received results.
+        Transforms validation results (expected DataFrame) and updates the
+        TableStateManager, preserving existing correction information.
 
         Args:
-            validation_results: The validation results (DataFrame expected).
+            validation_results: The validation results DataFrame.
+                                Expected to have columns like 'ColumnName_status'
+                                and optional 'ColumnName_details'.
         """
-        print(
-            f"ValidationAdapter received validation_complete: {type(validation_results)}"
-        )  # Debug print
+        print(f"ValidationAdapter received validation_complete: {type(validation_results)}")
         if validation_results is None or not isinstance(validation_results, pd.DataFrame):
-            print("Validation results are None or not a DataFrame, skipping update.")  # Debug print
+            print("Validation results are None or not a DataFrame, skipping update.")
             return
 
-        # Transform the results DataFrame into the format needed by TableStateManager
-        # Assuming validation_results DataFrame has columns like 'ColumnName_status'
-        # and potentially 'ColumnName_details'.
+        if validation_results.empty:
+            print("Validation results DataFrame is empty, skipping update.")
+            return
+
         state_changes: typing.Dict[typing.Tuple[int, int], CellFullState] = {}
+        col_names = self._table_state_manager.get_column_names()
+        col_map = {name: i for i, name in enumerate(col_names)}
         num_rows = len(validation_results)
-        col_map = {name: i for i, name in enumerate(self._table_state_manager.get_column_names())}
 
-        for row_idx in range(num_rows):
-            for col_name, col_idx in col_map.items():
-                status_col = f"{col_name}_status"
-                details_col = f"{col_name}_details"
+        print(f"Processing {num_rows} rows, using column map: {col_map}")  # Debug
 
-                status = validation_results.iloc[row_idx].get(status_col, ValidationStatus.VALID)
-                details = validation_results.iloc[row_idx].get(details_col, None)
+        # --- Efficient Iteration over DataFrame --- #
+        # Create lookup for status/details columns that exist
+        status_cols_present = {
+            f"{name}_status": name
+            for name in col_names
+            if f"{name}_status" in validation_results.columns
+        }
+        details_cols_present = {
+            f"{name}_details": name
+            for name in col_names
+            if f"{name}_details" in validation_results.columns
+        }
 
-                # We only need to store changes from the default VALID state
-                if status != ValidationStatus.VALID or details:
-                    # Fetch existing state to merge, preserving correction info
-                    existing_state = self._table_state_manager.get_full_cell_state(
-                        row_idx, col_idx
-                    )  # Assume this method exists
-                    if not existing_state:
-                        existing_state = CellFullState()
+        # Iterate using itertuples for potentially better performance
+        for row_idx, row_data in enumerate(
+            validation_results.itertuples(index=False, name="ValidationRow")
+        ):
+            row_data_dict = row_data._asdict()  # Convert NamedTuple to dict for easier access
 
-                    state_changes[(row_idx, col_idx)] = CellFullState(
-                        validation_status=status,
-                        error_details=details,
-                        correction_suggestions=existing_state.correction_suggestions,  # Preserve suggestions
+            # Process Status Columns
+            for status_col, base_col_name in status_cols_present.items():
+                if status_col in row_data_dict:
+                    col_idx = col_map.get(base_col_name)
+                    if col_idx is None:
+                        continue  # Skip if column not found in table
+
+                    key = (row_idx, col_idx)
+                    status = row_data_dict[status_col]
+                    # Convert status if it's not already CellState enum (e.g., bool, int)
+                    if not isinstance(status, CellState):
+                        # Basic conversion, might need refinement based on service output
+                        if str(status).lower() in ("invalid", "false", "0"):
+                            status = CellState.INVALID
+                        # Add other conversions if needed (e.g., for CORRECTABLE, WARNING)
+                        else:
+                            status = CellState.VALID  # Default to valid if not recognized
+
+                    # Get existing state or create default
+                    current_full_state = (
+                        self._table_state_manager.get_full_cell_state(row_idx, col_idx)
+                        or CellFullState()
                     )
 
-        # Update the TableStateManager with the transformed changes
+                    # Create update object, preserving existing details/suggestions
+                    change_state = CellFullState(
+                        validation_status=status,
+                        error_details=current_full_state.error_details,
+                        correction_suggestions=current_full_state.correction_suggestions,
+                    )
+                    state_changes[key] = change_state  # Add/overwrite in changes dict
+
+            # Process Details Columns
+            for details_col, base_col_name in details_cols_present.items():
+                if details_col in row_data_dict:
+                    col_idx = col_map.get(base_col_name)
+                    if col_idx is None:
+                        continue  # Skip if column not found
+
+                    key = (row_idx, col_idx)
+                    details = row_data_dict[details_col]
+
+                    # Get the state to update (either from current changes or existing)
+                    state_to_update = state_changes.get(
+                        key,
+                        self._table_state_manager.get_full_cell_state(row_idx, col_idx)
+                        or CellFullState(),
+                    )
+
+                    # Update details
+                    state_to_update.error_details = str(details) if details is not None else None
+                    state_changes[key] = state_to_update  # Ensure it's in the changes dict
+
+        # --- Update TableStateManager --- #
         try:
-            # Assuming TableStateManager has an update_states method
             if state_changes:
+                # Filter out states that haven't actually changed from the default
+                # This avoids unnecessary signals if validation confirms everything is NORMAL
+                # However, we MUST send updates if details/suggestions were added/removed
+                # even if validation_status remains NORMAL.
+                # The `update_states` method handles merging and only emitting if needed.
                 self._table_state_manager.update_states(state_changes)
-                print(f"Sent {len(state_changes)} state updates to TableStateManager.")  # Debug
+                print(
+                    f"Sent {len(state_changes)} potential state updates to TableStateManager."
+                )  # Debug
             else:
                 print("No validation state changes detected.")  # Debug
-        except AttributeError:
-            print(f"Error: TableStateManager object has no method 'update_states'")  # Debug print
+        except AttributeError as e:
+            print(f"Error: TableStateManager missing method or attribute: {e}")  # Debug
         except Exception as e:
-            print(f"Error updating TableStateManager: {e}")  # Debug print
+            print(f"Error updating TableStateManager: {e}")  # Debug
 
     def disconnect_signals(self):
         """Disconnect signals to prevent issues during cleanup."""

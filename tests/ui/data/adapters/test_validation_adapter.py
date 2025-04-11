@@ -5,11 +5,11 @@ Tests for the ValidationAdapter class.
 import pytest
 import pandas as pd
 from PySide6.QtCore import QObject, Signal
-from unittest.mock import MagicMock, call
+from unittest.mock import MagicMock, call, ANY
+from typing import Dict, Tuple, List, Optional
 
 from chestbuddy.ui.data.adapters.validation_adapter import ValidationAdapter
-from chestbuddy.core.managers.table_state_manager import TableStateManager, CellFullState
-from chestbuddy.core.enums.validation_enums import ValidationStatus
+from chestbuddy.core.managers.table_state_manager import TableStateManager, CellFullState, CellState
 
 
 # Mock classes for dependencies
@@ -18,20 +18,39 @@ class MockValidationService(QObject):
 
 
 class MockTableStateManager(QObject):
-    def update_cell_states_from_validation(self, updates):
-        pass  # Mock method
+    """Mock TableStateManager with new methods."""
+
+    def __init__(self):
+        self.states: Dict[Tuple[int, int], CellFullState] = {}
+        self.column_names = ["Player", "Chest", "Score"]  # Example column names
+        self.update_states_calls = []  # Track calls to update_states
+
+    def get_column_names(self) -> List[str]:
+        return self.column_names
+
+    def get_full_cell_state(self, row: int, col: int) -> Optional[CellFullState]:
+        return self.states.get((row, col))
+
+    def update_states(self, changes: Dict[Tuple[int, int], CellFullState]):
+        """Mock update_states, just record the call."""
+        self.update_states_calls.append(changes)
+        # Simulate merging for get_full_cell_state calls later in the test
+        for key, state in changes.items():
+            self.states[key] = state
 
 
 # Test data
 @pytest.fixture
-def mock_validation_results():
+def mock_validation_results_df():
     """Create mock validation results DataFrame."""
-    # Example structure: DataFrame with columns like 'ColumnName_status'
     return pd.DataFrame(
         {
-            "Player_status": ["VALID", "INVALID", "VALID"],
-            "Chest_status": ["VALID", "VALID", "CORRECTABLE"],
-            "Score_status": ["VALID", "VALID", "VALID"],
+            "Player_status": [CellState.VALID, CellState.INVALID, CellState.VALID],
+            "Player_details": [None, "Invalid Player Name", None],
+            "Chest_status": [CellState.VALID, CellState.VALID, CellState.CORRECTABLE],
+            "Chest_details": [None, None, "Typo? Suggest 'Silver'"],
+            "Score_status": [CellState.VALID, CellState.VALID, CellState.VALID],
+            # Missing Score_details column
         }
     )
 
@@ -43,11 +62,8 @@ def mock_validation_service(qtbot):  # Use qtbot for signal testing
 
 
 @pytest.fixture
-def mock_table_state_manager(mocker):  # Use mocker for method spying
-    """Create a mock TableStateManager instance."""
-    manager = MockTableStateManager()
-    mocker.spy(manager, "update_cell_states_from_validation")
-    return manager
+def mock_table_state_manager():  # Remove mocker spy here, use internal tracking
+    return MockTableStateManager()
 
 
 @pytest.fixture
@@ -71,42 +87,139 @@ class TestValidationAdapter:
         assert adapter._table_state_manager == mock_table_state_manager
         # Signal connection attempt is verified implicitly by teardown not failing
 
-    def test_on_validation_complete_updates_manager(
+    def test_on_validation_complete_calls_update_states(
         self,
         adapter,
         mock_validation_service,
         mock_table_state_manager,
-        mock_validation_results,
-        mocker,
+        mock_validation_results_df,
     ):
-        """Test that receiving validation results updates the state manager."""
+        """Test that receiving validation results calls manager.update_states correctly."""
         # Emit the signal
-        mock_validation_service.validation_complete.emit(mock_validation_results)
+        mock_validation_service.validation_complete.emit(mock_validation_results_df)
 
-        # Assert manager update method was called with the DataFrame
-        mock_table_state_manager.update_cell_states_from_validation.assert_called_once_with(
-            mock_validation_results
+        # Assert manager update method was called once
+        assert len(mock_table_state_manager.update_states_calls) == 1
+
+        # Get the changes dictionary passed to update_states
+        changes_dict = mock_table_state_manager.update_states_calls[0]
+
+        # Verify the content of the changes dictionary
+        # Expected changes based on mock_validation_results_df and mock columns:
+        # Row 1, Col 0 (Player): INVALID, with details
+        # Row 2, Col 1 (Chest): CORRECTABLE, with details
+        expected_changes = {
+            (1, 0): CellFullState(
+                validation_status=CellState.INVALID,
+                error_details="Invalid Player Name",
+                correction_suggestions=[],
+            ),  # Defaults preserved
+            (2, 1): CellFullState(
+                validation_status=CellState.CORRECTABLE,
+                error_details="Typo? Suggest 'Silver'",
+                correction_suggestions=[],
+            ),  # Defaults preserved
+        }
+
+        assert changes_dict == expected_changes
+
+    def test_on_validation_complete_preserves_corrections(
+        self, adapter, mock_validation_service, mock_table_state_manager
+    ):
+        """Test that validation updates preserve existing correction suggestions."""
+        # Setup: Manager has existing state with correction suggestions
+        key = (0, 0)  # Player column
+        existing_state = CellFullState(
+            validation_status=CellState.VALID,  # Initially valid
+            correction_suggestions=["SuggestionA", "SuggestionB"],
+        )
+        mock_table_state_manager.states[key] = existing_state
+
+        # Define validation results making the cell INVALID
+        validation_df = pd.DataFrame(
+            {
+                "Player_status": [CellState.INVALID],
+                "Player_details": ["Validation Error"],
+                "Chest_status": [CellState.VALID],
+                "Score_status": [CellState.VALID],
+            }
         )
 
+        # Emit signal
+        mock_validation_service.validation_complete.emit(validation_df)
+
+        # Check call to update_states
+        assert len(mock_table_state_manager.update_states_calls) == 1
+        changes_dict = mock_table_state_manager.update_states_calls[0]
+
+        # Verify the state for the key includes the preserved suggestions
+        assert key in changes_dict
+        updated_state = changes_dict[key]
+        assert updated_state.validation_status == CellState.INVALID
+        assert updated_state.error_details == "Validation Error"
+        assert updated_state.correction_suggestions == ["SuggestionA", "SuggestionB"]  # Preserved
+
     def test_on_validation_complete_handles_none(
-        self, adapter, mock_validation_service, mock_table_state_manager, mocker
+        self, adapter, mock_validation_service, mock_table_state_manager
     ):
         """Test that None results are handled gracefully."""
         # Emit signal with None
         mock_validation_service.validation_complete.emit(None)
 
         # Assert manager update method was NOT called
-        mock_table_state_manager.update_cell_states_from_validation.assert_not_called()
+        assert len(mock_table_state_manager.update_states_calls) == 0  # Check calls list
+
+    def test_on_validation_complete_handles_empty_dataframe(
+        self, adapter, mock_validation_service, mock_table_state_manager
+    ):
+        """Test that empty DataFrame results are handled gracefully."""
+        empty_df = pd.DataFrame()
+        mock_validation_service.validation_complete.emit(empty_df)
+        assert len(mock_table_state_manager.update_states_calls) == 0
 
     def test_on_validation_complete_handles_non_dataframe(
-        self, adapter, mock_validation_service, mock_table_state_manager, mocker
+        self, adapter, mock_validation_service, mock_table_state_manager
     ):
         """Test that non-DataFrame results are handled gracefully."""
         # Emit signal with a dictionary instead of DataFrame
         mock_validation_service.validation_complete.emit({"some": "data"})
 
         # Assert manager update method was NOT called
-        mock_table_state_manager.update_cell_states_from_validation.assert_not_called()
+        assert len(mock_table_state_manager.update_states_calls) == 0  # Check calls list
+
+    def test_on_validation_complete_handles_missing_columns(
+        self, adapter, mock_validation_service, mock_table_state_manager
+    ):
+        """Test that missing status/details columns are handled."""
+        validation_df = pd.DataFrame(
+            {
+                "Player_status": [CellState.INVALID],
+                # Missing Player_details, Chest_status, Chest_details, Score_status
+            }
+        )
+
+        mock_validation_service.validation_complete.emit(validation_df)
+
+        assert len(mock_table_state_manager.update_states_calls) == 1
+        changes_dict = mock_table_state_manager.update_states_calls[0]
+        # Only Player state should be updated
+        assert (0, 0) in changes_dict
+        assert changes_dict[(0, 0)].validation_status == CellState.INVALID
+        assert changes_dict[(0, 0)].error_details is None
+        assert len(changes_dict) == 1
+
+    def test_on_validation_complete_handles_mismatched_columns(
+        self, adapter, mock_validation_service, mock_table_state_manager
+    ):
+        """Test results with columns not present in the state manager."""
+        validation_df = pd.DataFrame(
+            {"Player_status": [CellState.VALID], "NonExistentColumn_status": [CellState.INVALID]}
+        )
+        mock_validation_service.validation_complete.emit(validation_df)
+        # Should not raise an error, and update_states should not be called
+        # because the only potential change (Player_status=VALID) doesn't require an update
+        # if the default state is also VALID/NORMAL
+        assert len(mock_table_state_manager.update_states_calls) == 0
 
     def test_disconnect_signals(self, adapter, mock_validation_service):
         """Test that signals are disconnected."""
@@ -116,93 +229,3 @@ class TestValidationAdapter:
             adapter.disconnect_signals()
         except Exception as e:
             pytest.fail(f"disconnect_signals raised an exception: {e}")
-
-    def test_on_validation_complete_updates_manager_with_transformed_data(
-        self,
-        adapter,
-        mock_validation_service,
-        mock_table_state_manager,
-        mock_validation_results,
-        mocker,
-    ):
-        """Test that receiving validation results updates the state manager with transformed data."""
-        # Emit the signal
-        mock_validation_service.validation_complete.emit(mock_validation_results)
-
-        # Define validation results
-        validation_df = pd.DataFrame(
-            {
-                "ColA_status": [ValidationStatus.VALID, ValidationStatus.INVALID],
-                "ColA_details": [None, "Error A1"],
-                "ColB_status": [ValidationStatus.CORRECTABLE, ValidationStatus.VALID],
-                "ColB_details": ["Suggestion B0", None],
-            }
-        )
-
-        # Define expected state changes
-        expected_changes = {
-            # Row 0, Col 1 (ColB) is CORRECTABLE with details
-            (0, 1): CellFullState(
-                validation_status=ValidationStatus.CORRECTABLE,
-                error_details="Suggestion B0",
-                correction_suggestions=None,  # Preserved existing (None in this case)
-            ),
-            # Row 1, Col 0 (ColA) is INVALID with details
-            (1, 0): CellFullState(
-                validation_status=ValidationStatus.INVALID,
-                error_details="Error A1",
-                correction_suggestions=None,  # Preserved existing
-            ),
-            # Row 0, Col 0 and Row 1, Col 1 are VALID with no details, so no state change entry
-        }
-
-        # Verify update_states was called with the correct dictionary
-        mock_table_state_manager.update_states.assert_called_once_with(expected_changes)
-
-    def test_on_validation_complete_no_changes(
-        self, mock_validation_service, mock_table_state_manager
-    ):
-        """Test adapter does not call update_states if results show no changes from VALID."""
-        # Setup: Manager returns default state
-        mock_table_state_manager.get_column_names.return_value = ["ColA"]
-        mock_table_state_manager.get_full_cell_state.return_value = CellFullState()
-
-        adapter = ValidationAdapter(
-            mock_validation_service,
-            mock_table_state_manager,
-        )
-
-        # Define validation results that are all VALID and have no details
-        validation_df = pd.DataFrame(
-            {"ColA_status": [ValidationStatus.VALID, ValidationStatus.VALID]}
-        )
-
-        # Simulate signal emission
-        mock_validation_service.validation_complete.emit(validation_df)
-
-        # Verify update_states was NOT called
-        mock_table_state_manager.update_states.assert_not_called()
-
-    def test_on_validation_complete_preserves_corrections(
-        self, mock_validation_service, mock_table_state_manager
-    ):
-        """Test that validation updates preserve existing correction suggestions."""
-        # Setup: Manager returns existing state with correction suggestions
-        mock_table_state_manager.get_column_names.return_value = ["ColA"]
-        existing_state = CellFullState(
-            validation_status=ValidationStatus.VALID,  # Initially valid
-            correction_suggestions=["Suggestion1"],
-        )
-        mock_table_state_manager.get_full_cell_state.return_value = existing_state
-
-        adapter = ValidationAdapter(
-            mock_validation_service,
-            mock_table_state_manager,
-        )
-
-        # Define validation results making the cell INVALID
-        validation_df = pd.DataFrame(
-            {"ColA_status": [ValidationStatus.INVALID], "ColA_details": ["Validation Error"]}
-        )
-
-        # Simulate signal emission

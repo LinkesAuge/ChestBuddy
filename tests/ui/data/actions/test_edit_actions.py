@@ -6,8 +6,8 @@ import pytest
 from unittest.mock import MagicMock, PropertyMock, patch
 
 from PySide6.QtCore import QModelIndex, Qt, QMimeData
-from PySide6.QtGui import QKeySequence, QGuiApplication, QClipboard
-from PySide6.QtWidgets import QTableView, QMessageBox  # Added QMessageBox
+from PySide6.QtGui import QKeySequence, QGuiApplication, QClipboard, QIcon
+from PySide6.QtWidgets import QTableView, QMessageBox, QDialog  # Added QDialog
 
 from chestbuddy.ui.data.actions.edit_actions import (
     CopyAction,
@@ -588,3 +588,194 @@ class TestShowEditDialogAction:
             action.execute(ctx)
             mock_dialog_class.assert_not_called()
             assert len(mock_model_readonly.setData_calls) == 0
+
+
+# --- Tests for ShowEditDialogAction ---
+
+
+@pytest.fixture
+def show_dialog_context(mock_model_index, mock_qwidget):
+    """Context for ShowEditDialogAction."""
+    model = MockModel()
+    return ActionContext(
+        clicked_index=mock_model_index,
+        selection=[mock_model_index],
+        model=model,
+        parent_widget=mock_qwidget,
+    )
+
+
+def test_show_edit_dialog_action_properties():
+    """Test basic properties of ShowEditDialogAction."""
+    action = ShowEditDialogAction()
+    assert action.id == "show_edit_dialog"
+    assert action.text == "Edit (Dialog)"
+    assert isinstance(action.icon, QIcon)
+    assert action.shortcut is None  # No shortcut defined yet
+
+
+def test_show_edit_dialog_action_applicability(show_dialog_context):
+    """Test applicability logic."""
+    action = ShowEditDialogAction()
+    context = show_dialog_context
+
+    # Applicable with single selection
+    assert action.is_applicable(context)
+
+    # Not applicable with no selection
+    context.selection = []
+    assert not action.is_applicable(context)
+
+    # Not applicable with multiple selections
+    context.selection = [context.clicked_index, context.model.index(0, 1)]
+    assert not action.is_applicable(context)
+
+    # Not applicable with no model
+    context.selection = [context.clicked_index]
+    context.model = None
+    assert not action.is_applicable(context)
+
+
+def test_show_edit_dialog_action_enabled(show_dialog_context):
+    """Test enabled logic."""
+    action = ShowEditDialogAction()
+    context = show_dialog_context
+
+    # Enabled when applicable and cell is editable
+    assert action.is_enabled(context)
+
+    # Disabled if not applicable (e.g., multi-select)
+    context.selection = [context.clicked_index, context.model.index(0, 1)]
+    assert not action.is_enabled(context)
+
+    # Disabled if cell is not editable
+    context.selection = [context.clicked_index]
+    context.model._is_editable = False  # Use internal flag of mock
+    assert not action.is_enabled(context)
+
+
+def test_show_edit_dialog_action_execute_accepted(show_dialog_context, mocker):
+    """Test execute when dialog is accepted."""
+    action = ShowEditDialogAction()
+    context = show_dialog_context
+    initial_value = context.model.data(context.clicked_index, Qt.DisplayRole)
+    new_value = "Edited Value"
+
+    # Mock the dialog
+    mock_dialog = MagicMock(spec=ComplexEditDialog)
+    mock_dialog.exec.return_value = QDialog.Accepted
+    mock_dialog.get_new_value.return_value = new_value
+
+    # Patch the dialog instantiation within the action's module
+    mocker.patch(
+        "chestbuddy.ui.data.actions.edit_actions.ComplexEditDialog", return_value=mock_dialog
+    )
+
+    # Mock the model's setData
+    mock_set_data = mocker.patch.object(context.model, "setData", return_value=True)
+
+    action.execute(context)
+
+    # Verify dialog was created with context and shown
+    edit_actions.ComplexEditDialog.assert_called_once_with(
+        context=context, parent=context.parent_widget
+    )
+    mock_dialog.exec.assert_called_once()
+    mock_dialog.get_new_value.assert_called_once()
+
+    # Verify model.setData was called
+    mock_set_data.assert_called_once_with(context.clicked_index, new_value, Qt.EditRole)
+
+
+def test_show_edit_dialog_action_execute_rejected(show_dialog_context, mocker):
+    """Test execute when dialog is rejected."""
+    action = ShowEditDialogAction()
+    context = show_dialog_context
+
+    # Mock the dialog
+    mock_dialog = MagicMock(spec=ComplexEditDialog)
+    mock_dialog.exec.return_value = QDialog.Rejected
+    mock_dialog.get_new_value.return_value = None  # Dialog might return None on reject
+
+    mocker.patch(
+        "chestbuddy.ui.data.actions.edit_actions.ComplexEditDialog", return_value=mock_dialog
+    )
+    mock_set_data = mocker.patch.object(context.model, "setData")
+
+    action.execute(context)
+
+    edit_actions.ComplexEditDialog.assert_called_once_with(
+        context=context, parent=context.parent_widget
+    )
+    mock_dialog.exec.assert_called_once()
+    # get_new_value might or might not be called depending on dialog logic after reject
+    # mock_dialog.get_new_value.assert_called_once()
+
+    # Verify model.setData was NOT called
+    mock_set_data.assert_not_called()
+
+
+def test_show_edit_dialog_action_execute_setdata_fails(show_dialog_context, mocker):
+    """Test execute when model.setData fails."""
+    action = ShowEditDialogAction()
+    context = show_dialog_context
+    new_value = "Edited Value"
+
+    # Mock the dialog
+    mock_dialog = MagicMock(spec=ComplexEditDialog)
+    mock_dialog.exec.return_value = QDialog.Accepted
+    mock_dialog.get_new_value.return_value = new_value
+
+    mocker.patch(
+        "chestbuddy.ui.data.actions.edit_actions.ComplexEditDialog", return_value=mock_dialog
+    )
+
+    # Mock setData to return False
+    mock_set_data = mocker.patch.object(context.model, "setData", return_value=False)
+
+    # Mock QMessageBox.warning to check if it's called
+    mock_warning = mocker.patch("chestbuddy.ui.data.actions.edit_actions.QMessageBox.warning")
+
+    action.execute(context)
+
+    edit_actions.ComplexEditDialog.assert_called_once_with(
+        context=context, parent=context.parent_widget
+    )
+    mock_dialog.exec.assert_called_once()
+    mock_set_data.assert_called_once_with(context.clicked_index, new_value, Qt.EditRole)
+
+    # Verify warning message was shown
+    mock_warning.assert_called_once()
+
+
+# --- ComplexEditDialog Tests (Optional, basic tests) ---
+
+
+def test_complex_edit_dialog_initialization(show_dialog_context):
+    """Test basic initialization of the dialog."""
+    context = show_dialog_context
+    initial_val = context.model.data(context.clicked_index, Qt.DisplayRole)
+    dialog = ComplexEditDialog(context=context)
+
+    assert dialog.initial_value == initial_val
+    assert dialog.editor.toPlainText() == initial_val
+
+
+def test_complex_edit_dialog_accept(show_dialog_context):
+    """Test accepting the dialog."""
+    context = show_dialog_context
+    dialog = ComplexEditDialog(context=context)
+    edited_text = "My new text"
+    dialog.editor.setPlainText(edited_text)
+
+    # Simulate accept
+    dialog.accept()
+
+    assert dialog.get_new_value() == edited_text
+
+
+# ... (Potentially add test_complex_edit_dialog_reject)
+
+# Add imports if needed at the top
+from chestbuddy.ui.data.actions import edit_actions  # To patch the dialog correctly
+from chestbuddy.ui.data.actions.edit_actions import ComplexEditDialog, ShowEditDialogAction

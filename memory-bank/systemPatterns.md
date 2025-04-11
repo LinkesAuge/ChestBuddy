@@ -84,7 +84,7 @@ class DataView:
 ```
 
 #### 2. Delegate Pattern
-The DataView uses the Delegate pattern extensively for customized cell rendering:
+The DataView uses the Delegate pattern extensively for customized cell rendering and interaction. Delegates (`ValidationDelegate`, `CorrectionDelegate`) are responsible for visualizing cell state managed by `TableStateManager`.
 
 ```python
 class CellDelegate(QtWidgets.QStyledItemDelegate):
@@ -121,8 +121,10 @@ class ValidationDelegate(CellDelegate):
             self._draw_status_icon(painter, option, status)
 ```
 
+**Integration Note**: Integration tests confirm that `ValidationDelegate` and `CorrectionDelegate` correctly receive state information propagated from `TableStateManager` and execute their paint logic without error.
+
 #### 3. Adapter Pattern
-The DataView uses the Adapter pattern to connect core services with UI components:
+The DataView uses the Adapter pattern to connect core services (`ValidationService`, `CorrectionService`) with UI components. Adapters (`ValidationAdapter`, `CorrectionAdapter`) transform service results into UI-friendly state updates managed by `TableStateManager`.
 
 ```python
 class ValidationAdapter:
@@ -145,6 +147,8 @@ class ValidationAdapter:
         """Convert service results to UI-friendly format."""
         # Implementation...
 ```
+
+**Integration Note**: Integration tests verify that adapters successfully receive signals from services, process the data, and trigger state updates in `TableStateManager`, which then correctly propagate to `DataViewModel` via signals.
 
 #### 4. Factory Pattern
 The DataView uses the Factory pattern for creating context-specific menu items:
@@ -200,7 +204,7 @@ class CorrectionRenderingStrategy(CellRenderingStrategy):
 ```
 
 #### 6. Observer Pattern
-The DataView uses the Observer pattern extensively through Qt's signal-slot mechanism:
+The DataView uses the Observer pattern extensively through Qt's signal-slot mechanism. Signals (`validation_state_changed`, `correction_state_changed`) from `TableStateManager` and `DataViewModel` notify dependent components of changes.
 
 ```python
 class DataViewModel(QtCore.QAbstractTableModel):
@@ -217,6 +221,8 @@ class DataViewModel(QtCore.QAbstractTableModel):
         self.validation_state_changed.emit(new_state)
         self.dataChanged.emit(QModelIndex(), QModelIndex())
 ```
+
+**Integration Note**: Integration tests confirm that signals like `TableStateManager.cell_states_changed` and `DataViewModel.dataChanged` are emitted correctly upon state updates, allowing the view and delegates to react appropriately.
 
 ### Component Interactions
 

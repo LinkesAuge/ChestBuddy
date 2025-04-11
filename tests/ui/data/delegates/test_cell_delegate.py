@@ -6,6 +6,8 @@ import pytest
 from PySide6.QtCore import Qt, QModelIndex, QAbstractItemModel
 from PySide6.QtWidgets import QApplication, QWidget, QStyleOptionViewItem
 from PySide6.QtGui import QPainter
+from PySide6.QtTest import QTest
+from unittest.mock import MagicMock
 
 from chestbuddy.ui.data.delegates.cell_delegate import CellDelegate
 
@@ -87,6 +89,32 @@ class TestCellDelegate:
 
         delegate.updateEditorGeometry(mock_editor, mock_option, mock_index)
         mock_super_update.assert_called_once_with(mock_editor, mock_option, mock_index)
+
+    def test_delegate_set_model_data_emits_signal(self, qtbot, mock_model_index, mock_editor):
+        """Test that setModelData emits validationRequested signal instead of calling setData."""
+        delegate = CellDelegate()
+        model = MockModel()
+        editor = mock_editor  # QLineEdit
+        index = mock_model_index
+        new_value = "New Text"
+        editor.setText(new_value)
+
+        # Spy on the signal
+        signal_spy = qtbot.createSignalSpy(delegate.validationRequested)
+        # Spy on model's setData (it should NOT be called)
+        set_data_spy = MagicMock()
+        model.setData = set_data_spy
+
+        # Call the method
+        delegate.setModelData(editor, model, index)
+
+        # Assert signal was emitted with correct arguments
+        assert signal_spy.count() == 1
+        assert len(signal_spy) == 1  # Another way to check count
+        assert signal_spy[0] == [new_value, index]  # Check arguments
+
+        # Assert model.setData was NOT called by the delegate
+        set_data_spy.assert_not_called()
 
     # Add similar tests for setEditorData, setModelData, updateEditorGeometry
     # to ensure they call the superclass method by default.

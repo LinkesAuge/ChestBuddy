@@ -282,5 +282,8 @@
   "tests/unit/ui/views/test_settings_tab_view.py::test_ui_tab": true,
   "tests/unit/ui/views/test_settings_tab_view.py::test_settings_changed_updates_config": true,
   "tests/unit/ui/views/test_settings_tab_view.py::test_validation_settings_update_service": true,
-  "tests/unit/ui/views/test_settings_tab_view.py::test_correction_settings": true
+  "tests/unit/ui/views/test_settings_tab_view.py::test_correction_settings": true,
+  "tests/unit/core/test_table_state_manager.py::TestTableStateManager::test_cell_state_enum": true,
+  "tests/unit/core/test_table_state_manager.py::TestTableStateManager::test_set_cell_state": true,
+  "tests/unit/core/test_table_state_manager.py::TestTableStateManager::test_update_cell_states_from_validation": true
 }

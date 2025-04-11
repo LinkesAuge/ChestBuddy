@@ -9,7 +9,7 @@ import typing
 
 # Placeholder imports - adjust based on actual locations
 from chestbuddy.core.services import CorrectionService
-from chestbuddy.core.managers.table_state_manager import TableStateManager, CellFullState
+from chestbuddy.core.managers.table_state_manager import TableStateManager, CellFullState, CellState
 from chestbuddy.core.enums.validation_enums import ValidationStatus
 
 # Placeholder types for clarity
@@ -63,42 +63,44 @@ class CorrectionAdapter(QObject):
         except Exception as e:
             print(f"Error connecting correction_suggestions_available signal: {e}")  # Debug print
 
-    @Slot(object)  # Adjust type hint based on actual signal payload (e.g., dict)
-    def _on_corrections_available(self, correction_suggestions):
+    @Slot(object)
+    def _on_corrections_available(self, correction_suggestions: dict):
         """
         Slot to handle the correction_suggestions_available signal from CorrectionService.
 
-        Processes the suggestions and updates the TableStateManager to mark cells correctable.
+        Processes the suggestions (expected dict: {(row, col): [suggestion1, ...]}) and updates
+        the TableStateManager, marking cells as CORRECTABLE and preserving existing validation info.
 
         Args:
-            correction_suggestions: The correction suggestions (dict mapping (r,c) to list expected).
+            correction_suggestions: Dictionary mapping (row, col) tuples to lists of suggestions.
         """
         print(
             f"CorrectionAdapter received correction_suggestions_available: {type(correction_suggestions)}"
-        )  # Debug print
+        )
         if not correction_suggestions or not isinstance(correction_suggestions, dict):
-            print(
-                "No correction suggestions received or not a dict, skipping update."
-            )  # Debug print
+            print("No correction suggestions received or not a dict, skipping update.")
             return
 
-        # Transform suggestions into the state_changes dict format
         state_changes: typing.Dict[typing.Tuple[int, int], CellFullState] = {}
 
         for (row, col), suggestions in correction_suggestions.items():
-            # Fetch existing state to merge, preserving validation info
-            existing_state = self._table_state_manager.get_full_cell_state(
-                row, col
-            )  # Assume this method exists
-            if not existing_state:
-                existing_state = CellFullState()
+            if not suggestions:
+                continue  # Skip if suggestions list is empty
 
-            # Update state: Mark as CORRECTABLE and store suggestions
-            state_changes[(row, col)] = CellFullState(
-                validation_status=ValidationStatus.CORRECTABLE,
+            key = (row, col)
+            # Fetch existing state to merge, preserving validation info
+            existing_state = (
+                self._table_state_manager.get_full_cell_state(row, col) or CellFullState()
+            )
+
+            # Create update object: Mark as CORRECTABLE and store suggestions
+            # Keep existing validation details
+            change_state = CellFullState(
+                validation_status=CellState.CORRECTABLE,
                 error_details=existing_state.error_details,  # Preserve validation details
                 correction_suggestions=suggestions,
             )
+            state_changes[key] = change_state
 
         # Update TableStateManager using the update_states method
         try:
@@ -109,13 +111,10 @@ class CorrectionAdapter(QObject):
                 )  # Debug
             else:
                 print("No correction state changes detected.")  # Debug
-
-        except AttributeError:
-            print(f"Error: TableStateManager object has no method 'update_states'")  # Debug print
+        except AttributeError as e:
+            print(f"Error: TableStateManager missing method or attribute: {e}")  # Debug
         except Exception as e:
-            print(
-                f"Error updating TableStateManager with correction state updates: {e}"
-            )  # Debug print
+            print(f"Error updating TableStateManager with correction state updates: {e}")  # Debug
 
     def disconnect_signals(self):
         """Disconnect signals to prevent issues during cleanup."""

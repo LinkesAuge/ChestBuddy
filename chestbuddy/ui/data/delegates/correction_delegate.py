@@ -8,7 +8,9 @@ from PySide6.QtWidgets import QStyleOptionViewItem
 from PySide6.QtCore import QModelIndex, Qt, QRect, QSize
 from PySide6.QtGui import QPainter, QIcon, QColor
 
-from .validation_delegate import ValidationDelegate, ValidationStatus
+# Use CellState from core, ValidationDelegate should also use it
+from chestbuddy.core.table_state_manager import CellState
+from .validation_delegate import ValidationDelegate  # ValidationDelegate should import CellState
 
 # Assuming DataViewModel provides CorrectionInfoRole or similar
 from ..models.data_view_model import DataViewModel
@@ -56,7 +58,7 @@ class CorrectionDelegate(ValidationDelegate):
         # Use CorrectionSuggestionsRole which is defined in DataViewModel
         suggestions = index.data(DataViewModel.CorrectionSuggestionsRole)
         is_correctable = (
-            index.data(DataViewModel.ValidationStateRole) == ValidationStatus.CORRECTABLE
+            index.data(DataViewModel.ValidationStateRole) == CellState.CORRECTABLE  # Use CellState
         )
 
         # If the cell is marked as correctable, draw the indicator
@@ -87,12 +89,12 @@ class CorrectionDelegate(ValidationDelegate):
         hint = super().sizeHint(option, index)
         # Add space if correction icon might be drawn (only if not already added by validation)
         validation_status = index.data(DataViewModel.ValidationStateRole)
-        is_correctable = validation_status == ValidationStatus.CORRECTABLE
+        is_correctable = validation_status == CellState.CORRECTABLE  # Use CellState
         # If correctable AND no validation icon is shown, add space
         if is_correctable and validation_status not in [
-            ValidationStatus.INVALID,
-            ValidationStatus.WARNING,
-            ValidationStatus.INFO,
+            CellState.INVALID,  # Use CellState
+            CellState.WARNING,  # Use CellState
+            CellState.INFO,  # Use CellState
         ]:
             hint.setWidth(hint.width() + self.ICON_SIZE + 4)
         # If correctable AND a validation icon is already shown, the space is likely sufficient
