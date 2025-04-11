@@ -10,7 +10,7 @@ from PySide6.QtCore import QModelIndex, Qt
 from PySide6.QtWidgets import QMenu, QWidget
 from PySide6.QtGui import QAction, QGuiApplication
 
-from chestbuddy.ui.data.menus.context_menu_factory import ContextMenuFactory, ContextMenuInfo
+from chestbuddy.ui.data.menus.context_menu_factory import ContextMenuFactory, ActionContext
 from chestbuddy.core.table_state_manager import CellState
 
 # --- Mock Objects ---
@@ -82,7 +82,7 @@ class TestContextMenuFactory:
 
     def test_create_empty_menu_no_model(self, mock_qwidget):
         """Test creating a menu with no model in context."""
-        info = ContextMenuInfo(
+        info = ActionContext(
             clicked_index=QModelIndex(), selection=[], model=None, parent_widget=mock_qwidget
         )
         menu, actions = ContextMenuFactory.create_context_menu(info)
@@ -93,7 +93,7 @@ class TestContextMenuFactory:
     def test_create_menu_no_selection(self, mock_model, mock_qwidget, mock_clipboard):
         """Test menu state with no selection."""
         mock_clipboard.text.return_value = ""
-        info = ContextMenuInfo(
+        info = ActionContext(
             clicked_index=QModelIndex(),  # No valid index clicked
             selection=[],
             model=mock_model,
@@ -120,7 +120,7 @@ class TestContextMenuFactory:
         """Test menu state with a single editable cell selected."""
         mock_clipboard.text.return_value = "some text"
         index = mock_model.index(0, 0)
-        info = ContextMenuInfo(
+        info = ActionContext(
             clicked_index=index,
             selection=[index],
             model=mock_model,  # Default model is editable
@@ -138,7 +138,7 @@ class TestContextMenuFactory:
         mock_model_not_editable = MockModel(is_editable=False)
         mock_clipboard.text.return_value = "some text"
         index = mock_model_not_editable.index(0, 0)
-        info = ContextMenuInfo(
+        info = ActionContext(
             clicked_index=index,
             selection=[index],
             model=mock_model_not_editable,
@@ -155,7 +155,7 @@ class TestContextMenuFactory:
         """Test menu includes validation action for invalid cell."""
         mock_model_invalid = MockModel(validation_state=CellState.INVALID)
         index = mock_model_invalid.index(0, 0)
-        info = ContextMenuInfo(
+        info = ActionContext(
             clicked_index=index,
             selection=[index],
             model=mock_model_invalid,
@@ -171,7 +171,7 @@ class TestContextMenuFactory:
         """Test menu includes correction action for correctable cell."""
         mock_model_correctable = MockModel(validation_state=CellState.CORRECTABLE)
         index = mock_model_correctable.index(0, 0)
-        info = ContextMenuInfo(
+        info = ActionContext(
             clicked_index=index,
             selection=[index],
             model=mock_model_correctable,

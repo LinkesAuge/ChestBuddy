@@ -121,17 +121,15 @@ ChestBuddy is currently focused on a comprehensive refactoring of the DataView c
 
 ### Phase 4: Context Menu Implementation (Was Phase 3)
 
-| Task                                     | Status        | Notes                                |
-|------------------------------------------|---------------|--------------------------------------|
-| **Core Context Menu Structure**          | 🟢 In Progress | Factory created and tested         |
-| Design context menu architecture         | ✅ Completed  |                                      |
-| Implement menu factory pattern           | ✅ Completed  |                                      |
-| Create extensible action framework       | 🟡 Planned    |                                      |
-| Implement standard actions               | 🔄 In Progress | Copy/Paste/Cut/Delete slots added    |
-| **Advanced Context Menu Functionality**  | 🟡 Planned    |                                      |
-| Implement selection-aware menu customization | 🟡 Planned    |                                      |
-| Implement correction list integration    | 🟡 Planned    |                                      |
-| Implement cell editing                 | 🟡 Planned    |                                      |
+| Task                                     | Status        | Notes                                      |
+|------------------------------------------|---------------|--------------------------------------------|
+| **Core Context Menu Structure**          | 🟢 In Progress | Factory and action framework created/tested |
+| Design context menu architecture         | ✅ Completed  |                                            |
+| Implement menu factory pattern           | ✅ Completed  |                                            |
+| Create extensible action framework       | ✅ Completed  | Base class and edit actions implemented    |
+| Create extensible action framework       | ✅ Completed  | Base class and edit actions implemented     |
+| Implement standard actions               | 🟢 In Progress | Copy/Paste/Cut/Delete logic moved to actions |
+| Add unit tests for context menu structure| ✅ Completed  | Tests for factory and actions added        |
 
 ### Phase 5: Validation and Correction Integration (Was Phase 4)
 

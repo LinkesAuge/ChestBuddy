@@ -27,11 +27,13 @@ class CellState(Enum):
     These states determine how cells are displayed in the table view.
     """
 
-    NORMAL = 0  # Default state
-    INVALID = 1  # Invalid value (failed validation)
-    CORRECTABLE = 2  # Invalid but can be corrected
-    CORRECTED = 3  # Has been corrected
-    PROCESSING = 4  # Currently being processed
+    UNKNOWN = 0
+    VALID = 1
+    NORMAL = 2  # Default state
+    INVALID = 3  # Invalid value (failed validation)
+    CORRECTABLE = 4  # Invalid but can be corrected
+    CORRECTED = 5  # Has been corrected
+    PROCESSING = 6  # Currently being processed
 
 
 class TableStateManager(QObject):

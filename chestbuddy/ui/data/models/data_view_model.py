@@ -8,6 +8,10 @@ the ChestDataModel and the DataTableView, providing data access, sorting, and fi
 from PySide6.QtCore import QAbstractTableModel, Qt, QModelIndex, Signal, Slot
 from PySide6.QtGui import QColor
 import typing
+import pandas as pd
+
+from chestbuddy.core.models import ChestDataModel  # Assuming this is the source model
+from chestbuddy.core.table_state_manager import TableStateManager, CellState
 
 # Placeholder for ChestDataModel and TableStateManager if needed
 # from chestbuddy.core.models import ChestDataModel
@@ -28,31 +32,33 @@ class DataViewModel(QAbstractTableModel):
     # Define custom roles
     ValidationStateRole = Qt.UserRole + 1
     CorrectionStateRole = Qt.UserRole + 2
+    ErrorDetailsRole = Qt.UserRole + 3
 
-    def __init__(self, data_model: ChestDataModel, parent=None):
+    def __init__(self, source_model: ChestDataModel, state_manager: TableStateManager, parent=None):
         """
         Initializes the DataViewModel.
 
         Args:
-            data_model (ChestDataModel): The underlying data model.
+            source_model (ChestDataModel): The underlying data model.
+            state_manager (TableStateManager): The table state manager instance.
             parent (QObject, optional): The parent object. Defaults to None.
         """
         super().__init__(parent)
-        self._data_model = data_model
-        self._table_state_manager: typing.Optional[TableStateManager] = None
+        self._source_model = source_model
+        self._state_manager = state_manager
 
         self._connect_source_model_signals()
 
     def _connect_source_model_signals(self):
         """Connect signals from the source ChestDataModel."""
-        if self._data_model and hasattr(self._data_model, "data_changed"):
+        if self._source_model and hasattr(self._source_model, "data_changed"):
             try:
                 # Disconnect first to prevent duplicate connections if called again
                 try:
-                    self._data_model.data_changed.disconnect(self._on_source_data_changed)
+                    self._source_model.data_changed.disconnect(self._on_source_data_changed)
                 except RuntimeError:
                     pass  # Signal was not connected
-                self._data_model.data_changed.connect(self._on_source_data_changed)
+                self._source_model.data_changed.connect(self._on_source_data_changed)
                 print("Successfully connected source model data_changed signal.")  # Debug
             except Exception as e:
                 print(f"Error connecting source model data_changed signal: {e}")  # Debug
@@ -66,7 +72,7 @@ class DataViewModel(QAbstractTableModel):
         Returns:
             ChestDataModel: The source data model.
         """
-        return self._data_model
+        return self._source_model
 
     def set_table_state_manager(self, manager: TableStateManager) -> None:
         """
@@ -75,7 +81,7 @@ class DataViewModel(QAbstractTableModel):
         Args:
             manager (TableStateManager): The table state manager instance.
         """
-        self._table_state_manager = manager
+        self._state_manager = manager
         # TODO: Connect signals if necessary and trigger layout change?
         # self.layoutChanged.emit()
 
@@ -90,7 +96,7 @@ class DataViewModel(QAbstractTableModel):
             int: The number of rows.
         """
         # Delegate to the source model's rowCount
-        return self._data_model.rowCount(parent) if self._data_model else 0
+        return self._source_model.rowCount(parent) if self._source_model else 0
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
         """
@@ -103,7 +109,7 @@ class DataViewModel(QAbstractTableModel):
             int: The number of columns.
         """
         # Delegate to the source model's columnCount
-        return self._data_model.columnCount(parent) if self._data_model else 0
+        return self._source_model.columnCount(parent) if self._source_model else 0
 
     def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> typing.Any:
         """
@@ -121,20 +127,20 @@ class DataViewModel(QAbstractTableModel):
 
         if role == Qt.DisplayRole:
             # Delegate to the source model's data for DisplayRole
-            return self._data_model.data(index, role)
+            return self._source_model.data(index, role)
         elif role == Qt.EditRole:
             # Delegate EditRole to source model as well (can be customized later)
-            return self._data_model.data(index, role)
+            return self._source_model.data(index, role)
         elif role == DataViewModel.ValidationStateRole:
-            if self._table_state_manager:
+            if self._state_manager:
                 # Retrieve validation state from the manager
                 # Placeholder: Actual implementation will depend on TableStateManager API
-                return self._table_state_manager.get_cell_state(index.row(), index.column())
+                return self._state_manager.get_cell_state(index.row(), index.column())
             return None  # Or a default state like 'UNKNOWN'
         elif role == Qt.BackgroundRole:
             # Placeholder: Determine background color based on validation state
-            if self._table_state_manager:
-                state = self._table_state_manager.get_cell_state(index.row(), index.column())
+            if self._state_manager:
+                state = self._state_manager.get_cell_state(index.row(), index.column())
                 # Example mapping (will need refinement based on actual states)
                 if state == "INVALID":
                     return QColor("#ffb6b6")  # Light red
@@ -143,14 +149,17 @@ class DataViewModel(QAbstractTableModel):
             return None  # Default background
         elif role == Qt.ToolTipRole:
             # Placeholder: Provide tooltips for validation/correction states
-            if self._table_state_manager:
-                state = self._table_state_manager.get_cell_state(index.row(), index.column())
+            if self._state_manager:
+                state = self._state_manager.get_cell_state(index.row(), index.column())
                 # Example tooltips
                 if state == "INVALID":
                     return f"Invalid data in cell ({index.row()}, {index.column()})"
                 elif state == "CORRECTABLE":
                     return f"Correctable data in cell ({index.row()}, {index.column()})"
             return None
+        elif role == DataViewModel.ErrorDetailsRole:
+            # Use the new method
+            return self.get_cell_details(index.row(), index.column())
 
         # Handle other roles as needed
 
@@ -171,7 +180,7 @@ class DataViewModel(QAbstractTableModel):
             typing.Any: The header data.
         """
         # Delegate header data requests to the source model
-        return self._data_model.headerData(section, orientation, role)
+        return self._source_model.headerData(section, orientation, role)
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         """
@@ -189,7 +198,7 @@ class DataViewModel(QAbstractTableModel):
         # Make items selectable, enabled, and editable by default
         # Delegate to source model's flags and potentially modify them
         default_flags = super().flags(index)
-        source_flags = self._data_model.flags(index) if self._data_model else default_flags
+        source_flags = self._source_model.flags(index) if self._source_model else default_flags
         # Example: Add editability
         source_flags |= Qt.ItemIsEditable
         return source_flags
@@ -210,27 +219,24 @@ class DataViewModel(QAbstractTableModel):
             return False
 
         # Delegate setData to the source model
-        if self._data_model and self._data_model.setData(index, value, role):
+        if self._source_model and self._source_model.setData(index, value, role):
             # Emit dataChanged signal to notify views
             self.dataChanged.emit(index, index, [role])
             return True
         return False
 
-    @Slot(object)  # Assuming data_changed emits the DataState object
-    def _on_source_data_changed(self, data_state: object):
+    @Slot()
+    def _on_source_data_changed(self):
         """
         Slot to handle data changes in the source ChestDataModel.
 
         Resets the model to reflect the changes.
-
-        Args:
-            data_state: The updated DataState object from the source model.
         """
         print(f"DataViewModel received source data_changed signal. Resetting model.")  # Debug
         # Perform a full model reset to reflect the changes
         # More granular updates can be implemented later if needed
         self.beginResetModel()
-        # The underlying _data_model is assumed to be updated already
+        # The underlying _source_model is assumed to be updated already
         self.endResetModel()
 
     def on_cell_states_changed(self, changes: dict):
@@ -263,6 +269,12 @@ class DataViewModel(QAbstractTableModel):
 
         # print(f"DataViewModel received state changes: {changes}")
         # TODO: Implement more granular updates if needed
+
+    def get_cell_details(self, row: int, col: int) -> typing.Optional[str]:
+        """Gets detailed information (like error messages) for a cell."""
+        if self._state_manager and hasattr(self._state_manager, "get_cell_details"):
+            return self._state_manager.get_cell_details(row, col)
+        return None
 
     # TODO: Add methods for sorting and filtering support
     # def sort(self, column: int, order: Qt.SortOrder = Qt.AscendingOrder):
