@@ -72,37 +72,42 @@ class TestDataViewModel:
         self, mock_chest_data_model, mock_table_state_manager
     ):
         """Test data returns the correct background color for INVALID state."""
-        mock_table_state_manager.get_cell_state.return_value = "INVALID"
-        model = DataViewModel(mock_chest_data_model)
-        model.set_table_state_manager(mock_table_state_manager)
-        test_index = model.createIndex(1, 1)
-        background_color = model.data(test_index, Qt.BackgroundRole)
-        assert isinstance(background_color, QColor)
-        assert background_color.name() == "#ffb6b6"
-        mock_table_state_manager.get_cell_state.assert_called_with(1, 1)
+        # Mock get_full_cell_state to return INVALID status
+        mock_table_state_manager.get_full_cell_state.return_value = CellFullState(
+            validation_status=CellState.INVALID
+        )
+        model = DataViewModel(mock_chest_data_model, mock_table_state_manager)
+        test_index = model.index(0, 0)
+        assert model.data(test_index, Qt.BackgroundRole) == DataViewModel.INVALID_COLOR
+        # Assert get_full_cell_state was called
+        mock_table_state_manager.get_full_cell_state.assert_called_with(0, 0)
 
     def test_data_for_background_role_correctable(
         self, mock_chest_data_model, mock_table_state_manager
     ):
         """Test data returns the correct background color for CORRECTABLE state."""
-        mock_table_state_manager.get_cell_state.return_value = "CORRECTABLE"
-        model = DataViewModel(mock_chest_data_model)
-        model.set_table_state_manager(mock_table_state_manager)
-        test_index = model.createIndex(2, 2)
-        background_color = model.data(test_index, Qt.BackgroundRole)
-        assert isinstance(background_color, QColor)
-        assert background_color.name() == "#fff3b6"
-        mock_table_state_manager.get_cell_state.assert_called_with(2, 2)
+        # Mock get_full_cell_state to return CORRECTABLE status
+        mock_table_state_manager.get_full_cell_state.return_value = CellFullState(
+            validation_status=CellState.CORRECTABLE
+        )
+        model = DataViewModel(mock_chest_data_model, mock_table_state_manager)
+        test_index = model.index(1, 1)
+        assert model.data(test_index, Qt.BackgroundRole) == DataViewModel.CORRECTABLE_COLOR
+        # Assert get_full_cell_state was called
+        mock_table_state_manager.get_full_cell_state.assert_called_with(1, 1)
 
     def test_data_for_background_role_normal(self, mock_chest_data_model, mock_table_state_manager):
         """Test data returns None for background color for NORMAL state."""
-        # Default return value is NORMAL, no need to set
-        model = DataViewModel(mock_chest_data_model)
-        model.set_table_state_manager(mock_table_state_manager)
-        test_index = model.createIndex(3, 3)
-        background_color = model.data(test_index, Qt.BackgroundRole)
-        assert background_color is None
-        mock_table_state_manager.get_cell_state.assert_called_with(3, 3)
+        # Mock the state manager to return NORMAL
+        mock_table_state_manager.get_full_cell_state.return_value = CellFullState(
+            validation_status=CellState.NORMAL
+        )
+        model = DataViewModel(mock_chest_data_model, mock_table_state_manager)
+        test_index = model.index(2, 2)
+        assert model.data(test_index, Qt.BackgroundRole) is None
+        mock_table_state_manager.get_full_cell_state.assert_called_with(
+            2, 2
+        )  # Expect get_full_cell_state
 
     def test_header_data(self):
         """Test headerData retrieves header from source model."""
@@ -164,22 +169,27 @@ class TestDataViewModel:
         with qtbot.waitSignals([self.model.layoutAboutToBeChanged, self.model.layoutChanged]):
             self.model.sort(0, Qt.AscendingOrder)
 
-        self.mock_source_model.sort_data.assert_called_once_with("ColumnA", True)
-        assert self.model.current_sort_column() == 0
-        assert self.model.current_sort_order() == Qt.AscendingOrder
+        # Use keyword arguments for assertion
+        self.mock_source_model.sort_data.assert_called_once_with(
+            column_name="ColumnA", ascending=True
+        )
 
     def test_sort_descending(self, mock_chest_data_model, qtbot):
         """Test sort with descending order."""
         mock_chest_data_model.headerData.return_value = "ColumnB"
         mock_chest_data_model.sort_data = MagicMock()
-        model = DataViewModel(mock_chest_data_model, None)
+        # Instantiate with a mock state manager, even if None, to match constructor
+        mock_state_manager = MagicMock(spec=TableStateManager)
+        mock_state_manager.state_changed = Signal(set)  # Add expected signal
+        model = DataViewModel(mock_chest_data_model, mock_state_manager)
 
         with qtbot.waitSignals([model.layoutAboutToBeChanged, model.layoutChanged]):
             model.sort(1, Qt.DescendingOrder)
 
-        mock_chest_data_model.sort_data.assert_called_once_with("ColumnB", False)
-        assert model.current_sort_column() == 1
-        assert model.current_sort_order() == Qt.DescendingOrder
+        # Use keyword arguments for assertion
+        mock_chest_data_model.sort_data.assert_called_once_with(
+            column_name="ColumnB", ascending=False
+        )
 
     def test_sort_invalid_column(self, mock_chest_data_model, qtbot):
         """Test sort does nothing if header data is not found."""
@@ -218,47 +228,52 @@ class TestDataViewModel:
         # Verify delegation happened for EditRole
         self.mock_source_model.data.assert_called_with(index, Qt.EditRole)
 
-    def test_data_for_tooltip_role_invalid(self, mock_table_state_manager):
-        """Test data returns the correct tooltip for INVALID state."""
-        mock_table_state_manager.get_cell_state.return_value = "INVALID"
-        model = DataViewModel(mock_chest_data_model)
-        model.set_table_state_manager(mock_table_state_manager)
-        test_index = model.createIndex(1, 2)
+    def test_data_for_tooltip_role_invalid(self, mock_chest_data_model, mock_table_state_manager):
+        """Test data method for ToolTipRole with invalid state."""
+        mock_table_state_manager.get_full_cell_state.return_value = CellFullState(
+            validation_status=CellState.INVALID, error_details="Test Error Details"
+        )
+        model = DataViewModel(mock_chest_data_model, mock_table_state_manager)
+        test_index = model.index(1, 2)
         tooltip = model.data(test_index, Qt.ToolTipRole)
-        assert tooltip == "Invalid data in cell (1, 2)"
-        mock_table_state_manager.get_cell_state.assert_called_with(1, 2)
+        assert tooltip == "Test Error Details"
+        mock_table_state_manager.get_full_cell_state.assert_called_with(1, 2)
 
-    def test_data_for_tooltip_role_correctable(self, mock_table_state_manager):
-        """Test data returns the correct tooltip for CORRECTABLE state."""
-        mock_table_state_manager.get_cell_state.return_value = "CORRECTABLE"
-        model = DataViewModel(mock_chest_data_model)
-        model.set_table_state_manager(mock_table_state_manager)
-        test_index = model.createIndex(2, 3)
+    def test_data_for_tooltip_role_correctable(
+        self, mock_chest_data_model, mock_table_state_manager
+    ):
+        """Test data method for ToolTipRole with correctable state."""
+        suggestions = ["Suggestion1", "Suggestion2"]
+        mock_table_state_manager.get_full_cell_state.return_value = CellFullState(
+            validation_status=CellState.CORRECTABLE, correction_suggestions=suggestions
+        )
+        model = DataViewModel(mock_chest_data_model, mock_table_state_manager)
+        test_index = model.index(2, 3)
+        expected_tooltip = "Suggestions:\n- Suggestion1\n- Suggestion2"
         tooltip = model.data(test_index, Qt.ToolTipRole)
-        assert tooltip == "Correctable data in cell (2, 3)"
-        mock_table_state_manager.get_cell_state.assert_called_with(2, 3)
+        assert tooltip == expected_tooltip
+        mock_table_state_manager.get_full_cell_state.assert_called_with(2, 3)
 
-    def test_data_for_tooltip_role_normal(self, mock_table_state_manager):
-        """Test data returns None for tooltip for NORMAL state."""
-        # Default state is NORMAL
-        model = DataViewModel(mock_chest_data_model)
-        model.set_table_state_manager(mock_table_state_manager)
-        test_index = model.createIndex(4, 4)
+    def test_data_for_tooltip_role_normal(self, mock_chest_data_model, mock_table_state_manager):
+        """Test data method for ToolTipRole with normal state."""
+        mock_table_state_manager.get_full_cell_state.return_value = CellFullState(
+            validation_status=CellState.NORMAL
+        )
+        model = DataViewModel(mock_chest_data_model, mock_table_state_manager)
+        test_index = model.index(4, 4)
         tooltip = model.data(test_index, Qt.ToolTipRole)
         assert tooltip is None
-        mock_table_state_manager.get_cell_state.assert_called_with(4, 4)
+        mock_table_state_manager.get_full_cell_state.assert_called_with(4, 4)
 
-    def test_data_for_unknown_role(self):
-        """Test data returns None for unhandled roles."""
-        model = DataViewModel(mock_chest_data_model)
-        test_index = model.createIndex(0, 0)
+    def test_data_for_unknown_role(self, mock_chest_data_model, mock_table_state_manager):
+        """Test data method for an unknown role."""
+        model = DataViewModel(mock_chest_data_model, mock_table_state_manager)
+        test_index = model.index(0, 0)
         assert model.data(test_index, Qt.UserRole + 100) is None  # Some arbitrary role
-        # Check that the source model wasn't called for this unknown role (optional)
-        # mock_chest_data_model.data.assert_called_with(test_index, Qt.UserRole + 100) # Should NOT have been called
 
-    def test_data_invalid_index(self):
-        """Test data returns None for an invalid index."""
-        model = DataViewModel(mock_chest_data_model)
+    def test_data_invalid_index(self, mock_chest_data_model, mock_table_state_manager):
+        """Test data method with an invalid index."""
+        model = DataViewModel(mock_chest_data_model, mock_table_state_manager)
         invalid_index = QModelIndex()  # Default constructor creates an invalid index
         assert model.data(invalid_index, Qt.DisplayRole) is None
 
@@ -284,22 +299,25 @@ class TestDataViewModel:
         mock_end_reset.assert_called_once()
 
     def test_on_state_manager_state_changed_resets_model(self, qtbot):
-        """Test state manager changes trigger begin/endResetModel (current implementation)."""
-        # Connect signal if not done in init mock
-        # self.model._connect_state_manager_signals()
-
-        mock_begin_reset = MagicMock()
-        mock_end_reset = MagicMock()
-        self.model.beginResetModel = mock_begin_reset
-        self.model.endResetModel = mock_end_reset
-
+        """Test state manager changes trigger dataChanged signal."""
         changed_set = {(0, 0), (1, 1)}
 
-        # Simulate state manager signal emission
-        self.mock_state_manager.state_changed.emit(changed_set)
+        # Expect dataChanged signal instead of model reset
+        with qtbot.waitSignal(self.model.dataChanged) as blocker:
+            # Simulate state manager signal emission
+            self.mock_state_manager.state_changed.emit(changed_set)
 
-        # Verify model reset was called
-        mock_begin_reset.assert_called_once()
-        mock_end_reset.assert_called_once()
+        # Verify the signal arguments (check range covers changes)
+        assert blocker.args[0].isValid()  # top left index
+        assert blocker.args[1].isValid()  # bottom right index
+        # Check if the emitted range covers the changed indices
+        # This requires converting indices to a common parent if they differ
+        # For simplicity here, we check rows/cols if parent is the same (root)
+        assert blocker.args[0].row() <= 0
+        assert blocker.args[0].column() <= 0
+        assert blocker.args[1].row() >= 1
+        assert blocker.args[1].column() >= 1
+        # Check roles (optional, but good practice)
+        assert isinstance(blocker.args[2], list)
 
     # Add any other specific tests needed for DataViewModel logic

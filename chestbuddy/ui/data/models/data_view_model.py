@@ -42,6 +42,10 @@ class DataViewModel(QAbstractTableModel):
     # Signals
     # validation_updated = Signal() # Might not be needed if using dataChanged
 
+    # Color constants for background roles (Can be moved to a central theme/color manager)
+    INVALID_COLOR = QColor("#ffb6b6")  # Light Red
+    CORRECTABLE_COLOR = QColor("#fff3b6")  # Light Yellow
+
     def __init__(self, source_model: ChestDataModel, state_manager: TableStateManager, parent=None):
         """
         Initializes the DataViewModel.
@@ -54,6 +58,16 @@ class DataViewModel(QAbstractTableModel):
         super().__init__(parent)
         self._source_model = source_model
         self._state_manager = state_manager
+
+        # Ensure the source model is valid before accessing properties
+        if not self._source_model:
+            print("Warning: DataViewModel initialized with None source model.")
+            # Handle appropriately, maybe raise an error or set defaults
+
+        # Ensure the state manager is valid before accessing properties
+        if not self._state_manager:
+            print("Warning: DataViewModel initialized with None state manager.")
+            # Handle appropriately
 
         self._connect_source_model_signals()
         self._connect_state_manager_signals()  # Connect to state manager
@@ -126,9 +140,8 @@ class DataViewModel(QAbstractTableModel):
         Returns:
             int: The number of rows.
         """
-        # Get row count from the source model's property
-        if self._source_model and hasattr(self._source_model, "row_count"):
-            return self._source_model.row_count
+        if not parent.isValid() and self._source_model and hasattr(self._source_model, "rowCount"):
+            return self._source_model.rowCount()
         return 0
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
@@ -141,9 +154,12 @@ class DataViewModel(QAbstractTableModel):
         Returns:
             int: The number of columns.
         """
-        # Get column names from the source model's property
-        if self._source_model and hasattr(self._source_model, "column_names"):
-            return len(self._source_model.column_names)
+        if (
+            not parent.isValid()
+            and self._source_model
+            and hasattr(self._source_model, "columnCount")
+        ):
+            return self._source_model.columnCount()
         return 0
 
     def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> typing.Any:
@@ -157,58 +173,59 @@ class DataViewModel(QAbstractTableModel):
         Returns:
             typing.Any: The data for the given index and role.
         """
-        if not index.isValid() or not self._source_model:
+        if not index.isValid() or not self._source_model or not self._state_manager:
             return None
 
         row = index.row()
         col = index.column()
 
-        # Get column name for accessing source model
-        # Use the defined EXPECTED_COLUMNS order from ChestDataModel for consistency
-        expected_columns = self._source_model.EXPECTED_COLUMNS
-        if col >= len(expected_columns):
+        try:
+            if role == Qt.DisplayRole or role == Qt.EditRole:
+                # Delegate to source model for these roles
+                return self._source_model.data(index, role)
+
+            full_state = self._state_manager.get_full_cell_state(row, col)
+
+            if role == self.ValidationStateRole:
+                return full_state.validation_status if full_state else CellState.NORMAL
+            elif role == self.CorrectionStateRole:
+                return bool(full_state and full_state.correction_suggestions)
+            elif role == self.ErrorDetailsRole:
+                return full_state.error_details if full_state else None
+            elif role == self.CorrectionSuggestionsRole:
+                return full_state.correction_suggestions if full_state else []
+            elif role == Qt.BackgroundRole:
+                status = full_state.validation_status if full_state else CellState.NORMAL
+                if status == CellState.INVALID:
+                    return self.INVALID_COLOR
+                elif status == CellState.CORRECTABLE:
+                    return self.CORRECTABLE_COLOR
+                # Add cases for WARNING, INFO if needed
+                return None
+            elif role == Qt.ToolTipRole:
+                tooltip_parts = []
+                if full_state:
+                    # Only show error details for INVALID state
+                    if (
+                        full_state.validation_status == CellState.INVALID
+                        and full_state.error_details
+                    ):
+                        tooltip_parts.append(full_state.error_details)
+                    # Show suggestions for CORRECTABLE state
+                    elif (
+                        full_state.validation_status == CellState.CORRECTABLE
+                        and full_state.correction_suggestions
+                    ):
+                        suggestions_str = "\n".join(
+                            [f"- {s}" for s in full_state.correction_suggestions]
+                        )
+                        tooltip_parts.append(f"Suggestions:\n{suggestions_str}")
+                    # Add handling for WARNING/INFO if needed
+                return "\n".join(tooltip_parts) if tooltip_parts else None
+
+        except Exception as e:
+            print(f"Error in DataViewModel.data(): {e} for index ({row},{col}), role {role}")
             return None
-        column_name = expected_columns[col]
-
-        full_state = self._state_manager.get_full_cell_state(row, col)
-
-        if role == Qt.DisplayRole or role == Qt.EditRole:
-            # Get data from source model using its method
-            value = self._source_model.get_cell_value(row, column_name)
-            return value
-        elif role == self.ValidationStateRole:
-            return full_state.validation_status if full_state else CellState.NORMAL
-        elif role == self.CorrectionStateRole:
-            # Could return a specific state or bool indicating correctability
-            return bool(full_state and full_state.correction_suggestions)
-        elif role == self.ErrorDetailsRole:
-            return full_state.error_details if full_state else None
-        elif role == self.CorrectionSuggestionsRole:
-            return full_state.correction_suggestions if full_state else []
-        elif role == Qt.BackgroundRole:
-            # Use full_state for background logic
-            status = full_state.validation_status if full_state else CellState.NORMAL
-            if status == CellState.INVALID:
-                return QColor("#ffb6b6")  # Light red
-            elif status == CellState.CORRECTABLE:
-                return QColor("#fff3b6")  # Light yellow
-            elif status == CellState.WARNING:
-                return QColor("#ffe4b6")  # Light orange
-            elif status == CellState.INFO:
-                return QColor("#b6e4ff")  # Light blue
-            return None  # Default background
-        elif role == Qt.ToolTipRole:
-            # Use full_state for tooltip logic
-            tooltip_parts = []
-            if full_state:
-                if full_state.error_details:
-                    tooltip_parts.append(f"Issue: {full_state.error_details}")
-                if full_state.correction_suggestions:
-                    # Maybe just indicate suggestions are available?
-                    tooltip_parts.append(
-                        f"Corrections Available ({len(full_state.correction_suggestions)})"
-                    )
-            return "\n".join(tooltip_parts) if tooltip_parts else None
 
         return None
 
@@ -230,12 +247,12 @@ class DataViewModel(QAbstractTableModel):
             orientation == Qt.Horizontal
             and role == Qt.DisplayRole
             and self._source_model
-            and hasattr(self._source_model, "column_names")
+            and hasattr(self._source_model, "headerData")
         ):
-            column_names = self._source_model.column_names
-            if 0 <= section < len(column_names):
-                return column_names[section]
-        return None
+            # Delegate to source model
+            return self._source_model.headerData(section, orientation, role)
+        # Handle Vertical/other roles if needed
+        return super().headerData(section, orientation, role)  # Use default for others
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         """
@@ -247,16 +264,19 @@ class DataViewModel(QAbstractTableModel):
         Returns:
             Qt.ItemFlags: The flags for the item.
         """
-        if not index.isValid():
+        if not index.isValid() or not self._source_model:
             return Qt.NoItemFlags
 
-        # Make items selectable, enabled, and editable by default
-        # Delegate to source model's flags and potentially modify them
-        default_flags = super().flags(index)
-        source_flags = self._source_model.flags(index) if self._source_model else default_flags
-        # Example: Add editability
-        source_flags |= Qt.ItemIsEditable
-        return source_flags
+        # Get flags from source model
+        source_flags = Qt.NoItemFlags
+        if hasattr(self._source_model, "flags"):
+            source_flags = self._source_model.flags(index)
+        else:
+            # Provide sensible defaults if source doesn't have flags
+            source_flags = Qt.ItemIsSelectable | Qt.ItemIsEnabled
+
+        # Add editable flag
+        return source_flags | Qt.ItemIsEditable
 
     def setData(self, index: QModelIndex, value: typing.Any, role: int = Qt.EditRole) -> bool:
         """
@@ -265,64 +285,67 @@ class DataViewModel(QAbstractTableModel):
         Args:
             index (QModelIndex): The model index.
             value (typing.Any): The new value.
-            role (int): The data role (usually Qt.EditRole).
+            role (int): The data role (typically EditRole).
 
         Returns:
             bool: True if successful, False otherwise.
         """
-        if not index.isValid() or role != Qt.EditRole:
+        if (
+            not index.isValid()
+            or role != Qt.EditRole
+            or not self._source_model
+            or not hasattr(self._source_model, "setData")
+        ):
             return False
 
-        # Delegate setData to the source model
-        if self._source_model and self._source_model.setData(index, value, role):
-            # Emit dataChanged signal to notify views
+        success = self._source_model.setData(index, value, role)
+        if success:
             self.dataChanged.emit(index, index, [role])
-            return True
-        return False
+            # Potentially trigger re-validation or state update here
+        return success
 
     @Slot()
     def _on_source_data_changed(self):
-        """
-        Slot to handle data changes in the source ChestDataModel.
-
-        Resets the model to reflect the changes.
-        """
-        print(f"DataViewModel received source data_changed signal. Resetting model.")  # Debug
+        """Slot called when the underlying source model changes."""
+        print("DataViewModel received source data_changed")
+        # This might be too coarse, leading to full view updates.
+        # Consider more granular updates if possible from source model.
         self.beginResetModel()
-        # Optionally, update internal caches or states if needed
         self.endResetModel()
 
     @Slot(set)  # Expecting a set of (row, col) tuples
     def _on_state_manager_state_changed(self, changed_indices: set):
         """
-        Slot to handle state changes from the TableStateManager.
-
-        Emits dataChanged for the specific indices and relevant roles.
+        Slot called when the TableStateManager reports state changes.
+        Emits dataChanged for the affected cells/roles.
         """
         print(f"DataViewModel received state_changed for {len(changed_indices)} indices.")  # Debug
         if not changed_indices:
             return
 
-        # Define roles affected by state changes
-        # These roles derive their data from the TableStateManager state
+        # Determine the bounding box of changes for signal emission
+        min_row = min(r for r, c in changed_indices)
+        max_row = max(r for r, c in changed_indices)
+        min_col = min(c for r, c in changed_indices)
+        max_col = max(c for r, c in changed_indices)
+
+        top_left = self.index(min_row, min_col)
+        bottom_right = self.index(max_row, max_col)
+
+        # Emit dataChanged for the affected range and relevant roles
+        # Roles affected by state changes: BackgroundRole, ToolTipRole, ValidationStateRole, etc.
         affected_roles = [
+            Qt.BackgroundRole,
+            Qt.ToolTipRole,
             self.ValidationStateRole,
             self.CorrectionStateRole,
             self.ErrorDetailsRole,
             self.CorrectionSuggestionsRole,
-            Qt.BackgroundRole,
-            Qt.ToolTipRole,
         ]
-
-        # Emit dataChanged for each affected index individually
-        # This explicitly tells the view which cells and roles need refreshing.
-        for r, c in changed_indices:
-            idx = self.index(r, c)
-            if idx.isValid():
-                self.dataChanged.emit(idx, idx, affected_roles)
-
-        # Emit a general signal if needed (though dataChanged is standard)
-        # self.validation_updated.emit()
+        self.dataChanged.emit(top_left, bottom_right, affected_roles)
+        print(
+            f"Emitted dataChanged for range ({min_row},{min_col}) to ({max_row},{max_col})"
+        )  # Debug
 
     # --- Direct access to state details (can be used by delegates/view) ---
     def get_cell_details(self, row: int, col: int) -> typing.Optional[str]:
@@ -338,47 +361,59 @@ class DataViewModel(QAbstractTableModel):
         return full_state.correction_suggestions if full_state else []
 
     # --- Sorting --- #
-
     def sort(self, column: int, order: Qt.SortOrder = Qt.AscendingOrder):
         """
         Sort the model by the specified column and order.
-
-        Args:
-            column (int): The column index to sort by.
-            order (Qt.SortOrder): The sort order (Ascending or Descending).
+        Delegates sorting to the source model if it supports it.
         """
-        if self._source_model and hasattr(self._source_model, "sort_data"):
-            column_name = self.headerData(column, Qt.Horizontal)
-            if column_name:
-                self.layoutAboutToBeChanged.emit()
-                self._sort_column = column
-                self._sort_order = order
-                try:
-                    # Delegate sorting to the source model if possible
-                    self._source_model.sort_data(column_name, order == Qt.AscendingOrder)
-                except Exception as e:
-                    print(f"Error sorting source model: {e}")
-                # Emit layoutChanged signal after sorting
-                self.layoutChanged.emit()
-            else:
-                print(f"Could not get header data for column {column}")
-        else:
-            print("Source model does not support sorting or is not set.")
+        print(f"DataViewModel sort called: column={column}, order={order}")  # Debug
+        if not self._source_model or not hasattr(self._source_model, "sort_data"):
+            print("Source model does not support sorting.")  # Debug
+            super().sort(column, order)  # Fallback to default (likely no-op)
+            return
+
+        # Get column name from header data for source model's sort method
+        column_name = self.headerData(column, Qt.Horizontal, Qt.DisplayRole)
+        if column_name is None:
+            print(f"Warning: Invalid column index {column} for sorting.")  # Debug
+            return
+
+        self._sort_column = column
+        self._sort_order = order
+
+        print(f"Sorting by column: {column_name}, order: {order}")  # Debug
+
+        self.layoutAboutToBeChanged.emit()
+        try:
+            # Call the source model's sorting method
+            self._source_model.sort_data(
+                column_name=column_name, ascending=(order == Qt.AscendingOrder)
+            )
+            print("Source model sort_data called successfully.")  # Debug
+        except Exception as e:
+            print(f"Error during source model sort: {e}")  # Debug
+        finally:
+            self.layoutChanged.emit()
+            print("Layout changed signal emitted after sort.")  # Debug
 
     def current_sort_column(self) -> int:
-        """Returns the index of the column currently used for sorting."""
+        """
+        Returns the index of the column currently used for sorting.
+
+        Returns:
+            int: The sort column index, or -1 if not sorted.
+        """
         return self._sort_column
 
     def current_sort_order(self) -> Qt.SortOrder:
-        """Returns the current sort order."""
+        """
+        Returns the current sort order.
+
+        Returns:
+            Qt.SortOrder: The current sort order.
+        """
         return self._sort_order
 
-    # TODO: Add methods for sorting and filtering support
-    # def sort(self, column: int, order: Qt.SortOrder = Qt.AscendingOrder):
-    #     pass
-
-    # def setFilterKeyColumn(self, column: int):
-    #     pass
-
-    # def setFilterRegularExpression(self, pattern: str):
-    #     pass
+    # --- Helper Methods (Placeholder) ---
+    def get_cell_details(self, row: int, col: int) -> typing.Optional[str]:
+        """Placeholder: Get detailed information about a cell."""

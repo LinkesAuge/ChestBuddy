@@ -8,9 +8,34 @@ from PySide6.QtWidgets import QStyledItemDelegate, QStyleOptionViewItem, QWidget
 from PySide6.QtCore import Qt, QModelIndex, QAbstractItemModel, Signal, QObject, QEvent
 from PySide6.QtGui import QPainter, QColor, QIcon
 import typing
+from typing import Any, Optional
 
 # Import role from view model
 from ..models.data_view_model import DataViewModel
+
+# --- Assume ValidationService is available somehow ---
+# Option 1: Import directly (if singleton or module-level instance)
+# from chestbuddy.core.services import ValidationService
+# validation_service = ValidationService.instance() # Example
+
+# Option 2: Get from parent (if parent provides it)
+# parent.validation_service
+
+# Option 3: Pass during init
+# self.validation_service = validation_service
+
+
+# For now, let's mock a validation function
+# In real implementation, replace this with actual service call
+def _mock_validate_data(index: QModelIndex, value: Any) -> tuple[bool, Optional[str]]:
+    # Mock validation: Check if column is 'Score' and value is numeric
+    if index.column() == 2:  # Assuming 'Score' is column 2
+        try:
+            float(value)
+            return True, None  # Valid
+        except (ValueError, TypeError):
+            return False, "Score must be a number."
+    return True, None  # Assume other columns are valid for now
 
 
 class CellDelegate(QStyledItemDelegate):
@@ -23,6 +48,8 @@ class CellDelegate(QStyledItemDelegate):
     # Signal emitted when editor data needs validation before committing
     # Arguments: value (editor content), index (model index)
     validationRequested = Signal(object, QModelIndex)
+    # Add a signal for validation failure notification
+    validationFailed = Signal(QModelIndex, str)
 
     def __init__(self, parent: QObject | None = None):
         """
@@ -82,7 +109,8 @@ class CellDelegate(QStyledItemDelegate):
 
     def setModelData(self, editor: QWidget, model: QAbstractItemModel, index: QModelIndex) -> None:
         """
-        Get data from the editor and *request validation* before setting it to the model.
+        Get data from the editor and emit validationRequested signal.
+        The actual setting of data to the model is deferred until validation passes.
         """
         value = None
         if isinstance(editor, QLineEdit):
@@ -96,7 +124,7 @@ class CellDelegate(QStyledItemDelegate):
             # Emit signal instead of calling model.setData directly
             self.validationRequested.emit(value, index)
         # We do NOT call model.setData here. The handler for validationRequested will do it.
-        # super().setModelData(editor, model, index) # Don't call super, as it might call setData
+        # The old validation logic here is removed.
 
     def updateEditorGeometry(
         self, editor: QWidget, option: QStyleOptionViewItem, index: QModelIndex

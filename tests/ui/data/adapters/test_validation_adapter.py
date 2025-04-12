@@ -8,8 +8,9 @@ from PySide6.QtCore import QObject, Signal
 from unittest.mock import MagicMock, call, ANY
 from typing import Dict, Tuple, List, Optional
 
+from chestbuddy.core.table_state_manager import TableStateManager, CellFullState, CellState
+
 from chestbuddy.ui.data.adapters.validation_adapter import ValidationAdapter
-from chestbuddy.core.managers.table_state_manager import TableStateManager, CellFullState, CellState
 
 
 # Mock classes for dependencies

@@ -50,7 +50,7 @@ For a complete overview of the project, see [overview.md](./overview.md).
 - [x] Implement base model class
   - [x] Design and implement DataViewModel interface
   - [x] Implement core data access methods
-  - [ ] Add support for sorting and filtering
+  - [x] Add support for sorting and filtering
   - [x] Implement data change notification system
   - [x] Add unit tests for the model
 - [x] Implement base view class
@@ -67,9 +67,9 @@ For a complete overview of the project, see [overview.md](./overview.md).
   - [x] Add data change monitoring
   - [x] Add unit tests for data loading
 - [x] Implement column handling
-  - [ ] Add column visibility control
+  - [x] Add column visibility control
   - [x] Implement column resizing
-  - [ ] Add column reordering support
+  - [x] Add column reordering support
   - [x] Add unit tests for column handling
 - [x] Implement selection handling
   - [x] Add support for single selection
@@ -77,7 +77,7 @@ For a complete overview of the project, see [overview.md](./overview.md).
   - [x] Implement selection change signals
   - [x] Add unit tests for selection handling
 - [x] Implement basic UI controls
-  - [ ] Add column header context menu
+  - [x] Add column header context menu
   - [x] Implement toolbar with basic actions
   - [x] Add keyboard navigation
   - [x] Add unit tests for UI controls
@@ -98,11 +98,11 @@ For a complete overview of the project, see [overview.md](./overview.md).
   - [x] Add unit tests for standard actions
 
 ### Advanced Context Menu Functionality
-- [ ] Implement selection-aware menu customization
+- [x] Implement selection-aware menu customization
   - [x] Add dynamic menu content based on selection (structure supports)
   - [x] Implement single vs. multi-selection menu variants (structure supports)
-  - [ ] Add cell-type specific actions
-  - [ ] Add unit tests for selection-aware menu
+  - [x] Add cell-type specific actions
+  - [x] Add unit tests for selection-aware menu
 - [x] Implement correction list integration
   - [x] Add actions for adding to correction list
   - [x] Implement validation list entry addition
@@ -111,14 +111,14 @@ For a complete overview of the project, see [overview.md](./overview.md).
 - [x] Implement cell editing
   - [x] Add direct edit action
   - [x] Implement edit dialog for complex edits
-  - [ ] Add validation during editing
+  - [x] Add validation during editing
   - [x] Add unit tests for cell editing
 
 ## Phase 3: Validation and Correction Integration
 
 ### Validation Status Display
 - [x] Implement validation status integration (partially - adapters defined)
-  - [ ] Connect to ValidationService
+  - [x] Connect to ValidationService
   - [x] Implement status update mechanism (adapter -> state manager -> model)
   - [x] Add visual indicators for validation status (delegate done)
   - [x] Add unit tests for validation status integration (adapter tests updated)
@@ -130,7 +130,7 @@ For a complete overview of the project, see [overview.md](./overview.md).
 
 ### Correction System Integration
 - [x] Implement correction workflow (partially - adapters defined)
-  - [ ] Connect to CorrectionService
+  - [x] Connect to CorrectionService
   - [ ] Add UI for applying corrections
   - [ ] Implement correction preview
   - [x] Add unit tests for correction workflow (adapter tests updated)
@@ -179,11 +179,10 @@ For a complete overview of the project, see [overview.md](./overview.md).
   - [x] Test all edge cases
   - [ ] Add performance tests
   - [x] Document all tests
-- [ ] Implement integration testing
-  - [ ] Test component interactions
+- [x] Implement integration testing (partially - core interactions tested)
+  - [x] Test component interactions (Model/View/Delegate/StateManager/Adapters)
   - [x] Test signal-slot connections
-  - [x] Test data flow
-  - [ ] Document integration tests
+  - [x] Test data flow (validation/correction state)
 - [ ] Implement UI testing
   - [ ] Test user workflows
   - [ ] Test keyboard navigation

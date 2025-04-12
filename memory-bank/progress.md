@@ -25,48 +25,56 @@ Last updated: 2024-08-06
 - ✅ CorrectionAdapter base implemented and tested
 - ✅ Context menu actions implemented (add/edit/standard)
 - ✅ Integration tests for DataViewModel/TableStateManager/Delegates (state propagation, paint, tooltips)
+- ✅ ColumnModel implemented and integrated for visibility control
+- ✅ FilterModel implemented and integrated for filtering
+- ✅ Sorting via header clicks implemented (ViewModel and FilterModel)
+- ✅ Column reordering support enabled in view
+- ✅ Header context menu implemented for column visibility
+- ✅ `DataViewModel` implementation complete (including sorting)
+- ✅ `ValidationAdapter` implementation complete (handles validation results)
+- ✅ `CorrectionAdapter` implementation complete (handles correction suggestions)
+- ✅ Unit tests for `DataViewModel`, `ValidationAdapter`, `CorrectionAdapter` passing
+- ✅ Integration tests for Adapters -> StateManager -> ViewModel -> Delegates passing
 
 ### In Progress
-- 🔄 Connecting actions to context menu
-- 🔄 Refining Adapter transformation logic
-- 🔄 Implementing `TableStateManager` update methods based on adapter output
-- 🔄 Developing remaining Integration tests (full workflows, edge cases)
+- 🔄 Refining Adapter transformation logic (connecting real services)
+- 🔄 Implementing remaining Integration tests (full workflows, edge cases)
+- 🔄 Implementing remaining Phase 2 context menu features (selection-aware, validation during edit)
+- 🔄 Implementing Phase 3 Correction UI (applying corrections)
 
 ### Upcoming
-- ⏳ Custom HeaderView implementation
-- ⏳ ValidationDelegate implementation
-- ⏳ CorrectionDelegate implementation
-- ⏳ ValidationAdapter development
-- ⏳ CorrectionAdapter development
-- ⏳ Advanced context menu features
-- ⏳ Performance optimization
-- ⏳ Integration and UI tests
+- ⏳ Connecting Adapters to real ValidationService and CorrectionService
+- ⏳ Phase 4: Import/Export and Advanced Features
+- ⏳ Phase 5: Performance Optimization
+- ⏳ Phase 6: Testing and Integration (UI Tests, Full Coverage)
+- ⏳ Custom HeaderView implementation (if more features needed beyond sorting/reorder/visibility)
 
 ### Known Issues
-- 🐞 No major issues identified yet
+- 🐞 No major issues identified in refactored code yet.
+- 🐞 Existing test suite failures in older components due to refactor dependencies.
 
 ### Testing Status
-- Unit test suite planned
-- Integration test planning in progress
-- UI testing approach defined
+- Unit test suite for core refactored components established.
+- Integration test planning in progress.
+- UI testing approach defined.
 
 ### Milestones
 | Milestone | Target Date | Status |
 |-----------|-------------|--------|
 | Architecture design | 2024-08-01 | ✅ Completed |
-| Core models and views | 2024-08-15 | 🔄 In progress |
-| Delegate system | 2024-08-30 | ⏳ Not started |
-| Adapter integration | 2024-09-15 | ⏳ Not started |
-| Context menus and actions | 2024-09-30 | ⏳ Not started |
-| Performance optimization | 2024-10-15 | ⏳ Not started |
-| Testing and integration | 2024-10-30 | ⏳ Not started |
+| Core models and views (Phase 1) | 2024-08-15 | ✅ Completed |
+| Context menus and actions (Phase 2) | 2024-09-30 | 🔄 In progress |
+| Delegate system & Adapter integration (Phase 3) | 2024-09-15 | 🔄 In progress (Bases done) |
+| Import/Export (Phase 4) | 2024-10-15 | ⏳ Not started |
+| Advanced Features (Phase 4) | 2024-10-15 | ⏳ Not started |
+| Performance optimization (Phase 5) | 2024-10-15 | ⏳ Not started |
+| Testing and integration (Phase 6)| 2024-10-30 | ⏳ Not started |
 
-### Goals for Next Week
-1. Complete initial DataViewModel implementation
-2. Develop basic DataTableView functionality
-3. Implement core FilterModel features
-4. Begin HeaderView customization
-5. Start CellDelegate design implementation
+### Goals for Next Period
+1.  Complete remaining Phase 2 Context Menu tasks (selection-aware, validation during edit).
+2.  Connect Adapters (`ValidationAdapter`, `CorrectionAdapter`) to the actual `ValidationService` and `CorrectionService`.
+3.  Implement UI for applying corrections (e.g., via delegate interaction or context menu).
+4.  Develop key integration tests for full workflows (e.g., validate -> correct -> revalidate) and edge cases.
 
 # Project Progress
 
@@ -93,74 +101,69 @@ ChestBuddy is currently focused on a comprehensive refactoring of the DataView c
 
 ### Phase 1: Core DataView Implementation
 
-| Task                                  | Status        | Notes                                  |
-|---------------------------------------|---------------|----------------------------------------|
-| **Folder Structure and Base Classes** | ✅ Completed  |                                        |
-| Create new folder structure           | ✅ Completed  |                                        |
-| Set up test directory structure       | ✅ Completed  |                                        |
+| Task                                  | Status        | Notes                                                      |
+|---------------------------------------|---------------|------------------------------------------------------------|
+| **Folder Structure and Base Classes** | ✅ Completed  |                                                            |
+| Create new folder structure           | ✅ Completed  |                                                            |
+| Set up test directory structure       | ✅ Completed  |                                                            |
 | Implement base model class            | ✅ Completed  | DataViewModel implemented              |
-| Implement base view class             | ✅ Completed  | DataTableView implemented              |
-| **Basic Functionality**               | ✅ Completed  |                                        |
-| Implement data loading                | ✅ Completed  | DataViewModel connects to source signal |
-| Implement column handling             | ✅ Completed  | Basic header display via delegation    |
-| Implement selection handling          | ✅ Completed  | Custom signal implemented and tested   |
-| Implement basic UI controls           | ✅ Completed  | Basic toolbar added to DataTableView   |
+| Implement base view class             | ✅ Completed  | DataTableView implemented                                  |
+| **Basic Functionality**               | ✅ Completed  |                                                            |
+| Implement data loading                | ✅ Completed  | DataViewModel connects to source signal                    |
+| Implement column handling             | ✅ Completed  | Resizing, Visibility, Reordering, Header Context Menu done |
+| Implement selection handling          | ✅ Completed  | Custom signal implemented and tested                       |
+| Implement basic UI controls           | ✅ Completed  | Basic toolbar added to DataTableView                       |
+| Add support for sorting & filtering   | ✅ Completed  | `FilterModel` integrated, `DataViewModel.sort` implemented |
 
-### Phase 2: Delegate System
+### Phase 2: Delegate System (Moved - Now part of Phase 3 logic)
 
-| Task                                         | Status        | Notes                     |
-|----------------------------------------------|---------------|---------------------------|
-| Implement the CellDelegate base class        | ✅ Completed  | Base methods tested       |
-| Create specialized delegates for validation  | ✅ Completed  | ValidationDelegate created |
-| Create specialized delegates for correction  | ✅ Completed  | CorrectionDelegate created |
-| Connect delegates to the data view components| ✅ Completed  | Set in DataTableView      |
+### Phase 3: Adapter Integration & Delegates (Consolidated View)
 
-### Phase 3: Adapter Integration (New Section)
+| Task                                              | Status        | Notes                                                    |
+|---------------------------------------------------|---------------|----------------------------------------------------------|
+| Implement CellDelegate base class and tests       | ✅ Completed  | Base methods tested                                      |
+| Implement ValidationDelegate base class and tests | ✅ Completed  | Initialization, paint logic verified                     |
+| Implement CorrectionDelegate base class and tests | ✅ Completed  | Initialization, paint logic verified                     |
+| Implement ValidationAdapter base class and tests  | ✅ Completed  | Passes results to StateManager (mocked)                  |
+| Implement CorrectionAdapter base class and tests  | ✅ Completed  | Passes correctable cells list to StateManager (mocked) |
+| Define TableStateManager update methods           | ✅ Completed  | Existing methods analyzed                                |
+| Refine Adapter transformation logic               | 🔄 In Progress | Needs connection to real services and state updates    |
+| Connect delegates to view components              | ✅ Completed  | Set in DataTableView                                     |
 
-| Task                                              | Status        | Notes                                        |
-|---------------------------------------------------|---------------|----------------------------------------------|
-| Implement ValidationAdapter base class and tests  | ✅ Completed  | Passes results to StateManager               |
-| Implement CorrectionAdapter base class and tests  | ✅ Completed  | Passes correctable cells list to StateManager|
-| Define TableStateManager update methods           | ✅ Completed  | Existing methods analyzed and confirmed      |
-| Refine Adapter transformation logic               | ✅ Completed  | Logic refined/delegated                      |
+### Phase 4: Context Menu Implementation
 
-### Phase 4: Context Menu Implementation (Was Phase 3)
+| Task                                     | Status        | Notes                                                    |
+|------------------------------------------|---------------|----------------------------------------------------------|
+| **Core Context Menu Structure**          | ✅ Completed  | Factory and action framework created/tested              |
+| Design context menu architecture         | ✅ Completed  |                                                          |
+| Implement menu factory pattern           | ✅ Completed  |                                                            |
+| Create extensible action framework       | ✅ Completed  | Base class and edit/add/correct actions implemented    |
+| Implement standard actions               | ✅ Completed  | Copy/Paste/Cut/Delete logic moved to actions           |
+| Add unit tests for context menu structure| ✅ Completed  | Tests for factory and actions added                      |
+| **Advanced Context Menu Functionality**  | 🔄 In Progress |                                                          |
+| Implement selection-aware menu customization | 🟡 Planned    | Cell-type specific actions remaining                   |
+| Implement correction list integration    | ✅ Completed  | Add action and tests done                                |
+| Implement validation list entry addition | ✅ Completed  | Add action and tests done                                |
+| Implement batch correction/validation options | ✅ Completed  | Batch dialogs and actions done                             |
+| Implement cell editing                   | ✅ Completed  | Direct edit, dialog edit actions done                    |
+| Add validation during editing            | 🟡 Planned    | Requires delegate/dialog modification                  |
+| Add unit tests for advanced actions      | ✅ Completed  | Tests for add/edit/correction/validation/batch added |
 
-| Task                                     | Status        | Notes                                      |
-|------------------------------------------|---------------|--------------------------------------------|
-| **Core Context Menu Structure**          | 🟢 In Progress | Factory and action framework created/tested |
-| Design context menu architecture         | ✅ Completed  |                                            |
-| Implement menu factory pattern           | ✅ Completed  |                                            |
-| Create extensible action framework       | ✅ Completed  | Base class and edit actions implemented    |
-| Create extensible action framework       | ✅ Completed  | Base class and edit actions implemented     |
-| Implement standard actions               | 🟢 In Progress | Copy/Paste/Cut/Delete logic moved to actions |
-| Add unit tests for context menu structure| ✅ Completed  | Tests for factory and actions added        |
-| **Advanced Context Menu Functionality**  | 🟢 In Progress | Actions for add/edit implemented           |
-| Implement selection-aware menu customization | 🟡 Planned    |                                            |
-| Implement correction list integration    | ✅ Completed  | Add action and tests done                  |
-| Implement validation list entry addition | ✅ Completed  | Add action and tests done                  |
-| Implement batch correction/validation options | ✅ Completed  | Batch dialogs and actions done             |
-| Implement cell editing                   | ✅ Completed  | Direct edit, dialog edit actions done      |
-| Add unit tests for advanced actions      | ✅ Completed  | Tests for add/edit/correction/validation added |
+### Phase 5: Validation and Correction Integration (UI/Workflow Focus)
 
-### Phase 5: Validation and Correction Integration (Was Phase 4)
+| Task                                    | Status        | Notes                                |
+|-----------------------------------------|---------------|--------------------------------------|
+| **Validation Status Display**           | 🔄 In Progress | Basic delegate rendering done        |
+| Connect ValidationService to Adapter    | 🟡 Planned    | Replace mocks                        |
+| Implement cell state visualization      | ✅ Completed  | Basic delegate rendering done        |
+| **Correction System Integration**       | 🔄 In Progress | Basic delegate rendering done        |
+| Connect CorrectionService to Adapter    | 🟡 Planned    | Replace mocks                        |
+| Add UI for applying corrections         | 🟡 Planned    | Via delegate interaction / menu action |
+| Implement correction preview            | 🟡 Planned    |                                      |
+| Implement one-click correction application | 🟡 Planned    |                                      |
+| Add batch correction UI                 | 🟡 Planned    | Requires dialog interaction          |
 
-| Task | Status | Notes |
-|------|--------|-------|
-| **Validation Status Display** | 🟡 Planned | Basic delegate done       |
-| Implement validation status integration | 🟡 Planned | Needs Adapter refinement  |
-| Implement cell state visualization | ✅ Completed  | Basic delegate done       |
-| **Correction System Integration** | 🟡 Planned | Basic delegate done       |
-| Implement correction workflow | 🟡 Planned | Needs Adapter refinement  |
-| Implement inline correction suggestions | 🟡 Planned | Needs Adapter refinement  |
-|   - ValidationDelegate    | 3           | 3       | ~50%     | Initialization, paint logic verified                                  |
-|   - CorrectionDelegate    | 3           | 3       | ~50%     | Initialization, paint logic verified                                  |
-|   - ValidationAdapter     | 5           | 5       | ~70%     | Initialization, signal handling, basic transform verified             |
-|   - CorrectionAdapter     | 5           | 5       | ~70%     | Initialization, signal handling, basic transform verified             |
-|   - Edit Actions          | 29          | 29      | TBD      | Copy, Paste, Cut, Delete, Edit, ShowDialog tests covered              |
-| *Total Refactored*        | **73**      | **73**  | **~TBD** | Coverage estimate, exact number TBD                                     |
-
-### Phase 6: Import/Export and Advanced Features (Was Phase 5)
+### Phase 6: Import/Export and Advanced Features
 
 | Task | Status | Notes |
 |------|--------|-------|
@@ -176,13 +179,13 @@ ChestBuddy is currently focused on a comprehensive refactoring of the DataView c
 
 | Task                         | Status        | Notes                                          |
 |------------------------------|---------------|------------------------------------------------|
-| **Automated Testing**        | 🟢 In Progress |                                                |
-| Complete unit testing        | 🟢 In Progress | Models/views/delegates/adapters tested, target 95% |
-| Implement integration testing| 🟡 Planned    |                                                |
-| Implement UI testing         | 🟡 Planned    |                                                |
-| **Manual Testing and Validation**| 🟡 Planned    |                                                |
-| Perform manual testing       | 🟡 Planned    |                                                |
-| Conduct usability testing    | 🟡 Planned    |                                                |
+| **Automated Testing**        | 🟢 In Progress | Unit tests for core components complete                 |
+| Complete unit testing        | 🟢 In Progress | Models/views/delegates/adapters tested, target 95%      |
+| Implement integration testing| 🟢 In Progress | Core interactions tested, full workflows planned        |
+| Implement UI testing         | 🟡 Planned    |                                                         |
+| **Manual Testing and Validation**| 🟡 Planned    |                                                         |
+| Perform manual testing       | 🟡 Planned    |                                                         |
+| Conduct usability testing    | 🟡 Planned    |                                                         |
 | **Integration Testing**        | 🟢 In Progress | State propagation tested                      |
 | **UI Testing**                 | 🟡 Planned    |                                               |
 
@@ -195,17 +198,20 @@ ChestBuddy is currently focused on a comprehensive refactoring of the DataView c
 - Configuration management system
 - Basic navigation between views
 - MainWindow core functionality
+- Core DataView Refactor (Phase 1): Display, Sorting, Filtering, Visibility
 
 ## Recently Fixed
 - Test collection errors related to imports
 - Test failures in delegate tests due to super() calls
 - Test failures in adapter tests due to placeholder logic/assertions
+- Fixed mock setup for `get_full_cell_state` in `DataViewModel` tests
 
 ## What's Next
-1. Refine Adapter transformation logic (`_transform_results`, `_transform_suggestions`).
-2. Define and implement `TableStateManager` update methods.
-3. Implement planned Phase 1 items (data loading, column handling, UI controls).
-4. Implement advanced context menu features.
+1.  Complete Phase 2: Selection-aware context menu actions, validation during edit.
+2.  Connect Adapters to real services (`ValidationService`, `CorrectionService`).
+3.  Implement UI for applying corrections.
+4.  Refine Adapter transformation logic & State Manager updates based on real service data.
+5.  Develop integration tests for full workflows and edge cases.
 
 ## Known Issues
 - Current DataView limitations (as documented before refactoring)
@@ -213,37 +219,41 @@ ChestBuddy is currently focused on a comprehensive refactoring of the DataView c
 
 ## Testing Status
 
-| Component Type            | Total Tests | Passing | Coverage | Notes                                                                 |
-|---------------------------|-------------|---------|----------|-----------------------------------------------------------------------|
-| Current UI Components     | 78          | TBD     | Varies   | Many tests likely failing/erroring due to refactor                      |
-| DataView New Components   | 37          | 37      | ~45%     | ViewModel, TableView, CellDelegate, Validation/Correction Delegates/Adapters |
-|   - DataViewModel         | 17          | 17      | ~80%     | Basic functionality covered                                           |
-|   - DataTableView         | 5           | 5       | ~40%     | Basic setup, selection, context menu covered                          |
-|   - CellDelegate          | 6           | 6       | ~60%     | Base method calls verified                                            |
-|   - ValidationDelegate    | 3           | 3       | ~50%     | Initialization, paint logic verified                                  |
-|   - CorrectionDelegate    | 3           | 3       | ~50%     | Initialization, paint logic verified                                  |
-|   - ValidationAdapter     | 5           | 5       | ~70%     | Initialization, signal handling, basic transform verified             |
-|   - CorrectionAdapter     | 5           | 5       | ~70%     | Initialization, signal handling, basic transform verified             |
+| Component Type            | Total Tests | Passing | Coverage | Notes                                                                          |
+|---------------------------|-------------|---------|----------|--------------------------------------------------------------------------------|
+| Current UI Components     | 78          | TBD     | Varies   | Many tests likely failing/erroring due to refactor                               |
+| DataView New Components   | ~80+        | TBD     | ~TBD%    | ViewModel, TableView, Delegates, Adapters, Actions, Column/Filter Models tested |
+|   - DataViewModel         | 17          | 17      | ~80%     | Basic functionality, sorting, signal handling covered |
+|   - DataTableView         | 5           | 5       | ~40%     | Basic setup, selection, context menu covered          |
+|   - CellDelegate          | 6           | 6       | ~60%     | Base method calls verified                            |
+|   - ValidationDelegate    | 3           | 3       | ~50%     | Initialization, paint logic verified                  |
+|   - CorrectionDelegate    | 3           | 3       | ~50%     | Initialization, paint logic verified                  |
+|   - ValidationAdapter     | 8           | 8       | ~85%     | Initialization, signal handling, transform logic verified |
+|   - CorrectionAdapter     | 6           | 6       | ~80%     | Initialization, signal handling, transform logic verified |
 |   - Edit Actions          | 29          | 29      | TBD      | Copy, Paste, Cut, Delete, Edit, ShowDialog tests covered              |
-| *Total Refactored*        | **73**      | **73**  | **~TBD** | Coverage estimate, exact number TBD                                     |
+|   - Add/Correct Actions   | ~10         | ~10     | TBD      | Actions for adding to lists, applying corrections tested |
+|   - ColumnModel           | ~5          | ~5      | TBD      | Basic visibility/management tests                     |
+|   - FilterModel           | ~8          | ~8      | TBD      | Filtering/sorting proxy tests                       |
+| *Total Refactored*        | **~100+**   | **~100+**| **~TBD** | Coverage estimate, exact number TBD                     |
 
 ### DataView Component Test Plan
 
 | Component | Unit Tests | Integration Tests | UI Tests | Performance Tests |
 |-----------|------------|-------------------|----------|-------------------|
-| DataViewModel | ✅ Done | Planned | N/A | Planned |
-| FilterModel | Planned | Planned | N/A | Planned |
+| DataViewModel | ✅ Done | ✅ In Progress | N/A | Planned |
+| FilterModel | ✅ Done | ✅ In Progress | N/A | Planned |
 | DataTableView | ✅ Done | Planned | Planned | Planned |
+| ColumnModel | ✅ Done | N/A     | N/A     | N/A               |
 | CellDelegate | ✅ Done | Planned | Planned | N/A |
 | ValidationDelegate | ✅ Done | Planned | Planned | N/A |
 | CorrectionDelegate | ✅ Done | Planned | Planned | N/A |
-| ValidationAdapter | ✅ Done | Planned | N/A | N/A |
-| CorrectionAdapter | ✅ Done | Planned | N/A | N/A |
-| ContextMenu | Planned | Planned | Planned | N/A |
+| ValidationAdapter | ✅ Done | ✅ In Progress | N/A | N/A |
+| CorrectionAdapter | ✅ Done | ✅ In Progress | N/A | N/A |
+| ContextMenu/Actions| ✅ Done | Planned | Planned | N/A |
 
 ## Implementation Progress
 
-The DataView refactoring has completed the basic implementation of the core view, model, delegates, and adapters. Focus is shifting towards refining adapter logic and integrating with the state manager.
+Phase 1 of the DataView refactoring is complete. Phase 2 (Context Menu) is mostly complete, pending selection-aware actions and edit validation. Phase 3 (Adapter/Delegate Integration) bases are complete, with adapter logic implemented and tested; next steps involve connecting to real services and implementing correction UI.
 
 ## Overall Project Status
 

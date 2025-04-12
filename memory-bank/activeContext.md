@@ -1,11 +1,11 @@
 ---
 title: Active Context - ChestBuddy Application
-date: 2024-08-05
+date: 2024-08-06
 ---
 
 # Active Context: DataView Refactoring
 
-Last Updated: 2024-08-05
+Last Updated: 2024-08-06
 
 ## Current Focus
 We are currently implementing a comprehensive refactoring of the DataView component, which is the central data display mechanism in ChestBuddy. This refactoring aims to enhance modularity, improve performance, and add new capabilities for data visualization and interaction.
@@ -43,6 +43,18 @@ We are currently implementing a comprehensive refactoring of the DataView compon
 - Implemented standard edit actions (`CopyAction`, `PasteAction`, `CutAction`, `DeleteAction`) and tests.
 - Implemented `EditCellAction` (F2) and tests.
 - Implemented `ShowEditDialogAction` with placeholder `ComplexEditDialog` and tests.
+- Implemented `ColumnModel` for managing column visibility.
+- Integrated `ColumnModel` into `DataTableView`.
+- Added column visibility control via header context menu.
+- Implemented `FilterModel` inheriting from `QSortFilterProxyModel`.
+- Integrated `FilterModel` into `DataTableView`.
+- Implemented sorting delegation from `FilterModel` to `DataViewModel`.
+- Added `sort` method implementation to `DataViewModel`.
+- Implemented `DataViewModel` with role handling, sorting, and connections to source model and state manager.
+- Implemented `ValidationAdapter` to connect `ValidationService` to `TableStateManager`.
+- Implemented `CorrectionAdapter` to connect `CorrectionService` to `TableStateManager`.
+- Added unit tests for `DataViewModel`, `ValidationAdapter`, and `CorrectionAdapter`.
+- Added integration tests covering interactions between `DataViewModel`, `TableStateManager`, Delegates, and Adapters.
 
 ## Implementation Plan
 
@@ -93,7 +105,7 @@ We are currently implementing a comprehensive refactoring of the DataView compon
 
 #### Current Status
 
-We are now focused on **Phase 3 (Adapter Integration)** and **Phase 4 (Context Menu Actions)**.
+We are now focused on **Phase 3 (Adapter Integration - Connecting Real Services)** and **Phase 4 (Context Menu Actions - Refinements)**.
 
 - ✅ Project overview documentation
 - ✅ UI mockups
@@ -105,32 +117,34 @@ We are now focused on **Phase 3 (Adapter Integration)** and **Phase 4 (Context M
 - ✅ Selection change signal added and tested
 - ✅ Basic context menu creation implemented and tested
 - ✅ Base CellDelegate implemented and tested
+- ✅ Fixtures moved to conftest.py
 - ✅ ValidationDelegate implemented and tested
 - ✅ CorrectionDelegate implemented and tested
-- ✅ ValidationAdapter base implemented and tested (placeholder logic)
-- ✅ CorrectionAdapter base implemented and tested (placeholder logic)
-- ✅ Fixtures moved to conftest.py
+- ✅ ValidationAdapter base implemented and tested
+- ✅ CorrectionAdapter base implemented and tested
 - ✅ Context menu actions implemented (add/edit/standard)
 - ✅ Integration tests for DataViewModel/TableStateManager/Delegates (state propagation, paint, tooltips) passed
+- ✅ `DataViewModel` implementation complete (including sorting)
+- ✅ `ValidationAdapter` implementation complete (handles validation results)
+- ✅ `CorrectionAdapter` implementation complete (handles correction suggestions)
+- ✅ Unit tests for `DataViewModel`, `ValidationAdapter`, `CorrectionAdapter` passing
+- ✅ Integration tests for Adapters -> StateManager -> ViewModel -> Delegates passing
 
 #### Next Steps
 
 1.  **Connect Edit Actions:** Add `EditCellAction` and `ShowEditDialogAction` to the `ContextMenuFactory`.
-2.  **Refine Adapters & State Manager**: Define `TableStateManager` update API and implement proper transformation logic in `ValidationAdapter` and `CorrectionAdapter`.
-3.  **Implement Remaining Integration Tests**: Cover full workflows and edge cases.
-4.  **Start Phase 5**: Begin integrating validation/correction visualizations with delegates (`ValidationDelegate`, `CorrectionDelegate`) and connecting real services.
+2.  **Connect Real Services:** Replace mocked service calls in Adapters (`ValidationAdapter`, `CorrectionAdapter`) with connections to the actual `ValidationService` and `CorrectionService`.
+3.  **Implement Remaining Integration Tests**: Cover full workflows (e.g., validate -> correct -> revalidate) and edge cases.
+4.  **Implement Correction UI**: Add UI elements for applying corrections (e.g., through delegate interaction or context menu actions).
 5.  **Refine `ComplexEditDialog`**: Make the dialog context-aware (different editors for different columns/data types).
 6.  **Implement Validation During Editing**: Modify the `QStyledItemDelegate` to perform validation during the editing process.
-7.  **Advanced Context Menu**: Implement context-specific actions.
-8.  **Define `CorrectionService` Interface:** Specify the method signature for adding a rule (e.g., `add_rule(from_value: str, to_value: str, category: str, enabled: bool) -> bool`).
-9.  **Update `ActionContext`:** Add a property or mechanism to access the `CorrectionService` (e.g., `context.correction_service`).
-10. **Modify `AddToCorrectionListAction`:** Replace the simulated `_call_correction_service_add` with a call to `context.correction_service.add_rule`.
-11. **Update Tests:** Mock the `CorrectionService` passed via the context in the action tests.
-12. **Implement the `AddToValidationListAction` similarly.
-13. **Implement Batch Actions:** Enhance `AddToCorrectionListAction` and `AddToValidationListAction` to handle multi-cell selections, possibly introducing batch dialogs.
-14. **Integrate Real Services:** Replace mocked service calls with actual implementations (requires `CorrectionService` and `ValidationService` to be ready).
-15. **Refine Service Injection:** Decide on the strategy for providing service instances to `ActionContext`.
-16. **Populate Dialog Categories/Lists:** Use real data sources for dropdowns in dialogs.
+7.  **Implement Selection-Aware Context Menu**: Adapt context menu based on selection state and cell content.
+8.  **Update `ActionContext`:** Finalize strategy for service access (e.g., `context.correction_service`).
+9.  **Update Action Tests:** Mock real services passed via context.
+10. **Implement Batch Actions UI:** Create dialogs for batch correction/validation if needed.
+11. **Populate Dialog Categories/Lists:** Use real data sources for dropdowns in dialogs.
+12. **Address Remaining TODOs** in the refactored code.
+13. **Begin Phase 4**: Start implementing Import/Export functionality integration.
 
 This refactoring project represents a significant improvement to the ChestBuddy application's data handling capabilities and will address multiple limitations in the current implementation.
 
@@ -211,7 +225,7 @@ The implementation will follow a phased approach:
 1. **Phase 1: Core DataView Implementation**
    - Establish new folder structure
    - Implement base classes (DataViewModel, DataTableView)
-   - Add core functionality (data loading, selection, columns)
+   - Add core functionality (data loading, selection, columns, sorting, filtering, visibility)
 
 2. **Phase 2: Context Menu Implementation**
    - Design context menu architecture
@@ -241,32 +255,7 @@ The implementation will follow a phased approach:
 
 #### Current Status
 
-We are currently in **Phase 3 (Adapter Integration)** and **Phase 4 (Context Menu Actions)**.
-
-- ✅ Project overview documentation
-- ✅ UI mockups for main view, context menu, validation, and correction integration
-- ✅ Project structure documentation
-- ✅ File structure specifications
-- ✅ Testing strategy documentation (unit, integration, UI, performance)
-- ✅ Base DataViewModel implemented and tested
-- ✅ Base DataTableView implemented and tested
-- ✅ Base CellDelegate implemented and tested
-- ✅ ValidationDelegate implemented and tested
-- ✅ CorrectionDelegate implemented and tested
-- ✅ ValidationAdapter base implemented and tested
-- ✅ CorrectionAdapter base implemented and tested
-- ✅ Context menu actions implemented (add/edit/standard)
-- ✅ Integration tests for core state propagation and delegate rendering passed
-
-#### Next Steps
-
-1. Begin implementation of the `ValidationDelegate`.
-2. Add tests for `ValidationDelegate` painting logic.
-3. Implement `CorrectionDelegate`.
-4. Implement `ValidationAdapter` and `CorrectionAdapter`.
-5. Add advanced context menu features.
-
-This refactoring project represents a significant improvement to the ChestBuddy application's data handling capabilities and will address multiple limitations in the current implementation.
+We are actively working on the DataView refactoring. Key components like the `DataViewModel`, `DataTableView`, base delegates (`CellDelegate`, `ValidationDelegate`, `CorrectionDelegate`), and adapters (`ValidationAdapter`, `CorrectionAdapter`) have been implemented and unit-tested. Initial integration tests covering state propagation are passing. Context menu actions for editing and adding to lists have been created.
 
 #### Detailed Testing Strategy
 

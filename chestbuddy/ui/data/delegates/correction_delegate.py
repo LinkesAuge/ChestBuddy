@@ -5,8 +5,10 @@ Delegate responsible for visualizing correction status and handling correction a
 """
 
 from PySide6.QtWidgets import QStyleOptionViewItem
-from PySide6.QtCore import QModelIndex, Qt, QRect, QSize
-from PySide6.QtGui import QPainter, QIcon, QColor
+from PySide6.QtCore import QModelIndex, Qt, QRect, QSize, QEvent, QObject, QPoint
+from PySide6.QtGui import QPainter, QIcon, QColor, QMouseEvent
+from PySide6.QtCore import QAbstractItemModel
+from PySide6.QtWidgets import QMenu
 
 # Use CellState from core, ValidationDelegate should also use it
 from chestbuddy.core.table_state_manager import CellState
@@ -21,6 +23,9 @@ class CorrectionSuggestion:
     def __init__(self, original, corrected):
         self.original = original
         self.corrected = corrected
+
+    def __str__(self):  # For display in menu
+        return f'" {self.corrected}"'
 
 
 class CorrectionDelegate(ValidationDelegate):
@@ -101,6 +106,81 @@ class CorrectionDelegate(ValidationDelegate):
         # This logic assumes correction indicator might overlap or replace validation icon
         # If they need separate space, adjust logic here.
         return hint
+
+    def editorEvent(
+        self,
+        event: QEvent,
+        model: QAbstractItemModel,
+        option: QStyleOptionViewItem,
+        index: QModelIndex,
+    ) -> bool:
+        """
+        Handle events within the delegate, specifically mouse clicks on the indicator.
+        """
+        if not index.isValid():
+            return False
+
+        # Check if the cell is correctable
+        is_correctable = index.data(DataViewModel.ValidationStateRole) == CellState.CORRECTABLE
+        if not is_correctable:
+            return super().editorEvent(event, model, option, index)
+
+        # Check for left mouse button release
+        if event.type() == QEvent.Type.MouseButtonRelease:
+            mouse_event = QMouseEvent(event)  # Cast to QMouseEvent
+            if mouse_event.button() == Qt.MouseButton.LeftButton:
+                # Calculate indicator rect
+                icon_margin = 2
+                indicator_rect = QRect(
+                    option.rect.right() - self.ICON_SIZE - icon_margin,
+                    option.rect.top() + (option.rect.height() - self.ICON_SIZE) // 2,
+                    self.ICON_SIZE,
+                    self.ICON_SIZE,
+                )
+
+                # Check if click was inside the indicator
+                if indicator_rect.contains(mouse_event.pos()):
+                    print(
+                        f"Correction indicator clicked for index {index.row()},{index.column()}"
+                    )  # Debug
+                    self._show_correction_menu(model, index, mouse_event.globalPos())
+                    return True  # Event handled
+
+        return super().editorEvent(event, model, option, index)
+
+    def _show_correction_menu(
+        self, model: QAbstractItemModel, index: QModelIndex, global_pos: QPoint
+    ):
+        """Shows a context menu with correction suggestions."""
+        suggestions = index.data(DataViewModel.CorrectionSuggestionsRole)
+
+        if not suggestions:
+            print("No suggestions found to show menu.")  # Debug
+            return
+
+        menu = QMenu()
+        for suggestion in suggestions:
+            action = menu.addAction(str(suggestion))  # Use __str__ for display
+            # Connect action to a placeholder handler
+            action.triggered.connect(
+                lambda checked=False,
+                idx=index,
+                sugg=suggestion: self._apply_correction_placeholder(idx, sugg)
+            )
+
+        if menu.isEmpty():
+            print("Correction menu is empty after processing suggestions.")  # Debug
+            return
+
+        menu.exec(global_pos)
+
+    def _apply_correction_placeholder(self, index: QModelIndex, suggestion: CorrectionSuggestion):
+        """Placeholder function to be called when a correction suggestion is selected."""
+        # Simplified print statement for debugging linter
+        print(f"Applying correction placeholder for {index.row()}, {index.column()}")
+        # In a real implementation, this would likely involve:
+        # 1. Getting the CorrectionService instance
+        # 2. Calling correction_service.apply_correction(index.row(), index.column(), suggestion)
 
     # TODO: Override editorEvent or add button handling to show suggestions
     # when the indicator area is clicked.

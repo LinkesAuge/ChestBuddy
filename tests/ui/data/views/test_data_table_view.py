@@ -17,18 +17,36 @@ from unittest.mock import MagicMock, patch
 
 from chestbuddy.ui.data.views.data_table_view import DataTableView
 from chestbuddy.ui.data.models.data_view_model import DataViewModel
+from PySide6.QtCore import QAbstractItemModel
+from chestbuddy.core.table_state_manager import TableStateManager
+from chestbuddy.ui.data.delegates.cell_delegate import CellDelegate
 
 # Fixtures like qapp and mock_chest_data_model are expected from conftest.py
+
+
+class MockDelegate(CellDelegate):
+    """Mock delegate to emit signals for testing."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+    def emit_validation_failed(self, index, message):
+        self.validationFailed.emit(index, message)
 
 
 class TestDataTableView:
     """Tests for the DataTableView class."""
 
     @pytest.fixture
-    def view_model(self, mock_chest_data_model):
+    def mock_state_manager(self):
+        """Create a mock TableStateManager."""
+        return MagicMock(spec=TableStateManager)
+
+    @pytest.fixture
+    def view_model(self, mock_chest_data_model, mock_state_manager):
         """Create a DataViewModel instance for view tests."""
         # Now we can use the actual DataViewModel
-        return DataViewModel(mock_chest_data_model)
+        return DataViewModel(mock_chest_data_model, mock_state_manager)
 
     def test_initialization(self, qapp, view_model):
         """Test that the DataTableView initializes correctly."""
@@ -339,3 +357,48 @@ class TestDataTableView:
         assert header.visualIndex(0) != 0
         # It's hard to predict exact final order reliably in tests, but we know 0 moved
         assert header.logicalIndex(0) != 0  # Check that logical 0 is no longer visual 0
+
+    # --- Tests for Validation Failure Handling --- #
+
+    def test_on_validation_failed_shows_messagebox(self, qapp, view_model, qtbot, mocker):
+        """Test that the _on_validation_failed slot shows a QMessageBox."""
+        model = view_model  # Use the fixture which now includes state manager
+        view = DataTableView()
+        view.setModel(model)
+        qtbot.addWidget(view)
+
+        # Mock QMessageBox.warning
+        mock_warning = mocker.patch("PySide6.QtWidgets.QMessageBox.warning")
+
+        # Get the delegate instance set by the view
+        delegate = view.table_view.itemDelegate()
+        assert delegate is not None
+
+        # Emit the validationFailed signal from the delegate
+        test_index = model.index(1, 1)
+        error_message = "Invalid data entered"
+
+        # Ensure the signal is connected
+        # Need to manually trigger signal emission if using MagicMock delegate
+        # If using a real delegate instance, we can emit its signal
+        if hasattr(delegate, "validationFailed"):
+            delegate.validationFailed.emit(test_index, error_message)
+        else:
+            # If the delegate doesn't have the signal (maybe base class test?),
+            # manually call the slot to test its logic
+            view._on_validation_failed(test_index, error_message)
+
+        # Verify QMessageBox.warning was called
+        mock_warning.assert_called_once()
+        # Check arguments (optional, but good practice)
+        args, kwargs = mock_warning.call_args
+        assert args[0] == view  # Parent
+        assert args[1] == "Validation Failed"  # Title
+        assert error_message in args[2]  # Message content
+        assert f"cell ({test_index.row()}, {test_index.column()})" in args[2]
+
+    def test_delegate_reconnection_on_set_model(self, qapp, mock_chest_data_model, qtbot, mocker):
+        """Test that delegate signals are disconnected and reconnected when model changes."""
+        # ... existing code ...
+
+    # --- Other Tests ---

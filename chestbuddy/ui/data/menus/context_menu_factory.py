@@ -158,6 +158,31 @@ class ContextMenuFactory:
             menu.addSeparator()
             needs_separator = False
 
+        # Add cell-type specific actions (only if single cell selected)
+        if info.clicked_index.isValid() and len(info.selection) <= 1:
+            col_index = info.clicked_index.column()
+            column_name = str(info.model.headerData(col_index, Qt.Horizontal))
+
+            if "date" in column_name.lower():
+                # Placeholder for Date formatting actions
+                date_format_action = QAction(f"Format Date ({column_name})...", info.parent_widget)
+                date_format_action.setEnabled(False)  # Placeholder - not implemented
+                menu.addAction(date_format_action)
+                needs_separator = True
+
+            if "score" in column_name.lower() or "value" in column_name.lower():  # Example check
+                # Placeholder for Number formatting actions
+                number_format_action = QAction(
+                    f"Number Format ({column_name})...", info.parent_widget
+                )
+                number_format_action.setEnabled(False)  # Placeholder - not implemented
+                menu.addAction(number_format_action)
+                needs_separator = True
+
+        if needs_separator:
+            menu.addSeparator()
+            needs_separator = False
+
         # Add context-specific actions (Validation/Correction)
         # Applicability might depend on single cell state
         context_action_ids = {"view_error", "apply_correction"}

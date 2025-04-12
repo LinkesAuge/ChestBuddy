@@ -7,9 +7,9 @@ Connects the CorrectionService to the TableStateManager for correction states.
 from PySide6.QtCore import QObject, Slot
 import typing
 
-# Placeholder imports - adjust based on actual locations
+# Updated import
 from chestbuddy.core.services import CorrectionService
-from chestbuddy.core.managers.table_state_manager import TableStateManager, CellFullState, CellState
+from chestbuddy.core.table_state_manager import TableStateManager, CellFullState, CellState
 from chestbuddy.core.enums.validation_enums import ValidationStatus
 
 # Placeholder types for clarity

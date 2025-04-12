@@ -252,6 +252,13 @@ The ChestBuddy application is built using the following technologies:
 - **UV**: Package management and dependency resolution
 - **pyenv**: Python version management
 
+## Refactoring Progress Update (2024-08-06)
+- Implemented `DataViewModel` with core logic for data access, roles, and sorting.
+- Implemented `ValidationAdapter` and `CorrectionAdapter` to connect services to the `TableStateManager`.
+- Completed unit tests for `DataViewModel`, `ValidationAdapter`, and `CorrectionAdapter`.
+- Established basic integration tests for state propagation between adapters, state manager, view model, and delegates.
+- These components form the foundation for visualizing validation and correction states in the refactored DataView.
+
 ## Project Structure
 
 The project follows a clear, modular structure with these key directories:

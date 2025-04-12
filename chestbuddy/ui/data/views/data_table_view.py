@@ -27,12 +27,21 @@ from PySide6.QtCore import (
 )
 from PySide6.QtGui import QAction, QGuiApplication, QIcon
 import typing
+from typing import Optional
 
 # Placeholder imports - adjust as needed when models/delegates are implemented
 from ..delegates.cell_delegate import CellDelegate  # Import base delegate
 from ..delegates.validation_delegate import ValidationDelegate  # Import validation delegate
 from ..delegates.correction_delegate import CorrectionDelegate  # Import correction delegate
+
 # from ..models.data_view_model import DataViewModel
+from ..models.column_model import ColumnModel  # Import ColumnModel
+from ..menus.context_menu_factory import (
+    ContextMenuFactory,
+    ActionContext,
+)  # Import ContextMenuFactory and ActionContext
+from ..models.filter_model import FilterModel  # Import FilterModel
+from ..models.data_view_model import DataViewModel  # Import DataViewModel for type hinting
 
 
 class DataTableView(QWidget):
@@ -55,6 +64,10 @@ class DataTableView(QWidget):
             parent: Parent widget
         """
         super().__init__(parent)
+
+        self._column_model = ColumnModel(self)  # Initialize ColumnModel
+        self._source_model: Optional[DataViewModel] = None  # Store source model reference
+        self._filter_model = FilterModel(self)  # Initialize FilterModel
 
         self._setup_toolbar()
         self._setup_table()
@@ -109,6 +122,7 @@ class DataTableView(QWidget):
         # Create table_view before adding to layout
         self.table_view = QTableView()  # Create the table view instance
         self.table_view.setObjectName("dataTableView")
+        self.table_view.setModel(self._filter_model)  # Set FilterModel on the view
         self._configure_table_view(self.table_view)
 
         layout.addWidget(self.toolbar)
@@ -151,11 +165,16 @@ class DataTableView(QWidget):
             print("Warning: Selection model not available during _configure_table_view")
 
     def _connect_signals(self):
-        """Connect signals for the container widget (if any)."""
+        """Connect signals for the container widget and internal components."""
         # Connect signals from the internal table_view or its model if needed by the container
         # Example: Forwarding selection changed if the container needs it directly
         # self.table_view.selectionModel().selectionChanged.connect(self.selection_changed)
-        pass  # Keep internal connections primarily
+
+        # Connect to ColumnModel signal
+        self._column_model.column_visibility_changed.connect(self._update_column_visibility)
+        self._column_model.columns_changed.connect(
+            self._initialize_column_visibility
+        )  # Connect columns_changed
 
     # --- Internal Slot for Selection --- #
     @Slot(QItemSelection, QItemSelection)
@@ -170,19 +189,21 @@ class DataTableView(QWidget):
     @Slot(QPoint)
     def _show_context_menu(self, position):
         """Gather context and show the context menu created by the factory."""
-        clicked_index = self.table_view.indexAt(position)
-        selection = self.table_view.selectionModel().selectedIndexes()
-        model = self.table_view.model()  # Should be DataViewModel
+        proxy_clicked_index = self.table_view.indexAt(position)
+        source_clicked_index = self._filter_model.mapToSource(proxy_clicked_index)
+        proxy_selection = self.table_view.selectionModel().selectedIndexes()
+        source_selection = [self._filter_model.mapToSource(idx) for idx in proxy_selection]
+        source_model = self.sourceModel()  # Use the stored source model
 
-        if not isinstance(model, DataViewModel):
-            print("Error: Model is not a DataViewModel instance.")
+        if not isinstance(source_model, DataViewModel):
+            print("Error: Source model is not a DataViewModel instance.")
             return
 
         # Prepare context information
         context_info = ActionContext(
-            clicked_index=clicked_index,
-            selection=selection,
-            model=model,
+            clicked_index=source_clicked_index,  # Pass source index
+            selection=source_selection,  # Pass source selection
+            model=source_model,  # Pass source model
             parent_widget=self,  # Pass the DataTableView widget as parent
         )
 
@@ -199,19 +220,27 @@ class DataTableView(QWidget):
         """Show context menu for the horizontal header."""
         header = self.table_view.horizontalHeader()
         menu = QMenu(self)
+        model = self.sourceModel()  # Get the source model for column names/count
 
-        # Add actions for each column
-        for logical_index in range(self.table_view.model().columnCount()):
-            visual_index = header.visualIndex(logical_index)
-            if visual_index < 0:  # Column might be hidden by moveSection
+        if not model:
+            return
+
+        # Add actions for each column based on ColumnModel
+        column_names = self._column_model.get_columns()
+        for logical_index, column_name in enumerate(column_names):
+            # Ensure the logical index is valid for the current model
+            if logical_index >= model.columnCount():
                 continue
 
-            column_name = self.table_view.model().headerData(logical_index, Qt.Horizontal)
             action = QAction(column_name, self)
             action.setCheckable(True)
-            action.setChecked(not self.table_view.isColumnHidden(logical_index))
+            # Set checked state based on ColumnModel
+            action.setChecked(self._column_model.is_column_visible(column_name))
+            # Connect to a lambda that calls ColumnModel to change visibility
             action.triggered.connect(
-                lambda checked, col=logical_index: self.setColumnVisible(col, checked)
+                lambda checked, name=column_name: self._column_model.set_column_visible(
+                    name, checked
+                )
             )
             menu.addAction(action)
 
@@ -225,18 +254,113 @@ class DataTableView(QWidget):
         global_pos = header.mapToGlobal(position)
         menu.exec(global_pos)
 
-    # --- Public Methods to interact with the internal table view ---
-    def setModel(self, model: QAbstractItemModel | None):
-        """Sets the model on the internal QTableView and updates delegates."""
-        if self.table_view:
-            self.table_view.setModel(model)
-            self._setup_delegates()  # Re-setup delegates when model changes
-        else:
-            print("Error: setModel called before table_view was initialized.")
+    # --- Internal Slot for Column Visibility --- #
+    @Slot(str, bool)
+    def _update_column_visibility(self, column_name: str, visible: bool):
+        """Update the visibility of a specific column in the table view."""
+        model = self.sourceModel()  # Use source model for column mapping
+        if not model:
+            return
 
-    def model(self) -> QAbstractItemModel | None:
-        """Returns the model from the internal QTableView."""
-        return self.table_view.model() if self.table_view else None
+        try:
+            # Find the logical index for the column name
+            # This assumes the underlying model (e.g., DataViewModel) can provide column names
+            # or we map names to indices based on the ColumnModel's initial column list
+            if hasattr(model, "column_names"):  # Example check
+                column_names = model.column_names()
+                if column_name in column_names:
+                    logical_index = column_names.index(column_name)
+                    self.table_view.setColumnHidden(logical_index, not visible)
+            else:
+                # Fallback: Use ColumnModel's internal list if model doesn't provide names
+                # This might be less reliable if column order changes in the source model
+                if column_name in self._column_model.get_columns():
+                    logical_index = self._column_model.get_columns().index(column_name)
+                    # Check if logical_index is valid for the current view model
+                    if logical_index < model.columnCount():
+                        self.table_view.setColumnHidden(logical_index, not visible)
+                    else:
+                        print(
+                            f"Warning: Logical index {logical_index} for column '{column_name}' out of bounds for model column count {model.columnCount()}"
+                        )
+                else:
+                    print(f"Warning: Column '{column_name}' not found for visibility update.")
+
+        except Exception as e:
+            print(f"Error updating column visibility for '{column_name}': {e}")
+
+    @Slot(list)
+    def _initialize_column_visibility(self, columns: list):
+        """Initialize column visibility when columns are set in ColumnModel."""
+        self._update_all_column_visibility()
+
+    def _update_all_column_visibility(self):
+        """Update visibility for all columns based on ColumnModel state."""
+        model = self.sourceModel()  # Use source model for column mapping
+        if not model:
+            return
+
+        column_names = self._column_model.get_columns()
+        for idx, name in enumerate(column_names):
+            # Ensure index is valid for the current model
+            if idx < model.columnCount():
+                is_visible = self._column_model.is_column_visible(name)
+                self.table_view.setColumnHidden(idx, not is_visible)
+            else:
+                print(
+                    f"Warning: Initializing visibility - index {idx} for '{name}' out of bounds ({model.columnCount()} cols)"
+                )
+
+    # --- Public Methods to interact with the internal table view ---
+    def setModel(self, model: DataViewModel | None):
+        """Sets the source DataViewModel and connects it to the FilterModel."""
+        if self.table_view:
+            # Check if the source model is the same
+            if self._source_model == model:
+                return  # Avoid resetting if the model is the same
+
+            # Disconnect signals from old source model if exists
+            if self._source_model and hasattr(self._source_model, "data_changed"):
+                try:
+                    self._source_model.data_changed.disconnect(
+                        self._filter_model.invalidate
+                    )  # Or a specific slot if needed
+                except (TypeError, RuntimeError):
+                    pass
+
+            self._source_model = model  # Store the new source model
+
+            # Set the source model for the filter proxy
+            self._filter_model.setSourceModel(self._source_model)
+
+            # The view keeps the filter model, we just change its source
+            self._setup_delegates()  # Re-setup delegates when model changes (might depend on source)
+            if self._source_model:
+                # Update ColumnModel when the source model changes
+                column_count = self._source_model.columnCount()
+                column_names = [
+                    str(self._source_model.headerData(i, Qt.Horizontal))
+                    for i in range(column_count)
+                ]
+                self._column_model.set_columns(column_names)
+                # Initial visibility update is handled by columns_changed signal connection
+
+                # Connect new source model signals
+                if hasattr(self._source_model, "data_changed"):
+                    try:
+                        self._source_model.data_changed.connect(self._filter_model.invalidate)
+                    except (TypeError, RuntimeError):
+                        print("Warning: Could not connect data_changed signal from source model")
+            else:
+                self._column_model.set_columns([])
+
+    def model(self) -> FilterModel | None:
+        """Returns the FilterModel used by the internal QTableView."""
+        return self._filter_model if self.table_view else None
+
+    def sourceModel(self) -> DataViewModel | None:
+        """Returns the source DataViewModel."""
+        return self._source_model
 
     def selectionModel(self) -> QItemSelectionModel | None:
         """Returns the selection model from the internal QTableView."""
@@ -257,65 +381,133 @@ class DataTableView(QWidget):
             self.table_view.clearSelection()
 
     def setColumnVisible(self, column_index: int, visible: bool):
-        """Shows or hides the specified column on the internal QTableView."""
-        if self.table_view:
-            self.table_view.setColumnHidden(column_index, not visible)
+        """Sets the visibility of a column by its logical index.
+
+        Updates the ColumnModel, which triggers the UI update via signal.
+        """
+        # Get column name from the source model (requires model to be set)
+        model = self.sourceModel()
+        if model and 0 <= column_index < model.columnCount():
+            # Use the index to get the column name directly from ColumnModel's list
+            column_names = self._column_model.get_columns()
+            if 0 <= column_index < len(column_names):
+                column_name = column_names[column_index]
+                if column_name:
+                    self._column_model.set_column_visible(column_name, visible)
+                else:
+                    print(f"Warning: Could not get name for column index {column_index}")
+            else:
+                print(
+                    f"Warning: column index {column_index} out of bounds for ColumnModel columns list"
+                )
+        else:
+            print(f"Warning: Invalid column index {column_index} for setColumnVisible")
 
     def isColumnVisible(self, column_index: int) -> bool:
-        """Returns True if the specified column is visible on the internal QTableView."""
-        return not self.table_view.isColumnHidden(column_index) if self.table_view else False
+        """Checks if a column is visible by its logical index, using ColumnModel."""
+        source_model = self.sourceModel()
+        if source_model and 0 <= column_index < source_model.columnCount():
+            # Use the index to get the column name directly from ColumnModel's list
+            column_names = self._column_model.get_columns()
+            if 0 <= column_index < len(column_names):
+                column_name = column_names[column_index]
+                if column_name:
+                    return self._column_model.is_column_visible(column_name)
+                else:
+                    print(
+                        f"Warning: Could not get name for column index {column_index} in isColumnVisible"
+                    )
+                    return False  # Assume hidden if name not found
+            else:
+                print(
+                    f"Warning: column index {column_index} out of bounds for ColumnModel columns list in isColumnVisible"
+                )
+                return False
+        else:
+            print(f"Warning: Invalid column index {column_index} for isColumnVisible")
+            return False
 
     def _setup_delegates(self):
-        """Sets up the item delegates for the internal table_view."""
+        """Set up delegates for cell rendering."""
         if not self.table_view:
             print("Error: Cannot setup delegates, table_view not initialized.")
             return
 
-        # Disconnect old signals if they exist
-        old_delegate = self.table_view.itemDelegate()  # Get delegate from internal view
-        if isinstance(old_delegate, CellDelegate) and hasattr(old_delegate, "validationRequested"):
+        # Disconnect old delegate signal if exists
+        old_delegate = self.table_view.itemDelegate()
+        if old_delegate and hasattr(old_delegate, "validationFailed"):
             try:
-                old_delegate.validationRequested.disconnect(self._on_validation_requested)
-            except (TypeError, RuntimeError):  # Handles disconnect errors if not connected
+                old_delegate.validationFailed.disconnect(self._on_validation_failed)
+            except (
+                TypeError,
+                RuntimeError,
+            ):  # Handles signal not connected or already disconnected
                 pass
 
-        # Create and set the new delegate for the internal view
-        delegate = CorrectionDelegate(self.table_view)  # Parent is the internal QTableView
-        self.table_view.setItemDelegate(delegate)
+        # Example: Set different delegates based on column or data type if needed
+        # For now, set the CorrectionDelegate as default
+        new_delegate = CorrectionDelegate(self.table_view)
+        self.table_view.setItemDelegate(new_delegate)
 
-        # Connect the validation request signal from the new delegate
-        # if hasattr(delegate, "validationRequested"):
-        #    delegate.validationRequested.connect(self._on_validation_requested)
+        # Connect new delegate signal
+        if hasattr(new_delegate, "validationFailed"):
+            new_delegate.validationFailed.connect(self._on_validation_failed)
 
-    @Slot(object, QModelIndex)
-    def _on_validation_requested(self, value: object, index: QModelIndex):
-        """
-        Handles the validationRequested signal from the delegate.
-        Currently just sets the data, validation logic will be added later.
-        """
-        print(
-            f"DataTableView: Received validationRequested for value '{value}' at {index.row()},{index.column()}"
+        # You might want to set specific delegates for columns:
+        # validation_delegate = ValidationDelegate(self.table_view)
+        # self.table_view.setItemDelegateForColumn(COLUMN_INDEX_FOR_VALIDATION, validation_delegate)
+
+    @Slot(QModelIndex, str)
+    def _on_validation_failed(self, index: QModelIndex, error_message: str):
+        """Slot to handle validation failures from the delegate."""
+        # Map index if needed (though maybe less relevant for just showing message)
+        # source_index = self._filter_model.mapToSource(index)
+        row = index.row()
+        col = index.column()
+
+        # Show a message box
+        QMessageBox.warning(
+            self,
+            "Validation Failed",
+            f"Invalid input for cell ({row}, {col}):\n{error_message}",
         )
-        if self.model() and index.isValid():
-            # TODO: Integrate call to ValidationService here
-            # result = validation_service.validate_single_cell(index.row(), index.column(), value)
-            # if result.is_valid:
-            #     self.model().setData(index, value, Qt.EditRole)
-            # else:
-            #     # Show error feedback, maybe keep editor open?
-            #     QMessageBox.warning(self, "Validation Failed", result.message)
-            #     # Optionally, re-open editor: self.edit(index)
-
-            # For now, directly set the data to maintain functionality
-            success = self.model().setData(index, value, Qt.EditRole)
-            if not success:
-                print(f"DataTableView: setData failed for {index.row()},{index.column()}")
-                QMessageBox.warning(self, "Edit Failed", "Could not set the new value.")
-        else:
-            print(f"DataTableView: Cannot set data - invalid model or index.")
+        # TODO: Optionally, re-open editor or highlight the cell
+        # self.table_view.edit(index)
 
     # Delegate other necessary QTableView methods...
     # Example:
     def resizeColumnsToContents(self):
+        if self.table_view:
+            self.table_view.resizeColumnsToContents()
+
+    # --- Public Methods for Column Visibility (Convenience) ---
+    def hide_column(self, column_name: str):
+        """Convenience method to hide a column by name."""
+        try:
+            self._column_model.set_column_visible(column_name, False)
+        except ValueError as e:
+            print(f"Error hiding column: {e}")
+
+    def show_column(self, column_name: str):
+        """Convenience method to show a column by name."""
+        try:
+            self._column_model.set_column_visible(column_name, True)
+        except ValueError as e:
+            print(f"Error showing column: {e}")
+
+    def get_visible_columns(self) -> typing.List[str]:
+        """Get a list of names of the currently visible columns."""
+        return self._column_model.get_visible_columns()
+
+    def get_column_visibility(self) -> typing.Dict[str, bool]:
+        """Get the visibility state of all columns."""
+        return self._column_model.get_visibility_state()
+
+    def set_column_visibility_state(self, state: typing.Dict[str, bool]):
+        """Set the visibility state for multiple columns."""
+        self._column_model.set_visibility_state(state)
+
+    def resizeColumnsToContents(self):
+        """Resizes all columns to fit their contents."""
         if self.table_view:
             self.table_view.resizeColumnsToContents()

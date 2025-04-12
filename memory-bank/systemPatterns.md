@@ -239,6 +239,8 @@ This architecture provides a robust foundation for the DataView, addressing the 
 
 The ChestBuddy application now implements a comprehensive set of design patterns and architectural principles, creating a robust, maintainable, and extensible codebase. This document outlines the key patterns used throughout the application, with particular emphasis on their implementation in the completed validation system integration.
 
+**Update**: The core `DataViewModel` and Adapters (`ValidationAdapter`, `CorrectionAdapter`) for the DataView refactor are now implemented and tested. They successfully integrate with the `TableStateManager` to manage and propagate cell state information, forming the backbone of the refactored data display and validation/correction visualization.
+
 ## Core Architectural Pattern: Model-View-Controller (MVC)
 
 The application follows a strict MVC architecture with clear separation of concerns:

@@ -7,7 +7,9 @@ from PySide6.QtCore import Qt, QModelIndex
 from PySide6.QtWidgets import QApplication, QWidget, QStyleOptionViewItem
 from PySide6.QtGui import QPainter, QColor
 
-from chestbuddy.ui.data.delegates.validation_delegate import ValidationDelegate, ValidationStatus
+from chestbuddy.ui.data.delegates.validation_delegate import ValidationDelegate
+from chestbuddy.core.table_state_manager import CellState
+
 from chestbuddy.ui.data.models.data_view_model import DataViewModel
 
 # Fixtures like qapp are expected from conftest.py
@@ -26,7 +28,7 @@ class TestValidationDelegate:
         assert delegate is not None
         # Check if STATUS_COLORS are defined
         assert hasattr(delegate, "STATUS_COLORS")
-        assert ValidationStatus.INVALID in delegate.STATUS_COLORS
+        assert CellState.INVALID in delegate.STATUS_COLORS
 
     def test_paint_valid_cell(self, delegate, mocker):
         """Test painting a cell with VALID status."""
@@ -37,7 +39,7 @@ class TestValidationDelegate:
         # Mock index.data to return VALID status for ValidationStateRole
         def mock_data(role):
             if role == DataViewModel.ValidationStateRole:
-                return ValidationStatus.VALID
+                return CellState.VALID
             return "Display Data"  # Default for other roles
 
         mock_index.data = mock_data
@@ -57,10 +59,10 @@ class TestValidationDelegate:
     @pytest.mark.parametrize(
         "status, expected_color_hex",
         [
-            (ValidationStatus.INVALID, "#ffb6b6"),
-            (ValidationStatus.CORRECTABLE, "#fff3b6"),
-            (ValidationStatus.WARNING, "#ffe4b6"),
-            (ValidationStatus.INFO, "#b6e4ff"),
+            (CellState.INVALID, "#ffb6b6"),
+            (CellState.CORRECTABLE, "#fff3b6"),
+            (CellState.WARNING, "#ffe4b6"),
+            (CellState.INFO, "#b6e4ff"),
         ],
     )
     def test_paint_other_status_cells(self, delegate, mocker, status, expected_color_hex):
