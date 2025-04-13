@@ -1387,9 +1387,7 @@ class DataViewController(BaseController):
 
     # --- Slot for Correction Application ---
     @Slot(QModelIndex, object)
-    def _handle_apply_correction(
-        self, source_index: QModelIndex, suggestion: object
-    ) -> None:
+    def _handle_apply_correction(self, source_index: QModelIndex, suggestion: object) -> None:
         """Handles the request to apply a specific correction suggestion.
 
         Args:
@@ -1400,9 +1398,7 @@ class DataViewController(BaseController):
             logger.warning("_handle_apply_correction received invalid index.")
             return
 
-        if not hasattr(suggestion, "original_value") or not hasattr(
-            suggestion, "corrected_value"
-        ):
+        if not hasattr(suggestion, "original_value") or not hasattr(suggestion, "corrected_value"):
             logger.error(
                 f"Invalid suggestion object received: {suggestion}. Missing required attributes."
             )
@@ -1416,8 +1412,8 @@ class DataViewController(BaseController):
         corrected_value = getattr(suggestion, "corrected_value", "Unknown")
 
         logger.info(
-            f"Applying correction for cell ({row}, {col} - {column_name}): 
-            '{original_value}' -> '{corrected_value}'"
+            f"Applying correction for cell ({row}, {col} - {column_name}): "
+            f"'{original_value}' -> '{corrected_value}'"
         )
 
         # Get the CorrectionService

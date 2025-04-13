@@ -11,7 +11,7 @@ Usage:
 import logging
 import hashlib
 from typing import Dict, List, Any, Optional, Tuple, Callable
-from PySide6.QtCore import Signal, QObject, QThread
+from PySide6.QtCore import Signal, QObject, QThread, Slot, QModelIndex
 
 from chestbuddy.core.controllers.base_controller import BaseController
 from chestbuddy.core.models.correction_rule import CorrectionRule
@@ -952,3 +952,52 @@ class CorrectionController(BaseController):
         logger.info("Applying auto-correction on import")
         self.apply_corrections(only_invalid=False, recursive=True)
         return True
+
+    @Slot(QModelIndex, object)
+    def apply_correction_from_ui(self, index: QModelIndex, suggestion: Any):
+        """
+        Slot to receive correction requests from the UI (e.g., CorrectionDelegate).
+
+        Args:
+            index: The QModelIndex of the cell to correct.
+            suggestion: The CorrectionSuggestion object selected by the user.
+        """
+        # --- Basic Validation ---
+        if not index.isValid():
+            logger.warning("apply_correction_from_ui received an invalid index.")
+            self.correction_error.emit("Cannot apply correction to an invalid cell index.")
+            return
+        if suggestion is None or not hasattr(suggestion, "corrected_value"):
+            logger.warning(f"apply_correction_from_ui received an invalid suggestion: {suggestion}")
+            self.correction_error.emit("Invalid correction suggestion received from UI.")
+            return
+        # --- End Basic Validation ---
+
+        row = index.row()
+        col = index.column()
+        corrected_value = suggestion.corrected_value
+
+        logger.info(
+            f"Applying correction from UI: Index=({row},{col}), Suggestion='{corrected_value}'"
+        )
+        try:
+            # Call the NEW service method
+            success = self._correction_service.apply_ui_correction(row, col, corrected_value)
+
+            if success:
+                logger.info("Correction applied successfully via UI request.")
+                # Optional: emit completion signal or trigger revalidation?
+                # self.correction_completed.emit(...)
+            else:
+                logger.warning("Correction via UI request reported no changes or failed.")
+                # Maybe emit a different signal or just log?
+
+        except AttributeError as e:
+            # This specific error shouldn't happen now, but keep general exception handling
+            logger.error(
+                f"CorrectionService is missing the expected method apply_ui_correction: {e}"
+            )
+            self.correction_error.emit("Internal error: Correction service method not found.")
+        except Exception as e:
+            logger.error(f"Error applying correction from UI: {e}", exc_info=True)
+            self.correction_error.emit(f"Error applying correction: {e}")

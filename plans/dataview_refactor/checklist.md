@@ -129,14 +129,14 @@ For a complete overview of the project, see [overview.md](./overview.md).
   - [x] Add unit tests for cell state visualization (delegate tests done)
 
 ### Correction System Integration
-- [x] Implement correction workflow (partially - adapters defined)
+- [x] Implement correction workflow (partially - adapters defined, UI signal flow tested)
   - [x] Connect to CorrectionService
-  - [ ] Add UI for applying corrections
+  - [x] Add UI for applying corrections (partially - single click delegate)
   - [ ] Implement correction preview
   - [x] Add unit tests for correction workflow (adapter tests updated)
 - [x] Implement inline correction suggestions (partially - visualization only)
   - [x] Add suggestion display (delegate draws indicator)
-  - [ ] Implement one-click correction application
+  - [x] Implement one-click correction application
   - [ ] Add batch correction UI
   - [x] Add unit tests for inline correction suggestions (delegate tests completed)
 
@@ -179,9 +179,9 @@ For a complete overview of the project, see [overview.md](./overview.md).
   - [x] Test all edge cases
   - [ ] Add performance tests
   - [x] Document all tests
-- [x] Implement integration testing (partially - core interactions tested)
+- [x] Implement integration testing (partially - core + correction flow tested)
   - [x] Test component interactions (Model/View/Delegate/StateManager/Adapters)
-  - [x] Test signal-slot connections
+  - [x] Test signal-slot connections (core + correction flow)
   - [x] Test data flow (validation/correction state)
 - [ ] Implement UI testing
   - [ ] Test user workflows

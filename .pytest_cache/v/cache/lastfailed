@@ -340,6 +340,17 @@
   "tests/unit/ui/views/test_validation_tab_view.py::TestValidationTabView::test_create_validation_list_section_error": true,
   "tests/unit/ui/views/test_validation_tab_view.py::TestValidationTabView::test_on_status_changed_edge_cases": true,
   "tests/unit/ui/views/test_validation_tab_view.py::TestValidationTabView::test_update_list_view_status": true,
-  "tests/ui/data/delegates/test_correction_delegate.py::TestCorrectionDelegate::test_show_menu_emits_signal_on_selection": true,
-  "tests/unit/core/services/test_correction_service.py": true
+  "tests/unit/core/services/test_correction_service.py": true,
+  "tests/integration/test_dataview_integration.py::TestDataViewIntegration::test_initial_state": true,
+  "tests/integration/test_dataview_integration.py::TestDataViewIntegration::test_validation_state_propagation": true,
+  "tests/integration/test_dataview_integration.py::TestDataViewIntegration::test_correction_state_propagation": true,
+  "tests/integration/test_dataview_integration.py::TestDataViewIntegration::test_tooltip_display_for_error": true,
+  "tests/integration/test_dataview_integration.py::TestDataViewIntegration::test_tooltip_display_for_correction": true,
+  "tests/integration/test_dataview_integration.py::TestDataViewIntegration::test_reset_state_propagation": true,
+  "tests/integration/test_dataview_integration.py::TestDataViewIntegration::test_paint_invalid_state": true,
+  "tests/integration/test_dataview_integration.py::TestDataViewIntegration::test_paint_correctable_state": true,
+  "tests/integration/test_dataview_integration.py::TestDataViewIntegration::test_apply_correction_workflow": true,
+  "tests/integration/test_dataview_integration.py::TestDataViewIntegration::test_correction_indicator_click": true,
+  "tests/integration/test_dataview_integration.py::TestDataViewIntegration::test_delegate_correction_selection_triggers_service": true,
+  "tests/integration/test_correction_flow.py::TestCorrectionFlowIntegration::test_delegate_signal_triggers_controller_slot": true
 }

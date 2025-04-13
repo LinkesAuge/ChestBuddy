@@ -820,73 +820,62 @@ class CorrectionService(QObject):
             logger.error(f"Error applying suggestion to cell ({row}, {col}): {e}", exc_info=True)
             return False
 
-    def apply_suggestion_to_cell(self, row: int, col: int, suggestion: object) -> bool:
-        """Applies a specific correction suggestion to a single cell.
+    def apply_ui_correction(self, row: int, col: int, corrected_value: Any) -> bool:
+        """
+        Applies a single correction initiated directly from the UI.
 
         Args:
-            row (int): Row index of the cell.
-            col (int): Column index of the cell.
-            suggestion (object): The suggestion object (must have 'corrected_value').
+            row: The row index of the cell.
+            col: The column index of the cell.
+            corrected_value: The new value to set.
 
         Returns:
-            bool: True if successful, False otherwise.
+            bool: True if the value was changed, False otherwise.
         """
-        if not hasattr(suggestion, "corrected_value"):
-            logger.error(
-                f"Suggestion object lacks 'corrected_value' attribute for cell ({row}, {col})"
-            )
+        if self._data_model is None:
+            logger.error("Cannot apply UI correction: Data model not available.")
             return False
-
-        corrected_value = suggestion.corrected_value
-        original_value = None
 
         try:
-            # Get original value for history/logging
-            original_value = self._data_model.get_cell_value(row, col)
+            # Get column name from index
+            column_name = self._data_model.column_names[col]
+            original_value = self._data_model.get_cell_value(row, column_name)
 
-            # Update the data model
-            success = self._data_model.set_cell_value(row, col, corrected_value)
-            if not success:
-                logger.error(f"DataModel failed to set value for cell ({row}, {col})")
-                return False
+            if original_value == corrected_value:
+                logger.debug(
+                    f"UI correction skipped: Value at ({row},{column_name}) is already '{corrected_value}'"
+                )
+                return False  # No change needed
 
             logger.info(
-                f"Applied suggestion to cell ({row}, {col}): '{original_value}' -> '{corrected_value}'"
+                f"Applying UI correction at ({row},{column_name}): '{original_value}' -> '{corrected_value}'"
             )
+            # Directly update the data model
+            # NOTE: This bypasses rule logic, applying the user's choice directly.
+            # Consider if validation should be re-run immediately after this.
+            success = self._data_model.set_cell_value(row, column_name, corrected_value)
 
-            # --- Reset state for the corrected cell --- #
-            if self._state_manager:
-                # Import necessary types if not already at top of file
-                from chestbuddy.core.table_state_manager import CellFullState, CellState
-
-                reset_state = CellFullState(
-                    validation_status=CellState.NOT_VALIDATED  # Or VALID if auto-revalidation is off
-                )
-                self._state_manager.update_states({(row, col): reset_state})
-                logger.debug(f"Reset state for corrected cell ({row}, {col})")
+            if success:
+                # Optional: Add to a simplified history?
+                # self._correction_history.append({"type": "ui", "row": row, "col": col, "old": original_value, "new": corrected_value})
+                # TODO: Consider resetting the state of this cell in TableStateManager
+                if self._state_manager:
+                    logger.debug(f"Resetting state for cell ({row}, {col}) after UI correction.")
+                    # Reset state to NORMAL or trigger revalidation
+                    reset_state = CellFullState(validation_status=CellState.NORMAL)
+                    self._state_manager.update_states({(row, col): reset_state})
+                return True
             else:
-                logger.warning("TableStateManager not available, cannot reset cell state.")
-            # ---------------------------------------- #
+                logger.warning(
+                    f"Data model update failed for UI correction at ({row},{column_name})."
+                )
+                return False
 
-            # TODO: Add to correction history?
-
-            return True
-
-        except Exception as e:
-            logger.error(f"Error applying suggestion to cell ({row}, {col}): {e}", exc_info=True)
+        except IndexError:
+            logger.error(f"Invalid column index {col} provided for UI correction.")
             return False
-
-    def apply_rule_to_data(
-        self, rule: CorrectionRule, only_invalid: bool = False, selected_only: List[int] = None
-    ) -> List[Tuple[int, int, Any, Any]]:
-        """Applies a correction rule to the data, returning the list of changes.
-
-        Args:
-            rule (CorrectionRule): The rule to apply.
-            only_invalid (bool): Apply only to invalid cells.
-            selected_only (List[int]): Apply only to these row indices.
-
-        Returns:
-            List[Tuple[int, int, Any, Any]]: List of (row_idx, col_idx, old_value, new_value)
-        """
-        # Implementation... (Existing code for apply_rule_to_data continues here)
+        except Exception as e:
+            logger.error(
+                f"Error during UI correction application at ({row},{col}): {e}", exc_info=True
+            )
+            return False

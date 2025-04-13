@@ -33,6 +33,12 @@ from chestbuddy.ui.data.models.data_view_model import DataViewModel
 # Import ValidationStatus enum
 from chestbuddy.core.enums.validation_enums import ValidationStatus
 
+from chestbuddy.ui.data.delegates.correction_delegate import (
+    CorrectionDelegate,
+    CorrectionSuggestion,
+)  # Add Delegate
+from chestbuddy.core.controllers.correction_controller import CorrectionController  # Add Controller
+
 # Setup logging for tests
 logger = logging.getLogger(__name__)
 
@@ -430,6 +436,124 @@ class TestCorrectionFlowIntegration:
             view_model.index(cell2_rc[0], cell2_rc[1]), DataViewModel.ValidationStateRole
         )
         assert state_role2 in (ValidationStatus.VALID, CellState.NORMAL)
+
+    def test_delegate_signal_triggers_controller_and_service(
+        self, integration_system_fixture, qtbot, mocker
+    ):
+        """
+        Test that CorrectionDelegate.correction_selected signal triggers
+        CorrectionController.apply_correction_from_ui slot, which in turn calls
+        CorrectionService.apply_ui_correction.
+        """
+        # Arrange: Get necessary components from fixture
+        correction_service = integration_system_fixture["correction_service"]
+        rule_manager = getattr(correction_service, "_rule_manager", None)
+        config_manager = integration_system_fixture["config_manager"]
+        validation_service = integration_system_fixture["validation_service"]
+        view_model = integration_system_fixture["data_view_model"]
+        logger = integration_system_fixture["logger"]
+
+        # Arrange: Mock the NEW service method we want to verify
+        mock_service_apply_ui = mocker.patch.object(
+            correction_service,
+            "apply_ui_correction",  # Use the correct method name
+            autospec=True,
+            return_value=True,  # Assume success
+        )
+
+        # Arrange: Create a REAL CorrectionController instance
+        real_correction_controller = CorrectionController(
+            correction_service=correction_service,
+            rule_manager=rule_manager,
+            config_manager=config_manager,
+            validation_service=validation_service,
+        )
+
+        # Arrange: Spy on the REAL controller's slot
+        spy_apply_slot = mocker.spy(real_correction_controller, "apply_correction_from_ui")
+
+        # Arrange: Mock CorrectionDelegate & Simulate Signal Connection/Emission
+        mock_delegate = MagicMock(spec=CorrectionDelegate)
+
+        # --- Custom Signal Simulation ---
+        connected_slots = []
+
+        def mock_connect(slot):
+            print(f"Mock Connect: Capturing slot {slot}")  # Debug
+            connected_slots.append(slot)
+
+        def mock_emit(*args):
+            print(f"Mock Emit: Emitting with args {args}")  # Debug
+            print(f"Mock Emit: Calling {len(connected_slots)} connected slots")  # Debug
+            for slot in connected_slots:
+                try:
+                    print(f"Mock Emit: Calling slot {slot}")  # Debug
+                    slot(*args)  # Call the connected slot
+                except Exception as e:
+                    print(f"Mock Emit: Error calling slot {slot}: {e}")  # Debug
+                    pytest.fail(f"Error calling connected slot {slot}: {e}")
+
+        # Assign custom methods to a mock signal attribute
+        mock_signal = MagicMock()
+        mock_signal.connect = mock_connect
+        mock_signal.emit = mock_emit
+        mock_delegate.correction_selected = mock_signal
+        # --- End Custom Signal Simulation ---
+
+        # Arrange: Connect the REAL controller slot using the custom mock connect
+        try:
+            mock_delegate.correction_selected.connect(
+                real_correction_controller.apply_correction_from_ui
+            )
+            assert len(connected_slots) == 1, "Slot was not captured by mock connect"
+            logger.info("Successfully connected REAL controller slot via mock connect.")
+        except Exception as e:
+            pytest.fail(f"Failed to connect mock signal/real slot: {e}")
+
+        # Arrange: Define data for signal emission
+        target_row = 1
+        target_col = 0  # 'JohnSmiht'
+        target_index = view_model.index(target_row, target_col)
+        assert target_index.isValid(), "Target index for test is invalid"
+        target_suggestion = CorrectionSuggestion("JohnSmiht", "John Smith")
+        expected_corrected_value = target_suggestion.corrected_value
+
+        # Act: Emit the mock delegate's signal using the custom mock emit
+        logger.info(
+            f"Emitting mock correction_selected signal for index ({target_index.row()},{target_index.column()})"
+        )
+        mock_delegate.correction_selected.emit(target_index, target_suggestion)
+        # No qtbot.wait should be needed as the call is now direct
+
+        # Assert 1: Check if the REAL controller's slot (spied) was called
+        try:
+            spy_apply_slot.assert_called_once()
+            logger.info("Real apply_correction_from_ui slot was called.")
+        except AssertionError as e:
+            pytest.fail(f"Real apply_correction_from_ui slot was not called: {e}")
+
+        # Assert 2: Check the arguments received by the spied slot
+        # ... (optional checks for slot args as before) ...
+
+        # Assert 3: Check if the MOCKED service method was called by the controller's slot
+        try:
+            mock_service_apply_ui.assert_called_once()
+            logger.info("Mocked correction_service.apply_ui_correction was called.")
+        except AssertionError as e:
+            pytest.fail(f"Mocked service method apply_ui_correction was not called: {e}")
+
+        # Assert 4: Check arguments passed to the MOCKED service method
+        service_call_args = mock_service_apply_ui.call_args[0]
+        assert len(service_call_args) == 3, (
+            f"Expected 3 args for service call, got {len(service_call_args)}"
+        )
+        service_row = service_call_args[0]
+        service_col = service_call_args[1]
+        service_value = service_call_args[2]
+        assert service_row == target_row, "Service called with wrong row"
+        assert service_col == target_col, "Service called with wrong column"
+        assert service_value == expected_corrected_value, "Service called with wrong value"
+        logger.info("Mocked service method apply_ui_correction received correct arguments.")
 
 
 # Ensure the file ends without trailing syntax errors

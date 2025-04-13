@@ -37,10 +37,14 @@ from chestbuddy.core.models import ChestDataModel
 from chestbuddy.core.table_state_manager import TableStateManager, CellState, CellFullState
 from chestbuddy.ui.data.models.data_view_model import DataViewModel
 from chestbuddy.ui.data.views.data_table_view import DataTableView
-from chestbuddy.ui.data.delegates.correction_delegate import CorrectionDelegate
+from chestbuddy.ui.data.delegates.correction_delegate import (
+    CorrectionDelegate,
+    CorrectionSuggestion,
+)
 
 # Service imports (needed for mocking or potential real instantiation)
 from chestbuddy.core.services import CorrectionService
+from chestbuddy.ui.main_window import ServiceLocator
 
 # --- Test Fixtures ---
 
@@ -711,6 +715,54 @@ class TestDataViewIntegration:
         # Verify the 'apply_correction' method was called on the mock instance
         mock_service_instance.apply_correction.assert_called_once_with(
             row=row, col=col, corrected_value=chosen_correction
+        )
+
+    def test_delegate_correction_selection_triggers_service(
+        self,
+        dataview_integration_setup,
+        mock_correction_service,  # Use the mock service fixture
+        qtbot,
+        monkeypatch,
+    ):
+        """Test selecting a correction from the delegate menu calls the service."""
+        state_manager = dataview_integration_setup["state_manager"]
+        view_model = dataview_integration_setup["view_model"]
+        table_widget = dataview_integration_setup["table_widget"]  # The QWidget container
+        table_view = dataview_integration_setup["table_view"]  # The internal QTableView
+
+        # Patch the ServiceLocator to return the mock service
+        monkeypatch.setattr(ServiceLocator, "get_service", lambda name: mock_correction_service)
+        # Re-assign the service in the table widget instance after patching
+        table_widget._correction_service = mock_correction_service
+
+        row, col = 2, 3  # Cell with "siver"
+        key = (row, col)
+        suggestions = [
+            CorrectionSuggestion(original="siver", corrected="Silver"),
+            CorrectionSuggestion(original="siver", corrected="Sliver"),
+        ]
+        correctable_state = CellFullState(
+            validation_status=CellState.CORRECTABLE, correction_suggestions=suggestions
+        )
+
+        # Update state manager to make the cell correctable
+        state_manager.update_states({key: correctable_state})
+        # Process events to ensure model updates
+        qtbot.wait(50)
+
+        # Simulate the signal being emitted from the delegate
+        # Directly call the slot on the DataTableView (container widget)
+        # This bypasses the need to simulate complex QMenu interaction
+        proxy_index = table_view.model().index(row, col)  # Use proxy index
+        selected_suggestion = suggestions[0]  # Choose the first suggestion
+
+        # Call the slot that should invoke the service
+        table_widget._on_correction_selected(proxy_index, selected_suggestion)
+
+        # Verify CorrectionService.apply_suggestion_to_cell was called
+        # The slot maps the proxy index to source, so row/col should be correct
+        mock_correction_service.apply_suggestion_to_cell.assert_called_once_with(
+            row, col, selected_suggestion
         )
 
 

@@ -10,7 +10,7 @@ from functools import partial
 # Import QAbstractItemView
 from PySide6.QtWidgets import QAbstractItemView
 from PySide6.QtCore import QModelIndex, Qt, QRect, QSize, QEvent, QObject, QPoint, Signal, Slot
-from PySide6.QtGui import QPainter, QIcon, QColor, QMouseEvent, QHelpEvent
+from PySide6.QtGui import QPainter, QIcon, QColor, QMouseEvent, QHelpEvent, QAction
 from PySide6.QtCore import QAbstractItemModel
 
 # Use CellState from core, ValidationDelegate should also use it
@@ -199,14 +199,42 @@ class CorrectionDelegate(ValidationDelegate):
                 action_text = f'Apply: "{suggestion.corrected_value}"'
 
             action = menu.addAction(action_text)
-            # Connect using functools.partial to bind the current index and suggestion
-            action.triggered.connect(partial(self.correction_selected.emit, index, suggestion))
+            # Store index and suggestion on the action itself for later retrieval
+            action.setProperty("modelIndex", index)
+            action.setProperty("suggestionData", suggestion)
+            # Connect to a dedicated helper slot
+            action.triggered.connect(self._handle_suggestion_action)
 
         if menu.isEmpty():
             print("Menu is empty, not showing.")  # Debug
             return
 
         menu.exec(global_pos)
+
+    # --- New Helper Slot ---
+    @Slot()
+    def _handle_suggestion_action(self):
+        """Handles the triggered signal from a correction suggestion QAction."""
+        sender_action = self.sender()  # Get the QAction that sent the signal
+        if isinstance(sender_action, QAction):
+            # Retrieve the data we stored earlier
+            index = sender_action.property("modelIndex")
+            suggestion = sender_action.property("suggestionData")
+
+            # Ensure retrieved data is valid before emitting
+            if isinstance(index, QModelIndex) and index.isValid() and suggestion is not None:
+                print(
+                    f"Helper slot emitting for index ({index.row()},{index.column()}) and suggestion {suggestion}"
+                )  # Debug
+                self.correction_selected.emit(index, suggestion)
+            else:
+                print(
+                    f"Helper slot: Invalid index ({type(index)}) or suggestion ({type(suggestion)}) retrieved from action."
+                )  # Debug
+        else:
+            print("Helper slot: Sender was not a QAction.")  # Debug
+
+    # --- End Helper Slot ---
 
     def helpEvent(
         self,

@@ -9,10 +9,10 @@ Last Updated: 2024-08-06
 
 ## Current Focus (2024-08-07)
 
-- **Task:** Update Memory Bank and plans after resolving `CorrectionDelegate` test failures.
-- **Goal:** Ensure documentation reflects the current state and define the next steps.
-- **Context:** Fixed all 10 tests for `CorrectionDelegate`, particularly the signal emission test, by using the standard `qtbot.waitSignal` pattern and ensuring mock signals had necessary methods (`connect`, `emit`).
-- **Outcome:** All `CorrectionDelegate` unit tests pass. The known issues related to these tests are resolved.
+- **Task:** Reflecting recent progress in Memory Bank after updating the checklist.
+- **Goal:** Ensure documentation accurately shows the completion of the single-click correction UI via the delegate and defines the next steps.
+- **Context:** Updated `plans/dataview_refactor/checklist.md` to mark "Implement one-click correction application" and related integration test items as complete.
+- **Outcome:** Memory bank aligned with the latest development state.
 - **Plan:**
   1. Update `progress.md` and `activeContext.md`.
   2. Update `bugfixing.mdc` to mark the delegate test issues as resolved.
@@ -28,6 +28,7 @@ Last Updated: 2024-08-06
 
 ## Recent Changes
 
+- Updated `plans/dataview_refactor/checklist.md` to reflect completion of single-click correction UI and related tests.
 - Added `pytest.mark.skip` to `tests/integration/test_correction_flow.py`.
 - Attempted various mocking strategies (`patch.object`, `@patch`) for `ValidationService.get_validation_status`, all failed with `AttributeError`.
 - Investigated `CorrectionService`, `TableStateManager`, and `DataViewModel` signal handling.
@@ -54,9 +55,9 @@ Last Updated: 2024-08-06
 - Add validation during cell editing
 
 ### Phase 5: Validation and Correction Integration (UI/Workflow Focus) (In Progress)
-- Add UI for applying corrections (via delegate interaction / menu action)
+- Add UI for applying corrections (via delegate interaction / menu action) - Delegate part done.
 - Implement correction preview
-- Implement one-click correction application
+- Implement one-click correction application - ✅ Completed (Delegate interaction)
 - Add batch correction UI
 
 ### Phase 6: Import/Export and Advanced Features (Planned)
@@ -86,12 +87,12 @@ Last Updated: 2024-08-06
 
 #### Current Status
 
-We have completed the core implementation of the DataView refactoring (Models, Views, Delegates, Adapters bases, Context Menu Actions). All unit tests for these individual components, including the previously problematic `CorrectionDelegate`, are passing.
+We have completed the core implementation of the DataView refactoring (Models, Views, Delegates, Adapters bases, Context Menu Actions). All unit tests for these individual components, including the `CorrectionDelegate`, are passing. The basic UI mechanism for applying a single correction via a click on the delegate indicator is implemented and its signal flow is tested.
 
 #### Next Steps
 
-1.  **Connect Adapters to Services:** Replace mock service interactions in `ValidationAdapter` and `CorrectionAdapter` with connections to the actual `ValidationService` and `CorrectionService`.
-2.  **Implement Correction Application UI:** Add the logic within the delegate or context menu actions to trigger the `CorrectionService` when a user chooses to apply a correction.
+1.  **Connect Adapters to Services:** Replace mock service interactions in `ValidationAdapter` and `CorrectionAdapter` with connections to the actual `ValidationService` and `CorrectionService`. This is the primary focus.
+2.  **Implement Correction Application Logic:** Connect the `correction_selected` signal (emitted by the delegate) to the `CorrectionAdapter` to actually trigger the `CorrectionService`.
 3.  **Refine State Flow:** Ensure that state changes originating from real service responses correctly update the `TableStateManager`, `DataViewModel`, and are reflected in the UI via delegates.
 4.  **Develop Integration Tests:** Create tests that cover the full workflow (e.g., load data -> validate -> view state -> apply correction -> revalidate -> view updated state).
 5.  **Complete Context Menu:** Implement remaining context menu features (selection-aware actions, validation during edit).

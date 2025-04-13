@@ -30,6 +30,8 @@ from PySide6.QtGui import QAction, QGuiApplication, QIcon, QColor
 import typing
 from typing import Optional, List, Dict, Tuple
 import logging
+from chestbuddy.utils.service_locator import ServiceLocator
+from chestbuddy.core.services import CorrectionService  # Import CorrectionService
 
 # Placeholder imports - adjust as needed when models/delegates are implemented
 from ..delegates.cell_delegate import CellDelegate  # Import base delegate
@@ -51,10 +53,27 @@ logger = logging.getLogger(__name__)
 
 class DataTableView(QWidget):
     """
-    DataTableView displays chest data with potential validation and correction
-    visualizations (to be implemented).
+    DataTableView displays chest data with validation and correction visualizations.
 
-    It inherits from QWidget and contains a QToolBar and a QTableView.
+    It inherits from QWidget and contains a QToolBar and a QTableView internally.
+    This view uses specialized delegates (like CorrectionDelegate and ValidationDelegate)
+    set on the internal QTableView to render cell states and handle user interactions
+    related to validation and correction.
+
+    Key Features:
+        - Displays data using a QTableView (`self.table_view`).
+        - Integrates with DataViewModel and FilterModel for data presentation, sorting, and filtering.
+        - Utilizes CorrectionDelegate for visualizing correction suggestions and showing correction menus.
+        - Connects to CorrectionDelegate signals (`correction_selected`, `apply_first_correction_requested`).
+        - Handles delegate signals via slots (`_on_correction_delegate_selected`, `_on_apply_first_correction_requested`).
+        - Emits view-level signals (`correction_action_triggered`, `correction_apply_requested`) with SOURCE model indices.
+        - Provides context menus for cell and header interactions.
+        - Manages column visibility via ColumnModel.
+
+    Attributes:
+        selection_changed (Signal): Emitted when the selection changes in the table view.
+        correction_apply_requested (Signal): Emitted when the delegate requests applying the first correction.
+        correction_action_triggered (Signal): Emitted when a user selects a correction from the delegate menu.
     """
 
     # --- Signals ---
@@ -80,6 +99,11 @@ class DataTableView(QWidget):
         self._correction_delegate = CorrectionDelegate(
             self
         )  # Create instance for signal connection
+
+        # Access CorrectionService via ServiceLocator
+        self._correction_service = ServiceLocator.get("correction_service")
+        if not self._correction_service:
+            logger.error("CorrectionService not found in ServiceLocator!")
 
         self._setup_toolbar()
         self._setup_layout()
@@ -381,9 +405,7 @@ class DataTableView(QWidget):
 
     # --- Slot for Correction Delegate Signal --- #
     @Slot(QModelIndex, object)
-    def _on_correction_delegate_selected(
-        self, delegate_index: QModelIndex, suggestion: object
-    ):
+    def _on_correction_delegate_selected(self, delegate_index: QModelIndex, suggestion: object):
         """Handles the correction_selected signal from the delegate.
 
         Maps the delegate (potentially proxy) index to the source index and
@@ -395,14 +417,14 @@ class DataTableView(QWidget):
         source_index = self._filter_model.mapToSource(delegate_index)
         if source_index.isValid():
             logger.debug(
-                f"Correction selected via delegate: Source({source_index.row()},
-                {source_index.column()}), Suggestion: {suggestion}"
+                f"Correction selected via delegate: Source({source_index.row()},"
+                f" {source_index.column()}), Suggestion: {suggestion}"
             )
             self.correction_action_triggered.emit(source_index, suggestion)
         else:
             logger.warning(
-                f"Could not map delegate index ({delegate_index.row()},{delegate_index.column()})
-                to source index."
+                f"Could not map delegate index ({delegate_index.row()},{delegate_index.column()})"
+                f" to source index."
             )
 
     # Delegate other necessary QTableView methods...
@@ -442,3 +464,49 @@ class DataTableView(QWidget):
         """Resizes all columns to fit their contents."""
         if self.table_view:
             self.table_view.resizeColumnsToContents()
+
+    @Slot(QModelIndex, object)
+    def _on_correction_selected(self, index: QModelIndex, suggestion: object):
+        """Handles the signal when a correction is selected from the delegate's menu.
+
+        Note: This slot currently calls the CorrectionService directly. Consider if
+        it should instead emit a view-level signal similar to correction_action_triggered
+        for better separation of concerns.
+        """
+        if not index.isValid():
+            # Try mapping from filter model if index might be from proxy
+            mapped_index = self._filter_model.mapToSource(index)
+            if not mapped_index.isValid():
+                logger.warning(
+                    "Received correction selected signal with invalid index (even after mapping)."
+                )
+                return
+            index = mapped_index  # Use the mapped index
+
+        if not self._correction_service:
+            logger.error("CorrectionService not available in _on_correction_selected.")
+            return
+
+        row = index.row()
+        col = index.column()
+        logger.info(f"Correction selected for cell ({row}, {col}): {suggestion}")
+
+        # Call the CorrectionService to apply the change
+        success = self._correction_service.apply_suggestion_to_cell(row, col, suggestion)
+
+        if success:
+            logger.info(f"Successfully applied correction to ({row}, {col}).")
+            # Optionally: trigger immediate re-validation or update UI feedback
+        else:
+            logger.error(f"Failed to apply correction to ({row}, {col}).")
+            # Optionally: show error message to user
+
+    def _setup_delegates(self):
+        """Set up the item delegates for the table view."""
+        # Set the CorrectionDelegate (which inherits from ValidationDelegate)
+        # This handles both validation display and correction interaction.
+        if self.table_view:
+            self.table_view.setItemDelegate(self._correction_delegate)
+            logger.debug("CorrectionDelegate set on internal table view.")
+        else:
+            logger.error("Cannot set delegate: self.table_view is not initialized.")
