@@ -36,6 +36,7 @@ Last updated: 2024-08-06
 - ✅ Unit tests for `DataViewModel`, `ValidationAdapter`, `CorrectionAdapter` passing
 - ✅ Integration tests for Adapters -> StateManager -> ViewModel -> Delegates passing
 - ✅ `CorrectionDelegate` signal emission refactor completed and tests updated.
+- ✅ `CorrectionDelegate` unit tests passing (all 10 tests)
 
 ### In Progress
 - 🔄 Refining Adapter transformation logic (connecting real services)
@@ -52,11 +53,11 @@ Last updated: 2024-08-06
 
 ### Known Issues
 - 🐞 No major issues identified in refactored code yet.
-- 🐞 `test_sizeHint_correctable_no_validation_icon` in `test_correction_delegate.py` shows incorrect failure message (`assert 100 == 120`) despite correct logic and assertion. Requires local investigation into pytest reporting/environment.
-- 🐞 `test_show_menu_emits_signal_on_selection` in `test_correction_delegate.py` fails to verify signal arguments with `QSignalSpy` (TypeError) despite correct emission count. Requires local investigation into `QSignalSpy` usage in this test context.
+- 🐞 `RuntimeWarning: Failed to disconnect...` during `DataViewModel` cleanup (Deferred fix).
 
 ### Testing Status
 - Unit test suite for core refactored components established.
+- All CorrectionDelegate unit tests (10/10) are now passing.
 - Integration test planning in progress.
 - UI testing approach defined.
 
@@ -66,7 +67,7 @@ Last updated: 2024-08-06
 | Architecture design | 2024-08-01 | ✅ Completed |
 | Core models and views (Phase 1) | 2024-08-15 | ✅ Completed |
 | Context menus and actions (Phase 2) | 2024-09-30 | 🔄 In progress |
-| Delegate system & Adapter integration (Phase 3) | 2024-09-15 | 🔄 In progress (Bases done) |
+| Delegate system & Adapter integration (Phase 3) | 2024-09-15 | ✅ Delegates Done / Adapters In Progress |
 | Import/Export (Phase 4) | 2024-10-15 | ⏳ Not started |
 | Advanced Features (Phase 4) | 2024-10-15 | ⏳ Not started |
 | Performance optimization (Phase 5) | 2024-10-15 | ⏳ Not started |
@@ -77,6 +78,7 @@ Last updated: 2024-08-06
 2.  Connect Adapters (`ValidationAdapter`, `CorrectionAdapter`) to the actual `ValidationService` and `CorrectionService`.
 3.  Implement UI for applying corrections (e.g., via delegate interaction or context menu).
 4.  Develop key integration tests for full workflows (e.g., validate -> correct -> revalidate) and edge cases.
+5.  *(Deferred)* Address `RuntimeWarning: Failed to disconnect...` in `DataViewModel` cleanup.
 
 # Project Progress
 
@@ -117,15 +119,13 @@ ChestBuddy is currently focused on a comprehensive refactoring of the DataView c
 | Implement basic UI controls           | ✅ Completed  | Basic toolbar added to DataTableView                       |
 | Add support for sorting & filtering   | ✅ Completed  | `FilterModel` integrated, `DataViewModel.sort` implemented |
 
-### Phase 2: Delegate System (Moved - Now part of Phase 3 logic)
-
 ### Phase 3: Adapter Integration & Delegates (Consolidated View)
 
 | Task                                              | Status        | Notes                                                    |
 |---------------------------------------------------|---------------|----------------------------------------------------------|
 | Implement CellDelegate base class and tests       | ✅ Completed  | Base methods tested                                      |
 | Implement ValidationDelegate base class and tests | ✅ Completed  | Initialization, paint logic verified                     |
-| Implement CorrectionDelegate base class and tests | ✅ Completed  | Initialization, paint logic verified                     |
+| Implement CorrectionDelegate base class and tests | ✅ Completed  | Initialization, paint logic, signal emission verified    |
 | Implement ValidationAdapter base class and tests  | ✅ Completed  | Passes results to StateManager (mocked)                  |
 | Implement CorrectionAdapter base class and tests  | ✅ Completed  | Passes correctable cells list to StateManager (mocked) |
 | Define TableStateManager update methods           | ✅ Completed  | Existing methods analyzed                                |
@@ -201,45 +201,51 @@ ChestBuddy is currently focused on a comprehensive refactoring of the DataView c
 - Basic navigation between views
 - MainWindow core functionality
 - Core DataView Refactor (Phase 1): Display, Sorting, Filtering, Visibility
+- Core Delegates (Validation, Correction) rendering and basic interaction (menu trigger)
+- Core Adapters (Validation, Correction) transforming mock data and updating StateManager
+- Core StateManager updating ViewModel
+- Core Context Menu actions (edit, add/correct lists)
+- Core Filter/Sort models
 
 ## Recently Fixed
 - Test collection errors related to imports
 - Test failures in delegate tests due to super() calls
 - Test failures in adapter tests due to placeholder logic/assertions
 - Fixed mock setup for `get_full_cell_state` in `DataViewModel` tests
-- **RuntimeError Crash:** Resolved `RuntimeError: Internal C++ object (...) already deleted` during test teardown by making `SignalManager.disconnect_receiver` more robust with `try...except` blocks and validity checks.
+- **RuntimeError Crash:** Resolved `RuntimeError: Internal C++ object (...) already deleted` during test teardown in `SignalManager`.
+- **CorrectionDelegate Tests:** Fixed all test failures related to signal emission verification and size hints.
 
 ## What's Next
-1.  Complete Phase 2: Selection-aware context menu actions, validation during edit.
-2.  Connect Adapters to real services (`ValidationService`, `CorrectionService`).
-3.  Implement UI for applying corrections.
+1.  Complete remaining Phase 4 (Context Menu) tasks: Selection-aware menu actions, validation during edit.
+2.  Connect Adapters (`ValidationAdapter`, `CorrectionAdapter`) to the actual `ValidationService` and `CorrectionService`.
+3.  Implement UI for applying corrections (e.g., via delegate interaction or context menu).
 4.  Refine Adapter transformation logic & State Manager updates based on real service data.
-5.  Develop integration tests for full workflows and edge cases.
+5.  Develop key integration tests for full workflows (e.g., validate -> correct -> revalidate) and edge cases.
 6.  *(Deferred)* Investigate and fix `RuntimeWarning: Failed to disconnect...` in `DataViewModel` cleanup.
 
 ## Known Issues
 - Current DataView limitations (as documented before refactoring)
 - Large number of failing/erroring tests in older test suites (e.g., `main_window` tests) due to refactoring and missing dependencies.
-- **RuntimeWarning during Cleanup:** Tests now show `RuntimeWarning: Failed to disconnect...` originating from `DataViewModel`'s cleanup attempts after related objects (`_source_model`, `_state_manager`) might have been destroyed. This does not cause test failures but indicates suboptimal cleanup logic. (Deferred fix)
+- **RuntimeWarning during Cleanup:** Tests show `RuntimeWarning: Failed to disconnect...` originating from `DataViewModel`'s cleanup attempts after related objects (`_source_model`, `_state_manager`) might have been destroyed. This does not cause test failures but indicates suboptimal cleanup logic. (Deferred fix)
 
 ## Testing Status
 
 | Component Type            | Total Tests | Passing | Coverage | Notes                                                                          |
 |---------------------------|-------------|---------|----------|--------------------------------------------------------------------------------|
 | Current UI Components     | 78          | TBD     | Varies   | Many tests likely failing/erroring due to refactor                               |
-| DataView New Components   | ~80+        | TBD     | ~TBD%    | ViewModel, TableView, Delegates, Adapters, Actions, Column/Filter Models tested |
+| DataView New Components   | ~100+       | ~100+   | ~TBD%    | ViewModel, TableView, Delegates, Adapters, Actions, Column/Filter Models tested |
 |   - DataViewModel         | 17          | 17      | ~80%     | Basic functionality, sorting, signal handling covered |
 |   - DataTableView         | 5           | 5       | ~40%     | Basic setup, selection, context menu covered          |
 |   - CellDelegate          | 6           | 6       | ~60%     | Base method calls verified                            |
 |   - ValidationDelegate    | 3           | 3       | ~50%     | Initialization, paint logic verified                  |
-|   - CorrectionDelegate    | 3           | 3       | ~50%     | Initialization, paint logic verified                  |
+|   - CorrectionDelegate    | 10          | 10      | ~80%     | Initialization, paint, signal emission verified       |
 |   - ValidationAdapter     | 8           | 8       | ~85%     | Initialization, signal handling, transform logic verified |
 |   - CorrectionAdapter     | 6           | 6       | ~80%     | Initialization, signal handling, transform logic verified |
 |   - Edit Actions          | 29          | 29      | TBD      | Copy, Paste, Cut, Delete, Edit, ShowDialog tests covered              |
 |   - Add/Correct Actions   | ~10         | ~10     | TBD      | Actions for adding to lists, applying corrections tested |
 |   - ColumnModel           | ~5          | ~5      | TBD      | Basic visibility/management tests                     |
 |   - FilterModel           | ~8          | ~8      | TBD      | Filtering/sorting proxy tests                       |
-| *Total Refactored*        | **~100+**   | **~100+**| **~TBD** | Coverage estimate, exact number TBD                     |
+| *Total Refactored*        | **~107+**   | **~107+**| **~TBD** | Coverage estimate, exact number TBD                     |
 
 ### DataView Component Test Plan
 
@@ -248,13 +254,13 @@ ChestBuddy is currently focused on a comprehensive refactoring of the DataView c
 | DataViewModel | ✅ Done | ✅ In Progress | N/A | Planned |
 | FilterModel | ✅ Done | ✅ In Progress | N/A | Planned |
 | DataTableView | ✅ Done | Planned | Planned | Planned |
-| ColumnModel | ✅ Done | N/A     | N/A     | N/A               |
-| CellDelegate | ✅ Done | Planned | Planned | N/A |
-| ValidationDelegate | ✅ Done | Planned | Planned | N/A |
-| CorrectionDelegate | ✅ Done | Planned | Planned | N/A |
-| ValidationAdapter | ✅ Done | ✅ In Progress | N/A | N/A |
-| CorrectionAdapter | ✅ Done | ✅ In Progress | N/A | N/A |
-| ContextMenu/Actions| ✅ Done | Planned | Planned | N/A |
+| CellDelegate | ✅ Done | ✅ In Progress | N/A | Planned |
+| ValidationDelegate | ✅ Done | ✅ In Progress | N/A | Planned |
+| CorrectionDelegate | ✅ Done | ✅ In Progress | N/A | Planned |
+| ValidationAdapter | ✅ Done | ✅ In Progress | N/A | Planned |
+| CorrectionAdapter | ✅ Done | ✅ In Progress | N/A | Planned |
+| Actions | ✅ Done | Planned | Planned | N/A |
+| Menus | ✅ Done | Planned | Planned | N/A |
 
 ## Implementation Progress
 

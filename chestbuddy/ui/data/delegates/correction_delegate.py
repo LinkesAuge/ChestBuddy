@@ -5,6 +5,7 @@ Delegate responsible for visualizing correction status and handling correction a
 """
 
 from PySide6.QtWidgets import QStyleOptionViewItem, QMenu, QToolTip
+from functools import partial
 
 # Import QAbstractItemView
 from PySide6.QtWidgets import QAbstractItemView
@@ -198,27 +199,14 @@ class CorrectionDelegate(ValidationDelegate):
                 action_text = f'Apply: "{suggestion.corrected_value}"'
 
             action = menu.addAction(action_text)
-            # Connect to a helper slot instead of emitting directly
-            action.triggered.connect(
-                lambda checked=False, idx=index, sugg=suggestion: self._handle_suggestion_selected(
-                    idx, sugg
-                )
-            )
+            # Connect using functools.partial to bind the current index and suggestion
+            action.triggered.connect(partial(self.correction_selected.emit, index, suggestion))
 
         if menu.isEmpty():
-            print("Correction menu is empty after processing suggestions.")  # Debug
+            print("Menu is empty, not showing.")  # Debug
             return
 
         menu.exec(global_pos)
-
-    # Helper slot to emit the signal
-    @Slot(QModelIndex, object)
-    def _handle_suggestion_selected(self, index: QModelIndex, suggestion: object):
-        """Handles the triggered signal from a menu action and emits correction_selected."""
-        print(
-            f"Suggestion selected: {suggestion} for index {index.row()},{index.column()}"
-        )  # Debug
-        self.correction_selected.emit(index, suggestion)
 
     def helpEvent(
         self,

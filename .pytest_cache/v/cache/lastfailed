@@ -161,7 +161,6 @@
   "tests/ui/data/context_menu/test_context_menu_factory.py::test_create_context_menu_score_column": true,
   "tests/ui/data/context_menu/test_context_menu_factory.py::test_create_context_menu_no_model": true,
   "tests/ui/data/delegates/test_cell_delegate.py::TestCellDelegate::test_create_editor_calls_super": true,
-  "tests/ui/data/delegates/test_correction_delegate.py::TestCorrectionDelegate::test_sizeHint_correctable_no_validation_icon": true,
   "tests/ui/data/delegates/test_correction_delegate.py::TestCorrectionDelegate::test_indicator_click_emits_signal": true,
   "tests/ui/data/delegates/test_validation_delegate.py::TestValidationDelegate::test_paint_other_status_cells[CellState.INVALID-#ffb6b6]": true,
   "tests/ui/data/delegates/test_validation_delegate.py::TestValidationDelegate::test_paint_other_status_cells[CellState.CORRECTABLE-#fff3b6]": true,
@@ -341,5 +340,6 @@
   "tests/unit/ui/views/test_validation_tab_view.py::TestValidationTabView::test_create_validation_list_section_error": true,
   "tests/unit/ui/views/test_validation_tab_view.py::TestValidationTabView::test_on_status_changed_edge_cases": true,
   "tests/unit/ui/views/test_validation_tab_view.py::TestValidationTabView::test_update_list_view_status": true,
-  "tests/ui/data/delegates/test_correction_delegate.py::TestCorrectionDelegate::test_show_menu_emits_signal_on_selection": true
+  "tests/ui/data/delegates/test_correction_delegate.py::TestCorrectionDelegate::test_show_menu_emits_signal_on_selection": true,
+  "tests/unit/core/services/test_correction_service.py": true
 }

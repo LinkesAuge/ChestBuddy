@@ -11,7 +11,7 @@ import logging
 import time
 from typing import Dict, Optional, Any, Tuple, List
 
-from PySide6.QtCore import QObject, Signal, Slot
+from PySide6.QtCore import QObject, Signal, Slot, QModelIndex
 import pandas as pd
 
 from chestbuddy.core.services.validation_service import ValidationService
@@ -1384,3 +1384,57 @@ class DataViewController(BaseController):
         except Exception as e:
             logger.error(f"Error in auto-validation after import: {e}")
             self.operation_error.emit(str(e))
+
+    # --- Slot for Correction Application ---
+    @Slot(QModelIndex, object)
+    def _handle_apply_correction(
+        self, source_index: QModelIndex, suggestion: object
+    ) -> None:
+        """Handles the request to apply a specific correction suggestion.
+
+        Args:
+            source_index: The QModelIndex of the cell in the source model.
+            suggestion: The CorrectionSuggestion object selected by the user.
+        """
+        if not source_index.isValid():
+            logger.warning("_handle_apply_correction received invalid index.")
+            return
+
+        if not hasattr(suggestion, "original_value") or not hasattr(
+            suggestion, "corrected_value"
+        ):
+            logger.error(
+                f"Invalid suggestion object received: {suggestion}. Missing required attributes."
+            )
+            self.operation_error.emit("Invalid suggestion object received.")
+            return
+
+        row = source_index.row()
+        col = source_index.column()
+        column_name = self._data_model.get_column_name(col)
+        original_value = getattr(suggestion, "original_value", "Unknown")
+        corrected_value = getattr(suggestion, "corrected_value", "Unknown")
+
+        logger.info(
+            f"Applying correction for cell ({row}, {col} - {column_name}): 
+            '{original_value}' -> '{corrected_value}'"
+        )
+
+        # Get the CorrectionService
+        correction_service = ServiceLocator.get_service("correction_service")
+        if not correction_service:
+            logger.error("CorrectionService not found in ServiceLocator.")
+            self.operation_error.emit("Correction service is unavailable.")
+            return
+
+        try:
+            # Call the dedicated CorrectionService method
+            success = correction_service.apply_suggestion_to_cell(row, col, suggestion)
+            if not success:
+                raise ValueError("CorrectionService.apply_suggestion_to_cell returned False.")
+
+            logger.info(f"Correction applied successfully for cell ({row}, {col}).")
+
+        except Exception as e:
+            logger.error(f"Error applying correction to cell ({row}, {col}): {e}", exc_info=True)
+            self.operation_error.emit(f"Failed to apply correction: {e}")

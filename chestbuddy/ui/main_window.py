@@ -807,6 +807,26 @@ class MainWindow(QMainWindow):
         # if self._progress_controller:
         #     pass # Connect signals if MainWindow needs to directly show progress
 
+        # Connect signals for validation view
+        validation_view = self._views.get("validation")
+        if validation_view and hasattr(validation_view, "import_requested"):
+            validation_view.import_requested.connect(self._on_import_requested)
+
+        # Connect DataTableView correction request to DataViewController slot
+        data_view = self._views.get("data")
+        if data_view and hasattr(data_view, "_data_view"):
+            data_table_view = data_view._data_view  # Get the DataTableView instance
+            if data_table_view and hasattr(data_table_view, "correction_action_triggered"):
+                data_table_view.correction_action_triggered.connect(
+                    self._data_view_controller._handle_apply_correction
+                )
+                logger.debug(
+                    "Connected DataTableView correction_action_triggered to DataViewController._handle_apply_correction"
+                )
+
+        # Connect application quit signal
+        app = QApplication.instance()
+
     def _load_settings(self) -> None:
         """Load application settings."""
         settings = QSettings("ChestBuddy", "ChestBuddy")

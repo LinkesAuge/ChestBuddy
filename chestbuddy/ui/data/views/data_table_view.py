@@ -62,6 +62,8 @@ class DataTableView(QWidget):
     selection_changed = Signal(list)
     # Emitted when the delegate requests applying the first correction for an index
     correction_apply_requested = Signal(QModelIndex, object)  # source_index, suggestion
+    # Emitted when a user selects a correction from the delegate menu
+    correction_action_triggered = Signal(QModelIndex, object)  # source_index, suggestion
 
     def __init__(self, parent=None):
         """
@@ -187,6 +189,8 @@ class DataTableView(QWidget):
         self._correction_delegate.apply_first_correction_requested.connect(
             self._on_apply_first_correction_requested
         )
+        # Connect the correction delegate's selection signal to our new slot
+        self._correction_delegate.correction_selected.connect(self._on_correction_delegate_selected)
 
     # --- Internal Slot for Selection --- #
     @Slot(QItemSelection, QItemSelection)
@@ -358,121 +362,6 @@ class DataTableView(QWidget):
             )  # Debug
         # --- End Original Logic --- #
 
-    # --- Public Methods to interact with the internal table view ---
-    def setModel(self, model: DataViewModel | None):
-        """Set the source data model for the view."""
-        if self._source_model:
-            # Disconnect previous model signals if necessary
-            pass
-
-        self._source_model = model
-        self._filter_model.setSourceModel(model)
-        self._column_model.set_model(model)  # Link ColumnModel to the new source model
-        self._initialize_column_visibility(self._column_model.get_columns())
-
-        # Ensure the table view uses the filter model
-        if hasattr(self, "table_view"):
-            self.table_view.setModel(self._filter_model)
-            # Reconnect selection model signal if view exists
-            selection_model = self.table_view.selectionModel()
-            if selection_model:
-                # Disconnect old connection if any before reconnecting
-                try:
-                    selection_model.selectionChanged.disconnect(self._on_selection_changed)
-                except RuntimeError:
-                    pass  # Ignore if not connected
-                selection_model.selectionChanged.connect(self._on_selection_changed)
-        else:
-            print("Warning: table_view not initialized when setting model.")
-
-    def model(self) -> FilterModel | None:
-        """Returns the FilterModel used by the internal QTableView."""
-        return self._filter_model if self.table_view else None
-
-    def sourceModel(self) -> DataViewModel | None:
-        """Returns the source DataViewModel."""
-        return self._source_model
-
-    def selectionModel(self) -> QItemSelectionModel | None:
-        """Returns the selection model from the internal QTableView."""
-        return self.table_view.selectionModel() if self.table_view else None
-
-    def currentIndex(self) -> QModelIndex:
-        """Returns the current index from the internal QTableView."""
-        return self.table_view.currentIndex() if self.table_view else QModelIndex()
-
-    def setCurrentIndex(self, index: QModelIndex):
-        """Sets the current index on the internal QTableView."""
-        if self.table_view:
-            self.table_view.setCurrentIndex(index)
-
-    def clearSelection(self):
-        """Clears the selection on the internal QTableView."""
-        if self.table_view:
-            self.table_view.clearSelection()
-
-    def setColumnVisible(self, column_index: int, visible: bool):
-        """Sets the visibility of a column by its logical index.
-
-        Updates the ColumnModel, which triggers the UI update via signal.
-        """
-        # Get column name from the source model (requires model to be set)
-        model = self.sourceModel()
-        if model and 0 <= column_index < model.columnCount():
-            # Use the index to get the column name directly from ColumnModel's list
-            column_names = self._column_model.get_columns()
-            if 0 <= column_index < len(column_names):
-                column_name = column_names[column_index]
-                if column_name:
-                    self._column_model.set_column_visible(column_name, visible)
-                else:
-                    print(f"Warning: Could not get name for column index {column_index}")
-            else:
-                print(
-                    f"Warning: column index {column_index} out of bounds for ColumnModel columns list"
-                )
-        else:
-            print(f"Warning: Invalid column index {column_index} for setColumnVisible")
-
-    def isColumnVisible(self, column_index: int) -> bool:
-        """Checks if a column is visible by its logical index, using ColumnModel."""
-        source_model = self.sourceModel()
-        if source_model and 0 <= column_index < source_model.columnCount():
-            # Use the index to get the column name directly from ColumnModel's list
-            column_names = self._column_model.get_columns()
-            if 0 <= column_index < len(column_names):
-                column_name = column_names[column_index]
-                if column_name:
-                    return self._column_model.is_column_visible(column_name)
-                else:
-                    print(
-                        f"Warning: Could not get name for column index {column_index} in isColumnVisible"
-                    )
-                    return False  # Assume hidden if name not found
-            else:
-                print(
-                    f"Warning: column index {column_index} out of bounds for ColumnModel columns list in isColumnVisible"
-                )
-                return False
-        else:
-            print(f"Warning: Invalid column index {column_index} for isColumnVisible")
-            return False
-
-    def _setup_delegates(self):
-        """Set up and assign delegates to the table view."""
-        if not hasattr(self, "table_view"):
-            print("Error: table_view not initialized during _setup_delegates")
-            return
-
-        # Set the correction delegate instance
-        # This delegate handles both correction and validation rendering (inherits)
-        self.table_view.setItemDelegate(self._correction_delegate)
-
-        # Optionally set delegates for specific columns if needed later
-        # Example:
-        # date_delegate = DateDelegate(self.table_view)
-        # self.table_view.setItemDelegateForColumn(DATE_COLUMN_INDEX, date_delegate)
-
     @Slot(QModelIndex, str)
     def _on_validation_failed(self, index: QModelIndex, error_message: str):
         """Slot to handle validation failures from the delegate."""
@@ -489,6 +378,32 @@ class DataTableView(QWidget):
         )
         # TODO: Optionally, re-open editor or highlight the cell
         # self.table_view.edit(index)
+
+    # --- Slot for Correction Delegate Signal --- #
+    @Slot(QModelIndex, object)
+    def _on_correction_delegate_selected(
+        self, delegate_index: QModelIndex, suggestion: object
+    ):
+        """Handles the correction_selected signal from the delegate.
+
+        Maps the delegate (potentially proxy) index to the source index and
+        emits the correction_action_triggered signal.
+        """
+        if not delegate_index.isValid():
+            return
+
+        source_index = self._filter_model.mapToSource(delegate_index)
+        if source_index.isValid():
+            logger.debug(
+                f"Correction selected via delegate: Source({source_index.row()},
+                {source_index.column()}), Suggestion: {suggestion}"
+            )
+            self.correction_action_triggered.emit(source_index, suggestion)
+        else:
+            logger.warning(
+                f"Could not map delegate index ({delegate_index.row()},{delegate_index.column()})
+                to source index."
+            )
 
     # Delegate other necessary QTableView methods...
     # Example:

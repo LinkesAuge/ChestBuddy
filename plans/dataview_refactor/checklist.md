@@ -138,7 +138,7 @@ For a complete overview of the project, see [overview.md](./overview.md).
   - [x] Add suggestion display (delegate draws indicator)
   - [ ] Implement one-click correction application
   - [ ] Add batch correction UI
-  - [x] Add unit tests for inline correction suggestions (delegate tests done)
+  - [x] Add unit tests for inline correction suggestions (delegate tests completed)
 
 ## Phase 4: Import/Export and Advanced Features
 

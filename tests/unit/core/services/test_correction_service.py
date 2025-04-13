@@ -10,6 +10,7 @@ import numpy as np
 from pathlib import Path
 import sys
 from unittest.mock import MagicMock, patch, Mock
+from pytest_mock import MockerFixture
 
 # Add project root to path to allow imports
 # Use absolute path based on the current file's location for robustness
@@ -29,6 +30,14 @@ from chestbuddy.core.enums.validation_enums import ValidationStatus
 from chestbuddy.core.models.chest_data_model import ChestDataModel
 from chestbuddy.core.state.data_state import DataState
 from chestbuddy.utils.config import ConfigManager
+from chestbuddy.core.services.validation_service import ValidationService
+from chestbuddy.core.models.enums import CorrectionAction, DataType
+from chestbuddy.core.data_model import DataModel
+from chestbuddy.core.table_state_manager import (
+    TableStateManager,
+    CellFullState,
+    CellState,
+)
 
 # Import Qt only if needed and handle import error
 try:
@@ -398,3 +407,173 @@ class TestCorrectionService:
     #     assert "A" in correction_service.column_names
     #     assert "B" in correction_service.column_names
     #     assert "C" not in correction_service.column_names
+
+    # --- Test apply_suggestion_to_cell --- #
+    def test_apply_suggestion_to_cell_success(
+        self, correction_service, mock_data_model, mock_state_manager
+    ):
+        """Test successfully applying a single suggestion to a cell."""
+        # Arrange
+        row, col = 1, 2
+        original_value = "Old Value"
+        corrected_value = "New Value"
+        suggestion = MagicMock(corrected_value=corrected_value, original_value=original_value)
+
+        # Mock data model methods
+        mock_data_model.get_cell_value.return_value = original_value
+        mock_data_model.set_cell_value.return_value = True
+        # Set state manager on the service
+        correction_service.set_state_manager(mock_state_manager)
+
+        # Act
+        result = correction_service.apply_suggestion_to_cell(row, col, suggestion)
+
+        # Assert
+        assert result is True
+        mock_data_model.get_cell_value.assert_called_once_with(row, col)
+        mock_data_model.set_cell_value.assert_called_once_with(row, col, corrected_value)
+        # Assert state manager was called to reset the state
+        expected_reset_state = CellFullState(validation_status=CellState.NOT_VALIDATED)
+        mock_state_manager.update_states.assert_called_once_with({(row, col): expected_reset_state})
+        # TODO: Assert history addition if implemented
+
+    def test_apply_suggestion_to_cell_missing_attribute(self, correction_service, mock_data_model):
+        """Test applying a suggestion object without 'corrected_value' attribute."""
+        # Arrange
+        row, col = 0, 0
+        suggestion = MagicMock(spec=object)  # Create a mock without the attribute
+        if hasattr(suggestion, "corrected_value"):
+            del suggestion.corrected_value
+
+        # Act
+        result = correction_service.apply_suggestion_to_cell(row, col, suggestion)
+
+        # Assert
+        assert result is False
+        mock_data_model.set_cell_value.assert_not_called()
+
+    def test_apply_suggestion_to_cell_model_update_fails(self, correction_service, mock_data_model):
+        """Test failure when DataModel cannot update the cell value."""
+        # Arrange
+        row, col = 1, 1
+        suggestion = MagicMock(corrected_value="New")
+        mock_data_model.set_cell_value.return_value = False  # Simulate failure
+
+        # Act
+        result = correction_service.apply_suggestion_to_cell(row, col, suggestion)
+
+        # Assert
+        assert result is False
+        mock_data_model.set_cell_value.assert_called_once()
+
+    # --- Test apply_rule_to_data --- #
+    def test_apply_rule_to_data_success(
+        self, correction_service, mock_data_model, mock_state_manager, mocker
+    ):
+        """Test successfully applying a rule that corrects cells."""
+        # Arrange
+        rule = CorrectionRule(
+            from_value="old", to_value="new", category="general", status="enabled"
+        )
+        row1, col1 = 0, 1
+        row2, col2 = 2, 3
+        potential_corrections = [
+            (row1, col1, "old", "new"),
+            (row2, col2, "old", "new"),
+        ]
+        # Mock the private helper method
+        mocker.patch.object(
+            correction_service, "_apply_rule_to_data", return_value=potential_corrections
+        )
+        mock_data_model.set_cell_value.return_value = True
+        mock_data_model.get_column_name.side_effect = lambda c: f"Col{c}"  # Mock column name lookup
+        correction_service.set_state_manager(mock_state_manager)
+
+        # Act
+        applied_info = correction_service.apply_rule_to_data(rule)
+
+        # Assert
+        assert len(applied_info) == 2
+        assert applied_info == potential_corrections
+        # Check data model calls
+        mock_data_model.set_cell_value.assert_any_call(row1, col1, "new")
+        mock_data_model.set_cell_value.assert_any_call(row2, col2, "new")
+        assert mock_data_model.set_cell_value.call_count == 2
+        # Check state manager calls
+        expected_reset_state = CellFullState(validation_status=CellState.NOT_VALIDATED)
+        expected_state_updates = {
+            (row1, col1): expected_reset_state,
+            (row2, col2): expected_reset_state,
+        }
+        mock_state_manager.update_states.assert_called_once_with(expected_state_updates)
+        # Check history
+        assert len(correction_service.get_correction_history()) > 0
+        last_history = correction_service.get_correction_history()[-1]
+        assert last_history["type"] == "rule_application"
+        assert last_history["stats"]["successful_applications"] == 2
+
+    def test_apply_rule_to_data_selected_only(
+        self, correction_service, mock_data_model, mock_state_manager, mocker
+    ):
+        """Test applying a rule only to selected rows."""
+        # Arrange
+        rule = CorrectionRule(
+            from_value="old", to_value="new", category="general", status="enabled"
+        )
+        row1, col1 = 0, 1  # Selected
+        row2, col2 = 1, 1  # Not selected
+        row3, col3 = 2, 1  # Selected
+        potential_corrections = [
+            (row1, col1, "old", "new"),
+            (row2, col2, "old", "new"),
+            (row3, col3, "old", "new"),
+        ]
+        mocker.patch.object(
+            correction_service, "_apply_rule_to_data", return_value=potential_corrections
+        )
+        mock_data_model.set_cell_value.return_value = True
+        mock_data_model.get_column_name.side_effect = lambda c: f"Col{c}"
+        correction_service.set_state_manager(mock_state_manager)
+        selected_rows = [0, 2]
+
+        # Act
+        applied_info = correction_service.apply_rule_to_data(rule, selected_only=selected_rows)
+
+        # Assert: Only selected rows should have corrections applied
+        assert len(applied_info) == 2
+        assert applied_info[0] == (row1, col1, "old", "new")
+        assert applied_info[1] == (row3, col3, "old", "new")
+        mock_data_model.set_cell_value.assert_any_call(row1, col1, "new")
+        mock_data_model.set_cell_value.assert_any_call(row3, col3, "new")
+        assert mock_data_model.set_cell_value.call_count == 2
+        # Check state manager calls (only for applied corrections)
+        expected_reset_state = CellFullState(validation_status=CellState.NOT_VALIDATED)
+        expected_state_updates = {
+            (row1, col1): expected_reset_state,
+            (row3, col3): expected_reset_state,
+        }
+        mock_state_manager.update_states.assert_called_once_with(expected_state_updates)
+
+    def test_apply_rule_to_data_no_matches(
+        self, correction_service, mock_data_model, mock_state_manager, mocker
+    ):
+        """Test applying a rule when no cells match."""
+        # Arrange
+        rule = CorrectionRule(
+            from_value="nonexistent", to_value="new", category="general", status="enabled"
+        )
+        mocker.patch.object(
+            correction_service, "_apply_rule_to_data", return_value=[]
+        )  # No matches
+        correction_service.set_state_manager(mock_state_manager)
+
+        # Act
+        applied_info = correction_service.apply_rule_to_data(rule)
+
+        # Assert
+        assert len(applied_info) == 0
+        mock_data_model.set_cell_value.assert_not_called()
+        mock_state_manager.update_states.assert_not_called()
+
+    def test_initialization_with_rules(self, correction_service, mock_data_model):
+        """Test initializing the service with correction rules."""

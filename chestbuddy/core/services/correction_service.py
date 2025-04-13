@@ -21,7 +21,7 @@ from chestbuddy.core.models.correction_rule_manager import CorrectionRuleManager
 from chestbuddy.core.enums.validation_enums import ValidationStatus
 from chestbuddy.core.models.chest_data_model import ChestDataModel
 from chestbuddy.utils.config import ConfigManager
-from chestbuddy.core.table_state_manager import TableStateManager
+from chestbuddy.core.table_state_manager import TableStateManager, CellFullState, CellState
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -265,76 +265,113 @@ class CorrectionService(QObject):
             "corrected_cells": len(corrected_cells),
         }
 
-        self._correction_history.append({"rule": rule, "stats": stats})
+        self._correction_history.append({"rule": rule.to_dict(), "stats": stats})
 
         return stats
 
     def apply_rule_to_data(
         self, rule: CorrectionRule, only_invalid: bool = False, selected_only: List[int] = None
     ) -> List[Tuple[int, int, Any, Any]]:
-        """
-        Apply a correction rule to the data.
+        """Applies a correction rule to the data, returning the list of changes.
 
         Args:
-            rule: Rule to apply
-            only_invalid: Whether to only apply to invalid cells
-            selected_only: List of selected row indices to apply to (if None, apply to all rows)
+            rule (CorrectionRule): The rule to apply.
+            only_invalid (bool): Apply only to invalid cells.
+            selected_only (List[int]): Apply only to these row indices.
 
         Returns:
-            List of (row, col, old_value, new_value) tuples representing applied corrections
+            List[Tuple[int, int, Any, Any]]: List of (row_idx, col_idx, old_value, new_value)
         """
         data = self._data_model.data
         if data is None or data.empty:
+            logger.info("No data available to apply rule to.")
             return []
 
         if not rule:
             logger.warning("No rule specified for correction")
             return []
 
-        # Get corrections
-        corrections = self._apply_rule_to_data(data, rule, only_invalid)
+        # Get potential corrections from the private helper
+        potential_corrections = self._apply_rule_to_data(data, rule, only_invalid)
 
         # Filter to selected rows if specified
         if selected_only is not None:
             selected_set = set(selected_only)
-            corrections = [c for c in corrections if c[0] in selected_set]
+            corrections_to_apply = [c for c in potential_corrections if c[0] in selected_set]
+            logger.debug(
+                f"Filtered {len(potential_corrections)} potential corrections to {len(corrections_to_apply)} based on selection."
+            )
+        else:
+            corrections_to_apply = potential_corrections
 
-        # Apply corrections
-        if corrections:
-            # Track history
-            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        if not corrections_to_apply:
+            logger.info(f"No corrections to apply for rule: {rule}")
+            return []
+
+        # Apply corrections and update state
+        applied_corrections_info = []
+        state_updates = {}
+        reset_state = CellFullState(validation_status=CellState.NOT_VALIDATED)
+
+        # Use a copy for multi-cell updates if DataModel updates immediately
+        # If DataModel batches updates, direct modification might be okay.
+        # Assuming direct update via set_cell_value for now.
+        successful_applications = 0
+        for row, col, old_value, new_value in corrections_to_apply:
+            try:
+                success = self._data_model.set_cell_value(row, col, new_value)
+                if success:
+                    applied_corrections_info.append((row, col, old_value, new_value))
+                    state_updates[(row, col)] = reset_state
+                    successful_applications += 1
+                else:
+                    logger.warning(
+                        f"Failed to apply correction for rule {rule} at ({row}, {col}) via DataModel."
+                    )
+            except Exception as e:
+                logger.error(
+                    f"Error applying correction for rule {rule} at ({row}, {col}): {e}",
+                    exc_info=True,
+                )
+
+        # Update state manager in one batch
+        if state_updates and self._state_manager:
+            self._state_manager.update_states(state_updates)
+            logger.debug(f"Reset state for {len(state_updates)} cells corrected by rule: {rule}")
+        elif state_updates:
+            logger.warning(
+                "State manager not available, cannot reset state for cells corrected by rule."
+            )
+
+        # Add to history (optional)
+        if successful_applications > 0:
+            now = datetime.now().isoformat()
             history_entry = {
                 "timestamp": now,
-                "rule": {
-                    "from_value": rule.from_value,
-                    "to_value": rule.to_value,
-                    "category": rule.category,
-                },
-                "corrections": [
+                "type": "rule_application",
+                "rule": rule.to_dict(),
+                "applied_corrections": [
                     {
                         "row": int(row),
-                        "column": self._data_model.data.columns[col],
+                        "column": self._data_model.get_column_name(col),
                         "old_value": str(old_val),
                         "new_value": str(new_val),
                     }
-                    for row, col, old_val, new_val in corrections
+                    for row, col, old_val, new_val in applied_corrections_info
                 ],
+                "stats": {
+                    "successful_applications": successful_applications,
+                    "attempted_corrections": len(corrections_to_apply),
+                },
             }
             self._correction_history.append(history_entry)
+            logger.info(
+                f"Applied {successful_applications}/{len(corrections_to_apply)} corrections with rule: {rule}"
+            )
+            # Optionally emit a signal here if needed
+            # self.corrections_applied.emit(successful_applications)
 
-            # Apply corrections to data
-            for row, col, _, new_val in corrections:
-                col_name = data.columns[col]
-                self._data_model.update_cell(row, col_name, new_val)
-
-                # Update correction status
-                self._update_correction_status(row, col, new_val)
-
-            # Notify of the change
-            self.corrections_applied.emit(len(corrections))
-            logger.info(f"Applied {len(corrections)} corrections with rule: {rule}")
-
-        return corrections
+        return applied_corrections_info
 
     def _apply_rule_to_data(
         self, data: pd.DataFrame, rule: CorrectionRule, only_invalid: bool = False
@@ -722,3 +759,134 @@ class CorrectionService(QObject):
         logger.info("TableStateManager set for CorrectionService")
 
     # ----------------------------------------------------------------
+
+    def apply_suggestion_to_cell(self, row: int, col: int, suggestion: object) -> bool:
+        """Applies a specific correction suggestion to a single cell.
+
+        Args:
+            row (int): Row index of the cell.
+            col (int): Column index of the cell.
+            suggestion (object): The suggestion object (must have 'corrected_value').
+
+        Returns:
+            bool: True if successful, False otherwise.
+        """
+        if not hasattr(suggestion, "corrected_value"):
+            logger.error(
+                f"Suggestion object lacks 'corrected_value' attribute for cell ({row}, {col})"
+            )
+            return False
+
+        corrected_value = suggestion.corrected_value
+        original_value = None
+
+        try:
+            # Get original value for history/logging
+            original_value = self._data_model.get_cell_value(row, col)
+
+            # Update the data model
+            success = self._data_model.set_cell_value(row, col, corrected_value)
+            if not success:
+                logger.error(f"DataModel failed to set value for cell ({row}, {col})")
+                return False
+
+            logger.info(
+                f"Applied suggestion to cell ({row}, {col}): '{original_value}' -> '{corrected_value}'"
+            )
+
+            # --- Reset state for the corrected cell --- #
+            if self._state_manager:
+                reset_state = CellFullState(
+                    validation_status=CellState.NOT_VALIDATED  # Or VALID if auto-revalidation is off
+                )
+                self._state_manager.update_states({(row, col): reset_state})
+                logger.debug(f"Reset state for corrected cell ({row}, {col})")
+            else:
+                logger.warning("TableStateManager not available, cannot reset cell state.")
+            # ---------------------------------------- #
+
+            # TODO: Add to correction history?
+            # self._correction_history.append({
+            #     "type": "suggestion",
+            #     "cell": (row, col),
+            #     "original": original_value,
+            #     "corrected": corrected_value,
+            #     "timestamp": datetime.now().isoformat()
+            # })
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Error applying suggestion to cell ({row}, {col}): {e}", exc_info=True)
+            return False
+
+    def apply_suggestion_to_cell(self, row: int, col: int, suggestion: object) -> bool:
+        """Applies a specific correction suggestion to a single cell.
+
+        Args:
+            row (int): Row index of the cell.
+            col (int): Column index of the cell.
+            suggestion (object): The suggestion object (must have 'corrected_value').
+
+        Returns:
+            bool: True if successful, False otherwise.
+        """
+        if not hasattr(suggestion, "corrected_value"):
+            logger.error(
+                f"Suggestion object lacks 'corrected_value' attribute for cell ({row}, {col})"
+            )
+            return False
+
+        corrected_value = suggestion.corrected_value
+        original_value = None
+
+        try:
+            # Get original value for history/logging
+            original_value = self._data_model.get_cell_value(row, col)
+
+            # Update the data model
+            success = self._data_model.set_cell_value(row, col, corrected_value)
+            if not success:
+                logger.error(f"DataModel failed to set value for cell ({row}, {col})")
+                return False
+
+            logger.info(
+                f"Applied suggestion to cell ({row}, {col}): '{original_value}' -> '{corrected_value}'"
+            )
+
+            # --- Reset state for the corrected cell --- #
+            if self._state_manager:
+                # Import necessary types if not already at top of file
+                from chestbuddy.core.table_state_manager import CellFullState, CellState
+
+                reset_state = CellFullState(
+                    validation_status=CellState.NOT_VALIDATED  # Or VALID if auto-revalidation is off
+                )
+                self._state_manager.update_states({(row, col): reset_state})
+                logger.debug(f"Reset state for corrected cell ({row}, {col})")
+            else:
+                logger.warning("TableStateManager not available, cannot reset cell state.")
+            # ---------------------------------------- #
+
+            # TODO: Add to correction history?
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Error applying suggestion to cell ({row}, {col}): {e}", exc_info=True)
+            return False
+
+    def apply_rule_to_data(
+        self, rule: CorrectionRule, only_invalid: bool = False, selected_only: List[int] = None
+    ) -> List[Tuple[int, int, Any, Any]]:
+        """Applies a correction rule to the data, returning the list of changes.
+
+        Args:
+            rule (CorrectionRule): The rule to apply.
+            only_invalid (bool): Apply only to invalid cells.
+            selected_only (List[int]): Apply only to these row indices.
+
+        Returns:
+            List[Tuple[int, int, Any, Any]]: List of (row_idx, col_idx, old_value, new_value)
+        """
+        # Implementation... (Existing code for apply_rule_to_data continues here)
