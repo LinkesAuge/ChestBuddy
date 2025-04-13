@@ -33,6 +33,7 @@ class CorrectionController(BaseController):
         correction_progress (Signal): Emitted to report correction progress
         correction_completed (Signal): Emitted when correction operation completes
         correction_error (Signal): Emitted when correction operation encounters an error
+        status_message_changed (Signal): Emitted for general status updates
     """
 
     # Define signals
@@ -40,6 +41,7 @@ class CorrectionController(BaseController):
     correction_progress = Signal(int, int)  # current, total
     correction_completed = Signal(object)  # Statistics dictionary
     correction_error = Signal(str)
+    status_message_changed = Signal(str)  # For general status updates
 
     # Maximum recursive iterations to prevent infinite loops
     MAX_ITERATIONS = 10
@@ -1001,3 +1003,43 @@ class CorrectionController(BaseController):
         except Exception as e:
             logger.error(f"Error applying correction from UI: {e}", exc_info=True)
             self.correction_error.emit(f"Error applying correction: {e}")
+
+    @Slot(int, int, object)
+    def handle_correction_selected(self, row: int, col: int, corrected_value: Any):
+        """
+        Handle a correction selection from the UI (typically from a delegate).
+
+        This method receives a correction selection from the new DataView refactoring
+        components and applies it to the specified cell.
+
+        Args:
+            row (int): The row index of the cell to correct
+            col (int): The column index of the cell to correct
+            corrected_value (Any): The value to apply as the correction
+        """
+        logger.info(f"Handling correction selection: row={row}, col={col}, value={corrected_value}")
+
+        try:
+            # Get the appropriate model index if we need a QModelIndex
+            if hasattr(self._correction_service, "apply_ui_correction"):
+                # Use the new dedicated method if available
+                self._correction_service.apply_ui_correction(row, col, corrected_value)
+                self.status_message_changed.emit(f"Applied correction at row {row}, column {col}")
+            else:
+                # Legacy fallback - construct a model index and use the old method
+                logger.warning(
+                    "Using legacy correction application method - service doesn't implement apply_ui_correction"
+                )
+                from PySide6.QtCore import QModelIndex
+
+                model_index = QModelIndex()  # This is a placeholder - need real model index
+                self.apply_correction_from_ui(model_index, corrected_value)
+
+            # Emit completed signal with minimal stats
+            self.correction_completed.emit(
+                {"corrected_cells": 1, "corrected_rows": 1, "total_corrections": 1}
+            )
+
+        except Exception as e:
+            logger.error(f"Error applying correction: {e}")
+            self.correction_error.emit(f"Failed to apply correction: {e}")

@@ -1,17 +1,18 @@
 ---
 title: Active Context - ChestBuddy Application
-date: 2024-08-06
+date: 2024-08-07
 ---
 
 # Active Context: DataView Refactoring
 
-Last Updated: 2024-08-06
+Last Updated: 2024-08-07
 
 ## Current Focus (2024-08-07)
 
 - **Task:** Reflecting recent progress in Memory Bank after updating the checklist.
 - **Goal:** Ensure documentation accurately shows the completion of the single-click correction UI via the delegate and defines the next steps.
 - **Context:** Updated `plans/dataview_refactor/checklist.md` to mark "Implement one-click correction application" and related integration test items as complete.
+- **Note on Import Functionality:** CSV import functionality is part of Phase 6 (Import/Export) which is not yet implemented. The existing import system from the original architecture continues to function through `FileOperationsController` and `DataManager`, but is not yet integrated with the refactored DataView components.
 - **Outcome:** Memory bank aligned with the latest development state.
 - **Plan:**
   1. Update `progress.md` and `activeContext.md`.

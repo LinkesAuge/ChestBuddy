@@ -34,6 +34,7 @@ class ValidationService(QObject):
     Signals:
         validation_preferences_changed (Signal): Emitted when validation preferences change
         validation_changed (Signal): Emitted when validation status changes with the status DataFrame
+        status_message_changed (Signal): Emitted when a general status update message changes
 
     Implementation Notes:
         - Uses statistical methods for outlier detection
@@ -45,6 +46,7 @@ class ValidationService(QObject):
     # Define signals
     validation_preferences_changed = Signal(dict)  # Dict of preferences
     validation_changed = Signal(object)  # Validation status DataFrame
+    status_message_changed = Signal(str)  # For general status updates
 
     # Define column names for validation
     PLAYER_COLUMN = "PLAYER"

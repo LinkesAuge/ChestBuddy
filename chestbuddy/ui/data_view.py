@@ -18,6 +18,8 @@ from PySide6.QtCore import (
     QModelIndex,
     QSortFilterProxyModel,
     QRegularExpression,
+    QItemSelection,
+    QItemSelectionModel,
 )
 from PySide6.QtWidgets import (
     QWidget,
@@ -54,6 +56,7 @@ from PySide6.QtGui import (
 from chestbuddy.core.enums.validation_enums import ValidationStatus, ValidationMode
 from chestbuddy.ui.widgets.action_toolbar import ActionToolbar, ActionButton
 from chestbuddy.ui.widgets.validation_delegate import ValidationStatusDelegate
+from chestbuddy.ui.data.delegates.correction_delegate import CorrectionDelegate
 from chestbuddy.ui.dialogs.add_edit_rule_dialog import AddEditRuleDialog
 from chestbuddy.ui.dialogs.batch_correction_dialog import BatchCorrectionDialog
 from chestbuddy.ui.dialogs.import_export_dialog import ImportExportDialog
@@ -226,6 +229,7 @@ class DataView(QWidget):
     data_corrected = Signal(list)  # List of correction operations
     data_removed = Signal(list)  # List of row indices removed
     status_updated = Signal(str, bool)  # Status message, is_error
+    correction_selected = Signal(int, int, object)  # Relayed from delegate
 
     # Column names used across the application
     PLAYER_COLUMN = "PLAYER"
@@ -974,66 +978,57 @@ class DataView(QWidget):
 
     def _connect_signals(self) -> None:
         """Connect signals and slots."""
-        # Connect action buttons
-        import_button = self._action_toolbar.get_button_by_name("import")
-        if import_button:
-            logger.debug("Connecting import button clicked signal to _on_import_clicked handler")
-            import_button.clicked.connect(self._on_import_clicked)
+        # Connect filter timer
+        # self._filter_timer.timeout.connect(self._apply_filter)
 
-        export_button = self._action_toolbar.get_button_by_name("export")
-        if export_button:
-            logger.debug("Connecting export button clicked signal to _on_export_clicked handler")
-            export_button.clicked.connect(self._on_export_clicked)
+        # Connect filter UI elements
+        self._filter_text.textChanged.connect(self._on_filter_text_changed)
+        self._filter_column.currentIndexChanged.connect(self._on_filter_column_changed)
+        self._filter_mode.currentIndexChanged.connect(self._on_filter_mode_changed)
+        self._case_sensitive.stateChanged.connect(self._on_case_sensitive_changed)
 
-        # Connect filter controls
-        filter_button = self._action_toolbar.get_button_by_name("apply_filter")
-        if filter_button:
-            filter_button.clicked.connect(self._apply_filter)
+        # Retrieve and connect the clear filter button from the toolbar
+        self._clear_filter_button = self._action_toolbar.get_button_by_name("clear_filter")
+        if self._clear_filter_button:
+            self._clear_filter_button.clicked.connect(self._clear_filter)
+        else:
+            logger.warning("Could not find 'clear_filter' button in ActionToolbar")
 
-        clear_button = self._action_toolbar.get_button_by_name("clear_filter")
-        if clear_button:
-            clear_button.clicked.connect(self._clear_filter)
-
-        # Connect Enter key press in filter text field to apply filter
-        if hasattr(self, "_filter_text") and self._filter_text is not None:
-            self._filter_text.returnPressed.connect(self._apply_filter)
-            logger.debug("Connected filter text Enter key to apply filter")
-
-        # Connect custom context menu
-        self._table_view.customContextMenuRequested.connect(self._show_context_menu)
-        logger.info("Connected custom context menu")
-
-        # Connect double-click signal for starting edit directly
+        # Connect table view signals
+        self._table_view.selectionModel().selectionChanged.connect(self._on_selection_changed)
+        self._table_view.customContextMenuRequested.connect(self._on_context_menu_requested)
         self._table_view.doubleClicked.connect(self._on_cell_double_clicked)
-        logger.info("Connected double-click handler for direct editing")
 
-        # Connect table model for data editing
-        if isinstance(self._table_model, QStandardItemModel):
-            self._table_model.itemChanged.connect(self._on_item_changed)
-
-        # Connect table view for sorting
+        # Connect sort indicator changes
         self._table_view.horizontalHeader().sortIndicatorChanged.connect(
             self._on_sort_indicator_changed
         )
 
-        # Connect to model signals for updates
-        if hasattr(self._data_model, "data_changed"):
-            self._data_model.data_changed.connect(self._on_data_changed)
-        if hasattr(self._data_model, "validation_changed"):
-            self._data_model.validation_changed.connect(self._on_validation_changed)
-        if hasattr(self._data_model, "correction_applied"):
-            self._data_model.correction_applied.connect(self._on_correction_applied)
+        # Connect data model signals (using safe connection)
+        if self._data_model:
+            if hasattr(self._data_model, "data_changed"):
+                try:
+                    self._data_model.data_changed.connect(self._on_data_changed)
+                except Exception as e:
+                    logger.error(f"Error connecting data_changed: {e}")
+            if hasattr(self._data_model, "data_cleared"):
+                try:
+                    self._data_model.data_cleared.connect(self._on_data_cleared)
+                except Exception as e:
+                    logger.error(f"Error connecting data_cleared: {e}")
 
-        # Connect refresh button
-        refresh_button = self._action_toolbar.get_button_by_name("refresh")
-        if refresh_button:
-            refresh_button.clicked.connect(self._on_refresh_clicked)
-            logger.debug("Connected refresh button")
-
-        # Connect to correction signals if available
-        correction_controller = self._get_correction_controller()
-        if correction_controller:
-            correction_controller.correction_completed.connect(self._on_correction_completed)
+        # Connect delegate signals if applicable
+        delegate = self._table_view.itemDelegate()
+        if isinstance(delegate, CorrectionDelegate):
+            try:
+                delegate.correction_selected.connect(self._relay_correction_selected)
+                logger.info(
+                    "Connected CorrectionDelegate.correction_selected to DataView relay slot."
+                )
+            except AttributeError:
+                logger.warning("CorrectionDelegate does not have correction_selected signal.")
+            except Exception as e:
+                logger.error(f"Error connecting correction_selected from delegate: {e}")
 
     def _update_view(self) -> None:
         """
@@ -2801,3 +2796,47 @@ class DataView(QWidget):
             self.update_cell_highlighting_from_state()
         else:
             logger.warning("Cannot update cell highlighting: TableStateManager not available")
+
+    # New Slot to relay the signal from the delegate
+    @Slot(int, int, object)
+    def _relay_correction_selected(self, row: int, col: int, suggestion: Any):
+        """Relays the correction_selected signal from the delegate."""
+        logger.debug(f"Relaying correction_selected for ({row}, {col}): {suggestion}")
+        self.correction_selected.emit(row, col, suggestion)
+
+    # Add the new slot methods here
+    @Slot(str)
+    def _on_filter_text_changed(self, text: str) -> None:
+        """Handle changes in the filter text input."""
+        logger.debug(f"Filter text changed: {text}")
+        # TODO: Implement debouncing using a timer (e.g., _filter_timer)
+        self._apply_filter()
+
+    @Slot(int)
+    def _on_filter_column_changed(self, index: int) -> None:
+        """Handle changes in the filter column selector."""
+        column_name = self._filter_column.itemText(index)
+        logger.debug(f"Filter column changed to: {column_name}")
+        self._apply_filter()
+
+    @Slot(int)
+    def _on_filter_mode_changed(self, index: int) -> None:
+        """Handle changes in the filter mode selector."""
+        mode = self._filter_mode.itemText(index)
+        logger.debug(f"Filter mode changed to: {mode}")
+        self._apply_filter()
+
+    @Slot(int)
+    def _on_case_sensitive_changed(self, state: int) -> None:
+        """Handle changes in the case sensitive checkbox."""
+        is_checked = state == Qt.Checked
+        logger.debug(f"Case sensitive changed: {is_checked}")
+        self._apply_filter()
+
+    @Slot(QItemSelection, QItemSelection)
+    def _on_selection_changed(self, selected: QItemSelection, deselected: QItemSelection) -> None:
+        """Handle changes in the table view selection."""
+        selected_indexes = self._table_view.selectedIndexes()
+        logger.debug(f"Selection changed. {len(selected_indexes)} items selected.")
+        # TODO: Implement logic based on selection (e.g., update status bar, enable/disable actions)
+        self._update_status_bar_selection()

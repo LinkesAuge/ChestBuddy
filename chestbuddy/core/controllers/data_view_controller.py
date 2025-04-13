@@ -44,6 +44,9 @@ class DataViewController(BaseController):
         operation_started (Signal): Emitted when an operation starts
         operation_completed (Signal): Emitted when an operation completes
         chart_created (Signal): Emitted when a chart is created
+        status_message_changed (Signal): Emits status updates
+        actions_state_changed (Signal): Emits dict of action names -> enabled state
+        recent_files_updated (Signal): Emits list of recent file paths
     """
 
     # Define signals
@@ -60,6 +63,9 @@ class DataViewController(BaseController):
     operation_started = Signal(str)  # Operation name
     operation_completed = Signal(str)  # Operation name
     chart_created = Signal(object)  # Chart data
+    status_message_changed = Signal(str)  # Emits status updates
+    actions_state_changed = Signal(dict)  # Emits dict of action names -> enabled state
+    recent_files_updated = Signal(list)  # Emits list of recent file paths
 
     def __init__(self, data_model, signal_manager=None, ui_state_controller=None):
         """

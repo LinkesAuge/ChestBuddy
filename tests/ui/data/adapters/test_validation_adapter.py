@@ -15,7 +15,7 @@ from chestbuddy.ui.data.adapters.validation_adapter import ValidationAdapter
 
 # Mock classes for dependencies
 class MockValidationService(QObject):
-    validation_complete = Signal(object)
+    validation_changed = Signal(object)
 
 
 class MockTableStateManager(QObject):
@@ -97,7 +97,7 @@ class TestValidationAdapter:
     ):
         """Test that receiving validation results calls manager.update_states correctly."""
         # Emit the signal
-        mock_validation_service.validation_complete.emit(mock_validation_results_df)
+        mock_validation_service.validation_changed.emit(mock_validation_results_df)
 
         # Assert manager update method was called once
         assert len(mock_table_state_manager.update_states_calls) == 1
@@ -147,7 +147,7 @@ class TestValidationAdapter:
         )
 
         # Emit signal
-        mock_validation_service.validation_complete.emit(validation_df)
+        mock_validation_service.validation_changed.emit(validation_df)
 
         # Check call to update_states
         assert len(mock_table_state_manager.update_states_calls) == 1
@@ -165,7 +165,7 @@ class TestValidationAdapter:
     ):
         """Test that None results are handled gracefully."""
         # Emit signal with None
-        mock_validation_service.validation_complete.emit(None)
+        mock_validation_service.validation_changed.emit(None)
 
         # Assert manager update method was NOT called
         assert len(mock_table_state_manager.update_states_calls) == 0  # Check calls list
@@ -175,7 +175,7 @@ class TestValidationAdapter:
     ):
         """Test that empty DataFrame results are handled gracefully."""
         empty_df = pd.DataFrame()
-        mock_validation_service.validation_complete.emit(empty_df)
+        mock_validation_service.validation_changed.emit(empty_df)
         assert len(mock_table_state_manager.update_states_calls) == 0
 
     def test_on_validation_complete_handles_non_dataframe(
@@ -183,7 +183,7 @@ class TestValidationAdapter:
     ):
         """Test that non-DataFrame results are handled gracefully."""
         # Emit signal with a dictionary instead of DataFrame
-        mock_validation_service.validation_complete.emit({"some": "data"})
+        mock_validation_service.validation_changed.emit({"some": "data"})
 
         # Assert manager update method was NOT called
         assert len(mock_table_state_manager.update_states_calls) == 0  # Check calls list
@@ -199,7 +199,7 @@ class TestValidationAdapter:
             }
         )
 
-        mock_validation_service.validation_complete.emit(validation_df)
+        mock_validation_service.validation_changed.emit(validation_df)
 
         assert len(mock_table_state_manager.update_states_calls) == 1
         changes_dict = mock_table_state_manager.update_states_calls[0]
@@ -216,7 +216,7 @@ class TestValidationAdapter:
         validation_df = pd.DataFrame(
             {"Player_status": [CellState.VALID], "NonExistentColumn_status": [CellState.INVALID]}
         )
-        mock_validation_service.validation_complete.emit(validation_df)
+        mock_validation_service.validation_changed.emit(validation_df)
         # Should not raise an error, and update_states should not be called
         # because the only potential change (Player_status=VALID) doesn't require an update
         # if the default state is also VALID/NORMAL

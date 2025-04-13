@@ -37,6 +37,7 @@ class DataViewAdapter(UpdatableView):
     Signals:
         import_requested: Emitted when user requests data import
         export_requested: Emitted when user requests data export
+        correction_selected: Emitted when a correction is selected
 
     Implementation Notes:
         - Inherits from UpdatableView to maintain UI consistency and use standardized update patterns
@@ -49,6 +50,7 @@ class DataViewAdapter(UpdatableView):
     # Define signals with consistent naming
     import_requested = Signal()
     export_requested = Signal()
+    correction_selected = Signal(int, int, object)
 
     def __init__(
         self,
@@ -192,9 +194,10 @@ class DataViewAdapter(UpdatableView):
 
                 logger.error(traceback.format_exc())
 
-    def _on_table_state_changed(self):
+    @Slot(set)
+    def _on_table_state_changed(self, changed_cells: set):
         """Handle state changes in the TableStateManager."""
-        logger.debug("TableStateManager state changed")
+        logger.debug(f"TableStateManager state changed for {len(changed_cells)} cells.")
 
         # Forward to the DataView if it has the update_cell_highlighting_from_state method
         if hasattr(self._data_view, "update_cell_highlighting_from_state"):
@@ -398,21 +401,38 @@ class DataViewAdapter(UpdatableView):
             self._connect_model_signals()
 
     def _connect_ui_signals(self):
-        """Connect UI component signals using safe connection pattern."""
-        # Connect to DataView signals using direct connections
-        if hasattr(self._data_view, "import_clicked"):
-            try:
-                # Connect the import button signal
-                self._data_view.import_clicked.connect(self._on_import_requested)
-            except Exception as e:
-                logger.error(f"Error connecting to import_clicked signal: {e}")
+        """Connect signals from the wrapped DataView UI components."""
+        if not self._data_view:
+            logger.error("Cannot connect UI signals: DataView is not initialized.")
+            return
 
-        if hasattr(self._data_view, "export_clicked"):
-            try:
-                # Connect the export button signal
-                self._data_view.export_clicked.connect(self._on_export_requested)
-            except Exception as e:
-                logger.error(f"Error connecting to export_clicked signal: {e}")
+        logger.debug(f"Connecting UI signals for DataView ID: {self._data_view_id}")
+
+        # Connect import/export buttons
+        if hasattr(self._data_view, "import_button") and hasattr(
+            self._data_view.import_button, "clicked"
+        ):
+            self._signal_manager.connect(
+                self._data_view.import_button, "clicked", self, "_on_import_requested"
+            )
+
+        if hasattr(self._data_view, "export_button") and hasattr(
+            self._data_view.export_button, "clicked"
+        ):
+            self._signal_manager.connect(
+                self._data_view.export_button, "clicked", self, "_on_export_requested"
+            )
+
+        # Relay the correction_selected signal from the actual DataView/delegate
+        if hasattr(self._data_view, "correction_selected"):
+            self._signal_manager.connect(
+                self._data_view,  # Source is the wrapped DataView
+                "correction_selected",
+                self.correction_selected,  # Target is the adapter's own signal
+            )
+            logger.info("Relaying correction_selected signal from DataView to DataViewAdapter")
+        else:
+            logger.warning("Wrapped DataView does not have a correction_selected signal to relay.")
 
         # Connect filter buttons using signal manager
         filter_button = self._data_view._action_toolbar.get_button_by_name("apply_filter")

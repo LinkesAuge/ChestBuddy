@@ -6,6 +6,7 @@ Connects the CorrectionService to the TableStateManager for correction states.
 
 from PySide6.QtCore import QObject, Slot
 import typing
+from typing import Any
 
 # Updated import
 from chestbuddy.core.services import CorrectionService
@@ -115,6 +116,36 @@ class CorrectionAdapter(QObject):
             print(f"Error: TableStateManager missing method or attribute: {e}")  # Debug
         except Exception as e:
             print(f"Error updating TableStateManager with correction state updates: {e}")  # Debug
+
+    @Slot(int, int, object)  # Assuming object for suggestion type
+    def apply_correction_from_ui(self, row: int, col: int, corrected_value: Any):
+        """
+        Slot to receive correction selection from the UI (e.g., delegate) and apply it.
+
+        Args:
+            row (int): The row index of the cell to correct.
+            col (int): The column index of the cell to correct.
+            corrected_value (Any): The value to apply as the correction.
+        """
+        try:
+            success = self._correction_service.apply_ui_correction(row, col, corrected_value)
+            if success:
+                logger.info(
+                    f"CorrectionAdapter: Successfully triggered correction for cell ({row}, {col}) to '{corrected_value}'"
+                )
+            else:
+                logger.warning(
+                    f"CorrectionAdapter: CorrectionService failed to apply correction for cell ({row}, {col})"
+                )
+        except AttributeError:
+            logger.error(
+                "CorrectionAdapter: CorrectionService does not have 'apply_ui_correction' method."
+            )
+        except Exception as e:
+            logger.error(
+                f"CorrectionAdapter: Error calling apply_ui_correction for cell ({row}, {col}): {e}",
+                exc_info=True,
+            )
 
     def disconnect_signals(self):
         """Disconnect signals to prevent issues during cleanup."""

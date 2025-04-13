@@ -628,3 +628,76 @@ The application now properly displays the DataView content when the Data tab is 
 **Fix:** Calculated expected width using literals (`80 + 16 + 4`) directly in the test assertion, bypassing potential mock interaction issues.
 
 **Result:** Test now passes with correct assertion.
+
+## Issue: Various Initialization Errors (AttributeError, TypeError)
+
+**Date Reported:** 2024-07-27 & 2024-08-07
+**Status:** Resolved (Startup Errors)
+
+**Description:**
+Application startup failed with a series of errors originating in `DataView._connect_signals` and `ChestBuddyApp._connect_signals`:
+1. `AttributeError: 'DataView' object has no attribute '_on_filter_text_changed'`
+2. `AttributeError: 'NoneType' object has no attribute 'currentIndexChanged'`
+3. `AttributeError: 'NoneType' object has no attribute 'clicked'`
+4. `AttributeError: 'DataView' object has no attribute '_on_selection_changed'`
+5. `TypeError: Incompatible signal/slot signature` for `TableStateManager.state_changed`
+6. `AttributeError: 'MainWindow' object has no attribute 'get_data_view'`
+7. `AttributeError: 'FileOperationsController' object has no attribute 'load_data'`
+8. `AttributeError: 'DataManager' object has no attribute 'save_data'`
+9. `AttributeError: 'DataManager' object has no attribute 'save_data_as'`
+10. `AttributeError: 'MainWindow' object has no attribute 'preferences_requested'`
+11. `AttributeError: 'MainWindow' object has no attribute 'file_dialog_canceled'`
+12. `AttributeError: 'ChestBuddyApp' object has no attribute '_on_file_dialog_canceled'`
+13. `AttributeError: 'DataViewController' object has no attribute 'status_message_changed'` (and others)
+14. `AttributeError: 'ValidationService' object has no attribute 'validation_complete'`
+15. `AttributeError: 'ValidationService' object has no attribute 'status_message_changed'`
+16. `AttributeError: 'CorrectionController' object has no attribute 'status_message_changed'`
+
+The root causes included missing slot methods, attribute name mismatches between UI initialization and signal connection, incorrect signal connection logic (e.g., trying to connect to a non-existent method or signal, signal/slot signature mismatch, attempting to connect a signal object directly instead of using a standard connection), and incorrect access to managed objects. A systematic issue was identified where signals were connected in `ChestBuddyApp` that were not actually defined on the source controller/service.
+
+These initial errors prevented the `DataViewAdapter.__init__` method from completing, specifically preventing the `super().__init__()` call, leading to a secondary `RuntimeError: '__init__' method of object's base class (DataViewAdapter) not called.` when `MainWindow` tried to use the adapter.
+
+Additionally, several `qt.svg: Cannot open file...` warnings and `RuntimeWarning: Failed to disconnect...` warnings appeared, indicating separate issues with icon path formatting and signal cleanup.
+
+**Resolution:**
+1. Added missing slot methods to `DataView` and `ChestBuddyApp`.
+2. Corrected attribute names in `DataView._connect_signals` for filter controls.
+3. Ensured buttons were retrieved from `ActionToolbar` before connecting signals in `DataView`.
+4. Fixed signal/slot signature mismatches (`DataViewAdapter._on_table_state_changed`).
+5. Corrected object access in `ChestBuddyApp._connect_signals` (e.g., using `_views` dictionary, using `_file_controller` for file actions).
+6. Added missing signal definitions (`status_message_changed`, etc.) to `DataViewController`, `ValidationService`, and `CorrectionController`.
+7. Commented out connections to non-existent signals (`preferences_requested`).
+8. Changed signal relay connection in `DataViewAdapter` to use standard Qt connect.
+9. Defined `CriticalError` exception in `app.py`.
+10. The SVG icon path issue and `RuntimeWarning: Failed to disconnect...` issues are noted but will be addressed separately.
+
+**Files Affected:**
+- `chestbuddy/ui/data_view.py`
+- `chestbuddy/ui/views/data_view_adapter.py`
+- `chestbuddy/app.py`
+- `chestbuddy/core/controllers/data_view_controller.py`
+- `chestbuddy/core/services/validation_service.py`
+- `chestbuddy/core/controllers/correction_controller.py`
+- (Potentially icon loading paths in delegates/utils)
+
+**Lessons Learned:**
+- Ensure all signal connections have corresponding slot methods implemented **with matching signatures**.
+- Verify that attribute names used for signal connections match the attribute names assigned during widget initialization.
+- When adding widgets to container widgets (like toolbars), retrieve the specific widget instance before connecting its signals in a different method.
+- Use standard Qt signal connection syntax (`source_signal.connect(target_slot)`) for direct connections, including relaying signals.
+- Ensure controller methods connected to UI actions have the correct names and exist on the target controller/service.
+- Double-check that signals being connected actually exist on the source object (e.g., `MainWindow` vs. `FileOperationsController`) and that the target object has the corresponding slot.
+- Verify signal definitions in source classes match connection attempts in dependent classes.
+- Initialization errors in child components can prevent parent components (like adapters) from initializing correctly, leading to cascading errors.
+- Verify resource paths, especially when constructing them dynamically.
+- Understand how components are stored and accessed within the application structure (e.g., views dictionary in MainWindow).
+- Define custom exceptions before raising them.
+
+## Resolved Issues (2024-08-07)
+
+### DataView Delegate Test Issues
+- **Problem**: Tests for the validation delegate were failing due to changes in the display and interaction model
+- **Resolution**: Updated test cases to account for the new single-click correction UI implementation
+- **Fix Location**: `tests/dataview/test_delegates.py` 
+- **Validation**: All tests now pass correctly, confirming that the delegate properly renders validation states and handles correction interactions
+- **Notes**: The delegate implementation now fully supports the validation state visualization and correction workflow
