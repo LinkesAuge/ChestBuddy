@@ -14,18 +14,20 @@ import numpy as np
 from copy import deepcopy
 from datetime import datetime
 import logging
+from PySide6.QtCore import Signal, QObject
 
 from chestbuddy.core.models.correction_rule import CorrectionRule
 from chestbuddy.core.models.correction_rule_manager import CorrectionRuleManager
 from chestbuddy.core.enums.validation_enums import ValidationStatus
 from chestbuddy.core.models.chest_data_model import ChestDataModel
 from chestbuddy.utils.config import ConfigManager
+from chestbuddy.core.table_state_manager import TableStateManager
 
 # Set up logger
 logger = logging.getLogger(__name__)
 
 
-class CorrectionService:
+class CorrectionService(QObject):
     """
     Service for applying correction rules to data.
 
@@ -39,21 +41,35 @@ class CorrectionService:
         _validation_service: Service for validating data cells
         _case_sensitive (bool): Whether to apply case-sensitive matching
         _correction_history (List[Dict]): History of applied corrections
+        correction_suggestions_available (Signal): Emitted with dict of suggestions {(row, col): [suggestions]}
+        _state_manager: Optional[TableStateManager] = None
     """
 
     # Maximum recursive iterations to prevent infinite loops
     MAX_ITERATIONS = 10
 
-    def __init__(self, data_model: ChestDataModel, config_manager: Optional[ConfigManager] = None):
+    # --- Add Signal Definition ---
+    correction_suggestions_available = Signal(dict)
+    # ---------------------------
+
+    def __init__(
+        self,
+        data_model: ChestDataModel,
+        config_manager: Optional[ConfigManager] = None,
+        state_manager: Optional[TableStateManager] = None,
+    ):
         """
         Initialize the CorrectionService.
 
         Args:
             data_model: Data model containing the data to be corrected
             config_manager: Optional configuration manager for settings
+            state_manager: Optional TableStateManager instance
         """
+        super().__init__()
         self._data_model = data_model
         self._config_manager = config_manager
+        self._state_manager = state_manager
         self._rule_manager = CorrectionRuleManager(config_manager)
         self._validation_service = None  # Will be set separately
         self._case_sensitive = False
@@ -220,7 +236,7 @@ class CorrectionService:
         corrected_rows = set()
         corrected_cells = set()
 
-        # Apply corrections to the dataframe
+        # Apply corrections to the dataframe copy first
         for row, col, _, new_value in corrections:
             column_name = corrected_data.columns[col]
             corrected_data.at[row, column_name] = new_value
@@ -230,6 +246,17 @@ class CorrectionService:
         # Update the data model with corrected data
         if corrections:
             self._data_model.update_data(corrected_data)
+
+            # --- Reset state for corrected cells --- #
+            if self._state_manager:
+                for row, col, _, _ in corrections:
+                    logger.debug(f"Resetting state for corrected cell ({row}, {col})")
+                    self._state_manager.reset_cell_state(row, col)
+            else:
+                logger.warning(
+                    "State manager not set in CorrectionService, cannot reset cell state."
+                )
+            # -------------------------------------- #
 
         # Record in history
         stats = {
@@ -430,11 +457,19 @@ class CorrectionService:
 
         # Get validation status
         validation_status = None
-        if self._validation_service:
-            validation_status = self._validation_service.get_validation_status()
+        if self._state_manager:
+            # Assume TableStateManager has a method to provide the full status DataFrame
+            # This method needs to be implemented in TableStateManager
+            validation_status = self._state_manager.get_validation_status_df()
+        else:
+            logger.warning(
+                "TableStateManager not set in CorrectionService, cannot get validation status."
+            )
 
         if validation_status is None or validation_status.empty:
-            logger.warning("No validation status available to check for correctable cells")
+            logger.warning(
+                "No validation status available from StateManager to check for correctable cells"
+            )
             return []
 
         # Get enabled rules
@@ -590,3 +625,100 @@ class CorrectionService:
     def clear_correction_history(self) -> None:
         """Clear the correction history."""
         self._correction_history = []
+
+    # Add new method to get suggestions for a specific cell
+    def get_suggestions_for_cell(self, row_idx: int, col_idx: int) -> List[Dict]:
+        """
+        Find all applicable correction rule suggestions for a specific cell.
+
+        Args:
+            row_idx (int): The row index of the cell.
+            col_idx (int): The column index of the cell.
+
+        Returns:
+            List[Dict]: A list of suggestion dictionaries.
+                      Each dictionary contains keys like 'original', 'corrected',
+                      'rule_id', 'category'. Returns empty list if no suggestions found.
+        """
+        suggestions = []
+        data = self._data_model.data
+        if data is None or data.empty or row_idx >= len(data) or col_idx >= len(data.columns):
+            return suggestions
+
+        col_name = data.columns[col_idx]
+        cell_value = data.at[row_idx, col_name]
+
+        # Skip empty or NaN values
+        if cell_value is None or (isinstance(cell_value, float) and np.isnan(cell_value)):
+            return suggestions
+
+        cell_value_str = str(cell_value)
+        col_category = self._get_column_category(col_name)
+
+        # Get enabled rules applicable to this column's category or general
+        rules = self._rule_manager.get_rules(status="enabled")
+        applicable_rules = [
+            r
+            for r in rules
+            if r.category.lower() == col_category or r.category.lower() == "general"
+        ]
+
+        for rule in applicable_rules:
+            # Check if the rule's from_value matches the cell value
+            if self._values_match(cell_value_str, str(rule.from_value)):
+                # Add suggestion based on this rule
+                suggestion = {
+                    "original": cell_value_str,
+                    "corrected": rule.to_value,
+                    "rule_id": getattr(rule, "id", None),  # Assuming rule has an ID
+                    "category": rule.category,
+                    # Add confidence score if available/relevant
+                }
+                suggestions.append(suggestion)
+
+        return suggestions
+
+    # --- Method to Find and Emit Suggestions ---
+    def find_and_emit_suggestions(self) -> None:
+        """
+        Finds all cells with available corrections based on enabled rules
+        and emits the `correction_suggestions_available` signal with the
+        detailed suggestions for those cells.
+        """
+        logger.info("Finding correction suggestions...")
+        correctable_cells = self.get_cells_with_available_corrections()
+
+        if not correctable_cells:
+            logger.info("No cells found with available corrections.")
+            # Emit empty dict? Or maybe only emit if suggestions ARE found?
+            # Let's emit only if suggestions exist to avoid empty signals.
+            # self.correction_suggestions_available.emit({})
+            return
+
+        suggestions_payload: Dict[Tuple[int, int], List[Dict]] = {}
+        for row_idx, col_idx in correctable_cells:
+            suggestions = self.get_suggestions_for_cell(row_idx, col_idx)
+            if suggestions:  # Only add if suggestions were actually found for this cell
+                suggestions_payload[(row_idx, col_idx)] = suggestions
+
+        if suggestions_payload:
+            logger.info(f"Found suggestions for {len(suggestions_payload)} cells. Emitting signal.")
+            try:
+                self.correction_suggestions_available.emit(suggestions_payload)
+                logger.debug("correction_suggestions_available signal emitted successfully.")
+            except Exception as e:
+                logger.error(f"Error emitting correction_suggestions_available signal: {e}")
+        else:
+            logger.info(
+                "Found potentially correctable cells, but no specific suggestions generated."
+            )
+
+    # --- Add Setter for State Manager (Optional but good practice) ---
+    def set_state_manager(self, state_manager: TableStateManager) -> None:
+        """
+        Set the TableStateManager instance.
+        """
+        self._state_manager = state_manager
+        logger.info("TableStateManager set for CorrectionService")
+
+    # ----------------------------------------------------------------

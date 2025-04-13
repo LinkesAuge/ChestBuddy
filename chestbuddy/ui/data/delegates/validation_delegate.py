@@ -6,7 +6,7 @@ Delegate responsible for visualizing validation status in cells.
 
 from PySide6.QtWidgets import QStyledItemDelegate, QStyleOptionViewItem
 from PySide6.QtCore import QModelIndex, Qt, QSize
-from PySide6.QtGui import QPainter, QColor, QIcon, QHelpEvent
+from PySide6.QtGui import QPainter, QColor, QIcon, QHelpEvent, QPalette
 from PySide6.QtWidgets import (
     QStyledItemDelegate,
     QStyleOptionViewItem,
@@ -72,7 +72,8 @@ class ValidationDelegate(CellDelegate):
         if validation_status and validation_status != CellState.VALID:
             color = self.STATUS_COLORS.get(validation_status)
             if color:
-                painter.fillRect(option.rect, color)
+                # Modify the palette for the background
+                option.palette.setColor(QPalette.Window, color)
 
         # Call the base class paint method to draw text and standard elements
         super().paint(painter, option, index)

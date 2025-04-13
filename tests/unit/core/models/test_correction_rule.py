@@ -25,7 +25,6 @@ class TestCorrectionRule:
         assert rule.from_value == "Incorrect"
         assert rule.category == "player"
         assert rule.status == "enabled"  # default value
-        assert rule.order == 0  # default value
 
     def test_creation_with_all_parameters(self):
         """Test creating a rule with all parameters specified."""
@@ -34,14 +33,12 @@ class TestCorrectionRule:
             from_value="Incorrect",
             category="chest_type",
             status="disabled",
-            order=5,
         )
 
         assert rule.to_value == "Correct"
         assert rule.from_value == "Incorrect"
         assert rule.category == "chest_type"
         assert rule.status == "disabled"
-        assert rule.order == 5
 
     def test_equality_comparison_equal(self):
         """Test that two rules with same values are considered equal."""
@@ -71,10 +68,6 @@ class TestCorrectionRule:
         rule5 = CorrectionRule("Correct", "Incorrect", "player", status="disabled")
         assert rule1 == rule5
 
-        # Different order doesn't affect equality
-        rule6 = CorrectionRule("Correct", "Incorrect", "player", order=10)
-        assert rule1 == rule6
-
     def test_equality_with_non_rule(self):
         """Test equality comparison with non-CorrectionRule objects."""
         rule = CorrectionRule("Correct", "Incorrect", "player")
@@ -91,7 +84,6 @@ class TestCorrectionRule:
             from_value="Incorrect",
             category="source",
             status="disabled",
-            order=5,
         )
 
         rule_dict = rule.to_dict()
@@ -100,10 +92,10 @@ class TestCorrectionRule:
         assert rule_dict["From"] == "Incorrect"
         assert rule_dict["Category"] == "source"
         assert rule_dict["Status"] == "disabled"
-        assert rule_dict["Order"] == 5
+        assert "Order" not in rule_dict
 
     def test_from_dict_with_all_fields(self):
-        """Test creating a rule from a dictionary with all fields."""
+        """Test creating a rule from a dictionary with all fields (including ignored Order)."""
         rule_dict = {
             "To": "Correct",
             "From": "Incorrect",
@@ -118,7 +110,7 @@ class TestCorrectionRule:
         assert rule.from_value == "Incorrect"
         assert rule.category == "general"
         assert rule.status == "enabled"
-        assert rule.order == 3
+        assert not hasattr(rule, "order")
 
     def test_from_dict_with_minimal_fields(self):
         """Test creating a rule from a dictionary with minimal fields."""
@@ -128,21 +120,25 @@ class TestCorrectionRule:
 
         assert rule.to_value == "Correct"
         assert rule.from_value == "Incorrect"
-        assert rule.category == "general"  # default value
-        assert rule.status == "enabled"  # default value
-        assert rule.order == 0  # default value
+        assert rule.category == "general"
+        assert rule.status == "enabled"
+        assert not hasattr(rule, "order")
 
     def test_from_dict_with_empty_order(self):
-        """Test creating a rule from a dictionary with empty order string."""
+        """Test creating a rule from a dictionary with empty order string (ignored)."""
         rule_dict = {"To": "Correct", "From": "Incorrect", "Order": ""}
 
         rule = CorrectionRule.from_dict(rule_dict)
 
-        assert rule.order == 0  # should default to 0 for empty strings
+        assert rule.to_value == "Correct"
+        assert rule.from_value == "Incorrect"
+        assert rule.category == "general"
+        assert rule.status == "enabled"
+        assert not hasattr(rule, "order")
 
     def test_string_representation(self):
         """Test the string representation of a rule."""
-        rule = CorrectionRule("Correct", "Incorrect", "player", "enabled", 5)
+        rule = CorrectionRule("Correct", "Incorrect", "player", "enabled")
         representation = repr(rule)
 
         assert "CorrectionRule" in representation
@@ -150,4 +146,4 @@ class TestCorrectionRule:
         assert "from='Incorrect'" in representation
         assert "category='player'" in representation
         assert "status='enabled'" in representation
-        assert "order=5" in representation
+        assert "order=" not in representation

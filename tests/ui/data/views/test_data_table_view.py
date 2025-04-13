@@ -12,7 +12,7 @@ from PySide6.QtCore import (
     QItemSelectionModel,
 )
 from PySide6.QtWidgets import QTableView, QMenu
-from PySide6.QtTest import QTest
+from PySide6.QtTest import QTest, QSignalSpy
 from unittest.mock import MagicMock, patch
 
 from chestbuddy.ui.data.views.data_table_view import DataTableView
@@ -20,6 +20,11 @@ from chestbuddy.ui.data.models.data_view_model import DataViewModel
 from PySide6.QtCore import QAbstractItemModel
 from chestbuddy.core.table_state_manager import TableStateManager
 from chestbuddy.ui.data.delegates.cell_delegate import CellDelegate
+from chestbuddy.ui.data.delegates.correction_delegate import (
+    CorrectionDelegate,
+    CorrectionSuggestion,
+)
+from chestbuddy.core.enums.validation_enums import ValidationStatus
 
 # Fixtures like qapp and mock_chest_data_model are expected from conftest.py
 
@@ -401,4 +406,65 @@ class TestDataTableView:
         """Test that delegate signals are disconnected and reconnected when model changes."""
         # ... existing code ...
 
-    # --- Other Tests ---
+    # --- New Test for Correction Signal --- #
+    def test_correction_apply_signal_emission(self, qapp, view_model, qtbot, mocker):
+        """Test that the correction_apply_requested signal is emitted correctly."""
+        view = DataTableView()
+
+        # Mock the model to provide suggestions for a specific cell
+        mock_suggestion = MagicMock(spec=CorrectionSuggestion)
+        mock_suggestion.corrected_value = "Corrected!"
+        test_row, test_col = 1, 2
+
+        # Store original data method
+        original_data_method = view_model.data
+
+        def mock_data_side_effect(index, role):
+            if index.row() == test_row and index.column() == test_col:
+                if role == DataViewModel.CorrectionSuggestionsRole:
+                    return [mock_suggestion]
+                if role == DataViewModel.ValidationStateRole:
+                    return CellState.CORRECTABLE
+                if role == Qt.DisplayRole:
+                    return "Original"
+            # Call original method for other cells/roles
+            # Make sure original_data_method captures the correct instance method
+            # Need to bind it if it's not already bound
+            bound_original_data = original_data_method.__get__(view_model, DataViewModel)
+            return bound_original_data(index, role)
+
+        # Patch the data method of the specific view_model instance
+        mocker.patch.object(view_model, "data", side_effect=mock_data_side_effect)
+
+        view.setModel(view_model)
+        view.show()
+        qtbot.addWidget(view)
+
+        # Get the correction delegate instance from the view
+        delegate = view.table_view.itemDelegate()
+        assert isinstance(delegate, CorrectionDelegate)
+
+        # Spy on the DataTableView's signal
+        view_signal_spy = QSignalSpy(view.correction_apply_requested)
+        assert view_signal_spy.isValid()
+
+        # Simulate the delegate emitting its signal
+        proxy_index = view.model().index(test_row, test_col)
+        source_index = view.sourceModel().index(test_row, test_col)
+
+        # Directly emit the delegate's signal with the proxy index
+        delegate.apply_first_correction_requested.emit(proxy_index)
+
+        # Verify the view's signal was emitted
+        assert len(view_signal_spy) == 1, f"Signal count: {len(view_signal_spy)}"
+        # Verify the arguments: source_index and the suggestion
+        assert len(view_signal_spy[0]) == 2
+        emitted_index = view_signal_spy[0][0]
+        emitted_suggestion = view_signal_spy[0][1]
+
+        assert emitted_index.row() == source_index.row()
+        assert emitted_index.column() == source_index.column()
+        assert emitted_suggestion == mock_suggestion
+
+    # --- Existing Tests --- #
+    # ... rest of the tests ...

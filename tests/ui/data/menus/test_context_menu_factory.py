@@ -57,6 +57,12 @@ class MockModel:
             return ["mock_suggestion"]  # Return something to enable the action
         return []
 
+    def headerData(self, section, orientation, role=Qt.DisplayRole):
+        """Mock headerData method."""
+        if role == Qt.DisplayRole:
+            return f"Header {section}"
+        return None
+
 
 @pytest.fixture
 def mock_qwidget(qapp):  # Need qapp for QWidget

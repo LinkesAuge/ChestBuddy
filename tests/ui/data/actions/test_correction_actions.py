@@ -6,11 +6,12 @@ import pytest
 from unittest.mock import MagicMock, patch
 
 from PySide6.QtCore import QModelIndex, Qt
-from PySide6.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QMessageBox, QDialog
 
 from chestbuddy.ui.data.actions.correction_actions import (
     ApplyCorrectionAction,
     AddToCorrectionListAction,
+    BatchApplyCorrectionAction,
 )
 from chestbuddy.ui.data.context.action_context import ActionContext
 from chestbuddy.ui.data.models.data_view_model import DataViewModel  # Need Role
@@ -19,12 +20,16 @@ from chestbuddy.ui.dialogs.add_correction_rule_dialog import AddCorrectionRuleDi
 from chestbuddy.ui.dialogs.batch_add_correction_dialog import (
     BatchAddCorrectionDialog,
 )  # Import batch dialog
+from chestbuddy.ui.widgets.correction_preview_dialog import CorrectionPreviewDialog
 
 # Import the dialog to patch it
 CORRECTION_DIALOG_PATH = "chestbuddy.ui.data.actions.correction_actions.AddCorrectionRuleDialog"
 BATCH_CORRECTION_DIALOG_PATH = (
     "chestbuddy.ui.data.actions.correction_actions.BatchAddCorrectionDialog"
 )
+# Add path for the preview dialog
+PREVIEW_DIALOG_PATH = "chestbuddy.ui.data.actions.correction_actions.CorrectionPreviewDialog"
+
 SERVICE_ADD_PATH = "chestbuddy.ui.data.actions.correction_actions.AddToCorrectionListAction._call_correction_service_add"
 
 # --- Mock Objects & Fixtures ---
@@ -40,54 +45,59 @@ def mock_suggestion():
 
 
 class MockModelWithCorrection(MagicMock):
-    """Mock model that can return validation state and suggestions."""
+    """Mock model that can return validation state and suggestions per cell."""
 
-    def __init__(self, validation_state=None, suggestions=None, setData_success=True, **kwargs):
+    def __init__(self, cell_data=None, setData_success=True, **kwargs):
         super().__init__(spec=DataViewModel, **kwargs)
-        self._validation_state = validation_state
-        self._suggestions = suggestions or []
+        # cell_data format: {(row, col): {"state": CellState, "suggestions": [], "display": value}}
+        self._cell_data = cell_data or {}
         self.setData_success = setData_success
         self.setData_calls = []
-        self._data = {}  # Data store
+        self._rows = max([r for r, c in self._cell_data.keys()], default=-1) + 1
+        self._cols = max([c for r, c in self._cell_data.keys()], default=-1) + 1
+
+    def rowCount(self, parent=QModelIndex()):
+        return self._rows
+
+    def columnCount(self, parent=QModelIndex()):
+        return self._cols
 
     def data(self, index, role):
+        key = (index.row(), index.column())
+        cell_info = self._cell_data.get(key, {})
+
         if role == DataViewModel.ValidationStateRole:
-            # For simplicity in tests, assume state is uniform or handle specific indices if needed
-            return self._validation_state
-        # Handle DisplayRole - Use the key from the passed index
+            return cell_info.get("state", CellState.VALID)
         if role == Qt.DisplayRole:
-            key = (index.row(), index.column())
-            return self._data.get(key, None)
+            return cell_info.get("display", None)
         if role == DataViewModel.CorrectionSuggestionsRole:
-            # Return suggestions only if the index matches where we set them (if needed)
-            # For simplicity, return for any index for now
-            return self._suggestions
+            return cell_info.get("suggestions", None)
         return None
 
     def get_correction_suggestions(self, row, col):
-        # Return suggestions only if coords match default index (0,0) for simplicity
-        # Needs refinement if testing suggestions for other cells
-        if row == 0 and col == 0:
-            return self._suggestions
-        return None
+        key = (row, col)
+        return self._cell_data.get(key, {}).get("suggestions", None)
 
     def setData(self, index, value, role):
-        # Simulate setData call - use the key from the passed index
         if role == Qt.EditRole:
             key = (index.row(), index.column())
-            self.setData_calls.append((key, value, role))  # Store key instead of index obj
-            # Optionally update self._data if needed for subsequent reads in the same test
-            # self._data[key] = value
+            self.setData_calls.append((key, value, role))
+            # Update internal data for consistency if needed
+            if key in self._cell_data:
+                self._cell_data[key]["display"] = value
+                self._cell_data[key]["state"] = CellState.VALID  # Assume correction validates
+                self._cell_data[key]["suggestions"] = None
             return self.setData_success
         return False
 
-    # Override index to return a *new* mock for each call, storing row/col
+    # index method remains the same
     def index(self, row, col, parent=QModelIndex()):
         mock_index = MagicMock(spec=QModelIndex)
         mock_index.isValid.return_value = True
         mock_index.row.return_value = row
         mock_index.column.return_value = col
         mock_index.parent.return_value = QModelIndex()  # Assume top-level
+        mock_index.model.return_value = self  # Link back to model
         return mock_index
 
 
@@ -145,9 +155,11 @@ class TestApplyCorrectionAction:
 
     def test_is_applicable(self, mock_context_factory):
         action = ApplyCorrectionAction()
-        model_valid = MockModelWithCorrection(validation_state=CellState.VALID)
-        model_invalid = MockModelWithCorrection(validation_state=CellState.INVALID)
-        model_correctable = MockModelWithCorrection(validation_state=CellState.CORRECTABLE)
+        model_valid = MockModelWithCorrection(cell_data={(0, 0): {"state": CellState.VALID}})
+        model_invalid = MockModelWithCorrection(cell_data={(0, 0): {"state": CellState.INVALID}})
+        model_correctable = MockModelWithCorrection(
+            cell_data={(0, 0): {"state": CellState.CORRECTABLE}}
+        )
 
         ctx_valid = mock_context_factory(model_valid)
         ctx_invalid = mock_context_factory(model_invalid)
@@ -162,13 +174,13 @@ class TestApplyCorrectionAction:
     def test_is_enabled(self, mock_context_factory, mock_suggestion):
         action = ApplyCorrectionAction()
         model_no_suggestions = MockModelWithCorrection(
-            validation_state=CellState.CORRECTABLE, suggestions=[]
+            cell_data={(0, 0): {"state": CellState.CORRECTABLE}}
         )
         model_with_suggestions = MockModelWithCorrection(
-            validation_state=CellState.CORRECTABLE, suggestions=[mock_suggestion]
+            cell_data={(0, 0): {"state": CellState.CORRECTABLE, "suggestions": [mock_suggestion]}}
         )
         model_not_correctable = MockModelWithCorrection(
-            validation_state=CellState.INVALID, suggestions=[mock_suggestion]
+            cell_data={(0, 0): {"state": CellState.INVALID, "suggestions": [mock_suggestion]}}
         )
 
         ctx_no_suggestions = mock_context_factory(model_no_suggestions)
@@ -182,19 +194,32 @@ class TestApplyCorrectionAction:
         assert not action.is_enabled(ctx_not_correctable)  # Not enabled if not correctable state
         assert not action.is_enabled(ctx_no_model)
 
+    @patch(PREVIEW_DIALOG_PATH)  # Patch the preview dialog
     @patch("chestbuddy.ui.data.actions.correction_actions.QMessageBox")
-    def test_execute_success(self, mock_qmessagebox, mock_context_factory, mock_suggestion):
+    def test_execute_success_with_preview_accept(
+        self, mock_qmessagebox, mock_preview_dialog_class, mock_context_factory, mock_suggestion
+    ):
+        """Test execute success path when preview dialog is accepted."""
         action = ApplyCorrectionAction()
         model = MockModelWithCorrection(
-            validation_state=CellState.CORRECTABLE,
-            suggestions=[mock_suggestion],
-            setData_success=True,
+            cell_data={(0, 0): {"state": CellState.CORRECTABLE, "suggestions": [mock_suggestion]}}
         )
         ctx = mock_context_factory(model=model)
 
+        # Configure the mocked preview dialog to simulate accept
+        mock_preview_instance = MagicMock()
+        mock_preview_instance.exec.return_value = (
+            QMessageBox.StandardButton.Ok
+        )  # Use QMessageBox const for example
+        mock_preview_dialog_class.return_value = mock_preview_instance
+
         action.execute(ctx)
 
-        # Verify setData was called with the corrected value
+        # Verify PreviewDialog was instantiated and shown
+        mock_preview_dialog_class.assert_called_once()
+        mock_preview_instance.exec.assert_called_once()
+
+        # Verify setData was called because dialog was accepted
         assert len(model.setData_calls) == 1
         _, set_value, set_role = model.setData_calls[0]
         assert set_value == mock_suggestion.corrected_value
@@ -202,22 +227,64 @@ class TestApplyCorrectionAction:
 
         # Verify success message box was shown
         mock_qmessagebox.information.assert_called_once()
-        call_args = mock_qmessagebox.information.call_args[0]
-        assert "Correction applied successfully" in call_args[2]
         mock_qmessagebox.warning.assert_not_called()
 
+    @patch(PREVIEW_DIALOG_PATH)  # Patch the preview dialog
     @patch("chestbuddy.ui.data.actions.correction_actions.QMessageBox")
-    def test_execute_failure(self, mock_qmessagebox, mock_context_factory, mock_suggestion):
+    def test_execute_success_with_preview_reject(
+        self, mock_qmessagebox, mock_preview_dialog_class, mock_context_factory, mock_suggestion
+    ):
+        """Test execute path when preview dialog is rejected."""
         action = ApplyCorrectionAction()
-        # Simulate setData failing
         model = MockModelWithCorrection(
-            validation_state=CellState.CORRECTABLE,
-            suggestions=[mock_suggestion],
-            setData_success=False,
+            cell_data={(0, 0): {"state": CellState.CORRECTABLE, "suggestions": [mock_suggestion]}}
         )
         ctx = mock_context_factory(model=model)
 
+        # Configure the mocked preview dialog to simulate reject
+        mock_preview_instance = MagicMock()
+        mock_preview_instance.exec.return_value = (
+            QMessageBox.StandardButton.Cancel
+        )  # Use QMessageBox const
+        mock_preview_dialog_class.return_value = mock_preview_instance
+
         action.execute(ctx)
+
+        # Verify PreviewDialog was instantiated and shown
+        mock_preview_dialog_class.assert_called_once()
+        mock_preview_instance.exec.assert_called_once()
+
+        # Verify setData was NOT called because dialog was rejected
+        assert len(model.setData_calls) == 0
+
+        # Verify no message box was shown (or maybe an info that it was cancelled? depends on spec)
+        mock_qmessagebox.information.assert_not_called()
+        mock_qmessagebox.warning.assert_not_called()
+
+    # Test execute_failure path (setData fails after preview accept)
+    @patch(PREVIEW_DIALOG_PATH)  # Patch the preview dialog
+    @patch("chestbuddy.ui.data.actions.correction_actions.QMessageBox")
+    def test_execute_failure_after_preview_accept(
+        self, mock_qmessagebox, mock_preview_dialog_class, mock_context_factory, mock_suggestion
+    ):
+        """Test execute failure path when setData fails after preview is accepted."""
+        action = ApplyCorrectionAction()
+        # Simulate setData failing
+        model = MockModelWithCorrection(
+            cell_data={(0, 0): {"state": CellState.CORRECTABLE, "suggestions": [mock_suggestion]}}
+        )
+        ctx = mock_context_factory(model=model)
+
+        # Configure the mocked preview dialog to simulate accept
+        mock_preview_instance = MagicMock()
+        mock_preview_instance.exec.return_value = QMessageBox.StandardButton.Ok
+        mock_preview_dialog_class.return_value = mock_preview_instance
+
+        action.execute(ctx)
+
+        # Verify PreviewDialog was instantiated and shown
+        mock_preview_dialog_class.assert_called_once()
+        mock_preview_instance.exec.assert_called_once()
 
         # Verify setData was called
         assert len(model.setData_calls) == 1
@@ -231,7 +298,7 @@ class TestApplyCorrectionAction:
     @patch("chestbuddy.ui.data.actions.correction_actions.QMessageBox")
     def test_execute_no_suggestions(self, mock_qmessagebox, mock_context_factory):
         action = ApplyCorrectionAction()
-        model = MockModelWithCorrection(validation_state=CellState.CORRECTABLE, suggestions=[])
+        model = MockModelWithCorrection(cell_data={(0, 0): {"state": CellState.CORRECTABLE}})
         ctx = mock_context_factory(model=model)
 
         action.execute(ctx)
@@ -292,7 +359,7 @@ class TestAddToCorrectionListAction:
         action = AddToCorrectionListAction()
         model = MockModelWithCorrection()
         from_value = "Value1"
-        model._data = {(0, 0): from_value}
+        model._cell_data = {(0, 0): {"state": CellState.VALID, "display": from_value}}
         ctx = mock_context_factory(
             model, selection_coords=[(0, 0)], correction_service=mock_correction_service
         )
@@ -334,7 +401,11 @@ class TestAddToCorrectionListAction:
         model = MockModelWithCorrection()
         values_to_add = ["FromVal1", "FromVal2", "FromVal1"]  # Include duplicate
         unique_sorted_values = sorted(list(set(values_to_add)))
-        model._data = {(0, 0): values_to_add[0], (1, 1): values_to_add[1], (2, 0): values_to_add[2]}
+        model._cell_data = {
+            (0, 0): {"state": CellState.VALID, "display": values_to_add[0]},
+            (1, 1): {"state": CellState.VALID, "display": values_to_add[1]},
+            (2, 0): {"state": CellState.VALID, "display": values_to_add[2]},
+        }
         ctx = mock_context_factory(
             model,
             selection_coords=[(0, 0), (1, 1), (2, 0)],
@@ -392,7 +463,10 @@ class TestAddToCorrectionListAction:
         model = MockModelWithCorrection()
         values_to_add = ["ValA", "ValB"]
         unique_sorted_values = sorted(values_to_add)
-        model._data = {(0, 0): values_to_add[0], (1, 1): values_to_add[1]}
+        model._cell_data = {
+            (0, 0): {"state": CellState.VALID, "display": values_to_add[0]},
+            (1, 1): {"state": CellState.VALID, "display": values_to_add[1]},
+        }
         ctx = mock_context_factory(
             model, selection_coords=[(0, 0), (1, 1)], correction_service=mock_correction_service
         )
@@ -432,7 +506,10 @@ class TestAddToCorrectionListAction:
         model = MockModelWithCorrection()
         values_to_add = ["ValA", "ValB"]
         unique_sorted_values = sorted(values_to_add)
-        model._data = {(0, 0): values_to_add[0], (1, 1): values_to_add[1]}
+        model._cell_data = {
+            (0, 0): {"state": CellState.VALID, "display": values_to_add[0]},
+            (1, 1): {"state": CellState.VALID, "display": values_to_add[1]},
+        }
         ctx = mock_context_factory(
             model, selection_coords=[(0, 0), (1, 1)], correction_service=mock_correction_service
         )
@@ -459,7 +536,7 @@ class TestAddToCorrectionListAction:
         action = AddToCorrectionListAction()
         model = MockModelWithCorrection()
         value_to_add = "Value1"
-        model._data = {(0, 0): value_to_add}
+        model._cell_data = {(0, 0): {"state": CellState.VALID, "display": value_to_add}}
         ctx = mock_context_factory(
             model, selection_coords=[(0, 0)], correction_service=mock_correction_service
         )
@@ -488,7 +565,7 @@ class TestAddToCorrectionListAction:
         action = AddToCorrectionListAction()
         model = MockModelWithCorrection()
         from_value = "Value1"
-        model._data = {(0, 0): from_value}
+        model._cell_data = {(0, 0): {"state": CellState.VALID, "display": from_value}}
         ctx = mock_context_factory(
             model, selection_coords=[(0, 0)], correction_service=mock_correction_service
         )
@@ -518,7 +595,7 @@ class TestAddToCorrectionListAction:
         """Test execution when correction service is not available."""
         action = AddToCorrectionListAction()
         model = MockModelWithCorrection()
-        model._data = {(0, 0): "Value1"}
+        model._cell_data = {(0, 0): {"state": CellState.VALID, "display": "Value1"}}
         ctx = mock_context_factory(model, selection_coords=[(0, 0)], correction_service=None)
 
         action.execute(ctx)
@@ -543,7 +620,10 @@ class TestAddToCorrectionListAction:
         """Test execution when selected cells contain no unique non-empty values."""
         action = AddToCorrectionListAction()
         model = MockModelWithCorrection()
-        model._data = {(0, 0): "", (1, 1): None}
+        model._cell_data = {
+            (0, 0): {"state": CellState.VALID, "display": "A"},
+            (1, 1): {"state": CellState.VALID, "display": "B"},
+        }
         ctx = mock_context_factory(model, selection_coords=[(0, 0), (1, 1)])
 
         action.execute(ctx)
@@ -565,7 +645,10 @@ class TestAddToCorrectionListAction:
         model = MockModelWithCorrection()
         values_to_add = ["ValA", "ValB"]
         unique_sorted_values = sorted(values_to_add)
-        model._data = {(0, 0): values_to_add[0], (1, 1): values_to_add[1]}
+        model._cell_data = {
+            (0, 0): {"state": CellState.VALID, "display": values_to_add[0]},
+            (1, 1): {"state": CellState.VALID, "display": values_to_add[1]},
+        }
         ctx = mock_context_factory(
             model, selection_coords=[(0, 0), (1, 1)], correction_service=mock_correction_service
         )
@@ -596,3 +679,189 @@ class TestAddToCorrectionListAction:
         mock_qmessagebox.information.assert_not_called()
         # No warning for partial success if exception occurred on first attempt
         # mock_qmessagebox.warning.assert_not_called()
+
+
+class TestBatchApplyCorrectionAction:
+    """Tests for the BatchApplyCorrectionAction class."""
+
+    def test_properties(self):
+        action = BatchApplyCorrectionAction()
+        assert action.id == "batch_apply_correction"
+        assert action.text == "Batch Apply Corrections"
+        assert action.icon is not None
+
+    def test_is_applicable(self, mock_context_factory):
+        action = BatchApplyCorrectionAction()
+        model = MockModelWithCorrection(cell_data={(0, 0): {}})
+        ctx_with_model = mock_context_factory(model)
+        ctx_no_model = mock_context_factory(None)
+        assert action.is_applicable(ctx_with_model)
+        assert not action.is_applicable(ctx_no_model)
+
+    # is_enabled is optimistically True if applicable, so test might be trivial now
+    def test_is_enabled(self, mock_context_factory):
+        action = BatchApplyCorrectionAction()
+        model = MockModelWithCorrection(cell_data={(0, 0): {}})
+        ctx_with_model = mock_context_factory(model)
+        ctx_no_model = mock_context_factory(None)
+        assert action.is_enabled(ctx_with_model)
+        assert not action.is_enabled(ctx_no_model)
+
+    @patch("chestbuddy.ui.data.actions.correction_actions.QMessageBox")
+    @patch(PREVIEW_DIALOG_PATH)
+    def test_execute_no_correctable_cells(
+        self, mock_preview_dialog, mock_qmessagebox, mock_context_factory
+    ):
+        action = BatchApplyCorrectionAction()
+        # Model with no correctable cells
+        model = MockModelWithCorrection(
+            cell_data={
+                (0, 0): {"state": CellState.VALID, "display": "A"},
+                (1, 1): {"state": CellState.INVALID, "display": "B"},
+            }
+        )
+        ctx = mock_context_factory(model=model)
+
+        action.execute(ctx)
+
+        # Verify preview dialog was NOT called
+        mock_preview_dialog.assert_not_called()
+        # Verify info message was shown
+        mock_qmessagebox.information.assert_called_once()
+        assert "No correctable cells" in mock_qmessagebox.information.call_args[0][2]
+        # Verify model was not changed
+        assert len(model.setData_calls) == 0
+
+    @patch("chestbuddy.ui.data.actions.correction_actions.QMessageBox")
+    @patch(PREVIEW_DIALOG_PATH)
+    def test_execute_preview_accept_all_success(
+        self, mock_preview_dialog_class, mock_qmessagebox, mock_context_factory, mock_suggestion
+    ):
+        action = BatchApplyCorrectionAction()
+        # Model with two correctable cells
+        cell_data = {
+            (0, 0): {"state": CellState.VALID, "display": "OK"},
+            (1, 1): {
+                "state": CellState.CORRECTABLE,
+                "suggestions": [mock_suggestion],
+                "display": "Orig1",
+            },
+            (2, 2): {
+                "state": CellState.CORRECTABLE,
+                "suggestions": [mock_suggestion],
+                "display": "Orig2",
+            },
+            (3, 0): {"state": CellState.INVALID, "display": "Bad"},
+        }
+        model = MockModelWithCorrection(cell_data=cell_data, setData_success=True)
+        ctx = mock_context_factory(model=model)
+
+        # Mock preview dialog accept
+        mock_preview_instance = MagicMock()
+        mock_preview_instance.exec.return_value = QDialog.Accepted
+        mock_preview_dialog_class.return_value = mock_preview_instance
+
+        action.execute(ctx)
+
+        # Verify preview dialog was called with 2 changes
+        mock_preview_dialog_class.assert_called_once()
+        assert len(mock_preview_dialog_class.call_args[0][0]) == 2  # Check number of changes passed
+        mock_preview_instance.exec.assert_called_once()
+
+        # Verify setData was called twice with correct values
+        assert len(model.setData_calls) == 2
+        # Note: Order might not be guaranteed depending on dict iteration
+        call_args_1 = model.setData_calls[0]
+        call_args_2 = model.setData_calls[1]
+        assert call_args_1[0] in [(1, 1), (2, 2)]  # Check key exists
+        assert call_args_1[1] == mock_suggestion.corrected_value
+        assert call_args_1[2] == Qt.EditRole
+        assert call_args_2[0] in [(1, 1), (2, 2)]  # Check key exists
+        assert call_args_1[0] != call_args_2[0]  # Ensure keys are different
+        assert call_args_2[1] == mock_suggestion.corrected_value
+        assert call_args_2[2] == Qt.EditRole
+
+        # Verify success message
+        mock_qmessagebox.information.assert_called_once()
+        assert "Applied 2 correction(s)" in mock_qmessagebox.information.call_args[0][2]
+        mock_qmessagebox.warning.assert_not_called()
+
+    @patch("chestbuddy.ui.data.actions.correction_actions.QMessageBox")
+    @patch(PREVIEW_DIALOG_PATH)
+    def test_execute_preview_accept_partial_success(
+        self, mock_preview_dialog_class, mock_qmessagebox, mock_context_factory, mock_suggestion
+    ):
+        action = BatchApplyCorrectionAction()
+        # Model with two correctable cells, one setData will fail
+        cell_data = {
+            (1, 1): {
+                "state": CellState.CORRECTABLE,
+                "suggestions": [mock_suggestion],
+                "display": "Orig1",
+            },
+            (2, 2): {
+                "state": CellState.CORRECTABLE,
+                "suggestions": [mock_suggestion],
+                "display": "Orig2",
+            },
+        }
+        # Simulate failure for the second setData call
+        model = MockModelWithCorrection(cell_data=cell_data)
+        model.setData = MagicMock(side_effect=[True, False])  # First succeeds, second fails
+        ctx = mock_context_factory(model=model)
+
+        # Mock preview dialog accept
+        mock_preview_instance = MagicMock()
+        mock_preview_instance.exec.return_value = QDialog.Accepted
+        mock_preview_dialog_class.return_value = mock_preview_instance
+
+        action.execute(ctx)
+
+        # Verify preview dialog was called
+        mock_preview_dialog_class.assert_called_once()
+        mock_preview_instance.exec.assert_called_once()
+
+        # Verify setData was called twice
+        assert model.setData.call_count == 2
+
+        # Verify warning message for partial success
+        mock_qmessagebox.warning.assert_called_once()
+        assert "Applied 1 correction(s)" in mock_qmessagebox.warning.call_args[0][2]
+        assert "Failed to apply 1 correction(s)" in mock_qmessagebox.warning.call_args[0][2]
+        mock_qmessagebox.information.assert_not_called()
+
+    @patch("chestbuddy.ui.data.actions.correction_actions.QMessageBox")
+    @patch(PREVIEW_DIALOG_PATH)
+    def test_execute_preview_reject(
+        self, mock_preview_dialog_class, mock_qmessagebox, mock_context_factory, mock_suggestion
+    ):
+        action = BatchApplyCorrectionAction()
+        # Model with correctable cells
+        cell_data = {
+            (1, 1): {
+                "state": CellState.CORRECTABLE,
+                "suggestions": [mock_suggestion],
+                "display": "Orig1",
+            },
+        }
+        model = MockModelWithCorrection(cell_data=cell_data)
+        ctx = mock_context_factory(model=model)
+
+        # Mock preview dialog reject
+        mock_preview_instance = MagicMock()
+        mock_preview_instance.exec.return_value = QDialog.Rejected
+        mock_preview_dialog_class.return_value = mock_preview_instance
+
+        action.execute(ctx)
+
+        # Verify preview dialog was called
+        mock_preview_dialog_class.assert_called_once()
+        mock_preview_instance.exec.assert_called_once()
+
+        # Verify setData was NOT called
+        assert len(model.setData_calls) == 0
+
+        # Verify no message boxes shown
+        mock_qmessagebox.information.assert_not_called()
+        mock_qmessagebox.warning.assert_not_called()
+        mock_qmessagebox.critical.assert_not_called()

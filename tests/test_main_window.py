@@ -109,9 +109,9 @@ def data_model(app, sample_data):
 
 
 @pytest.fixture
-def validation_service(data_model):
+def validation_service(data_model, config_mock):
     """Create a validation service."""
-    return ValidationService(data_model)
+    return ValidationService(data_model, config_mock=config_mock)
 
 
 @pytest.fixture
@@ -121,9 +121,9 @@ def rule_manager():
 
 
 @pytest.fixture
-def correction_service(rule_manager, data_model, validation_service):
+def correction_service(rule_manager, data_model, validation_service, config_mock):
     """Create a correction service."""
-    return CorrectionService(rule_manager, data_model, validation_service)
+    return CorrectionService(rule_manager, data_model, validation_service, config_mock=config_mock)
 
 
 @pytest.fixture

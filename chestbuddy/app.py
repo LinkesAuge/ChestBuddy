@@ -43,6 +43,8 @@ from chestbuddy.utils.service_locator import ServiceLocator
 from chestbuddy.ui.utils.update_manager import UpdateManager
 from chestbuddy.core.models.correction_rule_manager import CorrectionRuleManager
 from chestbuddy.core.table_state_manager import TableStateManager
+from chestbuddy.ui.data.adapters.validation_adapter import ValidationAdapter
+from chestbuddy.ui.data.adapters.correction_adapter import CorrectionAdapter
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -94,7 +96,8 @@ class ChestBuddyApp(QObject):
 
             # Initialize table state manager
             self._table_state_manager = TableStateManager(self._data_model)
-            logger.info("TableStateManager initialized")
+            ServiceLocator.register("table_state_manager", self._table_state_manager)
+            logger.info("TableStateManager initialized and registered")
 
             # Create controllers - create error controller early
             self._error_controller = ErrorHandlingController(self._signal_manager)
@@ -108,13 +111,15 @@ class ChestBuddyApp(QObject):
                 self._data_manager = DataManager(self._data_model, self._csv_service)
 
                 self._validation_service = ValidationService(self._data_model, self._config_manager)
+                ServiceLocator.register("validation_service", self._validation_service)
+                logger.info("ValidationService initialized and registered")
 
                 # Initialize CorrectionRuleManager and CorrectionService with all required parameters
                 self._correction_rule_manager = CorrectionRuleManager(self._config_manager)
                 self._correction_service = CorrectionService(self._data_model, self._config_manager)
-
-                # Set validation service in correction service
                 self._correction_service._validation_service = self._validation_service
+                ServiceLocator.register("correction_service", self._correction_service)
+                logger.info("CorrectionService initialized and registered")
 
                 # Load correction rules
                 try:
@@ -125,8 +130,18 @@ class ChestBuddyApp(QObject):
 
                 self._chart_service = ChartService(self._data_model)
 
-                # Register services with ServiceLocator
-                ServiceLocator.register("validation_service", self._validation_service)
+                # Create and Connect Adapters
+                self._validation_adapter = ValidationAdapter(
+                    validation_service=self._validation_service,
+                    table_state_manager=self._table_state_manager,
+                )
+                logger.info("ValidationAdapter initialized and connected")
+
+                self._correction_adapter = CorrectionAdapter(
+                    correction_service=self._correction_service,
+                    table_state_manager=self._table_state_manager,
+                )
+                logger.info("CorrectionAdapter initialized and connected")
 
                 # Initialize DataManager with config_manager
                 self._data_manager._config = self._config_manager
@@ -152,25 +167,15 @@ class ChestBuddyApp(QObject):
                 )
 
                 # Initialize CorrectionController
-                try:
-                    self._correction_controller = CorrectionController(
-                        self._correction_service,
-                        self._correction_rule_manager,
-                        self._config_manager,
-                        self._validation_service,
-                        self._signal_manager,
-                    )
-                    logger.info("CorrectionController initialized")
-
-                    # Register the correction controller with ServiceLocator
-                    ServiceLocator.register("correction_controller", self._correction_controller)
-                    logger.info("CorrectionController registered with ServiceLocator")
-                except Exception as e:
-                    logger.error(f"Error initializing CorrectionController: {e}")
-                    self._error_controller.handle_exception(
-                        e, "Error initializing CorrectionController"
-                    )
-                    raise
+                self._correction_controller = CorrectionController(
+                    self._correction_service,
+                    self._correction_rule_manager,
+                    self._config_manager,
+                    self._validation_service,
+                    self._signal_manager,
+                )
+                ServiceLocator.register("correction_controller", self._correction_controller)
+                logger.info("CorrectionController initialized and registered")
 
             except Exception as e:
                 logger.error(f"Error initializing controllers: {e}")

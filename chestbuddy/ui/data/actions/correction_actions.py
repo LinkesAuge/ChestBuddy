@@ -1,7 +1,7 @@
 import typing
 from PySide6.QtGui import QIcon
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QMessageBox, QMenu
+from PySide6.QtWidgets import QMessageBox, QMenu, QDialog
 from unittest.mock import patch  # Temporary for simulation
 
 from .base_action import AbstractContextAction
@@ -10,6 +10,7 @@ from ..models.data_view_model import DataViewModel
 from chestbuddy.core.table_state_manager import CellState
 from chestbuddy.ui.dialogs.add_correction_rule_dialog import AddCorrectionRuleDialog
 from chestbuddy.ui.dialogs.batch_add_correction_dialog import BatchAddCorrectionDialog
+from chestbuddy.ui.widgets.correction_preview_dialog import CorrectionPreviewDialog
 # Placeholder for future dialog and service
 # from ...dialogs.add_correction_rule_dialog import AddCorrectionRuleDialog
 # from ....core.services.correction_service import CorrectionService
@@ -53,16 +54,16 @@ class ApplyCorrectionAction(AbstractContextAction):
         return suggestions is not None and len(suggestions) > 0
 
     def execute(self, context: ActionContext) -> None:
-        """Applies the first available correction suggestion."""
+        """Shows a preview and applies the selected correction."""
         if not context.model or not context.clicked_index.isValid():
             return
 
         row = context.clicked_index.row()
         col = context.clicked_index.column()
         suggestions = context.model.get_correction_suggestions(row, col)
+        original_value = context.model.data(context.clicked_index, Qt.DisplayRole)
 
         if not suggestions:
-            print(f"ApplyCorrectionAction: No suggestions found for ({row},{col}).")
             QMessageBox.information(
                 context.parent_widget,
                 "Apply Correction",
@@ -70,42 +71,46 @@ class ApplyCorrectionAction(AbstractContextAction):
             )
             return
 
-        # For now, apply the first suggestion automatically
-        # TODO: Handle multiple suggestions (e.g., show submenu/dialog)
+        # --- Prepare for Preview --- #
+        # Currently applies first suggestion. If multiple, might need selection first.
+        # Let's assume we apply the first one for now.
         first_suggestion = suggestions[0]
-
-        print(f"ApplyCorrectionAction: Applying suggestion {first_suggestion} to ({row},{col})")
-
-        # --- Placeholder for actual application logic ---
-        # This needs to interact with the model/service to change the data
-        # and potentially trigger re-validation.
-        # Example:
-        # success = context.model.apply_correction(row, col, first_suggestion)
-        success = False  # Placeholder
-        print(f"Calling model.setData for ({row}, {col})")
-        # success = context.model.apply_correction(row, col, first_suggestion)
-        # Mock success for now
-        # We need to define the structure of CorrectionSuggestion first
-        # Assuming suggestion has a 'corrected_value' attribute
-        corrected_value = getattr(first_suggestion, "corrected_value", "[Applied Correction]")
-        success = context.model.setData(context.clicked_index, corrected_value, Qt.EditRole)
-        print(f"setData called, success: {success}")
-        # else:
-        #      print("Error: DataViewModel does not have an apply_correction method.")
-        # --- End Placeholder ---
-
-        if success:
-            QMessageBox.information(
-                context.parent_widget,
-                "Apply Correction",
-                f"Correction applied successfully to cell ({row},{col}).",
-            )
-        else:
+        corrected_value = getattr(first_suggestion, "corrected_value", None)
+        if corrected_value is None:
             QMessageBox.warning(
                 context.parent_widget,
                 "Apply Correction",
-                f"Failed to apply correction to cell ({row},{col}).",
+                "Could not determine corrected value from suggestion.",
             )
+            return
+
+        changes_to_preview = [(context.clicked_index, original_value, corrected_value)]
+
+        # --- Show Preview Dialog --- #
+        preview_dialog = CorrectionPreviewDialog(changes_to_preview, context.parent_widget)
+        if preview_dialog.exec() == QDialog.Accepted:
+            print(f"ApplyCorrectionAction: Applying suggestion {first_suggestion} to ({row},{col})")
+
+            # --- Actual application logic --- #
+            # Replace placeholder with service call when ready
+            # success = context.correction_service.apply_suggestion(row, col, first_suggestion)
+            success = context.model.setData(context.clicked_index, corrected_value, Qt.EditRole)
+            print(f"setData called, success: {success}")
+
+            if success:
+                QMessageBox.information(
+                    context.parent_widget,
+                    "Apply Correction",
+                    f"Correction applied successfully to cell ({row},{col}).",
+                )
+            else:
+                QMessageBox.warning(
+                    context.parent_widget,
+                    "Apply Correction",
+                    f"Failed to apply correction to cell ({row},{col}).",
+                )
+        else:  # User clicked Cancel or closed the dialog
+            print(f"ApplyCorrectionAction: Correction cancelled by user for ({row},{col}).")
 
         print(f"ApplyCorrectionAction executed.")  # Debug
 
@@ -253,3 +258,105 @@ class AddToCorrectionListAction(AbstractContextAction):
             print(
                 f"AddToCorrectionListAction: Added {success_count}/{total_rules_attempted} rules."
             )
+
+
+# TODO: Create a BatchApplyCorrectionAction that gathers multiple suggestions
+# and passes them to the CorrectionPreviewDialog.
+
+
+class BatchApplyCorrectionAction(AbstractContextAction):
+    """Action to apply the first suggested correction to multiple cells in batch."""
+
+    @property
+    def id(self) -> str:
+        return "batch_apply_correction"
+
+    @property
+    def text(self) -> str:
+        return "Batch Apply Corrections"
+
+    @property
+    def icon(self) -> QIcon:
+        # Consider a different icon, maybe magic wand with plus?
+        return QIcon.fromTheme("edit-fix-all", QIcon(":/icons/edit-fix-all.png"))
+
+    def is_applicable(self, context: ActionContext) -> bool:
+        # Applicable if there's a model
+        return context.model is not None
+
+    def is_enabled(self, context: ActionContext) -> bool:
+        # Enabled if the model has *any* correctable cells (check might be expensive)
+        # For now, let's assume enabled if applicable, execute will check.
+        # A better approach might involve the model/state manager caching this.
+        if not self.is_applicable(context):
+            return False
+        # TODO: Maybe add a quick check if CorrectionService has suggestions pending?
+        return True  # Optimistically enabled
+
+    def execute(self, context: ActionContext) -> None:
+        """Gathers all correctable cells, shows preview, applies corrections if accepted."""
+        if not context.model:
+            return
+
+        source_model = context.model
+        changes_to_preview = []
+        print("BatchApplyCorrectionAction: Scanning for correctable cells...")
+
+        # Determine scope: selection or all? For now, let's do all.
+        # TODO: Add logic to check context.selection first
+        for row in range(source_model.rowCount()):
+            for col in range(source_model.columnCount()):
+                index = source_model.index(row, col)
+                if not index.isValid():
+                    continue
+
+                state = source_model.data(index, DataViewModel.ValidationStateRole)
+                if state == CellState.CORRECTABLE:
+                    suggestions = source_model.get_correction_suggestions(row, col)
+                    if suggestions and len(suggestions) > 0:
+                        first_suggestion = suggestions[0]
+                        corrected_value = getattr(first_suggestion, "corrected_value", None)
+                        if corrected_value is not None:
+                            original_value = source_model.data(index, Qt.DisplayRole)
+                            changes_to_preview.append((index, original_value, corrected_value))
+
+        if not changes_to_preview:
+            print("BatchApplyCorrectionAction: No correctable cells with suggestions found.")
+            QMessageBox.information(
+                context.parent_widget,
+                self.text,
+                "No correctable cells with suggestions found to apply.",
+            )
+            return
+
+        print(f"BatchApplyCorrectionAction: Found {len(changes_to_preview)} potential corrections.")
+
+        # Show Preview Dialog
+        preview_dialog = CorrectionPreviewDialog(changes_to_preview, context.parent_widget)
+        if preview_dialog.exec() == QDialog.Accepted:
+            print(f"BatchApplyCorrectionAction: Applying {len(changes_to_preview)} corrections...")
+            applied_count = 0
+            failed_count = 0
+            for index, _, corrected_value in changes_to_preview:
+                # Apply correction using model.setData
+                # TODO: Replace with service call if appropriate
+                if source_model.setData(index, corrected_value, Qt.EditRole):
+                    applied_count += 1
+                else:
+                    failed_count += 1
+                    print(
+                        f"BatchApplyCorrectionAction: Failed to apply correction at {index.row()},{index.column()}"
+                    )
+
+            # Show summary message
+            summary_message = f"Applied {applied_count} correction(s)."
+            if failed_count > 0:
+                summary_message += f"\nFailed to apply {failed_count} correction(s)."
+                QMessageBox.warning(context.parent_widget, self.text, summary_message)
+            else:
+                QMessageBox.information(context.parent_widget, self.text, summary_message)
+
+        else:
+            print("BatchApplyCorrectionAction: Batch correction cancelled by user.")
+
+        print(f"BatchApplyCorrectionAction executed.")  # Debug

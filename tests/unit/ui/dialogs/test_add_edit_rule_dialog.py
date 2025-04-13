@@ -80,21 +80,19 @@ class TestAddEditRuleDialog:
     def test_get_rule(self, qtbot, new_rule_dialog):
         """Test that get_rule returns a correctly configured rule."""
         # Set the input values
-        qtbot.keyClicks(new_rule_dialog._from_value, "test_from")
-        qtbot.keyClicks(new_rule_dialog._to_value, "test_to")
+        qtbot.keyClicks(new_rule_dialog._from_value, "OriginalValue")
+        qtbot.keyClicks(new_rule_dialog._to_value, "CorrectedValue")
         new_rule_dialog._category_combo.setCurrentText("chest_type")
         new_rule_dialog._disabled_radio.setChecked(True)
-        new_rule_dialog._order.setValue(10)
 
         # Get the rule
         rule = new_rule_dialog.get_rule()
 
         # Check that the rule has the correct values
-        assert rule.from_value == "test_from"
-        assert rule.to_value == "test_to"
+        assert rule.from_value == "OriginalValue"
+        assert rule.to_value == "CorrectedValue"
         assert rule.category == "chest_type"
         assert rule.status == "disabled"
-        assert rule.order == 10
 
     def test_validation(self, qtbot, new_rule_dialog):
         """Test that validation prevents empty values."""

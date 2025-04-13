@@ -34,9 +34,9 @@ def mock_correction_controller():
 
     # Mock rule data
     rules = [
-        CorrectionRule("test1", "corrected1", "general", "enabled", 0),
-        CorrectionRule("test2", "corrected2", "player", "enabled", 1),
-        CorrectionRule("test3", "corrected3", "chest_type", "disabled", 2),
+        CorrectionRule("test1", "corrected1", "general", "enabled"),
+        CorrectionRule("test2", "corrected2", "player", "enabled"),
+        CorrectionRule("test3", "corrected3", "chest_type", "disabled"),
     ]
 
     # Setup controller methods that the view will call
@@ -171,7 +171,7 @@ class TestCorrectionRuleView:
     def test_add_rule(self, qtbot, correction_rule_view, mock_correction_controller):
         """Test adding a new rule."""
         # Mock the add_rule_dialog to return a new rule
-        new_rule = CorrectionRule("new", "corrected", "general", "enabled", 3)
+        new_rule = CorrectionRule("new", "corrected", "general", "enabled")
         with patch("chestbuddy.ui.views.correction_rule_view.AddEditRuleDialog") as MockDialog:
             mock_dialog = MockDialog.return_value
             mock_dialog.exec.return_value = True
@@ -206,7 +206,7 @@ class TestCorrectionRuleView:
             mock_dialog = MockDialog.return_value
             mock_dialog.exec.return_value = True
             mock_dialog.get_rule.return_value = CorrectionRule(
-                "updated", "corrected", "general", "enabled", 1
+                "updated", "corrected", "general", "enabled"
             )
 
             # Call the method directly
@@ -330,10 +330,10 @@ class TestCorrectionRuleView:
         """Test that the status bar is updated correctly with proper format."""
         # Mock the rule counts
         mock_correction_controller.get_rules.return_value = [
-            CorrectionRule("test1", "corrected1", "general", "enabled", 0),
-            CorrectionRule("test2", "corrected2", "player", "enabled", 1),
-            CorrectionRule("test3", "corrected3", "chest_type", "disabled", 2),
-            CorrectionRule("test4", "corrected4", "source", "disabled", 3),
+            CorrectionRule("test1", "corrected1", "general", "enabled"),
+            CorrectionRule("test2", "corrected2", "player", "enabled"),
+            CorrectionRule("test3", "corrected3", "chest_type", "disabled"),
+            CorrectionRule("test4", "corrected4", "source", "disabled"),
         ]
 
         # Update the status bar
@@ -350,8 +350,8 @@ class TestCorrectionRuleView:
 
         # Test updating counts with different data
         mock_correction_controller.get_rules.return_value = [
-            CorrectionRule("test1", "corrected1", "general", "enabled", 0),
-            CorrectionRule("test3", "corrected3", "chest_type", "disabled", 2),
+            CorrectionRule("test1", "corrected1", "general", "enabled"),
+            CorrectionRule("test3", "corrected3", "chest_type", "disabled"),
         ]
 
         # Force update again

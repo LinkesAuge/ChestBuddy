@@ -50,21 +50,43 @@ def batch_dialog(qtbot, selected_cells, mock_validation_service):
 class TestBatchCorrectionDialog:
     """Test cases for the BatchCorrectionDialog class."""
 
-    def test_initialization(self, batch_dialog, selected_cells, mock_validation_service):
-        """Test that the dialog initializes correctly with all components."""
-        # Check that the title is set correctly
-        assert batch_dialog.windowTitle() == "Batch Correction Rules"
+    @pytest.fixture
+    def initial_data(self):
+        """Sample data for the dialog."""
+        return {
+            (0, 1): {"from": "val1", "to": "corrected1"},
+            (2, 3): {"from": "val2", "to": "corrected2"},
+        }
 
-        # Check that table is created and populated
-        assert isinstance(batch_dialog._corrections_table, QTableWidget)
-        assert batch_dialog._corrections_table.rowCount() == len(selected_cells)
+    @pytest.fixture
+    def dialog(self, qtbot, initial_data):
+        """Create BatchCorrectionDialog for testing."""
+        dlg = BatchCorrectionDialog(initial_data)
+        qtbot.addWidget(dlg)
+        return dlg
 
-        # Check that global options are created
-        assert isinstance(batch_dialog._auto_enable_checkbox, QCheckBox)
-        assert isinstance(batch_dialog._add_to_validation_checkbox, QCheckBox)
+    def test_initialization(self, dialog, initial_data):
+        """Test dialog initialization and population."""
+        assert dialog.table_widget.rowCount() == len(initial_data)
+        assert dialog.table_widget.item(0, 1).text() == "val1"
+        assert dialog.table_widget.item(1, 1).text() == "val2"
 
-        # Check that validation service was passed
-        assert batch_dialog._validation_service == mock_validation_service
+    def test_get_rules(self, dialog, initial_data):
+        """Test retrieving rules from the dialog."""
+        # Set category for the first row
+        combo_box = dialog.table_widget.cellWidget(0, 2)
+        combo_box.setCurrentText("player")
+
+        rules = dialog.get_rules()
+
+        assert len(rules) == len(initial_data)
+        assert isinstance(rules[0], CorrectionRule)
+        assert rules[0].from_value == "val1"
+        assert rules[0].to_value == "corrected1"
+        assert rules[0].category == "player"
+        # assert rules[0].order == 0 # Removed: Order does not exist
+        assert rules[1].category == "general"  # Default
+        # assert rules[1].order == 1 # Removed: Order does not exist
 
     def test_table_population(self, batch_dialog, selected_cells):
         """Test that the table is populated correctly with selected cells."""
@@ -111,28 +133,6 @@ class TestBatchCorrectionDialog:
 
         batch_dialog._add_to_validation_checkbox.setChecked(False)
         assert not batch_dialog._add_to_validation_checkbox.isChecked()
-
-    def test_get_rules(self, qtbot, batch_dialog, selected_cells):
-        """Test that get_rules returns correctly configured rules."""
-        # Set some values in the correction comboboxes
-        for row in range(batch_dialog._corrections_table.rowCount()):
-            correct_to_combo = batch_dialog._corrections_table.cellWidget(row, 2)
-
-            # Set the first item in the combobox
-            if correct_to_combo.count() > 0:
-                correct_to_combo.setCurrentIndex(0)
-
-        # Get the rules
-        rules = batch_dialog.get_rules()
-
-        # Should have a rule for each row
-        assert len(rules) == len(selected_cells)
-
-        # Check rule configuration
-        for i, rule in enumerate(rules):
-            assert rule.from_value == selected_cells[i]["value"]
-            assert rule.category == selected_cells[i]["column_name"]
-            assert rule.status == "enabled"  # Default from checkbox
 
     def test_accept_rejects_with_no_corrections(self, batch_dialog):
         """Test that accept() rejects if no corrections are specified."""

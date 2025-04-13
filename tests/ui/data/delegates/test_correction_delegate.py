@@ -3,9 +3,10 @@ Tests for the CorrectionDelegate class.
 """
 
 import pytest
-from PySide6.QtCore import Qt, QModelIndex, QRect, QSize
+from PySide6.QtCore import Qt, QModelIndex, QRect, QSize, QEvent, QPoint, Signal
 from PySide6.QtWidgets import QApplication, QStyleOptionViewItem
-from PySide6.QtGui import QPainter, QIcon, QColor
+from PySide6.QtGui import QPainter, QIcon, QColor, QMouseEvent
+from PySide6.QtTest import QSignalSpy
 
 from chestbuddy.ui.data.delegates.correction_delegate import (
     CorrectionDelegate,
@@ -24,9 +25,17 @@ class TestCorrectionDelegate:
     """Tests for the CorrectionDelegate class."""
 
     @pytest.fixture
-    def delegate(self, qapp):
+    def delegate_class(self):
+        """Return the CorrectionDelegate class for modification if needed."""
+        return CorrectionDelegate
+
+    @pytest.fixture
+    def delegate(self, delegate_class, qapp):
         """Create a CorrectionDelegate instance."""
-        return CorrectionDelegate()
+        # Ensure the signal exists on the class before instantiation for QSignalSpy
+        if not hasattr(delegate_class, "apply_first_correction_requested"):
+            delegate_class.apply_first_correction_requested = Signal(QModelIndex)
+        return delegate_class()
 
     @pytest.fixture
     def mock_painter(self, mocker):
@@ -156,5 +165,61 @@ class TestCorrectionDelegate:
 
         # Expect base size hint
         assert hint == base_hint
+
+    def test_indicator_click_emits_signal(self, delegate, style_option, mock_index, qtbot, mocker):
+        """Test clicking the correction indicator emits the correct signal."""
+        # Configure index for CORRECTABLE state
+        mock_index.data.side_effect = (
+            lambda role: ValidationStatus.CORRECTABLE
+            if role == DataViewModel.ValidationStateRole
+            else None
+        )
+
+        # Spy on the *instance's* signal
+        spy = QSignalSpy(delegate.apply_first_correction_requested)
+        assert spy.isValid()
+
+        # Calculate the indicator rect (assuming a helper method or calculation logic)
+        # Replicate potential logic from _paint_correction_indicator or a helper
+        indicator_rect = QRect(
+            style_option.rect.right() - delegate.ICON_SIZE - 2,  # 2px margin
+            style_option.rect.top() + (style_option.rect.height() - delegate.ICON_SIZE) // 2,
+            delegate.ICON_SIZE,
+            delegate.ICON_SIZE,
+        )
+        click_pos = indicator_rect.center()
+
+        # Simulate the mouse click event that would trigger editorEvent
+        # We need to simulate the view calling editorEvent
+        # Mock the view to control the event
+        mock_view = mocker.MagicMock()
+        # Simulate a MouseButtonPress event within the indicator rect
+        event = QMouseEvent(
+            QEvent.Type.MouseButtonPress,
+            click_pos,  # Local position within the cell
+            Qt.MouseButton.LeftButton,
+            Qt.MouseButton.LeftButton,
+            Qt.KeyboardModifier.NoModifier,
+        )
+
+        # Call editorEvent - the delegate method that should handle this
+        # Assuming editorEvent is overridden to handle this click
+        # The base QStyledItemDelegate.editorEvent might return False if no editor is created
+        # We expect our override to handle the click and return True, or emit the signal
+        # and potentially return False if no editor is meant to be opened.
+
+        # Mock the parent view's viewport for event processing if needed
+        mock_view.viewport.return_value = mocker.MagicMock()
+
+        # Call editorEvent
+        # Note: We might need to mock the model return value for Qt.EditRole if editorEvent checks it
+        delegate.editorEvent(event, mock_index.model(), style_option, mock_index)
+
+        # Assert the signal was emitted once
+        assert len(spy) == 1, f"Signal emitted {len(spy)} times, expected 1"
+
+        # Assert the signal was emitted with the correct index
+        assert len(spy[0]) == 1, "Signal emitted with incorrect number of arguments"
+        assert spy[0][0] == mock_index, "Signal emitted with incorrect QModelIndex"
 
     # TODO: Add tests for other overridden methods if implemented (e.g., createEditor)

@@ -5,10 +5,10 @@ Delegate responsible for visualizing correction status and handling correction a
 """
 
 from PySide6.QtWidgets import QStyleOptionViewItem
-from PySide6.QtCore import QModelIndex, Qt, QRect, QSize, QEvent, QObject, QPoint
-from PySide6.QtGui import QPainter, QIcon, QColor, QMouseEvent
+from PySide6.QtCore import QModelIndex, Qt, QRect, QSize, QEvent, QObject, QPoint, Signal
+from PySide6.QtGui import QPainter, QIcon, QColor, QMouseEvent, QHelpEvent
 from PySide6.QtCore import QAbstractItemModel
-from PySide6.QtWidgets import QMenu
+from PySide6.QtWidgets import QMenu, QToolTip
 
 # Use CellState from core, ValidationDelegate should also use it
 from chestbuddy.core.table_state_manager import CellState
@@ -35,7 +35,15 @@ class CorrectionDelegate(ValidationDelegate):
 
     Overrides the paint method to draw correction indicators (e.g., icons).
     May override createEditor or other methods to facilitate corrections.
+
+    Signals:
+        apply_first_correction_requested (QModelIndex): Emitted when the user clicks
+            the correction indicator, requesting the first available correction
+            be applied.
     """
+
+    # Define the signal
+    apply_first_correction_requested = Signal(QModelIndex)
 
     # Define icons or visual elements for correction
     # Example using a resource path for the icon
@@ -116,19 +124,25 @@ class CorrectionDelegate(ValidationDelegate):
     ) -> bool:
         """
         Handle events within the delegate, specifically mouse clicks on the indicator.
+        Emits `apply_first_correction_requested` if the indicator is clicked.
         """
         if not index.isValid():
             return False
 
         # Check if the cell is correctable
         is_correctable = index.data(DataViewModel.ValidationStateRole) == CellState.CORRECTABLE
-        if not is_correctable:
-            return super().editorEvent(event, model, option, index)
 
-        # Check for left mouse button release
-        if event.type() == QEvent.Type.MouseButtonRelease:
+        print(
+            f"Delegate editorEvent: type={event.type()}, index=({index.row()},{index.column()}), correctable={is_correctable}"
+        )  # Debug
+
+        # Check for left mouse button press
+        if event.type() == QEvent.Type.MouseButtonPress:
             mouse_event = QMouseEvent(event)  # Cast to QMouseEvent
-            if mouse_event.button() == Qt.MouseButton.LeftButton:
+            print(
+                f"Mouse Press: button={mouse_event.button()}, pos={mouse_event.pos()}, correctable={is_correctable}"
+            )  # Debug
+            if mouse_event.button() == Qt.MouseButton.LeftButton and is_correctable:
                 # Calculate indicator rect
                 icon_margin = 2
                 indicator_rect = QRect(
@@ -137,14 +151,25 @@ class CorrectionDelegate(ValidationDelegate):
                     self.ICON_SIZE,
                     self.ICON_SIZE,
                 )
+                print(f"Indicator Rect: {indicator_rect}, Click Pos: {mouse_event.pos()}")  # Debug
 
                 # Check if click was inside the indicator
                 if indicator_rect.contains(mouse_event.pos()):
                     print(
-                        f"Correction indicator clicked for index {index.row()},{index.column()}"
+                        f"Correction indicator CLICKED for index {index.row()},{index.column()}"
                     )  # Debug
-                    self._show_correction_menu(model, index, mouse_event.globalPos())
-                    return True  # Event handled
+                    self.apply_first_correction_requested.emit(index)
+                    return True  # Event handled, don't proceed further
+                else:
+                    print("Click was outside indicator rect.")  # Debug
+
+        # Handle other events (like right-click for menu) or pass to base class
+        if event.type() == QEvent.Type.MouseButtonRelease:
+            mouse_event = QMouseEvent(event)  # Cast again if needed
+            if mouse_event.button() == Qt.MouseButton.RightButton and is_correctable:
+                # Show context menu on right-click? Or handle elsewhere?
+                # For now, let base handle it or TableView handle context menu
+                pass
 
         return super().editorEvent(event, model, option, index)
 
@@ -184,3 +209,29 @@ class CorrectionDelegate(ValidationDelegate):
 
     # TODO: Override editorEvent or add button handling to show suggestions
     # when the indicator area is clicked.
+
+    def helpEvent(
+        self,
+        event: QHelpEvent,
+        view,
+        option: QStyleOptionViewItem,
+        index: QModelIndex,
+    ):
+        """Handles tooltip events to show detailed correction suggestions."""
+        if event.type() == QHelpEvent.Type.ToolTip and index.isValid():
+            suggestions = index.data(DataViewModel.CorrectionSuggestionsRole)
+            if suggestions:
+                suggestions_text = "Suggestions:\n" + "\n".join(
+                    [f"- {getattr(s, 'corrected_value', str(s))}" for s in suggestions]
+                )
+                QToolTip.showText(event.globalPos(), suggestions_text, view)
+                return True  # Event handled
+            # else:
+            # Fallback to default tooltip if no suggestions
+            # default_tooltip = index.data(Qt.ToolTipRole)
+            # if default_tooltip:
+            #    QToolTip.showText(event.globalPos(), str(default_tooltip), view)
+            #    return True
+
+        # Call the base class (ValidationDelegate) helpEvent for its tooltip logic
+        return super().helpEvent(event, view, option, index)

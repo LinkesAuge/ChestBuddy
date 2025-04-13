@@ -57,7 +57,7 @@ def temp_config_file():
 
 
 @pytest.fixture
-def enhanced_qtbot(qtbot):
+def my_custom_qtbot_wrapper(qtbot):
     """
     Enhanced version of qtbot with additional helper methods.
 

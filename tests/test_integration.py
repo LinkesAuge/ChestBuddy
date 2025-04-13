@@ -186,18 +186,22 @@ def data_model(app):
 
 
 @pytest.fixture(scope="function")
-def validation_service(data_model):
+def validation_service(data_model, config_mock):
     """Create and return a ValidationService instance."""
-    service = ValidationService(data_model)
+    # Pass config_mock to the service constructor
+    service = ValidationService(data_model, config_mock=config_mock)
     yield service
 
 
 @pytest.fixture(scope="function")
-def correction_service(data_model, validation_service):
+def correction_service(data_model, validation_service, config_mock):
     """Create and return a CorrectionService instance."""
     # Create a rule manager first
     rule_manager = CorrectionRuleManager()
-    service = CorrectionService(rule_manager, data_model, validation_service)
+    # Pass config_mock to the service constructor
+    service = CorrectionService(
+        rule_manager, data_model, validation_service, config_mock=config_mock
+    )
     yield service
 
 

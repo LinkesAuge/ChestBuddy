@@ -115,11 +115,11 @@ class PasteAction(AbstractContextAction):
             return False  # No text to paste
 
         # Determine target cell
-        target_index = context.clicked_index
         if context.selection:
             # Pasting usually targets the top-left of current selection
             # or just the active cell if no block selection
-            target_index = min(context.selection)
+            # Find the index with the minimum row, then minimum column
+            target_index = min(context.selection, key=lambda idx: (idx.row(), idx.column()))
 
         if not target_index.isValid():
             # Cannot paste if there's no valid target cell

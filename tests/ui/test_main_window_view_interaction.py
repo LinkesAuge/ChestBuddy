@@ -10,7 +10,7 @@ import pytest
 from unittest.mock import MagicMock, patch, call
 import logging
 
-from PySide6.QtCore import Qt, Signal, QObject
+from PySide6.QtCore import Qt, Signal, QObject, QModelIndex
 from PySide6.QtWidgets import QApplication, QWidget, QStackedWidget, QMessageBox
 
 from chestbuddy.ui.main_window import MainWindow
@@ -21,6 +21,9 @@ from chestbuddy.core.controllers.progress_controller import ProgressController
 from chestbuddy.core.controllers.ui_state_controller import UIStateController
 from chestbuddy.ui.widgets.sidebar_navigation import SidebarNavigation
 from chestbuddy.core.models import ChestDataModel
+from chestbuddy.utils.service_locator import ServiceLocator
+from chestbuddy.core.services import CorrectionService
+from chestbuddy.ui.data.delegates.correction_delegate import CorrectionSuggestion
 
 
 class MockSignal:
@@ -372,3 +375,60 @@ class TestMainWindowViewInteraction:
 
         # Verify sidebar.update_item_availability was called
         sidebar.update_item_availability.assert_called_with(availability)
+
+    @patch.object(ServiceLocator, "get_service")
+    def test_correction_apply_requested_signal(self, mock_get_service, main_window, qtbot):
+        """Test handling of correction_apply_requested signal from DataTableView."""
+        # Mock the CorrectionService returned by ServiceLocator
+        mock_correction_service = MagicMock(spec=CorrectionService)
+        mock_get_service.return_value = mock_correction_service
+
+        # Get the DataTableView instance (assuming it's under key 'Data')
+        # Need to ensure the view is the actual DataTableView or a mock that emits the signal
+        # Let's replace the mock view with a mock DataTableView for this test
+        mock_data_table_view = MagicMock(spec=DataTableView)
+        mock_data_table_view.correction_apply_requested = MockSignal(QModelIndex, object)
+        main_window._views["Data"] = mock_data_table_view
+        # Re-run connection logic might be needed if it happened before mock was inserted
+        # Or connect directly here for test isolation
+        mock_data_table_view.correction_apply_requested.connect(
+            main_window._on_correction_apply_requested
+        )
+
+        # Prepare mock data for the signal
+        mock_model = MagicMock(spec=QAbstractItemModel)
+        mock_index = QModelIndex()  # Use default invalid for simplicity, or mock properly
+
+        def mock_isValid():
+            return True
+
+        def mock_row():
+            return 5
+
+        def mock_column():
+            return 2
+
+        mock_index.isValid = mock_isValid
+        mock_index.row = mock_row
+        mock_index.column = mock_column
+
+        mock_suggestion = MagicMock(spec=CorrectionSuggestion)
+        mock_suggestion.corrected_value = "TestCorrection"
+
+        # Spy on the MainWindow slot
+        slot_spy = qtbot.createSignalSpy(main_window._on_correction_apply_requested)
+
+        # Emit the signal from the mock DataTableView
+        mock_data_table_view.correction_apply_requested.emit(mock_index, mock_suggestion)
+
+        # Verify the slot was called once
+        # assert slot_spy.count() == 1 # QSignalSpy doesn't work directly on slots
+        # Instead, verify the service call
+
+        # Verify ServiceLocator was called to get the service
+        mock_get_service.assert_called_once_with("correction_service")
+
+        # Verify the correction service method was called with correct args
+        mock_correction_service.apply_correction.assert_called_once_with(
+            mock_index.row(), mock_index.column(), mock_suggestion.corrected_value
+        )

@@ -6,13 +6,22 @@ import pytest
 from PySide6.QtCore import Qt, QModelIndex, QObject, Signal
 from PySide6.QtWidgets import QApplication
 
+# Import real services
+from chestbuddy.core.services.validation_service import ValidationService
+from chestbuddy.core.services.correction_service import CorrectionService
+from chestbuddy.core.table_state_manager import (
+    TableStateManager,
+    CellState,
+    CellFullState,
+)  # Add CellFullState
+
 # Placeholder types until actual classes are importable/defined
 import typing
 
 ChestDataModel = typing.NewType("ChestDataModel", object)
-TableStateManager = typing.NewType("TableStateManager", object)
-ValidationService = typing.NewType("ValidationService", object)
-CorrectionService = typing.NewType("CorrectionService", object)
+# TableStateManager = typing.NewType("TableStateManager", object) # Use real import
+# ValidationService = typing.NewType("ValidationService", object) # Use real import
+# CorrectionService = typing.NewType("CorrectionService", object) # Use real import
 
 
 @pytest.fixture(scope="session")
@@ -70,14 +79,19 @@ def sample_dataframe():
 @pytest.fixture
 def mock_validation_service(mocker):
     """Create a mock ValidationService for testing."""
+    # Keep spec for type checking where possible
     service = mocker.MagicMock(spec=ValidationService)
+    # Ensure necessary signals exist if services emit signals
+    # service.validation_complete = Signal(object) # Example if service has signals
     return service
 
 
 @pytest.fixture
 def mock_correction_service(mocker):
     """Create a mock CorrectionService for testing."""
+    # Keep spec for type checking where possible
     service = mocker.MagicMock(spec=CorrectionService)
+    # service.correction_available = Signal(object) # Example if service has signals
     return service
 
 
@@ -117,3 +131,22 @@ def mock_table_state_manager(mocker):
 
 # Make sure CellState is imported if used in mocks
 from chestbuddy.core.table_state_manager import CellState, CellFullState  # Add CellFullState
+
+
+# --- Add new fixtures for real services ---
+@pytest.fixture
+def real_validation_service():
+    """Provide a real instance of the ValidationService."""
+    # Add any necessary setup for the real service if needed
+    # e.g., providing mock dependencies if the service requires them
+    return ValidationService()
+
+
+@pytest.fixture
+def real_correction_service():
+    """Provide a real instance of the CorrectionService."""
+    # Add any necessary setup for the real service if needed
+    return CorrectionService()
+
+
+# --- End of new fixtures ---

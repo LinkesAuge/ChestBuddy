@@ -235,30 +235,60 @@ def test_config_validation_integration(config_manager, temp_config_dir):
 
 def test_default_list_integration(config_manager, data_model, temp_config_dir):
     """Test the integration of default validation lists."""
-    # Set up default list directory
-    default_dir = Path(temp_config_dir) / "default_lists"
-    default_dir.mkdir(exist_ok=True)
+    # Set up default list directory relative to the test run
+    # Assume a standard place for default lists within the project structure if needed
+    # For the test, we can force the fallback by mocking config_manager.get_path
+    # and then patch Path.exists to control which files appear to exist.
 
-    # Create default list files
-    players_default = default_dir / "players.txt"
-    players_default.write_text("DefaultPlayer1\nDefaultPlayer2\nDefaultPlayer3")
+    players_filename = "players.txt"
+    # Use a controlled temporary directory for the default file
+    default_file = Path(temp_config_dir) / players_filename
+    default_file.write_text("DefaultPlayer1\nDefaultPlayer2\nDefaultPlayer3")
 
-    # Create validation service and patch default lists dir
-    with patch(
-        "chestbuddy.core.services.validation_service.ValidationService._get_default_lists_dir"
-    ) as mock_dir:
-        mock_dir.return_value = default_dir
+    # Mock config_manager to force fallback to default path logic
+    with patch.object(config_manager, "get_path", return_value=None) as mock_get_path:
+        # Mock Path.exists to simulate the default file existing
+        original_exists = Path.exists
 
-        # Create validation service
-        validation_service = ValidationService(data_model, config_manager)
+        def mock_exists(path_obj):
+            if path_obj == default_file:
+                return True
+            # Check if it's asking about the *user* config path (it shouldn't exist yet)
+            user_config_path = config_manager._get_user_config_path(players_filename)
+            if path_obj == user_config_path:
+                return False
+            # Fallback to original for other paths if needed
+            return original_exists(path_obj)
 
-        # Check that player list path exists in the user's config directory
-        player_list_path = validation_service.get_validation_list_path("players")
-        assert player_list_path.exists()
+        with patch("pathlib.Path.exists", side_effect=mock_exists) as mock_path_exists:
+            # Patch the internal method that ValidationService uses to FIND the default dir
+            # Let's assume it uses an internal helper or searches relative paths.
+            # A simpler approach is to ensure the fallback logic in `_resolve_validation_path`
+            # can find our temp default file. Let's assume it checks a predefined default location.
+            # We'll patch THAT location finding mechanism.
+            with patch(
+                "chestbuddy.core.services.validation_service.ValidationService._get_default_validation_list_path",
+                return_value=default_file,  # Make it return our temp default file path
+            ) as mock_default_path_finder:
+                # Create validation service - it should now load the default
+                validation_service = ValidationService(data_model, config_manager)
 
-        # Check content of the file
-        with open(player_list_path, "r") as f:
-            content = f.read()
+                # Get the player list model
+                player_list_model = validation_service.get_player_list_model()
+                assert player_list_model is not None
 
-        # Should contain default players
-        assert "DefaultPlayer1" in content
+                # Check that the model loaded the default entries
+                entries = player_list_model.get_entries()
+                assert "DefaultPlayer1" in entries
+                assert "DefaultPlayer2" in entries
+                assert "DefaultPlayer3" in entries
+
+                # Verify the path used by the model is the *user* config path,
+                # even though it loaded from default initially.
+                expected_user_path = config_manager._get_user_config_path(players_filename)
+                assert player_list_model._file_path == expected_user_path
+
+                # Verify mocks were called as expected
+                mock_get_path.assert_called_with("Validation", "players_list_path", None)
+                # mock_path_exists might be called multiple times, check relevant calls
+                # mock_default_path_finder.assert_called_once() # Should be called to find the default

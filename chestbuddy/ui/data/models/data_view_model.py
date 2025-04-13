@@ -9,6 +9,8 @@ from PySide6.QtCore import QAbstractTableModel, Qt, QModelIndex, Signal, Slot
 from PySide6.QtGui import QColor
 import typing
 import pandas as pd
+import logging
+import numpy as np
 
 from chestbuddy.core.models import ChestDataModel  # Assuming this is the source model
 from chestbuddy.core.table_state_manager import TableStateManager, CellState, CellFullState
@@ -21,6 +23,9 @@ TableStateManager = typing.NewType("TableStateManager", object)  # Placeholder t
 
 # Placeholder for CorrectionSuggestion structure
 CorrectionSuggestion = typing.NewType("CorrectionSuggestion", object)
+
+# Add logger setup
+logger = logging.getLogger(__name__)
 
 
 class DataViewModel(QAbstractTableModel):
@@ -86,7 +91,6 @@ class DataViewModel(QAbstractTableModel):
                 except RuntimeError:
                     pass  # Signal was not connected
                 self._source_model.data_changed.connect(self._on_source_data_changed)
-                print("Successfully connected source model data_changed signal.")  # Debug
             except Exception as e:
                 print(f"Error connecting source model data_changed signal: {e}")  # Debug
         else:
@@ -96,19 +100,20 @@ class DataViewModel(QAbstractTableModel):
         """Connect signals from the TableStateManager."""
         if self._state_manager and hasattr(self._state_manager, "state_changed"):
             try:
-                # Disconnect first
+                # Attempt to disconnect first, ignore error if not connected
                 try:
                     self._state_manager.state_changed.disconnect(
                         self._on_state_manager_state_changed
                     )
                 except RuntimeError:
-                    pass
+                    pass  # Signal wasn't connected, which is fine
+
+                # Connect the signal
                 self._state_manager.state_changed.connect(self._on_state_manager_state_changed)
-                print("Successfully connected state_manager state_changed signal.")  # Debug
             except Exception as e:
                 print(f"Error connecting state_manager state_changed signal: {e}")  # Debug
         else:
-            print("State manager does not have state_changed signal or is None.")  # Debug
+            print("State manager is None or does not have state_changed signal.")  # Debug
 
     def source_model(self) -> ChestDataModel:
         """
@@ -140,8 +145,18 @@ class DataViewModel(QAbstractTableModel):
         Returns:
             int: The number of rows.
         """
-        if not parent.isValid() and self._source_model and hasattr(self._source_model, "rowCount"):
-            return self._source_model.rowCount()
+        # Use the length of the internal DataFrame
+        if (
+            not parent.isValid()
+            and self._source_model
+            and hasattr(self._source_model, "_data")
+            and self._source_model._data is not None
+        ):
+            try:
+                return len(self._source_model._data)
+            except Exception as e:
+                print(f"Error getting row count from source model: {e}")
+                return 0
         return 0
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
@@ -154,25 +169,21 @@ class DataViewModel(QAbstractTableModel):
         Returns:
             int: The number of columns.
         """
+        # Use the length of the column_names property
         if (
             not parent.isValid()
             and self._source_model
-            and hasattr(self._source_model, "columnCount")
+            and hasattr(self._source_model, "column_names")
+            and self._source_model.column_names is not None
         ):
-            return self._source_model.columnCount()
+            try:
+                return len(self._source_model.column_names)
+            except Exception as e:
+                print(f"Error getting column count from source model: {e}")
+                return 0
         return 0
 
     def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> typing.Any:
-        """
-        Returns the data stored under the given role for the item referred to by the index.
-
-        Args:
-            index (QModelIndex): The model index.
-            role (int): The data role.
-
-        Returns:
-            typing.Any: The data for the given index and role.
-        """
         if not index.isValid() or not self._source_model or not self._state_manager:
             return None
 
@@ -181,53 +192,98 @@ class DataViewModel(QAbstractTableModel):
 
         try:
             if role == Qt.DisplayRole or role == Qt.EditRole:
-                # Delegate to source model for these roles
-                return self._source_model.data(index, role)
+                # Access data directly from the source model's DataFrame
+                # Assuming ChestDataModel has a way to get value by row/col index
+                # Option 1: Direct access (if _data is accessible and reliable)
+                if 0 <= row < len(self._source_model._data) and 0 <= col < len(
+                    self._source_model._data.columns
+                ):
+                    value = self._source_model._data.iloc[row, col]
+                    # Convert numpy types to standard Python types for Qt if necessary
+                    if isinstance(value, np.generic):
+                        value = value.item()
+                    return str(value) if value is not None else ""  # Ensure string for display
+                else:
+                    return None  # Index out of bounds
+                # Option 2: Using a dedicated method (if exists)
+                # return self._source_model.get_value(row, col)
 
+            # Get full state safely
             full_state = self._state_manager.get_full_cell_state(row, col)
 
             if role == self.ValidationStateRole:
-                return full_state.validation_status if full_state else CellState.NORMAL
+                return (
+                    full_state.validation_status
+                    if (full_state and hasattr(full_state, "validation_status"))
+                    else CellState.NORMAL
+                )
             elif role == self.CorrectionStateRole:
-                return bool(full_state and full_state.correction_suggestions)
+                return bool(
+                    full_state
+                    and hasattr(full_state, "correction_suggestions")
+                    and full_state.correction_suggestions
+                )
             elif role == self.ErrorDetailsRole:
-                return full_state.error_details if full_state else None
+                return (
+                    full_state.error_details
+                    if (full_state and hasattr(full_state, "error_details"))
+                    else None
+                )
             elif role == self.CorrectionSuggestionsRole:
-                return full_state.correction_suggestions if full_state else []
+                return (
+                    full_state.correction_suggestions
+                    if (full_state and hasattr(full_state, "correction_suggestions"))
+                    else []
+                )
             elif role == Qt.BackgroundRole:
-                status = full_state.validation_status if full_state else CellState.NORMAL
+                status = (
+                    full_state.validation_status
+                    if (full_state and hasattr(full_state, "validation_status"))
+                    else CellState.NORMAL
+                )
                 if status == CellState.INVALID:
                     return self.INVALID_COLOR
                 elif status == CellState.CORRECTABLE:
                     return self.CORRECTABLE_COLOR
-                # Add cases for WARNING, INFO if needed
                 return None
             elif role == Qt.ToolTipRole:
                 tooltip_parts = []
                 if full_state:
-                    # Only show error details for INVALID state
                     if (
-                        full_state.validation_status == CellState.INVALID
+                        hasattr(full_state, "validation_status")
+                        and full_state.validation_status == CellState.INVALID
+                        and hasattr(full_state, "error_details")
                         and full_state.error_details
                     ):
                         tooltip_parts.append(full_state.error_details)
-                    # Show suggestions for CORRECTABLE state
                     elif (
-                        full_state.validation_status == CellState.CORRECTABLE
+                        hasattr(full_state, "validation_status")
+                        and full_state.validation_status == CellState.CORRECTABLE
+                        and hasattr(full_state, "correction_suggestions")
                         and full_state.correction_suggestions
                     ):
                         suggestions_str = "\n".join(
-                            [f"- {s}" for s in full_state.correction_suggestions]
+                            [
+                                f"- {getattr(s, 'corrected_value', str(s))}"
+                                for s in full_state.correction_suggestions
+                            ]
                         )
                         tooltip_parts.append(f"Suggestions:\n{suggestions_str}")
-                    # Add handling for WARNING/INFO if needed
                 return "\n".join(tooltip_parts) if tooltip_parts else None
 
+        except IndexError:
+            print(f"IndexError in DataViewModel.data(): Index ({row},{col}) out of bounds.")
+            return None
+        except AttributeError as ae:
+            print(
+                f"AttributeError in DataViewModel.data() for index ({row},{col}), role {role}: {ae}"
+            )  # Debug attribute errors
+            return None
         except Exception as e:
             print(f"Error in DataViewModel.data(): {e} for index ({row},{col}), role {role}")
             return None
 
-        return None
+        return None  # Role not handled
 
     def headerData(
         self, section: int, orientation: Qt.Orientation, role: int = Qt.DisplayRole
@@ -243,16 +299,27 @@ class DataViewModel(QAbstractTableModel):
         Returns:
             typing.Any: The header data.
         """
-        if (
-            orientation == Qt.Horizontal
-            and role == Qt.DisplayRole
-            and self._source_model
-            and hasattr(self._source_model, "headerData")
-        ):
-            # Delegate to source model
-            return self._source_model.headerData(section, orientation, role)
-        # Handle Vertical/other roles if needed
-        return super().headerData(section, orientation, role)  # Use default for others
+        if orientation == Qt.Horizontal and role == Qt.DisplayRole and self._source_model:
+            try:
+                # Ensure the source model has column_names property and section is valid
+                if hasattr(self._source_model, "column_names") and 0 <= section < len(
+                    self._source_model.column_names
+                ):
+                    return self._source_model.column_names[section]
+                else:
+                    print(
+                        f"Warning: Cannot get header data for section {section}. Source model columns: {getattr(self._source_model, 'column_names', 'N/A')}"
+                    )
+                    return None
+            except Exception as e:
+                print(f"Error in DataViewModel.headerData(): {e} for section {section}")
+                return None
+
+        # Handle vertical header if needed (row numbers)
+        if orientation == Qt.Vertical and role == Qt.DisplayRole:
+            return str(section + 1)  # Return 1-based row number
+
+        return None
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         """
@@ -307,11 +374,19 @@ class DataViewModel(QAbstractTableModel):
     @Slot()
     def _on_source_data_changed(self):
         """Slot called when the underlying source model changes."""
-        print("DataViewModel received source data_changed")
+        print("DataViewModel received source data_changed")  # Debug
         # This might be too coarse, leading to full view updates.
         # Consider more granular updates if possible from source model.
-        self.beginResetModel()
-        self.endResetModel()
+        # A common pattern is to emit layoutChanged only if dimensions change,
+        # and dataChanged otherwise.
+        # For now, let's assume the source signals provide enough info
+        # or we stick with resetting.
+        # IMPORTANT: Check if source_model emits signals BEFORE data is ready.
+        self.beginResetModel()  # Signals that the model is about to be reset
+        # The actual data update is assumed to happen in the source model
+        # and we just need to notify the view(s) that it has happened.
+        self.endResetModel()  # Signals that the model has been reset
+        print("DataViewModel finished model reset.")  # Debug
 
     @Slot(set)  # Expecting a set of (row, col) tuples
     def _on_state_manager_state_changed(self, changed_indices: set):

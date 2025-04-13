@@ -24,10 +24,12 @@ from PySide6.QtCore import (
     QItemSelectionModel,
     QAbstractItemModel,
     QModelIndex,
+    QSortFilterProxyModel,
 )
-from PySide6.QtGui import QAction, QGuiApplication, QIcon
+from PySide6.QtGui import QAction, QGuiApplication, QIcon, QColor
 import typing
-from typing import Optional
+from typing import Optional, List, Dict, Tuple
+import logging
 
 # Placeholder imports - adjust as needed when models/delegates are implemented
 from ..delegates.cell_delegate import CellDelegate  # Import base delegate
@@ -43,6 +45,9 @@ from ..menus.context_menu_factory import (
 from ..models.filter_model import FilterModel  # Import FilterModel
 from ..models.data_view_model import DataViewModel  # Import DataViewModel for type hinting
 
+# Add logger setup
+logger = logging.getLogger(__name__)
+
 
 class DataTableView(QWidget):
     """
@@ -55,6 +60,8 @@ class DataTableView(QWidget):
     # --- Signals ---
     # Emits a list of currently selected QModelIndex objects
     selection_changed = Signal(list)
+    # Emitted when the delegate requests applying the first correction for an index
+    correction_apply_requested = Signal(QModelIndex, object)  # source_index, suggestion
 
     def __init__(self, parent=None):
         """
@@ -68,12 +75,14 @@ class DataTableView(QWidget):
         self._column_model = ColumnModel(self)  # Initialize ColumnModel
         self._source_model: Optional[DataViewModel] = None  # Store source model reference
         self._filter_model = FilterModel(self)  # Initialize FilterModel
+        self._correction_delegate = CorrectionDelegate(
+            self
+        )  # Create instance for signal connection
 
         self._setup_toolbar()
-        self._setup_table()
         self._setup_layout()
+        self._setup_delegates()
         self._connect_signals()
-        self._setup_delegates()  # Call delegate setup
 
         # INTERNAL STATE (if needed)
         # self._some_internal_state = None
@@ -146,22 +155,20 @@ class DataTableView(QWidget):
         header.setContextMenuPolicy(Qt.CustomContextMenu)
         header.customContextMenuRequested.connect(self._show_header_context_menu)
 
-        # Set delegate on the actual table_view
-        table_view.setItemDelegate(CorrectionDelegate(table_view))
+        # Set delegate on the actual table_view - use the instance we created
+        # self._setup_delegates() will handle setting this instance
+        # table_view.setItemDelegate(self._correction_delegate)
+
         # Connect context menu on the actual table_view
         table_view.customContextMenuRequested.connect(self._show_context_menu)
 
         # Connect selection changed signal from the actual table_view's selection model
-        # Ensure selectionModel() exists before connecting
         selection_model = table_view.selectionModel()
         if selection_model:
             selection_model.selectionChanged.connect(
                 self._on_selection_changed
             )  # Connect to internal slot
         else:
-            # Handle case where selection model is not ready yet (might need QTimer.singleShot)
-            # This typically happens if setModel hasn't been called or finished.
-            # For now, we assume it's available after setModel in the fixture.
             print("Warning: Selection model not available during _configure_table_view")
 
     def _connect_signals(self):
@@ -175,6 +182,11 @@ class DataTableView(QWidget):
         self._column_model.columns_changed.connect(
             self._initialize_column_visibility
         )  # Connect columns_changed
+
+        # Connect the delegate's signal to our internal slot
+        self._correction_delegate.apply_first_correction_requested.connect(
+            self._on_apply_first_correction_requested
+        )
 
     # --- Internal Slot for Selection --- #
     @Slot(QItemSelection, QItemSelection)
@@ -190,7 +202,13 @@ class DataTableView(QWidget):
     def _show_context_menu(self, position):
         """Gather context and show the context menu created by the factory."""
         proxy_clicked_index = self.table_view.indexAt(position)
+        print(
+            f"_show_context_menu: pos={position}, proxy_idx=({proxy_clicked_index.row()},{proxy_clicked_index.column()})"
+        )  # Debug
         source_clicked_index = self._filter_model.mapToSource(proxy_clicked_index)
+        print(
+            f"_show_context_menu: source_idx=({source_clicked_index.row()},{source_clicked_index.column()})"
+        )  # Debug
         proxy_selection = self.table_view.selectionModel().selectedIndexes()
         source_selection = [self._filter_model.mapToSource(idx) for idx in proxy_selection]
         source_model = self.sourceModel()  # Use the stored source model
@@ -311,48 +329,61 @@ class DataTableView(QWidget):
                     f"Warning: Initializing visibility - index {idx} for '{name}' out of bounds ({model.columnCount()} cols)"
                 )
 
+    # --- Slot for Correction Request --- #
+    @Slot(QModelIndex)
+    def _on_apply_first_correction_requested(self, proxy_index: QModelIndex):
+        """Handles the request from the delegate to apply the first correction."""
+        # --- Original Logic --- #
+        if not proxy_index.isValid():
+            return
+
+        source_index = self._filter_model.mapToSource(proxy_index)
+        if not source_index.isValid() or self._source_model is None:
+            return
+
+        # Get suggestions from the source model for the source index
+        suggestions = self._source_model.data(source_index, DataViewModel.CorrectionSuggestionsRole)
+
+        if suggestions and isinstance(suggestions, list) and len(suggestions) > 0:
+            first_suggestion = suggestions[0]
+            print(
+                f"Slot received apply_first_correction_requested for source index {source_index.row()},{source_index.column()}."
+                f" Emitting correction_apply_requested."
+            )  # Debug
+            # Emit the new signal with the source index and the suggestion object
+            self.correction_apply_requested.emit(source_index, first_suggestion)
+        else:
+            print(
+                f"Slot received apply_first_correction_requested for index {source_index.row()},{source_index.column()} but no suggestions found."
+            )  # Debug
+        # --- End Original Logic --- #
+
     # --- Public Methods to interact with the internal table view ---
     def setModel(self, model: DataViewModel | None):
-        """Sets the source DataViewModel and connects it to the FilterModel."""
-        if self.table_view:
-            # Check if the source model is the same
-            if self._source_model == model:
-                return  # Avoid resetting if the model is the same
+        """Set the source data model for the view."""
+        if self._source_model:
+            # Disconnect previous model signals if necessary
+            pass
 
-            # Disconnect signals from old source model if exists
-            if self._source_model and hasattr(self._source_model, "data_changed"):
+        self._source_model = model
+        self._filter_model.setSourceModel(model)
+        self._column_model.set_model(model)  # Link ColumnModel to the new source model
+        self._initialize_column_visibility(self._column_model.get_columns())
+
+        # Ensure the table view uses the filter model
+        if hasattr(self, "table_view"):
+            self.table_view.setModel(self._filter_model)
+            # Reconnect selection model signal if view exists
+            selection_model = self.table_view.selectionModel()
+            if selection_model:
+                # Disconnect old connection if any before reconnecting
                 try:
-                    self._source_model.data_changed.disconnect(
-                        self._filter_model.invalidate
-                    )  # Or a specific slot if needed
-                except (TypeError, RuntimeError):
-                    pass
-
-            self._source_model = model  # Store the new source model
-
-            # Set the source model for the filter proxy
-            self._filter_model.setSourceModel(self._source_model)
-
-            # The view keeps the filter model, we just change its source
-            self._setup_delegates()  # Re-setup delegates when model changes (might depend on source)
-            if self._source_model:
-                # Update ColumnModel when the source model changes
-                column_count = self._source_model.columnCount()
-                column_names = [
-                    str(self._source_model.headerData(i, Qt.Horizontal))
-                    for i in range(column_count)
-                ]
-                self._column_model.set_columns(column_names)
-                # Initial visibility update is handled by columns_changed signal connection
-
-                # Connect new source model signals
-                if hasattr(self._source_model, "data_changed"):
-                    try:
-                        self._source_model.data_changed.connect(self._filter_model.invalidate)
-                    except (TypeError, RuntimeError):
-                        print("Warning: Could not connect data_changed signal from source model")
-            else:
-                self._column_model.set_columns([])
+                    selection_model.selectionChanged.disconnect(self._on_selection_changed)
+                except RuntimeError:
+                    pass  # Ignore if not connected
+                selection_model.selectionChanged.connect(self._on_selection_changed)
+        else:
+            print("Warning: table_view not initialized when setting model.")
 
     def model(self) -> FilterModel | None:
         """Returns the FilterModel used by the internal QTableView."""
@@ -428,34 +459,19 @@ class DataTableView(QWidget):
             return False
 
     def _setup_delegates(self):
-        """Set up delegates for cell rendering."""
-        if not self.table_view:
-            print("Error: Cannot setup delegates, table_view not initialized.")
+        """Set up and assign delegates to the table view."""
+        if not hasattr(self, "table_view"):
+            print("Error: table_view not initialized during _setup_delegates")
             return
 
-        # Disconnect old delegate signal if exists
-        old_delegate = self.table_view.itemDelegate()
-        if old_delegate and hasattr(old_delegate, "validationFailed"):
-            try:
-                old_delegate.validationFailed.disconnect(self._on_validation_failed)
-            except (
-                TypeError,
-                RuntimeError,
-            ):  # Handles signal not connected or already disconnected
-                pass
+        # Set the correction delegate instance
+        # This delegate handles both correction and validation rendering (inherits)
+        self.table_view.setItemDelegate(self._correction_delegate)
 
-        # Example: Set different delegates based on column or data type if needed
-        # For now, set the CorrectionDelegate as default
-        new_delegate = CorrectionDelegate(self.table_view)
-        self.table_view.setItemDelegate(new_delegate)
-
-        # Connect new delegate signal
-        if hasattr(new_delegate, "validationFailed"):
-            new_delegate.validationFailed.connect(self._on_validation_failed)
-
-        # You might want to set specific delegates for columns:
-        # validation_delegate = ValidationDelegate(self.table_view)
-        # self.table_view.setItemDelegateForColumn(COLUMN_INDEX_FOR_VALIDATION, validation_delegate)
+        # Optionally set delegates for specific columns if needed later
+        # Example:
+        # date_delegate = DateDelegate(self.table_view)
+        # self.table_view.setItemDelegateForColumn(DATE_COLUMN_INDEX, date_delegate)
 
     @Slot(QModelIndex, str)
     def _on_validation_failed(self, index: QModelIndex, error_message: str):

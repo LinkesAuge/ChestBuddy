@@ -519,3 +519,27 @@ The application now properly displays the DataView content when the Data tab is 
     - Verifying the side effects of the delegate's internal logic, specifically spying on the `_paint_correction_indicator` method in the correctable state test to ensure it was called.
 
 **Result**: Both paint tests now pass reliably, confirming the delegate's paint setup and the logic for different validation states (at least in terms of triggering the correct internal paths).
+
+## July 30, 2024: DataView Integration Test Failures (`RuntimeError`)
+
+**Issue**: Integration tests in `tests/integration/test_dataview_integration.py` started failing with `RuntimeError: Internal C++ object (...) already deleted` after fixing initial import errors.
+
+**Root Cause**: The error occurred during test teardown when the `SignalManager.disconnect_receiver` method was called. It attempted to disconnect signals from objects (e.g., `ChestDataModel`, `TableStateManager`) whose underlying C++ instances had already been garbage collected by Qt. The order of object destruction during test teardown was not guaranteed, leading to attempts to access destroyed objects.
+
+**Analysis**:
+- Traced the error to the `disconnect_receiver` method in `chestbuddy/utils/signal_manager.py`.
+- Identified that the disconnection attempts were happening too late in the object lifecycle, often during Python's garbage collection (`__del__`), by which time Qt might have already destroyed the C++ object.
+
+**Fix**:
+- Modified `SignalManager.disconnect_receiver` to be more robust:
+  - Added checks to ensure the `sender` object is still valid (`sender is not None and hasattr(sender, signal_name)`) before attempting to get the signal attribute.
+  - Wrapped the `getattr(sender, ...)` and `signal.disconnect(...)` calls within `try...except RuntimeError` blocks to gracefully handle cases where the C++ object is already deleted.
+  - Added logging (`logger.warning`) for cases where disconnection failed due to `RuntimeError` or invalid sender/signal.
+
+**Outcome**:
+- The `RuntimeError` crash during test teardown was successfully resolved.
+- Tests in `test_dataview_integration.py` now pass (excluding `xfail`s).
+- New `RuntimeWarning: Failed to disconnect...` messages now appear, originating from `DataViewModel`'s cleanup logic (lines 90, 105). These indicate that the underlying timing issue still exists (disconnecting too late), but the `SignalManager` now prevents it from causing a crash.
+
+**Next Steps (Related)**:
+- The `RuntimeWarning`s are noted as a code health issue to be addressed later by ensuring `DataViewModel` disconnects signals earlier in its lifecycle (e.g., explicitly, not just in `__del__`).

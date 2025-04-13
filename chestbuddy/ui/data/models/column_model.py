@@ -38,6 +38,30 @@ class ColumnModel(QObject):
         super().__init__(parent)
         self._columns: List[str] = []
         self._visibility: Dict[str, bool] = {}
+        self._source_model = None  # Add reference to the source model
+
+    def set_model(self, model) -> None:
+        """
+        Set the source data model.
+
+        Args:
+            model: The source data model (e.g., DataViewModel).
+        """
+        self._source_model = model
+        if model:
+            # Initialize columns based on the model
+            try:
+                # Use headerData to get columns if available, assuming horizontal orientation
+                columns = [
+                    model.headerData(i, Qt.Horizontal, Qt.DisplayRole)
+                    for i in range(model.columnCount())
+                ]
+                self.set_columns([col for col in columns if col is not None])
+            except Exception as e:
+                print(f"Error initializing columns from model: {e}")
+                self.set_columns([])  # Set to empty if error
+        else:
+            self.set_columns([])
 
     def set_columns(self, columns: List[str]) -> None:
         """

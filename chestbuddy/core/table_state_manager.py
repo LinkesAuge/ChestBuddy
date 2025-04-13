@@ -91,18 +91,23 @@ class TableStateManager(QObject):
     def _create_headers_map(self) -> Dict[str, int]:
         """Create a mapping from column names to column indices."""
         headers_map = {}
-        if (
-            self._data_model
-            and hasattr(self._data_model, "columnCount")
-            and hasattr(self._data_model, "headerData")
-        ):
+        model = self._data_model  # Use local var for clarity
+        logger.debug(f"_create_headers_map: Checking model type: {type(model)}")
+        has_model = model is not None
+        has_col_count = hasattr(model, "columnCount")
+        has_header_data = hasattr(model, "headerData")
+        logger.debug(
+            f"_create_headers_map: has_model={has_model}, has_col_count={has_col_count}, has_header_data={has_header_data}"
+        )
+
+        if has_model and has_col_count and has_header_data:
             try:
-                num_cols = self._data_model.columnCount()
+                num_cols = model.columnCount()
+                logger.debug(f"_create_headers_map: Found {num_cols} columns.")
                 for col_idx in range(num_cols):
                     # Assuming headerData with Qt.Horizontal orientation gives the name
-                    header_name = self._data_model.headerData(
-                        col_idx, Qt.Horizontal, Qt.DisplayRole
-                    )
+                    header_name = model.headerData(col_idx, Qt.Horizontal, Qt.DisplayRole)
+                    logger.debug(f"_create_headers_map: Header for col {col_idx} = {header_name}")
                     if header_name:
                         headers_map[str(header_name)] = col_idx
                 logger.debug(f"Created headers map: {headers_map}")
@@ -374,3 +379,55 @@ class TableStateManager(QObject):
         """Returns the list of current column names based on the headers map."""
         # Sort by index to maintain order
         return sorted(self._headers_map, key=self._headers_map.get)
+
+    # --- New Method for CorrectionService ---
+    def get_validation_status_df(self) -> pd.DataFrame:
+        """
+        Constructs and returns a DataFrame representing the current validation
+        status of all cells.
+
+        Returns:
+            pd.DataFrame: A DataFrame indexed by row, with columns like
+                          'ColumnName_status' containing ValidationStatus enums.
+                          Returns an empty DataFrame if no states are stored or if
+                          the header map is not available.
+        """
+        if not self._cell_states or not self._headers_map:
+            return pd.DataFrame()
+
+        # Determine max row and col index from stored states
+        max_row = 0
+        max_col = 0
+        if self._cell_states:
+            rows, cols = zip(*self._cell_states.keys())
+            max_row = max(rows) if rows else -1
+            max_col = max(cols) if cols else -1
+
+        # Need column names to create the DataFrame columns
+        # Invert the headers map: index -> name
+        idx_to_name = {idx: name for name, idx in self._headers_map.items()}
+        if not idx_to_name or max_col >= len(idx_to_name):
+            logger.warning(
+                "Header map seems inconsistent with stored cell states. Cannot create status DF."
+            )
+            return pd.DataFrame()
+
+        # Prepare data for the DataFrame
+        data = {}
+        for col_idx in range(max_col + 1):
+            col_name = idx_to_name.get(col_idx)
+            if not col_name:
+                continue  # Should not happen if map is correct
+            status_col_name = f"{col_name}_status"  # Naming convention
+            # Initialize column with default state
+            col_data = [CellState.NORMAL] * (max_row + 1)
+            for row_idx in range(max_row + 1):
+                full_state = self._cell_states.get((row_idx, col_idx))
+                if full_state:
+                    col_data[row_idx] = full_state.validation_status
+            data[status_col_name] = col_data
+
+        status_df = pd.DataFrame(data)
+        return status_df
+
+    # --- End New Method ---

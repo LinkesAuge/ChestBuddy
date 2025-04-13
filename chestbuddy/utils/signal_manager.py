@@ -699,87 +699,138 @@ class SignalManager:
 
     def disconnect_receiver(self, receiver: QObject) -> int:
         """
-        Disconnect all signals connected to the given receiver.
+        Disconnect all signals connected to a specific receiver.
 
         Args:
-            receiver: Object receiving signals to disconnect
+            receiver: Object to disconnect all signals from
 
         Returns:
-            int: Number of disconnections made
+            int: Number of connections successfully disconnected
         """
+        if not isinstance(receiver, QObject):
+            logger.warning(f"Attempted to disconnect signals for non-QObject: {receiver}")
+            return 0
+
         count = 0
 
         # Disconnect regular connections
+        connections_to_remove = []
         for connection_key, connections in list(self._connections.items()):
             sender, signal_name = connection_key
-            signal = getattr(sender, signal_name)
-
-            for recv, slot_name in list(connections):
+            updated_connections = []
+            for recv, slot_name in connections:
                 if recv == receiver:
-                    slot = getattr(recv, slot_name)
-                    signal.disconnect(slot)
-                    self._connections[connection_key].remove((recv, slot_name))
-                    count += 1
-
-                    if self._debug_mode:
-                        logger.debug(
-                            f"Disconnected: {sender}.{signal_name} -> {receiver}.{slot_name}"
+                    try:
+                        # Check if sender is still valid before accessing attributes/disconnecting
+                        if sender is not None and hasattr(sender, signal_name):
+                            signal = getattr(sender, signal_name)
+                            slot = getattr(recv, slot_name)
+                            signal.disconnect(slot)
+                            count += 1
+                            if self._debug_mode:
+                                logger.debug(
+                                    f"Disconnected: {sender}.{signal_name} -> {receiver}.{slot_name}"
+                                )
+                        else:
+                            logger.warning(
+                                f"Sender {sender} or signal {signal_name} no longer valid during disconnect."
+                            )
+                    except RuntimeError as e:
+                        # Catch cases where the underlying C++ object might be deleted
+                        logger.warning(
+                            f"RuntimeError during disconnect (regular): {sender}.{signal_name} -> {receiver}.{slot_name}. Error: {e}"
                         )
+                    except Exception as e:
+                        logger.error(f"Unexpected error during disconnect (regular): {e}")
+                else:
+                    updated_connections.append((recv, slot_name))
 
-            if not self._connections[connection_key]:
-                del self._connections[connection_key]
+            if updated_connections:
+                self._connections[connection_key] = updated_connections
+            else:
+                # Use try-except in case key was already removed in another thread/process
+                try:
+                    del self._connections[connection_key]
+                except KeyError:
+                    pass
 
-        # Disconnect throttled connections
+        # Disconnect throttled connections (Apply similar try-except logic)
+        throttled_connections_to_remove = []
         for connection_key, connections in list(self._throttled_connections.items()):
             sender, signal_name = connection_key
-            signal = getattr(sender, signal_name)
-
-            for recv, slot_name, throttled_slot, throttle_ms, throttle_mode in list(connections):
+            updated_connections = []
+            for conn_data in connections:
+                recv, slot_name, throttled_slot, throttle_ms, throttle_mode = conn_data
                 if recv == receiver:
-                    signal.disconnect(throttled_slot)
-                    self._throttled_connections[connection_key].remove(
-                        (recv, slot_name, throttled_slot, throttle_ms, throttle_mode)
-                    )
-                    count += 1
+                    try:
+                        if sender is not None and hasattr(sender, signal_name):
+                            signal = getattr(sender, signal_name)
+                            signal.disconnect(throttled_slot)  # Disconnect the wrapper
+                            count += 1
+                            if self._debug_mode:
+                                logger.debug(
+                                    f"Disconnected throttled: {sender}.{signal_name} -> {receiver}.{slot_name}"
+                                )
+                        else:
+                            logger.warning(
+                                f"Sender {sender} or signal {signal_name} no longer valid during throttled disconnect."
+                            )
 
-                    if self._debug_mode:
-                        logger.debug(
-                            f"Disconnected throttled: {sender}.{signal_name} -> {receiver}.{slot_name}"
+                    except RuntimeError as e:
+                        logger.warning(
+                            f"RuntimeError during disconnect (throttled): {sender}.{signal_name} -> {receiver}.{slot_name}. Error: {e}"
                         )
+                    except Exception as e:
+                        logger.error(f"Unexpected error during disconnect (throttled): {e}")
 
-            if not self._throttled_connections[connection_key]:
-                del self._throttled_connections[connection_key]
+                else:
+                    updated_connections.append(conn_data)
 
-        # Disconnect prioritized connections
+            if updated_connections:
+                self._throttled_connections[connection_key] = updated_connections
+            else:
+                try:
+                    del self._throttled_connections[connection_key]
+                except KeyError:
+                    pass
+
+        # Disconnect prioritized connections (Apply similar try-except logic)
+        prioritized_connections_to_remove = []
         for connection_key, connections in list(self._prioritized_connections.items()):
             sender, signal_name = connection_key
-            signal = getattr(sender, signal_name)
-
-            connections_to_keep = []
-
-            for conn in connections:
-                recv, slot_name, priority, wrapper_slot = conn
-
+            updated_connections = []
+            for conn_data in connections:
+                recv, slot_name, priority, wrapper_slot = conn_data
                 if recv == receiver:
-                    # Disconnect this connection
                     try:
-                        signal.disconnect(wrapper_slot)
-                        count += 1
-
-                        if self._debug_mode:
-                            logger.debug(
-                                f"Disconnected prioritized: {sender}.{signal_name} -> {receiver}.{slot_name}"
+                        if sender is not None and hasattr(sender, signal_name):
+                            signal = getattr(sender, signal_name)
+                            signal.disconnect(wrapper_slot)  # Disconnect the wrapper
+                            count += 1
+                            if self._debug_mode:
+                                logger.debug(
+                                    f"Disconnected prioritized: {sender}.{signal_name} -> {receiver}.{slot_name}"
+                                )
+                        else:
+                            logger.warning(
+                                f"Sender {sender} or signal {signal_name} no longer valid during prioritized disconnect."
                             )
+                    except RuntimeError as e:
+                        logger.warning(
+                            f"RuntimeError during disconnect (prioritized): {sender}.{signal_name} -> {receiver}.{slot_name}. Error: {e}"
+                        )
                     except Exception as e:
-                        logger.warning(f"Failed to disconnect prioritized signal: {e}")
+                        logger.error(f"Unexpected error during disconnect (prioritized): {e}")
                 else:
-                    # Keep this connection
-                    connections_to_keep.append(conn)
+                    updated_connections.append(conn_data)
 
-            if connections_to_keep:
-                self._prioritized_connections[connection_key] = connections_to_keep
+            if updated_connections:
+                self._prioritized_connections[connection_key] = updated_connections
             else:
-                del self._prioritized_connections[connection_key]
+                try:
+                    del self._prioritized_connections[connection_key]
+                except KeyError:
+                    pass
 
         return count
 

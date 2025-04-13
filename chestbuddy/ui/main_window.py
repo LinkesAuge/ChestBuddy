@@ -13,7 +13,17 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Optional, Union, Any, Set, Tuple
 
-from PySide6.QtCore import Qt, Signal, Slot, QSettings, QSize, QTimer, QObject, QDateTime
+from PySide6.QtCore import (
+    Qt,
+    Signal,
+    Slot,
+    QSettings,
+    QSize,
+    QTimer,
+    QObject,
+    QDateTime,
+    QModelIndex,
+)
 from PySide6.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -55,6 +65,7 @@ from chestbuddy.ui.views.validation_view_adapter import ValidationViewAdapter
 from chestbuddy.ui.views.chart_view import ChartView
 from chestbuddy.ui.widgets import ProgressDialog, ProgressBar
 from chestbuddy.ui.data_view import DataView
+from chestbuddy.ui.data.views.data_table_view import DataTableView
 import pandas as pd
 from chestbuddy.utils.service_locator import ServiceLocator
 from chestbuddy.utils.config import ConfigManager
@@ -752,6 +763,49 @@ class MainWindow(QMainWindow):
         # Connect data_loaded signal to populate_data_table method
         # This ensures the table is populated even for subsequent file loads
         self._data_manager.data_loaded.connect(self._ensure_data_table_populated)
+
+        # Connect DataTableView signal
+        data_view_instance = self._views.get("data")
+        # Check if it's DataTableView or DataViewAdapter containing it
+        actual_table_view = None
+        if isinstance(data_view_instance, DataTableView):
+            actual_table_view = data_view_instance
+        elif hasattr(data_view_instance, "get_table_view"):  # Check if adapter has a getter
+            actual_table_view = data_view_instance.get_table_view()
+        elif hasattr(data_view_instance, "table_view"):  # Or direct access
+            actual_table_view = data_view_instance.table_view
+
+        if actual_table_view and hasattr(actual_table_view, "correction_apply_requested"):
+            print("Connecting DataTableView.correction_apply_requested")  # Debug
+            actual_table_view.correction_apply_requested.connect(
+                self._on_correction_apply_requested
+            )
+        elif data_view_instance:
+            print(
+                f"Warning: Could not find correction_apply_requested signal on view 'data' or its table_view (Type: {type(data_view_instance)}). Cannot connect correction signal."
+            )
+        else:
+            print(
+                "Warning: Data view instance not found in self._views. Cannot connect correction signal."
+            )
+
+        # Connect UI State Controller
+        if self._ui_state_controller:
+            self._ui_state_controller.status_message_changed.connect(self.statusBar().showMessage)
+            self._ui_state_controller.actions_state_changed.connect(self._on_actions_state_changed)
+            self._ui_state_controller.ui_refresh_needed.connect(self.refresh_ui)
+
+        # Connect File Controller
+        if self._file_controller:
+            self._file_controller.file_opened.connect(self._on_file_opened)
+            self._file_controller.file_saved.connect(self._on_file_saved)
+            self._file_controller.recent_files_changed.connect(self._on_recent_files_changed)
+            if hasattr(self._file_controller, "file_dialog_canceled"):
+                self._file_controller.file_dialog_canceled.connect(self._on_file_dialog_canceled)
+
+        # Connect Progress Controller (for manual progress dialog if needed elsewhere)
+        # if self._progress_controller:
+        #     pass # Connect signals if MainWindow needs to directly show progress
 
     def _load_settings(self) -> None:
         """Load application settings."""
@@ -1493,3 +1547,99 @@ class MainWindow(QMainWindow):
 
         # Initialize controllers with services and data model
         self._init_controllers()
+
+    @Slot(QModelIndex, object)
+    def _on_correction_apply_requested(self, source_index: QModelIndex, suggestion: object) -> None:
+        """Handles the request from the DataTableView to apply a correction."""
+        if not source_index.isValid():
+            print("MainWindow received invalid index for correction request.")
+            return
+
+        print(
+            f"MainWindow received correction request for {source_index.row()},{source_index.column()}."
+            f" Suggestion: {suggestion}"
+        )
+
+        # Retrieve the CorrectionService
+        correction_service = ServiceLocator.get("correction_service")
+        if not correction_service:
+            QMessageBox.critical(
+                self,
+                "Correction Error",
+                "Correction service is not available. Cannot apply correction.",
+            )
+            print("CorrectionService not found in ServiceLocator.")
+            return
+
+        # Get the corrected value from the suggestion object
+        # (Assuming suggestion has a 'corrected_value' attribute)
+        corrected_value = getattr(suggestion, "corrected_value", None)
+        if corrected_value is None:
+            QMessageBox.warning(
+                self, "Correction Error", "Could not determine corrected value from suggestion."
+            )
+            print("Could not get corrected_value from suggestion object.")
+            return
+
+        # Call the service to apply the correction
+        # Option 1: Service takes index + value
+        # Option 2: Service takes index + suggestion object
+        # Let's assume Option 1 for now, modify if service API differs
+        try:
+            # Assuming the service has a method like apply_correction(row, col, value)
+            if hasattr(correction_service, "apply_correction") and callable(
+                getattr(correction_service, "apply_correction")
+            ):
+                success = correction_service.apply_correction(
+                    source_index.row(), source_index.column(), corrected_value
+                )
+                if success:
+                    print(
+                        f"Correction applied successfully via service for {source_index.row()},{source_index.column()}"
+                    )
+                    # Optionally show a brief status message or rely on data model refresh
+                    self.statusBar().showMessage("Correction applied.", 2000)
+                else:
+                    QMessageBox.warning(
+                        self,
+                        "Correction Error",
+                        f"Correction service failed to apply change for cell ({source_index.row()},{source_index.column()}).",
+                    )
+                    print(
+                        f"CorrectionService returned False for {source_index.row()},{source_index.column()}"
+                    )
+            else:
+                # Fallback: Try setting data directly on the source model
+                print("CorrectionService.apply_correction not found, attempting model.setData")
+                source_model = self._source_model  # Ensure we have access to the source model
+                if source_model:
+                    success = source_model.setData(source_index, corrected_value, Qt.EditRole)
+                    if success:
+                        print(
+                            f"Correction applied successfully via model.setData for {source_index.row()},{source_index.column()}"
+                        )
+                        self.statusBar().showMessage("Correction applied.", 2000)
+                    else:
+                        QMessageBox.warning(
+                            self,
+                            "Correction Error",
+                            f"Failed to apply change via model.setData for cell ({source_index.row()},{source_index.column()}).",
+                        )
+                        print(
+                            f"model.setData returned False for {source_index.row()},{source_index.column()}"
+                        )
+                else:
+                    raise AttributeError(
+                        "CorrectionService missing apply_correction and source_model not available"
+                    )
+
+        except Exception as e:
+            logger.error(
+                f"Error calling CorrectionService.apply_correction or model.setData: {e}",
+                exc_info=True,
+            )
+            QMessageBox.critical(
+                self,
+                "Correction Error",
+                f"An unexpected error occurred while applying the correction: {e}",
+            )

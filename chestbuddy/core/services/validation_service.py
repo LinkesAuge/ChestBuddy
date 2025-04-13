@@ -435,47 +435,49 @@ class ValidationService(QObject):
             logger.warning("Cannot validate empty data.")
             return {}
 
+        logger.info(f"Starting validation. Running rules: {specific_rules or 'all'}")
         validation_results = {}
-        df = self._data_model.data
-
-        # Determine which rules to run
         rules_to_run = specific_rules or self._validation_rules.keys()
+        current_df = self._data_model.data  # Get current data once
 
-        # Run each validation rule
         for rule_name in rules_to_run:
             if rule_name in self._validation_rules:
                 try:
-                    # Special case for validation list rules that don't take the dataframe
-                    if rule_name in [
-                        "player_validation",
-                        "chest_type_validation",
-                        "source_validation",
-                    ]:
-                        results = self._validation_rules[rule_name]()
+                    logger.info(f"Running validation rule: {rule_name}")
+                    # Pass current data to the rule function
+                    rule_result = self._validation_rules[rule_name](current_df)
+                    if rule_result:  # Only store if there are errors
+                        validation_results[rule_name] = rule_result
+                        logger.info(f"Rule {rule_name} found {len(rule_result)} issues.")
                     else:
-                        results = self._validation_rules[rule_name](df)
-
-                    if results:
-                        validation_results[rule_name] = results
+                        logger.info(f"Rule {rule_name} found no issues.")
                 except Exception as e:
-                    logger.error(f"Error running validation rule {rule_name}: {e}")
-                    validation_results[rule_name] = {-1: f"Error running validation rule: {str(e)}"}
+                    logger.error(f"Error executing validation rule {rule_name}: {e}", exc_info=True)
             else:
                 logger.warning(f"Validation rule {rule_name} not found.")
 
-        # Update the validation status in the data model
+        logger.info("Finished running validation rules. Aggregated results:")
+        for rule, errors in validation_results.items():
+            logger.info(f"  {rule}: {len(errors)} issues")
+
+        # Update the model's validation status
         self._update_validation_status(validation_results)
 
-        # Return all validation results
         return validation_results
 
-    def _check_players(self) -> Dict[int, str]:
+    def _check_players(self, df=None) -> Dict[int, str]:
         """
         Check that player names are in the validation list.
+
+        Args:
+            df (pd.DataFrame, optional): The DataFrame to check. If not provided, uses the model's data.
 
         Returns:
             Dict[int, str]: Dictionary mapping row indices to error messages.
         """
+        if df is None:
+            df = self._data_model.data
+
         try:
             # Skip if validation list is not available
             if not self._player_list_model:
@@ -485,7 +487,6 @@ class ValidationService(QObject):
                 return {}
 
             result = {}
-            df = self._data_model.data
 
             # Skip if column is not available
             if self.PLAYER_COLUMN not in df.columns:
@@ -538,13 +539,19 @@ class ValidationService(QObject):
             logger.error(f"Error checking players: {e}")
             return {}
 
-    def _check_chest_types(self) -> Dict[int, str]:
+    def _check_chest_types(self, df=None) -> Dict[int, str]:
         """
         Check that chest types are in the validation list.
+
+        Args:
+            df (pd.DataFrame, optional): The DataFrame to check. If not provided, uses the model's data.
 
         Returns:
             Dict[int, str]: Dictionary mapping row indices to error messages.
         """
+        if df is None:
+            df = self._data_model.data
+
         try:
             # Skip if validation list is not available
             if not self._chest_type_list_model:
@@ -554,7 +561,6 @@ class ValidationService(QObject):
                 return {}
 
             result = {}
-            df = self._data_model.data
 
             # Skip if column is not available
             if self.CHEST_COLUMN not in df.columns:
@@ -607,13 +613,19 @@ class ValidationService(QObject):
             logger.error(f"Error checking chest types: {e}")
             return {}
 
-    def _check_sources(self) -> Dict[int, str]:
+    def _check_sources(self, df=None) -> Dict[int, str]:
         """
         Check that sources are in the validation list.
+
+        Args:
+            df (pd.DataFrame, optional): The DataFrame to check. If not provided, uses the model's data.
 
         Returns:
             Dict[int, str]: Dictionary mapping row indices to error messages.
         """
+        if df is None:
+            df = self._data_model.data
+
         try:
             # Skip if validation list is not available
             if not self._source_list_model:
@@ -623,7 +635,6 @@ class ValidationService(QObject):
                 return {}
 
             result = {}
-            df = self._data_model.data
 
             # Skip if column is not available
             if self.SOURCE_COLUMN not in df.columns:
@@ -1054,8 +1065,15 @@ class ValidationService(QObject):
             # Update the validation status in the data model
             self._data_model.set_validation_status(status_df)
 
-            # Emit the validation changed signal
-            self.validation_changed.emit(status_df)
+            # Emit the signal with the final status DataFrame
+            logger.info(
+                f"ValidationService emitting validation_changed with status_df:\n{status_df}"
+            )
+            try:
+                self.validation_changed.emit(status_df)
+                logger.info("ValidationService validation_changed signal emitted successfully.")
+            except Exception as e:
+                logger.error(f"Error emitting validation_changed signal: {e}")
 
         except Exception as e:
             logger.error(f"Error updating validation status: {e}")
