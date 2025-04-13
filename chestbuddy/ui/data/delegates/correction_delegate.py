@@ -4,11 +4,13 @@ correction_delegate.py
 Delegate responsible for visualizing correction status and handling correction actions.
 """
 
-from PySide6.QtWidgets import QStyleOptionViewItem
-from PySide6.QtCore import QModelIndex, Qt, QRect, QSize, QEvent, QObject, QPoint, Signal
+from PySide6.QtWidgets import QStyleOptionViewItem, QMenu, QToolTip
+
+# Import QAbstractItemView
+from PySide6.QtWidgets import QAbstractItemView
+from PySide6.QtCore import QModelIndex, Qt, QRect, QSize, QEvent, QObject, QPoint, Signal, Slot
 from PySide6.QtGui import QPainter, QIcon, QColor, QMouseEvent, QHelpEvent
 from PySide6.QtCore import QAbstractItemModel
-from PySide6.QtWidgets import QMenu, QToolTip
 
 # Use CellState from core, ValidationDelegate should also use it
 from chestbuddy.core.table_state_manager import CellState
@@ -19,35 +21,35 @@ from ..models.data_view_model import DataViewModel
 
 
 # Placeholder for actual correction suggestion structure
+# Ensure this matches the structure provided by CorrectionAdapter/Service
 class CorrectionSuggestion:
     def __init__(self, original, corrected):
-        self.original = original
-        self.corrected = corrected
+        self.original_value = original  # Match the name used in helpEvent
+        self.corrected_value = corrected
 
     def __str__(self):  # For display in menu
-        return f'" {self.corrected}"'
+        # Provide a more descriptive string if possible
+        return f'Correct to: "{self.corrected_value}"'
 
 
 class CorrectionDelegate(ValidationDelegate):
     """
     Extends ValidationDelegate to provide visual feedback for correctable cells
-    and potentially handle correction actions.
+    and handle correction actions via a context menu on the indicator.
 
     Overrides the paint method to draw correction indicators (e.g., icons).
-    May override createEditor or other methods to facilitate corrections.
+    Overrides editorEvent to show a correction menu when the indicator is clicked.
 
     Signals:
-        apply_first_correction_requested (QModelIndex): Emitted when the user clicks
-            the correction indicator, requesting the first available correction
-            be applied.
+        correction_selected (QModelIndex, CorrectionSuggestion): Emitted when the user
+            selects a correction suggestion from the menu.
     """
 
-    # Define the signal
-    apply_first_correction_requested = Signal(QModelIndex)
+    # Define the new signal
+    correction_selected = Signal(QModelIndex, object)  # Use object type for suggestion
 
     # Define icons or visual elements for correction
-    # Example using a resource path for the icon
-    CORRECTION_INDICATOR_ICON = QIcon("icons:correction_available.svg")
+    CORRECTION_INDICATOR_ICON = QIcon("icons:correction_available.svg")  # Ensure this icon exists
     ICON_SIZE = 16  # Shared icon size
 
     def __init__(self, parent=None):
@@ -68,11 +70,10 @@ class CorrectionDelegate(ValidationDelegate):
         super().paint(painter, option, index)
 
         # Retrieve correction info from the model
-        # Use CorrectionSuggestionsRole which is defined in DataViewModel
-        suggestions = index.data(DataViewModel.CorrectionSuggestionsRole)
-        is_correctable = (
-            index.data(DataViewModel.ValidationStateRole) == CellState.CORRECTABLE  # Use CellState
-        )
+        suggestions = index.data(
+            DataViewModel.CorrectionSuggestionsRole
+        )  # Needed for logic, not drawing
+        is_correctable = index.data(DataViewModel.ValidationStateRole) == CellState.CORRECTABLE
 
         # If the cell is marked as correctable, draw the indicator
         if is_correctable:
@@ -89,30 +90,44 @@ class CorrectionDelegate(ValidationDelegate):
         icon = self.CORRECTION_INDICATOR_ICON
         if not icon.isNull():
             icon_margin = 2
-            icon_rect = option.rect.adjusted(0, 0, 0, 0)
-            icon_rect.setLeft(option.rect.right() - self.ICON_SIZE - icon_margin)
-            icon_rect.setTop(option.rect.top() + (option.rect.height() - self.ICON_SIZE) // 2)
-            icon_rect.setWidth(self.ICON_SIZE)
-            icon_rect.setHeight(self.ICON_SIZE)
-            icon.paint(painter, icon_rect, Qt.AlignRight | Qt.AlignVCenter)
+            # Calculate indicator rect based on option.rect
+            indicator_rect = self._get_indicator_rect(option.rect)
+            icon.paint(painter, indicator_rect, Qt.AlignRight | Qt.AlignVCenter)
+
+    # Helper method to calculate the indicator rect
+    def _get_indicator_rect(self, cell_rect: QRect) -> QRect:
+        icon_margin = 2
+        return QRect(
+            cell_rect.right() - self.ICON_SIZE - icon_margin,
+            cell_rect.top() + (cell_rect.height() - self.ICON_SIZE) // 2,
+            self.ICON_SIZE,
+            self.ICON_SIZE,
+        )
 
     def sizeHint(self, option: QStyleOptionViewItem, index: QModelIndex) -> QSize:
         """Provides size hint, potentially adding space for icons."""
-        # Get hint from ValidationDelegate (which considers its icons)
+        # Get hint from ValidationDelegate ONCE
         hint = super().sizeHint(option, index)
+        base_width = hint.width()  # Store base width
+
         # Add space if correction icon might be drawn (only if not already added by validation)
         validation_status = index.data(DataViewModel.ValidationStateRole)
-        is_correctable = validation_status == CellState.CORRECTABLE  # Use CellState
-        # If correctable AND no validation icon is shown, add space
-        if is_correctable and validation_status not in [
-            CellState.INVALID,  # Use CellState
-            CellState.WARNING,  # Use CellState
-            CellState.INFO,  # Use CellState
-        ]:
-            hint.setWidth(hint.width() + self.ICON_SIZE + 4)
-        # If correctable AND a validation icon is already shown, the space is likely sufficient
-        # This logic assumes correction indicator might overlap or replace validation icon
-        # If they need separate space, adjust logic here.
+        is_correctable = validation_status == CellState.CORRECTABLE
+        # Check if validation delegate already added space
+        has_validation_icon = validation_status in [
+            CellState.INVALID,
+            CellState.WARNING,
+            # INFO does not exist
+        ]
+
+        if is_correctable and not has_validation_icon:
+            # Add space only if the current hint width is not already larger than the base
+            if hint.width() <= base_width:
+                hint.setWidth(base_width + self.ICON_SIZE + 4)
+            # If hint is already wider (e.g., due to text), just ensure enough space for icon
+            else:
+                hint.setWidth(max(hint.width(), base_width + self.ICON_SIZE + 4))
+
         return hint
 
     def editorEvent(
@@ -124,7 +139,7 @@ class CorrectionDelegate(ValidationDelegate):
     ) -> bool:
         """
         Handle events within the delegate, specifically mouse clicks on the indicator.
-        Emits `apply_first_correction_requested` if the indicator is clicked.
+        Shows the correction menu if the indicator is left-clicked.
         """
         if not index.isValid():
             return False
@@ -132,45 +147,38 @@ class CorrectionDelegate(ValidationDelegate):
         # Check if the cell is correctable
         is_correctable = index.data(DataViewModel.ValidationStateRole) == CellState.CORRECTABLE
 
-        print(
-            f"Delegate editorEvent: type={event.type()}, index=({index.row()},{index.column()}), correctable={is_correctable}"
-        )  # Debug
-
         # Check for left mouse button press
-        if event.type() == QEvent.Type.MouseButtonPress:
-            mouse_event = QMouseEvent(event)  # Cast to QMouseEvent
-            print(
-                f"Mouse Press: button={mouse_event.button()}, pos={mouse_event.pos()}, correctable={is_correctable}"
-            )  # Debug
-            if mouse_event.button() == Qt.MouseButton.LeftButton and is_correctable:
+        if event.type() == QEvent.Type.MouseButtonPress and is_correctable:
+            # Use QEvent.Type.MouseButtonPress check first for type safety
+            if isinstance(event, QMouseEvent) and event.button() == Qt.MouseButton.LeftButton:
                 # Calculate indicator rect
-                icon_margin = 2
-                indicator_rect = QRect(
-                    option.rect.right() - self.ICON_SIZE - icon_margin,
-                    option.rect.top() + (option.rect.height() - self.ICON_SIZE) // 2,
-                    self.ICON_SIZE,
-                    self.ICON_SIZE,
-                )
-                print(f"Indicator Rect: {indicator_rect}, Click Pos: {mouse_event.pos()}")  # Debug
+                indicator_rect = self._get_indicator_rect(option.rect)
 
                 # Check if click was inside the indicator
-                if indicator_rect.contains(mouse_event.pos()):
-                    print(
-                        f"Correction indicator CLICKED for index {index.row()},{index.column()}"
-                    )  # Debug
-                    self.apply_first_correction_requested.emit(index)
-                    return True  # Event handled, don't proceed further
-                else:
-                    print("Click was outside indicator rect.")  # Debug
+                if indicator_rect.contains(event.pos()):
+                    # Get the view associated with the option to map position correctly
+                    view = (
+                        self.parent()
+                        if isinstance(self.parent(), QAbstractItemView)
+                        else option.widget
+                    )
 
-        # Handle other events (like right-click for menu) or pass to base class
-        if event.type() == QEvent.Type.MouseButtonRelease:
-            mouse_event = QMouseEvent(event)  # Cast again if needed
-            if mouse_event.button() == Qt.MouseButton.RightButton and is_correctable:
-                # Show context menu on right-click? Or handle elsewhere?
-                # For now, let base handle it or TableView handle context menu
-                pass
+                    if view and hasattr(view, "viewport"):
+                        global_pos = view.viewport().mapToGlobal(event.pos())
+                        self._show_correction_menu(model, index, global_pos)
+                        return True  # Event handled, stop processing
+                    else:
+                        # Fallback using event global pos if view is not available
+                        self._show_correction_menu(model, index, event.globalPos())
+                        print(
+                            "Warning: Could not get view to map position, using globalPos."
+                        )  # Debug
+                        return True  # Event handled, stop processing
 
+        # IMPORTANT: If the click wasn't handled above (e.g., not on indicator),
+        # pass the event to the base class implementation.
+        # The previous TypeError likely occurred because we passed a QMouseEvent
+        # when the signature expects a generic QEvent. We should pass the original event.
         return super().editorEvent(event, model, option, index)
 
     def _show_correction_menu(
@@ -180,17 +188,21 @@ class CorrectionDelegate(ValidationDelegate):
         suggestions = index.data(DataViewModel.CorrectionSuggestionsRole)
 
         if not suggestions:
-            print("No suggestions found to show menu.")  # Debug
+            print(f"No suggestions found for index {index.row()},{index.column()}")  # Debug
             return
 
         menu = QMenu()
         for suggestion in suggestions:
-            action = menu.addAction(str(suggestion))  # Use __str__ for display
-            # Connect action to a placeholder handler
+            action_text = str(suggestion)
+            if hasattr(suggestion, "corrected_value"):
+                action_text = f'Apply: "{suggestion.corrected_value}"'
+
+            action = menu.addAction(action_text)
+            # Connect to a helper slot instead of emitting directly
             action.triggered.connect(
-                lambda checked=False,
-                idx=index,
-                sugg=suggestion: self._apply_correction_placeholder(idx, sugg)
+                lambda checked=False, idx=index, sugg=suggestion: self._handle_suggestion_selected(
+                    idx, sugg
+                )
             )
 
         if menu.isEmpty():
@@ -199,21 +211,19 @@ class CorrectionDelegate(ValidationDelegate):
 
         menu.exec(global_pos)
 
-    def _apply_correction_placeholder(self, index: QModelIndex, suggestion: CorrectionSuggestion):
-        """Placeholder function to be called when a correction suggestion is selected."""
-        # Simplified print statement for debugging linter
-        print(f"Applying correction placeholder for {index.row()}, {index.column()}")
-        # In a real implementation, this would likely involve:
-        # 1. Getting the CorrectionService instance
-        # 2. Calling correction_service.apply_correction(index.row(), index.column(), suggestion)
-
-    # TODO: Override editorEvent or add button handling to show suggestions
-    # when the indicator area is clicked.
+    # Helper slot to emit the signal
+    @Slot(QModelIndex, object)
+    def _handle_suggestion_selected(self, index: QModelIndex, suggestion: object):
+        """Handles the triggered signal from a menu action and emits correction_selected."""
+        print(
+            f"Suggestion selected: {suggestion} for index {index.row()},{index.column()}"
+        )  # Debug
+        self.correction_selected.emit(index, suggestion)
 
     def helpEvent(
         self,
         event: QHelpEvent,
-        view,
+        view,  # QAbstractItemView
         option: QStyleOptionViewItem,
         index: QModelIndex,
     ):
@@ -221,17 +231,16 @@ class CorrectionDelegate(ValidationDelegate):
         if event.type() == QHelpEvent.Type.ToolTip and index.isValid():
             suggestions = index.data(DataViewModel.CorrectionSuggestionsRole)
             if suggestions:
-                suggestions_text = "Suggestions:\n" + "\n".join(
-                    [f"- {getattr(s, 'corrected_value', str(s))}" for s in suggestions]
-                )
+                # Ensure suggestions have 'corrected_value' or adapt as needed
+                # Corrected f-string formatting
+                suggestions_list = []
+                for s in suggestions:
+                    suggestion_str = getattr(s, "corrected_value", str(s))
+                    suggestions_list.append(f"- {suggestion_str}")
+                suggestions_text = "Suggestions:\n" + "\n".join(suggestions_list)
+
                 QToolTip.showText(event.globalPos(), suggestions_text, view)
                 return True  # Event handled
-            # else:
-            # Fallback to default tooltip if no suggestions
-            # default_tooltip = index.data(Qt.ToolTipRole)
-            # if default_tooltip:
-            #    QToolTip.showText(event.globalPos(), str(default_tooltip), view)
-            #    return True
 
         # Call the base class (ValidationDelegate) helpEvent for its tooltip logic
         return super().helpEvent(event, view, option, index)

@@ -3,9 +3,16 @@ Tests for the CorrectionDelegate class.
 """
 
 import pytest
-from PySide6.QtCore import Qt, QModelIndex, QRect, QSize, QEvent, QPoint, Signal
-from PySide6.QtWidgets import QApplication, QStyleOptionViewItem
-from PySide6.QtGui import QPainter, QIcon, QColor, QMouseEvent
+from unittest.mock import MagicMock, patch
+from PySide6.QtCore import Qt, QModelIndex, QRect, QSize, QEvent, QPoint, Signal, QAbstractItemModel
+from PySide6.QtWidgets import (
+    QApplication,
+    QStyleOptionViewItem,
+    QAbstractItemView,
+    QMenu,
+    QTableView,
+)
+from PySide6.QtGui import QPainter, QIcon, QColor, QMouseEvent, QAction
 from PySide6.QtTest import QSignalSpy
 
 from chestbuddy.ui.data.delegates.correction_delegate import (
@@ -15,6 +22,7 @@ from chestbuddy.ui.data.delegates.correction_delegate import (
 from chestbuddy.ui.data.delegates.validation_delegate import ValidationDelegate
 from chestbuddy.ui.data.models.data_view_model import DataViewModel
 from chestbuddy.core.enums.validation_enums import ValidationStatus
+from chestbuddy.core.table_state_manager import CellState
 # Import necessary models or roles if needed later
 # from chestbuddy.ui.data.models.data_view_model import DataViewModel
 
@@ -33,8 +41,8 @@ class TestCorrectionDelegate:
     def delegate(self, delegate_class, qapp):
         """Create a CorrectionDelegate instance."""
         # Ensure the signal exists on the class before instantiation for QSignalSpy
-        if not hasattr(delegate_class, "apply_first_correction_requested"):
-            delegate_class.apply_first_correction_requested = Signal(QModelIndex)
+        if not hasattr(delegate_class, "correction_selected"):
+            delegate_class.correction_selected = Signal(QModelIndex, object)
         return delegate_class()
 
     @pytest.fixture
@@ -43,10 +51,19 @@ class TestCorrectionDelegate:
         return mocker.MagicMock(spec=QPainter)
 
     @pytest.fixture
-    def style_option(self):
+    def style_option(self, qapp):
         """Fixture for a basic QStyleOptionViewItem."""
         option = QStyleOptionViewItem()
         option.rect = QRect(0, 0, 100, 30)
+        # Create a minimal, actual QTableView instance
+        dummy_view = QTableView()  # Use a concrete class
+        # We still need to mock viewport().mapToGlobal for the test
+        # Use patch.object to mock the viewport method temporarily
+        # This is safer than direct assignment if the object is complex
+        mock_viewport = MagicMock()
+        mock_viewport.mapToGlobal.side_effect = lambda pos: QPoint(pos.x() + 10, pos.y() + 20)
+        with patch.object(dummy_view, "viewport", return_value=mock_viewport, create=True):
+            option.widget = dummy_view
         return option
 
     @pytest.fixture
@@ -62,72 +79,124 @@ class TestCorrectionDelegate:
         }.get(role, None)
         return index
 
+    @pytest.fixture
+    def correctable_index(self, mocker):
+        """Fixture for an index marked as CORRECTABLE with suggestions."""
+        index = mocker.MagicMock(spec=QModelIndex)
+        index.isValid.return_value = True
+        suggestions = [
+            CorrectionSuggestion("orig", "corrected1"),
+            CorrectionSuggestion("orig", "corrected2"),
+        ]
+
+        # Define the data dictionary based on roles
+        data_map = {
+            # CRITICAL FIX: Use CellState enum, not ValidationStatus directly if delegate uses CellState
+            DataViewModel.ValidationStateRole: CellState.CORRECTABLE,
+            DataViewModel.CorrectionSuggestionsRole: suggestions,
+            Qt.DisplayRole: "orig",
+            # Add other roles if needed by delegate logic (e.g., ToolTipRole?)
+        }
+
+        # Use side_effect to return value based on role
+        index.data.side_effect = lambda role: data_map.get(role)
+        # Ensure model() returns a mock model if needed by delegate logic
+        index.model.return_value = mocker.MagicMock(spec=QAbstractItemModel)
+        # Add row() and column() if needed for debugging or logic
+        index.row.return_value = 1
+        index.column.return_value = 1
+        return index
+
     def test_initialization(self, delegate):
         """Test that the CorrectionDelegate initializes correctly."""
         assert delegate is not None
 
-    def test_paint_correctable_cell(self, delegate, mock_painter, style_option, mock_index, mocker):
-        """Test painting a cell marked as CORRECTABLE."""
-        # Configure index for CORRECTABLE state
-        mock_index.data.side_effect = (
-            lambda role: ValidationStatus.CORRECTABLE
-            if role == DataViewModel.ValidationStateRole
-            else None
-        )
+    def test_paint_correctable_cell(
+        self, delegate, mock_painter, style_option, correctable_index, mocker
+    ):
+        """Test painting a cell marked as CORRECTABLE calls indicator paint."""
+        # Patch the direct superclass paint method to avoid C++ layer issues
+        # Patch on the instance's specific super() chain if needed, or the class
+        mock_super_paint = mocker.patch.object(ValidationDelegate, "paint", return_value=None)
 
-        # Mock the icon paint method to verify it's called
-        mock_icon_paint = mocker.patch.object(QIcon, "paint")
+        # Spy on the private method that should be called
+        spy_paint_indicator = mocker.spy(delegate, "_paint_correction_indicator")
 
-        delegate.paint(mock_painter, style_option, mock_index)
+        # Call the delegate's paint method
+        delegate.paint(mock_painter, style_option, correctable_index)
 
-        # Verify the correction indicator icon paint was called
-        mock_icon_paint.assert_called()
-        # Check if the base class (ValidationDelegate) paint was called (important!)
-        # This requires careful mocking or checking painter calls if super().paint is complex
-        # For simplicity, assume base paint is called correctly if no error
+        # Verify the base paint was called
+        # assert mock_super_paint.call_count == 1 # Optional: verify super was called
+        mock_super_paint.assert_called_once_with(mock_painter, style_option, correctable_index)
+
+        # Verify the correction indicator painting was called
+        spy_paint_indicator.assert_called_once_with(mock_painter, style_option)
 
     def test_paint_non_correctable_cell(
         self, delegate, mock_painter, style_option, mock_index, mocker
     ):
-        """Test painting a cell not marked as CORRECTABLE."""
-        # Configure index for VALID state (or INVALID, etc.)
+        """Test painting a non-correctable cell does not call indicator paint."""
+        # Configure index for VALID state
         mock_index.data.side_effect = (
             lambda role: ValidationStatus.VALID
             if role == DataViewModel.ValidationStateRole
             else None
         )
 
-        mock_icon_paint = mocker.patch.object(QIcon, "paint")
+        # Patch the direct superclass paint method
+        mock_super_paint = mocker.patch.object(ValidationDelegate, "paint", return_value=None)
 
-        delegate.paint(mock_painter, style_option, mock_index)
-
-        # Verify the correction indicator icon paint was *not* called
-        # Note: This assumes ValidationDelegate doesn't paint the *same* icon.
-        # If icons can overlap, this needs adjustment.
-        # Let's refine: Check if CorrectionDelegate._paint_correction_indicator was called.
+        # Spy on the private method that should NOT be called
         spy_paint_indicator = mocker.spy(delegate, "_paint_correction_indicator")
+
+        # Call the delegate's paint method
         delegate.paint(mock_painter, style_option, mock_index)
+
+        # Verify the base paint was called
+        # assert mock_super_paint.call_count == 1 # Optional
+        mock_super_paint.assert_called_once_with(mock_painter, style_option, mock_index)
+
+        # Verify the correction indicator painting was *not* called
         spy_paint_indicator.assert_not_called()
 
     def test_sizeHint_correctable_no_validation_icon(
-        self, delegate, style_option, mock_index, mocker
+        self, delegate, style_option, correctable_index, mocker
     ):
         """Test sizeHint adds space for correctable cells without other icons."""
-        mock_index.data.side_effect = (
-            lambda role: ValidationStatus.CORRECTABLE
-            if role == DataViewModel.ValidationStateRole
-            else None
-        )
-        # Mock super().sizeHint
+        # Mock super().sizeHint specifically for THIS delegate's base
         base_hint = QSize(80, 30)
-        mocker.patch.object(ValidationDelegate, "sizeHint", return_value=base_hint)
+        # Ensure the mock targets the correct base class method for sizeHint
+        mock_super_sizeHint = mocker.patch.object(
+            ValidationDelegate, "sizeHint", return_value=base_hint
+        )
 
-        hint = delegate.sizeHint(style_option, mock_index)
+        # Explicitly check the validation status from the fixture
+        validation_status = correctable_index.data(DataViewModel.ValidationStateRole)
+        # Use correct enum name from fixture setup
+        # Compare against CellState, which is what the fixture provides
+        assert validation_status == CellState.CORRECTABLE, (
+            "Fixture setup issue: Index not correctable"
+        )
+        has_validation_icon = validation_status in [
+            CellState.INVALID,
+            CellState.WARNING,
+            # INFO does not exist
+            # Check against CellState enum members
+        ]
+        assert not has_validation_icon, (
+            "Fixture setup issue: Index unexpectedly has validation icon status (INVALID/WARNING)"
+        )
+
+        # Call the method under test
+        hint = delegate.sizeHint(style_option, correctable_index)
+
+        # Verify the superclass method was called
+        mock_super_sizeHint.assert_called_once_with(style_option, correctable_index)
 
         # Expect width increased by icon size + margin
         expected_width = base_hint.width() + delegate.ICON_SIZE + 4
         assert hint.width() == expected_width
-        assert hint.height() == base_hint.height()
+        assert hint.height() == base_hint.height(), "Height should not change"
 
     def test_sizeHint_correctable_with_validation_icon(
         self, delegate, style_option, mock_index, mocker
@@ -166,60 +235,159 @@ class TestCorrectionDelegate:
         # Expect base size hint
         assert hint == base_hint
 
-    def test_indicator_click_emits_signal(self, delegate, style_option, mock_index, qtbot, mocker):
-        """Test clicking the correction indicator emits the correct signal."""
-        # Configure index for CORRECTABLE state
-        mock_index.data.side_effect = (
-            lambda role: ValidationStatus.CORRECTABLE
-            if role == DataViewModel.ValidationStateRole
-            else None
-        )
+    # Test editorEvent - Focus on own logic, avoid asserting return value of super()
+    def test_indicator_click_shows_menu(
+        self, delegate, style_option, correctable_index, qtbot, mocker
+    ):
+        """Test clicking the correction indicator calls _show_correction_menu."""
+        # Spy on the private method
+        spy_show_menu = mocker.spy(delegate, "_show_correction_menu")
+        # Mock the super() call to prevent TypeError and focus on delegate logic
+        mocker.patch.object(ValidationDelegate, "editorEvent", return_value=False)
 
-        # Spy on the *instance's* signal
-        spy = QSignalSpy(delegate.apply_first_correction_requested)
-        assert spy.isValid()
-
-        # Calculate the indicator rect (assuming a helper method or calculation logic)
-        # Replicate potential logic from _paint_correction_indicator or a helper
-        indicator_rect = QRect(
-            style_option.rect.right() - delegate.ICON_SIZE - 2,  # 2px margin
-            style_option.rect.top() + (style_option.rect.height() - delegate.ICON_SIZE) // 2,
-            delegate.ICON_SIZE,
-            delegate.ICON_SIZE,
-        )
+        # Calculate the indicator rect
+        indicator_rect = delegate._get_indicator_rect(style_option.rect)
         click_pos = indicator_rect.center()
 
-        # Simulate the mouse click event that would trigger editorEvent
-        # We need to simulate the view calling editorEvent
-        # Mock the view to control the event
-        mock_view = mocker.MagicMock()
-        # Simulate a MouseButtonPress event within the indicator rect
+        # Simulate the mouse click event
         event = QMouseEvent(
             QEvent.Type.MouseButtonPress,
-            click_pos,  # Local position within the cell
+            click_pos,
             Qt.MouseButton.LeftButton,
             Qt.MouseButton.LeftButton,
             Qt.KeyboardModifier.NoModifier,
         )
 
-        # Call editorEvent - the delegate method that should handle this
-        # Assuming editorEvent is overridden to handle this click
-        # The base QStyledItemDelegate.editorEvent might return False if no editor is created
-        # We expect our override to handle the click and return True, or emit the signal
-        # and potentially return False if no editor is meant to be opened.
+        # Mock QMenu.exec_ to prevent actual menu display
+        mocker.patch.object(QMenu, "exec", return_value=None)
 
-        # Mock the parent view's viewport for event processing if needed
-        mock_view.viewport.return_value = mocker.MagicMock()
+        # Call editorEvent - DO NOT assert return value (handled)
+        delegate.editorEvent(event, correctable_index.model(), style_option, correctable_index)
+
+        # Assert _show_correction_menu was called
+        spy_show_menu.assert_called_once()
+        # We expect super().editorEvent NOT to be called because click was handled
+        ValidationDelegate.editorEvent.assert_not_called()
+
+    # Test QMenu Patching
+    @patch("chestbuddy.ui.data.delegates.correction_delegate.QMenu", autospec=True)
+    def test_show_menu_emits_signal_on_selection(
+        self, MockQMenu, delegate, correctable_index, qtbot
+    ):
+        """Test that selecting an item from the correction menu emits the signal."""
+        suggestions = correctable_index.data(DataViewModel.CorrectionSuggestionsRole)
+        selected_suggestion = suggestions[0]  # Choose the first suggestion
+
+        spy_signal = QSignalSpy(delegate.correction_selected)
+        assert spy_signal.isValid()
+
+        mock_menu_instance = MockQMenu.return_value
+        added_actions = []
+        captured_lambdas = {}  # Dictionary to store captured lambdas per action text
+
+        # Mock addAction to capture the QAction and its connected lambda
+        def mock_add_action(text):
+            action = MagicMock(spec=QAction)
+            action.text.return_value = text
+            matching_suggestion = None
+            for sugg in suggestions:
+                s_text = f'Apply: "{sugg.corrected_value}"'
+                if s_text == text:
+                    matching_suggestion = sugg
+                    break
+            action.associated_suggestion = matching_suggestion
+
+            # Mock connect to capture the lambda
+            def mock_connect(slot):
+                # Store the lambda associated with this action's text
+                captured_lambdas[action.text()] = slot
+
+            action.triggered = MagicMock(spec=Signal)
+            action.triggered.connect = MagicMock(side_effect=mock_connect)
+            # Remove the mock for emit, as we won't call it directly
+            # action.triggered.emit = MagicMock()
+            added_actions.append(action)
+            return action
+
+        mock_menu_instance.addAction.side_effect = mock_add_action
+        mock_menu_instance.isEmpty.return_value = False
+        mock_menu_instance.exec.return_value = None
+
+        # Call the method that shows the menu
+        delegate._show_correction_menu(correctable_index.model(), correctable_index, QPoint(10, 10))
+
+        # Assertions
+        MockQMenu.assert_called_once()
+        assert mock_menu_instance.addAction.call_count == len(suggestions)
+        mock_menu_instance.exec.assert_called_once()
+
+        assert len(added_actions) > 0, "No actions were added to the mock menu"
+        first_action = added_actions[0]
+        first_action_text = first_action.text()
+        assert first_action.associated_suggestion == selected_suggestion, "Mock setup failed"
+        assert first_action_text in captured_lambdas, "Lambda for the first action was not captured"
+
+        # Call the captured lambda directly to simulate the trigger
+        captured_lambda = captured_lambdas[first_action_text]
+        captured_lambda()  # Call the lambda
+
+        # Assert the delegate's signal was emitted
+        assert spy_signal.count() == 1, f"Signal emitted {spy_signal.count()} times, expected 1"
+
+        # Access the arguments of the first emission by iterating the spy
+        assert spy_signal.isValid(), "Signal spy is invalid"
+        emitted_args_list = list(spy_signal)  # Iterate to get list of emissions
+        assert len(emitted_args_list) == 1, "Expected exactly one signal emission"
+        emitted_args = emitted_args_list[0]  # Get the args from the first emission
+
+        assert len(emitted_args) == 2, f"Signal args count mismatch: {len(emitted_args)}"
+        assert emitted_args[0] == correctable_index, "Signal index mismatch"
+        assert emitted_args[1] == selected_suggestion, "Signal suggestion mismatch"
+
+    # Test editorEvent click outside indicator
+    def test_click_outside_indicator_does_not_show_menu(
+        self, delegate, style_option, correctable_index, qtbot, mocker
+    ):
+        """Test clicking outside the indicator does not call _show_correction_menu."""
+        spy_show_menu = mocker.spy(delegate, "_show_correction_menu")
+        # Mock the super() call to verify it happens
+        mock_super_editor_event = mocker.patch.object(
+            ValidationDelegate, "editorEvent", return_value=False
+        )
+
+        # Calculate a point outside the indicator rect
+        indicator_rect = delegate._get_indicator_rect(style_option.rect)
+        click_pos = QPoint(indicator_rect.left() - 5, indicator_rect.center().y())
+
+        event = QMouseEvent(
+            QEvent.Type.MouseButtonPress,
+            click_pos,
+            Qt.MouseButton.LeftButton,
+            Qt.MouseButton.LeftButton,
+            Qt.KeyboardModifier.NoModifier,
+        )
 
         # Call editorEvent
-        # Note: We might need to mock the model return value for Qt.EditRole if editorEvent checks it
-        delegate.editorEvent(event, mock_index.model(), style_option, mock_index)
+        delegate.editorEvent(event, correctable_index.model(), style_option, correctable_index)
 
-        # Assert the signal was emitted once
-        assert len(spy) == 1, f"Signal emitted {len(spy)} times, expected 1"
+        spy_show_menu.assert_not_called()
+        # Verify super().editorEvent *was* called because the click wasn't handled
+        mock_super_editor_event.assert_called_once()
 
-        # Assert the signal was emitted with the correct index
-        assert len(spy[0]) == 1, "Signal emitted with incorrect number of arguments"
-        assert spy[0][0] == mock_index, "Signal emitted with incorrect QModelIndex"
+    # Test _show_correction_menu with no suggestions
+    def test_show_menu_no_suggestions(self, delegate, mock_index, qtbot, mocker):
+        """Test _show_correction_menu does nothing if no suggestions exist."""
+        # Ensure index has no suggestions
+        mock_index.data.side_effect = lambda role: {
+            DataViewModel.ValidationStateRole: ValidationStatus.CORRECTABLE,
+            DataViewModel.CorrectionSuggestionsRole: [],  # Empty list
+        }.get(role, None)
+
+        # Spy on QMenu.exec_ to ensure it's not called
+        mock_exec = mocker.patch.object(QMenu, "exec")
+
+        delegate._show_correction_menu(mock_index.model(), mock_index, QPoint(10, 10))
+
+        mock_exec.assert_not_called()
 
     # TODO: Add tests for other overridden methods if implemented (e.g., createEditor)
