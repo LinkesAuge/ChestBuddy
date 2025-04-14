@@ -209,11 +209,7 @@ class DataTableView(QWidget):
             self._initialize_column_visibility
         )  # Connect columns_changed
 
-        # Connect the delegate's signal to our internal slot
-        self._correction_delegate.apply_first_correction_requested.connect(
-            self._on_apply_first_correction_requested
-        )
-        # Connect the correction delegate's selection signal to our new slot
+        # Connect the correction delegate's selection signal to our internal slot
         self._correction_delegate.correction_selected.connect(self._on_correction_delegate_selected)
 
     # --- Internal Slot for Selection --- #

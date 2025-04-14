@@ -16,6 +16,7 @@ import pandas as pd
 from PySide6.QtCore import QObject, Signal, Slot, Qt
 from PySide6.QtWidgets import QApplication
 from dataclasses import dataclass, field
+from chestbuddy.core.models.chest_data_model import ChestDataModel
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -93,26 +94,42 @@ class TableStateManager(QObject):
         headers_map = {}
         model = self._data_model  # Use local var for clarity
         logger.debug(f"_create_headers_map: Checking model type: {type(model)}")
+
+        # Check if it's our ChestDataModel
+        if isinstance(model, ChestDataModel):
+            try:
+                columns = model.column_names  # Use the property
+                logger.debug(
+                    f"_create_headers_map: Found {len(columns)} columns from ChestDataModel."
+                )
+                headers_map = {name: i for i, name in enumerate(columns)}
+                logger.debug(f"Created headers map from ChestDataModel: {headers_map}")
+            except Exception as e:
+                logger.error(f"Failed to create headers map from ChestDataModel: {e}")
+            return headers_map  # Return early
+
+        # Fallback for QAbstractItemModel-like objects
         has_model = model is not None
         has_col_count = hasattr(model, "columnCount")
         has_header_data = hasattr(model, "headerData")
         logger.debug(
-            f"_create_headers_map: has_model={has_model}, has_col_count={has_col_count}, has_header_data={has_header_data}"
+            f"_create_headers_map (Qt Model Check): has_model={has_model}, has_col_count={has_col_count}, has_header_data={has_header_data}"
         )
 
         if has_model and has_col_count and has_header_data:
             try:
                 num_cols = model.columnCount()
-                logger.debug(f"_create_headers_map: Found {num_cols} columns.")
+                logger.debug(f"_create_headers_map (Qt Model): Found {num_cols} columns.")
                 for col_idx in range(num_cols):
-                    # Assuming headerData with Qt.Horizontal orientation gives the name
                     header_name = model.headerData(col_idx, Qt.Horizontal, Qt.DisplayRole)
-                    logger.debug(f"_create_headers_map: Header for col {col_idx} = {header_name}")
+                    logger.debug(
+                        f"_create_headers_map (Qt Model): Header for col {col_idx} = {header_name}"
+                    )
                     if header_name:
                         headers_map[str(header_name)] = col_idx
-                logger.debug(f"Created headers map: {headers_map}")
+                logger.debug(f"Created headers map (Qt Model): {headers_map}")
             except Exception as e:
-                logger.error(f"Failed to create headers map from data model: {e}")
+                logger.error(f"Failed to create headers map from Qt data model: {e}")
         else:
             logger.warning("Data model not suitable for creating headers map in TableStateManager")
         return headers_map

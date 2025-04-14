@@ -30,21 +30,25 @@ def settings_tab_view(qtbot, mock_validation_service, mock_correction_controller
         return view
 
 
-def test_settings_tab_view_init(settings_tab_view):
+def test_settings_tab_view_init(qtbot, mock_controller):
     """Test SettingsTabView initialization."""
-    assert settings_tab_view is not None
+    view = SettingsTabView(controller=mock_controller)
+    qtbot.addWidget(view)
+    assert view._controller == mock_controller
     # Check if tab widget exists
-    assert settings_tab_view._tab_widget is not None
+    assert view._tab_widget is not None
     # Check if settings widgets dictionaries exist
-    assert "General" in settings_tab_view._settings_widgets
-    assert "Validation" in settings_tab_view._settings_widgets
-    assert "Correction" in settings_tab_view._settings_widgets
-    assert "UI" in settings_tab_view._settings_widgets
+    assert "General" in view._settings_widgets
+    assert "Validation" in view._settings_widgets
+    assert "Correction" in view._settings_widgets
+    assert "UI" in view._settings_widgets
 
 
-def test_general_tab(settings_tab_view):
-    """Test general tab has expected controls."""
-    general_widgets = settings_tab_view._settings_widgets["General"]
+def test_general_tab(qtbot, mock_controller):
+    """Test the General settings tab."""
+    view = SettingsTabView(controller=mock_controller)
+    qtbot.addWidget(view)
+    general_widgets = view._settings_widgets["General"]
     assert "theme" in general_widgets
     assert "language" in general_widgets
     assert "config_version" in general_widgets
@@ -53,9 +57,11 @@ def test_general_tab(settings_tab_view):
     assert isinstance(general_widgets["config_version"], QLineEdit)
 
 
-def test_validation_tab(settings_tab_view):
-    """Test validation tab has expected controls."""
-    validation_widgets = settings_tab_view._settings_widgets["Validation"]
+def test_validation_tab(qtbot, mock_controller):
+    """Test the Validation settings tab."""
+    view = SettingsTabView(controller=mock_controller)
+    qtbot.addWidget(view)
+    validation_widgets = view._settings_widgets["Validation"]
     assert "validate_on_import" in validation_widgets
     assert "case_sensitive" in validation_widgets
     assert "auto_save" in validation_widgets
@@ -66,18 +72,22 @@ def test_validation_tab(settings_tab_view):
     assert isinstance(validation_widgets["validation_lists_dir"], QLineEdit)
 
 
-def test_correction_tab(settings_tab_view):
-    """Test correction tab has expected controls."""
-    correction_widgets = settings_tab_view._settings_widgets["Correction"]
+def test_correction_tab(qtbot, mock_controller):
+    """Test the Correction settings tab."""
+    view = SettingsTabView(controller=mock_controller)
+    qtbot.addWidget(view)
+    correction_widgets = view._settings_widgets["Correction"]
     assert "auto_correct_on_validation" in correction_widgets
     assert "auto_correct_on_import" in correction_widgets
     assert isinstance(correction_widgets["auto_correct_on_validation"], QCheckBox)
     assert isinstance(correction_widgets["auto_correct_on_import"], QCheckBox)
 
 
-def test_ui_tab(settings_tab_view):
-    """Test UI tab has expected controls."""
-    ui_widgets = settings_tab_view._settings_widgets["UI"]
+def test_ui_tab(qtbot, mock_controller):
+    """Test the UI settings tab."""
+    view = SettingsTabView(controller=mock_controller)
+    qtbot.addWidget(view)
+    ui_widgets = view._settings_widgets["UI"]
     assert "window_width" in ui_widgets
     assert "window_height" in ui_widgets
     assert "table_page_size" in ui_widgets

@@ -40,6 +40,7 @@ Last Updated: 2024-08-07
 - Reverted `test_correction_suggestion_updates_state` to remove failed mocking attempts (test is currently non-functional).
 - Fixed `RuntimeError` Crash: Modified `SignalManager.disconnect_receiver` to handle potential `RuntimeError` when disconnecting signals from already deleted C++ objects during test teardown.
 - Fixed all unit tests for `CorrectionDelegate` (10/10).
+- Fixed `TypeError` in `test_context_menu_factory.py`, ensuring context menu unit tests pass.
 
 ## Implementation Plan
 

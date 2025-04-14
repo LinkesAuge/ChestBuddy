@@ -356,22 +356,24 @@ class ChestBuddyApp(QObject):
             # Access the adapter from the MainWindow's view dictionary
             data_view_adapter = self._main_window._views.get("Data")
             if data_view_adapter and hasattr(data_view_adapter, "correction_selected"):
-                # Connect correction signal using signal_manager for safety
+                # Connect correction signal from the view/delegate to the CorrectionAdapter's slot
                 try:
                     self._signal_manager.safe_connect(
-                        data_view_adapter,
-                        "correction_selected",
-                        self._correction_controller,
-                        "handle_correction_selected",
+                        data_view_adapter,  # Source: The DataView adapter/wrapper
+                        "correction_selected",  # Signal: Emitted by delegate/view when a correction is chosen
+                        self._correction_adapter,  # Target: The CorrectionAdapter instance
+                        "apply_correction_from_ui",  # Slot: Handles applying the correction via CorrectionService
                     )
                     logger.info(
-                        f"Connected correction_selected signal from {type(data_view_adapter).__name__}"
+                        "Connected correction_selected signal from DataView to CorrectionAdapter."
                     )
                 except Exception as e:
-                    logger.error(f"Failed to connect correction_selected signal: {e}")
+                    logger.error(
+                        f"Failed to connect correction_selected signal to CorrectionAdapter: {e}"
+                    )
             else:
                 logger.warning(
-                    f"Data view adapter not found or missing correction_selected signal. Found type: {type(data_view_adapter).__name__ if data_view_adapter else 'None'}"
+                    f"Data view adapter not found or missing correction_selected signal. Cannot connect correction signal. Found type: {type(data_view_adapter).__name__ if data_view_adapter else 'None'}"
                 )
 
             # Connect ValidationController signals

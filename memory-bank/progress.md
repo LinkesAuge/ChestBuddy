@@ -217,6 +217,7 @@ ChestBuddy is currently focused on a comprehensive refactoring of the DataView c
 - Fixed mock setup for `get_full_cell_state` in `DataViewModel` tests
 - **RuntimeError Crash:** Resolved `RuntimeError: Internal C++ object (...) already deleted` during test teardown in `SignalManager`.
 - **CorrectionDelegate Tests:** Fixed all test failures related to signal emission verification and size hints.
+- **Context Menu Factory Test:** Fixed `TypeError` in `test_create_menu_invalid_cell` caused by incorrect keyword argument for `CellFullState`.
 
 ## What's Next
 1.  Complete remaining Phase 4 (Context Menu) tasks: Selection-aware menu actions, validation during edit.
@@ -236,7 +237,7 @@ ChestBuddy is currently focused on a comprehensive refactoring of the DataView c
 | Component Type            | Total Tests | Passing | Coverage | Notes                                                                          |
 |---------------------------|-------------|---------|----------|--------------------------------------------------------------------------------|
 | Current UI Components     | 78          | TBD     | Varies   | Many tests likely failing/erroring due to refactor                               |
-| DataView New Components   | ~100+       | ~100+   | ~TBD%    | ViewModel, TableView, Delegates, Adapters, Actions, Column/Filter Models tested |
+| DataView New Components   | ~100+       | ~100+   | ~TBD%    | ViewModel, TableView, Delegates, Adapters, Actions, ContextMenuFactory, Column/Filter Models tested |
 |   - DataViewModel         | 17          | 17      | ~80%     | Basic functionality, sorting, signal handling covered |
 |   - DataTableView         | 5           | 5       | ~40%     | Basic setup, selection, context menu covered          |
 |   - CellDelegate          | 6           | 6       | ~60%     | Base method calls verified                            |

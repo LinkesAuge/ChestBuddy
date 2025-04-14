@@ -701,3 +701,10 @@ Additionally, several `qt.svg: Cannot open file...` warnings and `RuntimeWarning
 - **Fix Location**: `tests/dataview/test_delegates.py` 
 - **Validation**: All tests now pass correctly, confirming that the delegate properly renders validation states and handles correction interactions
 - **Notes**: The delegate implementation now fully supports the validation state visualization and correction workflow
+
+### FIXED: Context Menu Factory Test Failure
+
+**Issue**: The test `TestContextMenuFactory::test_create_menu_invalid_cell` in `tests/ui/data/menus/test_context_menu_factory.py` was failing with a `TypeError`.
+**Root Cause**: The test attempted to instantiate the `CellFullState` dataclass (from `chestbuddy.core.table_state_manager`) using an incorrect keyword argument `error_message` instead of the expected `error_details`.
+**Fix**: Modified line 224 in the test file to use the correct keyword argument `error_details` when creating the `CellFullState` instance.
+**Result**: All 6 tests in `test_context_menu_factory.py` now pass successfully.

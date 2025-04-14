@@ -83,11 +83,9 @@ def mock_correction_controller():
 
     # Mock rule data
     rules = [
-        CorrectionRule(
-            "corrected1", "test1", "general", "enabled"
-        ),  # to_value, from_value, category, status
-        CorrectionRule("corrected2", "test2", "player", "enabled"),
-        CorrectionRule("corrected3", "test3", "chest_type", "disabled"),
+        CorrectionRule("rule1", "corrected1", "test1", "general", "enabled"),
+        CorrectionRule("rule2", "corrected2", "test2", "player", "enabled"),
+        CorrectionRule("rule3", "corrected3", "test3", "chest_type", "disabled"),
     ]
 
     # Setup controller methods

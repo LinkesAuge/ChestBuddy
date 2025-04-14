@@ -55,6 +55,10 @@ def mock_chest_data_model(mocker):
     model.createIndex = lambda row, col, parent=None: QModelIndex()  # Needs model instance if used?
     # Add methods required by QAbstractTableModel if ChestDataModel inherits from it
     # model.index = mocker.Mock(return_value=QModelIndex()) # Example if needed
+
+    # Add the missing has_data attribute
+    model.has_data = True  # Default to True for most tests
+
     return model
 
 

@@ -31,8 +31,6 @@ from chestbuddy.core.models.chest_data_model import ChestDataModel
 from chestbuddy.core.state.data_state import DataState
 from chestbuddy.utils.config import ConfigManager
 from chestbuddy.core.services.validation_service import ValidationService
-from chestbuddy.core.models.enums import CorrectionAction, DataType
-from chestbuddy.core.data_model import DataModel
 from chestbuddy.core.table_state_manager import (
     TableStateManager,
     CellFullState,

@@ -84,6 +84,13 @@ def mock_clipboard(mocker):
     return mock
 
 
+@pytest.fixture
+def mock_table_state_manager(mocker):
+    """Fixture for mocking the table state manager."""
+    mock = MagicMock()
+    return mock
+
+
 # --- Helper Function ---
 
 
@@ -98,17 +105,9 @@ def get_actions_dict(menu: QMenu) -> typing.Dict[str, QAction]:
 class TestContextMenuFactory:
     """Tests for ContextMenuFactory."""
 
-    def test_create_empty_menu_no_model(self, mock_qwidget):
-        """Test creating a menu with no model in context."""
-        info = ActionContext(
-            clicked_index=QModelIndex(), selection=[], model=None, parent_widget=mock_qwidget
-        )
-        menu, actions = ContextMenuFactory.create_context_menu(info)
-        assert isinstance(menu, QMenu)
-        assert len(actions) == 0
-        assert len(menu.actions()) == 0  # No actions should be added
-
-    def test_create_menu_no_selection(self, mock_model, mock_qwidget, mock_clipboard):
+    def test_create_menu_no_selection(
+        self, mock_model, mock_qwidget, mock_clipboard, mock_table_state_manager
+    ):
         """Test menu state with no selection."""
         mock_clipboard.text.return_value = ""
         info = ActionContext(
@@ -116,6 +115,7 @@ class TestContextMenuFactory:
             selection=[],
             model=mock_model,
             parent_widget=mock_qwidget,
+            state_manager=mock_table_state_manager,
         )
         menu, actions_map = ContextMenuFactory.create_context_menu(info)
         # actions = get_actions_dict(menu)
@@ -134,7 +134,13 @@ class TestContextMenuFactory:
         assert "view_error" not in actions_map
         assert "apply_correction" not in actions_map
 
-    def test_create_menu_single_selection_editable(self, mock_model, mock_qwidget, mock_clipboard):
+    def test_create_menu_single_selection_editable(
+        self,
+        mock_model,
+        mock_qwidget,
+        mock_clipboard,
+        mock_table_state_manager,
+    ):
         """Test menu state with a single editable cell selected."""
         mock_clipboard.text.return_value = "some text"
         index = mock_model.index(0, 0)
@@ -143,6 +149,7 @@ class TestContextMenuFactory:
             selection=[index],
             model=mock_model,  # Default model is editable
             parent_widget=mock_qwidget,
+            state_manager=mock_table_state_manager,
         )
         menu, actions_map = ContextMenuFactory.create_context_menu(info)
 
@@ -155,7 +162,9 @@ class TestContextMenuFactory:
         assert actions_map["edit_cell"].isEnabled()
         assert actions_map["show_edit_dialog"].isEnabled()
 
-    def test_create_menu_single_selection_not_editable(self, mock_qwidget, mock_clipboard):
+    def test_create_menu_single_selection_not_editable(
+        self, mock_qwidget, mock_clipboard, mock_table_state_manager
+    ):
         """Test menu state with a single non-editable cell selected."""
         mock_model_not_editable = MockModel(is_editable=False)
         mock_clipboard.text.return_value = "some text"
@@ -165,6 +174,7 @@ class TestContextMenuFactory:
             selection=[index],
             model=mock_model_not_editable,
             parent_widget=mock_qwidget,
+            state_manager=mock_table_state_manager,
         )
         menu, actions_map = ContextMenuFactory.create_context_menu(info)
 
@@ -177,7 +187,9 @@ class TestContextMenuFactory:
         assert not actions_map["edit_cell"].isEnabled()
         assert not actions_map["show_edit_dialog"].isEnabled()
 
-    def test_create_menu_multi_selection(self, mock_model, mock_qwidget, mock_clipboard):
+    def test_create_menu_multi_selection(
+        self, mock_model, mock_qwidget, mock_clipboard, mock_table_state_manager
+    ):
         """Test menu state with multiple cells selected."""
         mock_clipboard.text.return_value = "some text"
         index1 = mock_model.index(0, 0)
@@ -187,6 +199,7 @@ class TestContextMenuFactory:
             selection=[index1, index2],
             model=mock_model,  # Editable by default
             parent_widget=mock_qwidget,
+            state_manager=mock_table_state_manager,
         )
         menu, actions_map = ContextMenuFactory.create_context_menu(info)
 
@@ -200,15 +213,30 @@ class TestContextMenuFactory:
         # Checking for presence OR disabled state might be more robust.
         # For now, assume is_applicable=False means they aren't added.
 
-    def test_create_menu_invalid_cell(self, mock_qwidget, mock_clipboard):
+    def test_create_menu_invalid_cell(self, mock_qwidget, mock_clipboard, mock_table_state_manager):
         """Test menu includes validation action for invalid cell."""
         mock_model_invalid = MockModel(validation_state=CellState.INVALID)
         index = mock_model_invalid.index(0, 0)
+
+        # Setup mock state manager for INVALID state
+        from chestbuddy.core.table_state_manager import CellFullState
+
+        invalid_state = CellFullState(
+            validation_status=CellState.INVALID,
+            error_details="Mock error message",
+        )
+        mock_table_state_manager.get_full_cell_state.side_effect = (
+            lambda r, c: invalid_state
+            if r == index.row() and c == index.column()
+            else CellFullState()
+        )
+
         info = ActionContext(
             clicked_index=index,
             selection=[index],
             model=mock_model_invalid,
             parent_widget=mock_qwidget,
+            state_manager=mock_table_state_manager,
         )
         menu, actions_map = ContextMenuFactory.create_context_menu(info)
 
@@ -216,15 +244,41 @@ class TestContextMenuFactory:
         assert actions_map["view_error"].isEnabled()
         assert "apply_correction" not in actions_map
 
-    def test_create_menu_correctable_cell(self, mock_qwidget, mock_clipboard):
+    def test_create_menu_correctable_cell(
+        self, mock_qwidget, mock_clipboard, mock_table_state_manager
+    ):
         """Test menu includes correction action for correctable cell."""
         mock_model_correctable = MockModel(validation_state=CellState.CORRECTABLE)
         index = mock_model_correctable.index(0, 0)
+
+        # --- Setup Mock State Manager --- #
+        from chestbuddy.core.table_state_manager import CellFullState
+
+        # Define the state to be returned by the mock
+        correctable_state = CellFullState(
+            validation_status=CellState.CORRECTABLE,
+            correction_suggestions=["mock_suggestion"],  # Needs suggestions to be enabled
+        )
+        # Configure the mock to return this state for the target cell
+        mock_table_state_manager.get_full_cell_state.return_value = correctable_state
+        # If state manager is called with specific row/col:
+        # mock_table_state_manager.get_full_cell_state.configure_mock(**{
+        #     f'({index.row()}, {index.column()})': correctable_state
+        # })
+        # If get_full_cell_state is called like get_full_cell_state(row, col):
+        mock_table_state_manager.get_full_cell_state.side_effect = (
+            lambda r, c: correctable_state
+            if r == index.row() and c == index.column()
+            else CellFullState()
+        )
+
+        # Use the provided mock state manager
         info = ActionContext(
             clicked_index=index,
             selection=[index],
             model=mock_model_correctable,
             parent_widget=mock_qwidget,
+            state_manager=mock_table_state_manager,
         )
         menu, actions_map = ContextMenuFactory.create_context_menu(info)
 

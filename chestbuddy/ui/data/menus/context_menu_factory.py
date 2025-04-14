@@ -30,10 +30,14 @@ from ..actions.edit_actions import (
 
 # Import future action classes here
 from ..actions.validation_actions import ViewErrorAction  # Import real action
-from ..actions.correction_actions import ApplyCorrectionAction  # Import real action
+from ..actions.correction_actions import (
+    ApplyCorrectionAction,
+    AddToCorrectionListAction,
+    PreviewCorrectionAction,
+)
 
 # Import AddToCorrectionListAction from correct path
-from ..actions.correction_actions import AddToCorrectionListAction
+# from ..actions.correction_actions import AddToCorrectionListAction # Already imported above
 
 # Import real ActionContext
 from ..context.action_context import ActionContext
@@ -79,6 +83,7 @@ class ContextMenuFactory:
         # Separator needed here
         ViewErrorAction,
         ApplyCorrectionAction,
+        PreviewCorrectionAction,
         # Separator needed here
         AddToCorrectionListAction,
     ]
@@ -125,7 +130,9 @@ class ContextMenuFactory:
                     qaction.setEnabled(action_instance.is_enabled(info))
                     # Connect triggered signal to the action's execute method
                     qaction.triggered.connect(
-                        lambda bound_action=action_instance: bound_action.execute(info)
+                        lambda checked=False, bound_action=action_instance: bound_action.execute(
+                            info
+                        )
                     )
                     menu.addAction(qaction)
                     created_qactions[action_instance.id] = qaction
@@ -148,7 +155,9 @@ class ContextMenuFactory:
                     qaction.setToolTip(action_instance.tooltip)
                     qaction.setEnabled(action_instance.is_enabled(info))
                     qaction.triggered.connect(
-                        lambda bound_action=action_instance: bound_action.execute(info)
+                        lambda checked=False, bound_action=action_instance: bound_action.execute(
+                            info
+                        )
                     )
                     menu.addAction(qaction)
                     created_qactions[action_instance.id] = qaction
@@ -185,7 +194,7 @@ class ContextMenuFactory:
 
         # Add context-specific actions (Validation/Correction)
         # Applicability might depend on single cell state
-        context_action_ids = {"view_error", "apply_correction"}
+        context_action_ids = {"view_error", "apply_correction", "preview_correction"}
         for action_instance in action_instances:
             if action_instance.id in context_action_ids:
                 if action_instance.is_applicable(info):
@@ -196,7 +205,9 @@ class ContextMenuFactory:
                     qaction.setToolTip(action_instance.tooltip)
                     qaction.setEnabled(action_instance.is_enabled(info))
                     qaction.triggered.connect(
-                        lambda bound_action=action_instance: bound_action.execute(info)
+                        lambda checked=False, bound_action=action_instance: bound_action.execute(
+                            info
+                        )
                     )
                     menu.addAction(qaction)
                     created_qactions[action_instance.id] = qaction
@@ -215,7 +226,9 @@ class ContextMenuFactory:
                     qaction.setToolTip(action_instance.tooltip)
                     qaction.setEnabled(action_instance.is_enabled(info))
                     qaction.triggered.connect(
-                        lambda bound_action=action_instance: bound_action.execute(info)
+                        lambda checked=False, bound_action=action_instance: bound_action.execute(
+                            info
+                        )
                     )
                     menu.addAction(qaction)
                     created_qactions[action_instance.id] = qaction

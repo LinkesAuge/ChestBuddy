@@ -33,31 +33,67 @@ def mock_widget():
 
 
 @pytest.fixture
-def base_context(mock_model, mock_widget):
+def mock_table_state_manager():
+    """Creates a mock table state manager."""
+    return MagicMock()
+
+
+@pytest.fixture
+def mock_context_factory(mocker, mock_table_state_manager):
+    """Factory to create mock ActionContext instances."""
+
+    def _factory(
+        model=None,
+        clicked_index=QModelIndex(),
+        selection=None,
+        parent_widget=None,
+        state_manager=mock_table_state_manager,  # Default to mock
+        correction_service=None,
+        validation_service=None,
+    ):
+        return ActionContext(
+            clicked_index=clicked_index,
+            selection=selection
+            if selection is not None
+            else ([clicked_index] if clicked_index.isValid() else []),
+            model=model or mocker.MagicMock(spec=DataViewModel),
+            parent_widget=parent_widget or mocker.MagicMock(spec=QWidget),
+            state_manager=state_manager,  # Use provided or default mock
+            correction_service=correction_service,
+            validation_service=validation_service,
+        )
+
+    return _factory
+
+
+@pytest.fixture
+def base_context(mock_model, mock_table_state_manager):
     """Creates a base ActionContext."""
     return ActionContext(
-        clicked_index=QModelIndex(),  # No specific click initially
+        clicked_index=QModelIndex(),
         selection=[],
         model=mock_model,
-        parent_widget=mock_widget,
+        parent_widget=None,
+        state_manager=mock_table_state_manager,
     )
 
 
 @pytest.fixture
-def single_cell_context(mock_model, mock_widget):
+def single_cell_context(mock_model, mock_table_state_manager):
     """Creates an ActionContext for a single cell click."""
-    clicked_index = mock_model.index(1, 1)  # Example index
+    clicked_index = mock_model.index(1, 1)
     return ActionContext(
         clicked_index=clicked_index,
         selection=[clicked_index],
         model=mock_model,
-        parent_widget=mock_widget,
+        parent_widget=None,
+        state_manager=mock_table_state_manager,
     )
 
 
 @pytest.fixture
-def date_column_context(mock_model, mock_widget):
-    """Creates context for clicking a 'Date' column (assuming column 3)."""
+def date_column_context(mock_model, mock_table_state_manager):
+    """Creates context for clicking a 'Date' column."""
     mock_model.headerData.side_effect = (
         lambda col, orient: "Date Column"
         if col == 3 and orient == Qt.Horizontal
@@ -68,13 +104,14 @@ def date_column_context(mock_model, mock_widget):
         clicked_index=clicked_index,
         selection=[clicked_index],
         model=mock_model,
-        parent_widget=mock_widget,
+        parent_widget=None,
+        state_manager=mock_table_state_manager,
     )
 
 
 @pytest.fixture
-def score_column_context(mock_model, mock_widget):
-    """Creates context for clicking a 'Score' column (assuming column 2)."""
+def score_column_context(mock_model, mock_table_state_manager):
+    """Creates context for clicking a 'Score' column."""
     mock_model.headerData.side_effect = (
         lambda col, orient: "Score Column"
         if col == 2 and orient == Qt.Horizontal
@@ -85,87 +122,85 @@ def score_column_context(mock_model, mock_widget):
         clicked_index=clicked_index,
         selection=[clicked_index],
         model=mock_model,
-        parent_widget=mock_widget,
+        parent_widget=None,
+        state_manager=mock_table_state_manager,
     )
 
 
 # --- Test Cases ---
 
 
-def test_create_context_menu_basic_actions(base_context):
-    """Test that standard actions are present even with no selection."""
-    menu, actions = ContextMenuFactory.create_context_menu(base_context)
+class TestContextMenuFactoryIntegration:  # Example class name
+    def test_create_context_menu_basic_actions(self, base_context):
+        menu, actions = ContextMenuFactory.create_context_menu(base_context)
 
-    assert isinstance(menu, QMenu)
-    # Check standard actions (Copy, Paste, Cut, Delete might be disabled but present)
-    assert "copy" in actions
-    assert "paste" in actions
-    assert "cut" in actions
-    assert "delete" in actions
-    assert "edit_cell" not in actions  # Requires single selection
-    assert "show_edit_dialog" not in actions  # Requires single selection
+        assert isinstance(menu, QMenu)
+        # Check standard actions (Copy, Paste, Cut, Delete might be disabled but present)
+        assert "copy" in actions
+        assert "paste" in actions
+        assert "cut" in actions
+        assert "delete" in actions
+        assert "edit_cell" not in actions  # Requires single selection
+        assert "show_edit_dialog" not in actions  # Requires single selection
 
+    def test_create_context_menu_single_selection(self, single_cell_context):
+        menu, actions = ContextMenuFactory.create_context_menu(single_cell_context)
 
-def test_create_context_menu_single_selection(single_cell_context):
-    """Test actions available for a single cell selection."""
-    menu, actions = ContextMenuFactory.create_context_menu(single_cell_context)
+        assert "copy" in actions
+        assert "paste" in actions
+        assert "cut" in actions
+        assert "delete" in actions
+        assert "edit_cell" in actions
+        assert "show_edit_dialog" in actions
+        assert "add_correction" in actions  # Assuming AddToCorrectionListAction is applicable
 
-    assert "copy" in actions
-    assert "paste" in actions
-    assert "cut" in actions
-    assert "delete" in actions
-    assert "edit_cell" in actions
-    assert "show_edit_dialog" in actions
-    assert "add_correction" in actions  # Assuming AddToCorrectionListAction is applicable
+        # Check that cell-type specific placeholders are NOT present for a generic column
+        action_texts = [a.text() for a in menu.actions()]
+        assert not any("Format Date" in text for text in action_texts)
+        assert not any("Number Format" in text for text in action_texts)
 
-    # Check that cell-type specific placeholders are NOT present for a generic column
-    action_texts = [a.text() for a in menu.actions()]
-    assert not any("Format Date" in text for text in action_texts)
-    assert not any("Number Format" in text for text in action_texts)
+    def test_create_context_menu_date_column(self, date_column_context):
+        menu, actions = ContextMenuFactory.create_context_menu(date_column_context)
 
+        assert "copy" in actions
+        assert "edit_cell" in actions
 
-def test_create_context_menu_date_column(date_column_context):
-    """Test that the 'Format Date' placeholder appears for a date column."""
-    menu, actions = ContextMenuFactory.create_context_menu(date_column_context)
+        action_texts = [a.text() for a in menu.actions()]
+        assert any("Format Date (DATE)" in text for text in action_texts)
+        assert not any("Number Format" in text for text in action_texts)
 
-    assert "copy" in actions
-    assert "edit_cell" in actions
+        # Verify the placeholder action is disabled
+        date_action = next((a for a in menu.actions() if "Format Date" in a.text()), None)
+        assert date_action is not None
+        assert not date_action.isEnabled()
 
-    action_texts = [a.text() for a in menu.actions()]
-    assert any("Format Date (Date Column)" in text for text in action_texts)
-    assert not any("Number Format" in text for text in action_texts)
+    def test_create_context_menu_score_column(self, score_column_context):
+        menu, actions = ContextMenuFactory.create_context_menu(score_column_context)
 
-    # Verify the placeholder action is disabled
-    date_action = next((a for a in menu.actions() if "Format Date" in a.text()), None)
-    assert date_action is not None
-    assert not date_action.isEnabled()
+        assert "copy" in actions
+        assert "edit_cell" in actions
 
+        action_texts = [a.text() for a in menu.actions()]
+        assert not any("Format Date" in text for text in action_texts)
+        assert any("Number Format (SCORE)" in text for text in action_texts)
 
-def test_create_context_menu_score_column(score_column_context):
-    """Test that the 'Number Format' placeholder appears for a score column."""
-    menu, actions = ContextMenuFactory.create_context_menu(score_column_context)
+        # Verify the placeholder action is disabled
+        num_action = next((a for a in menu.actions() if "Number Format" in a.text()), None)
+        assert num_action is not None
+        assert not num_action.isEnabled()
 
-    assert "copy" in actions
-    assert "edit_cell" in actions
-
-    action_texts = [a.text() for a in menu.actions()]
-    assert not any("Format Date" in text for text in action_texts)
-    assert any("Number Format (Score Column)" in text for text in action_texts)
-
-    # Verify the placeholder action is disabled
-    num_action = next((a for a in menu.actions() if "Number Format" in a.text()), None)
-    assert num_action is not None
-    assert not num_action.isEnabled()
-
-
-def test_create_context_menu_no_model(mock_widget):
-    """Test menu creation when no model is provided in context."""
-    context_no_model = ActionContext(
-        clicked_index=QModelIndex(), selection=[], model=None, parent_widget=mock_widget
-    )
-    menu, actions = ContextMenuFactory.create_context_menu(context_no_model)
-    assert len(menu.actions()) == 0  # Should return an empty menu
-    assert len(actions) == 0
+    def test_create_context_menu_no_model(self, mock_table_state_manager):
+        """Test menu creation when no model is provided."""
+        context_no_model = ActionContext(
+            clicked_index=QModelIndex(),
+            selection=[],
+            model=None,
+            parent_widget=None,
+            state_manager=mock_table_state_manager,
+        )
+        menu, actions = ContextMenuFactory.create_context_menu(context_no_model)
+        assert len(menu.actions()) == 0
+        assert len(actions) == 0
 
 
 # TODO: Add tests for other actions (ViewError, ApplyCorrection, AddToCorrectionList)

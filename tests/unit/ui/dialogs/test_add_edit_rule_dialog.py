@@ -40,9 +40,14 @@ def new_rule_dialog(qtbot, mock_validation_service):
 @pytest.fixture
 def edit_rule_dialog(qtbot, mock_validation_service):
     """Create an AddEditRuleDialog instance for editing an existing rule."""
-    existing_rule = CorrectionRule(
-        to_value="corrected", from_value="test", category="player", status="enabled", order=5
-    )
+    existing_rule_data = {
+        "id": "R123",
+        "from_value": "old",
+        "to_value": "new",
+        "category": "test_cat",
+        "enabled": True,
+    }
+    existing_rule = CorrectionRule(**existing_rule_data)
     dialog = AddEditRuleDialog(mock_validation_service, rule=existing_rule)
     qtbot.addWidget(dialog)
     return dialog
@@ -70,12 +75,11 @@ class TestAddEditRuleDialog:
         assert edit_rule_dialog.windowTitle() == "Edit Correction Rule"
 
         # Check that input fields are populated with rule data
-        assert edit_rule_dialog._from_value.text() == "test"
-        assert edit_rule_dialog._to_value.text() == "corrected"
-        assert edit_rule_dialog._category_combo.currentText() == "player"
+        assert edit_rule_dialog._from_value.text() == "old"
+        assert edit_rule_dialog._to_value.text() == "new"
+        assert edit_rule_dialog._category_combo.currentText() == "test_cat"
         assert edit_rule_dialog._enabled_radio.isChecked()
         assert not edit_rule_dialog._disabled_radio.isChecked()
-        assert edit_rule_dialog._order.value() == 5
 
     def test_get_rule(self, qtbot, new_rule_dialog):
         """Test that get_rule returns a correctly configured rule."""

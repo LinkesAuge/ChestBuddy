@@ -40,9 +40,12 @@ def selected_cells():
 
 
 @pytest.fixture
-def batch_dialog(qtbot, selected_cells, mock_validation_service):
-    """Create a BatchCorrectionDialog instance for testing."""
-    dialog = BatchCorrectionDialog(selected_cells, mock_validation_service)
+def batch_dialog(qtbot):
+    """Create a BatchCorrectionDialog instance."""
+    values = ["value1", "value2", "value3"]
+    # Add the missing validation_service mock
+    mock_validation_service = MagicMock()
+    dialog = BatchCorrectionDialog(values, validation_service=mock_validation_service)
     qtbot.addWidget(dialog)
     return dialog
 

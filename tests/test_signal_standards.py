@@ -82,7 +82,7 @@ def base_view(app):
 @pytest.fixture
 def data_view_adapter(app, mock_data_model):
     """Create a DataViewAdapter for testing."""
-    adapter = DataViewAdapter(mock_data_model, debug_mode=True)
+    adapter = DataViewAdapter(mock_data_model)
     yield adapter
     adapter.deleteLater()
 
@@ -209,3 +209,11 @@ def test_view_cleanup_on_close(data_view_adapter):
 
         # Verify disconnect_receiver was called with the adapter
         mock_disconnect.assert_called_once_with(data_view_adapter)
+
+
+def test_data_view_adapter_action_toolbar_exists(qtbot, mock_data_model):
+    """Test that DataViewAdapter correctly integrates ActionToolbar."""
+    # Remove debug_mode
+    adapter = DataViewAdapter(mock_data_model)
+    assert adapter._header is not None
+    assert isinstance(adapter._header, QHBoxLayout)

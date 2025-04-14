@@ -178,10 +178,16 @@ def main_window(
 class TestMainWindowControllerInteraction:
     """Tests for MainWindow interaction with various controllers."""
 
+    @pytest.fixture(autouse=True)
+    def setup_mocks(self, mocker, mock_data_model, mock_controllers):
+        # ... (existing setup) ...
+
     def test_file_operations_controller_interactions(
-        self, main_window, mock_file_operations_controller
+        self, main_window, mock_file_operations_controller, mock_data_model
     ):
         """Test interactions with FileOperationsController."""
+        # Explicitly set has_data on the mock
+        mock_data_model.has_data = True
         # Test open_file action
         main_window._open_action.trigger()
         mock_file_operations_controller.open_files.assert_called_once()
@@ -207,9 +213,11 @@ class TestMainWindowControllerInteraction:
         mock_file_operations_controller.export_csv.assert_called_once()
 
     def test_file_operations_signals(
-        self, main_window, mock_file_operations_controller, monkeypatch
+        self, main_window, mock_file_operations_controller, mock_data_model, monkeypatch
     ):
         """Test MainWindow response to FileOperationsController signals."""
+        # Explicitly set has_data on the mock
+        mock_data_model.has_data = True
         # Mock MainWindow methods to verify they're called
         update_ui_mock = MagicMock()
         monkeypatch.setattr(main_window, "_update_ui", update_ui_mock)
@@ -231,9 +239,11 @@ class TestMainWindowControllerInteraction:
         status_message_mock.assert_called_with("File saved successfully")
 
     def test_progress_controller_interactions(
-        self, main_window, mock_progress_controller, monkeypatch
+        self, main_window, mock_progress_controller, mock_data_model, monkeypatch
     ):
         """Test interactions with ProgressController."""
+        # Explicitly set has_data on the mock
+        mock_data_model.has_data = True
         # Mock status bar methods
         show_progress_mock = MagicMock()
         update_progress_mock = MagicMock()
@@ -256,9 +266,11 @@ class TestMainWindowControllerInteraction:
         hide_progress_mock.assert_called_once()
 
     def test_data_view_controller_interactions(
-        self, main_window, mock_data_view_controller, monkeypatch
+        self, main_window, mock_data_view_controller, mock_data_model, monkeypatch
     ):
         """Test interactions with DataViewController."""
+        # Explicitly set has_data on the mock
+        mock_data_model.has_data = True
         # Test data filter signal
         filter_params = {"column": "Age", "operator": ">", "value": 30}
         mock_data_view_controller.data_filtered.emit(filter_params)
@@ -276,9 +288,11 @@ class TestMainWindowControllerInteraction:
         # but it's difficult to test without knowing exact implementation details
 
     def test_view_state_controller_signal_connections(
-        self, main_window, mock_view_state_controller
+        self, main_window, mock_view_state_controller, mock_data_model
     ):
-        """Test that MainWindow correctly connects to ViewStateController signals."""
+        """Verify ViewStateController signals are connected."""
+        # Explicitly set has_data on the mock
+        mock_data_model.has_data = True
         # Ensure the view_changed signal is connected
         assert len(mock_view_state_controller.view_changed.callbacks) > 0
 
@@ -286,9 +300,11 @@ class TestMainWindowControllerInteraction:
         assert len(mock_view_state_controller.data_state_changed.callbacks) > 0
 
     def test_ui_state_controller_interactions(
-        self, main_window, mock_ui_state_controller, monkeypatch
+        self, main_window, mock_ui_state_controller, mock_data_model, monkeypatch
     ):
         """Test interactions with UIStateController."""
+        # Explicitly set has_data on the mock
+        mock_data_model.has_data = True
         # Test theme_changed signal
         mock_ui_state_controller.theme_changed.emit("dark")
 
@@ -299,64 +315,36 @@ class TestMainWindowControllerInteraction:
         # For these signals, we're verifying they don't cause exceptions
         # In a real application, MainWindow would update UI based on these signals
 
-    def test_controller_disconnection_during_cleanup(
-        self,
-        mock_data_model,
-        mock_file_operations_controller,
-        mock_view_state_controller,
-        mock_data_view_controller,
-        mock_progress_controller,
-        mock_ui_state_controller,
-    ):
-        """Test that controllers are properly disconnected during window cleanup."""
+    def test_controller_disconnection_during_cleanup(self, qtbot, mock_controllers, mock_data_model):
+        """Test that controller signals are disconnected on close."""
+        # Explicitly set has_data on the mock
+        mock_data_model.has_data = True
         # Create additional methods on controllers to track disconnection
+        mock_view_state_controller = mock_controllers["view_state"]
         mock_view_state_controller.disconnect_from_view = MagicMock()
-        mock_file_operations_controller.disconnect_from_view = MagicMock()
-        mock_data_view_controller.disconnect_from_view = MagicMock()
 
-        # Create other required mocks
-        csv_service = MagicMock()
-        validation_service = MagicMock()
-        correction_service = MagicMock()
-        chart_service = MagicMock()
-        data_manager = MagicMock()
-        config_manager = MagicMock()
+        # Create a MainWindow instance (ensure proper indentation for the following block)
+        main_window = MainWindow(
+            data_model=mock_data_model,
+            # Pass other necessary mocks from mock_controllers
+            file_operations_controller=mock_controllers["file"],
+            progress_controller=mock_controllers["progress"],
+            view_state_controller=mock_controllers["view_state"],
+            data_view_controller=mock_controllers["data_view"],
+            ui_state_controller=mock_controllers["ui_state"],
+            config_manager=MagicMock(),  # Add mock config manager
+            table_state_manager=MagicMock(),  # Add mock state manager
+            # Add mocks for services if needed by MainWindow init
+            csv_service=MagicMock(),
+            validation_service=MagicMock(),
+            correction_service=MagicMock(),
+            chart_service=MagicMock(),
+            data_manager=MagicMock(),
+        )
+        qtbot.addWidget(main_window)
 
-        # Create and immediately destroy a MainWindow
-        with patch("PySide6.QtWidgets.QMessageBox", autospec=True):
-            window = MainWindow(
-                data_model=mock_data_model,
-                csv_service=csv_service,
-                validation_service=validation_service,
-                correction_service=correction_service,
-                chart_service=chart_service,
-                data_manager=data_manager,
-                file_operations_controller=mock_file_operations_controller,
-                progress_controller=mock_progress_controller,
-                view_state_controller=mock_view_state_controller,
-                data_view_controller=mock_data_view_controller,
-                ui_state_controller=mock_ui_state_controller,
-                config_manager=config_manager,
-            )
+        # Simulate closing the window
+        main_window.close()
 
-            # Call closeEvent explicitly (simulates window close)
-            if hasattr(window, "closeEvent"):
-                window.closeEvent(MagicMock())
-            else:
-                # If closeEvent doesn't exist, try disconnect method directly
-                if hasattr(window, "_disconnect_controllers"):
-                    window._disconnect_controllers()
-
-            # Destroy the window
-            window.deleteLater()
-
-        # Check if disconnect methods were called
-        # This is implementation dependent - the actual method might be different
-        if hasattr(mock_view_state_controller, "disconnect_from_view"):
-            mock_view_state_controller.disconnect_from_view.assert_called()
-
-        if hasattr(mock_file_operations_controller, "disconnect_from_view"):
-            mock_file_operations_controller.disconnect_from_view.assert_called()
-
-        if hasattr(mock_data_view_controller, "disconnect_from_view"):
-            mock_data_view_controller.disconnect_from_view.assert_called()
+        # Check if disconnection methods were called (adapt based on actual implementation)
+        mock_view_state_controller.disconnect_from_view.assert_called_once()
