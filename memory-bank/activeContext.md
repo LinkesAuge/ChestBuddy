@@ -18,7 +18,9 @@ This document captures the current state of the ChestBuddy project, focusing on 
 - **Completed Correction Rule Preview Feature:** Successfully implemented the "Preview Rule" action in the `CorrectionRuleView`, including the context menu entry, controller logic, preview dialog, and comprehensive unit tests for all involved components.
 
 ## Current Focus
-- **Testing and Integration (Phase 8):** Verifying the full correction application cycle, including the state update propagation back to the view. Adding unit tests for `CorrectionService.get_correction_preview`.
+- **Testing and Integration (Phase 8):** 
+    - Adding unit tests for `CorrectionService.get_correction_preview`.
+    - Verifying the full correction application cycle, including the state update propagation back to the view.
 - **Architecture Refinement (Phase 5):** Analyzing the state update flow post-correction and planning signal decoupling.
 - **Advanced Context Menu Features (Phase 4):** Planning implementation for remaining cell-type specific actions and validation during edit.
 
@@ -63,7 +65,7 @@ This document captures the current state of the ChestBuddy project, focusing on 
 ## Current Status Summary
 - The core DataView refactoring (Phases 1-3) is largely complete, with fundamental display, interaction, and state management components implemented and unit-tested.
 - Integration tests cover basic validation and correction suggestion flows, plus the UI trigger for correction application.
-- The "Preview Rule" feature within the separate `CorrectionRuleView` is complete and fully unit-tested.
+- ✅ The "Preview Rule" feature within the separate `CorrectionRuleView` is complete and fully unit-tested.
 - Focus is now shifting towards:
     1.  Testing the `CorrectionService`'s preview method.
     2.  Verifying the *complete* correction cycle in integration tests (including state updates back to the view).
