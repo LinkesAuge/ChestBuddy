@@ -356,64 +356,36 @@ Phase 1 of the DataView refactoring is complete. Phase 2 (Context Menu) is mostl
 ### What's Left to Build / Implement
 - **DataView Refactoring:**
   - Complete Phase 3: Validation and Correction Integration
-    - [ ] Implement UI for applying corrections (context menu actions, indicator click) - *Testing this interaction now*.
-    - [ ] Implement one-click correction application from indicator/tooltip - *Testing this interaction now*.
-    - [ ] Implement batch correction UI.
+    - [ ] Connect adapters to real services and remove mock implementations
+    - [ ] Integrate batch correction UI with services
+    - [ ] Implement correction preview mechanism
+    - [ ] Integrate one-click correction with actual data modification via services
     - [x] Create specialized tests
       - [x] Validation visualization tests (partially covered by delegate/integration tests).
-      - [/] Correction integration tests - *Adding more specific tests now*.
+      - [x] Correction integration tests - core signal flow tests completed
+      - [x] Basic integration tests for delegate interaction completed
       - [ ] End-to-end validation/correction workflow tests (basic simulation exists, needs UI trigger).
 - Implement UI testing
   - [ ] Test user workflows involving correction application via context menu/indicator.
 
 ### Completed Tasks
-
-# ... existing code ...
-
-- **Unit Tests (Delegates):** All unit tests for `ValidationStatusDelegate`, `CorrectionDelegate`, `ReadOnlyDelegate`, and `TextEditDelegate` are passing, verifying their painting, editor creation, model data setting, and signal emission logic.
-- **Unit Tests (Adapters):** Core unit tests for `ValidationAdapter` and `CorrectionAdapter` are passing, verifying transformation logic with mock services.
-- **UI Implementation (Correction Delegate):** Implemented the basic UI interaction for single-click correction application via the `CorrectionDelegate`. The delegate now shows a menu and emits a `correction_selected` signal.
+- **Correction UI Components:**
+  - [x] Implemented CorrectionDelegate with indicators and menu interface
+  - [x] Created BatchCorrectionDialog with two variants:
+    - [x] For applying existing corrections to multiple cells (`chestbuddy/ui/data/widgets/batch_correction_dialog.py`)
+    - [x] For creating new correction rules from selection (`chestbuddy/ui/dialogs/batch_correction_dialog.py`)
+  - [x] Implemented ApplyCorrectionAction and BatchApplyCorrectionAction
+  - [x] Implemented correction indicator visualization and tooltip information
+  - [x] Created one-click correction interface with dropdown menu
+  - [x] Added unit tests for all delegate functionality
 
 ### Ongoing Tasks
-
-# ... existing code ...
-
-- **Correction Workflow:**
-    - Implement correction preview mechanism.
-    - Implement batch correction UI and logic.
-    - Connect `CorrectionDelegate`'s `correction_selected` signal to the `CorrectionAdapter` to trigger the `CorrectionService`.
-
-# ... existing code ...
-
-- **Integration Testing:**
-    - Core interactions (loading, sorting, filtering) tested.
-    - Basic correction signal flow via delegate interaction tested.
-    - Develop comprehensive tests covering the full data lifecycle (load -> validate -> correct -> revalidate -> display).
-    - Add tests for context menu actions and their interaction with services.
-    - Test interaction between multiple delegates (e.g., editing causing validation changes).
-
-# ... existing code ...
-
-### Testing Status
-
-- **Unit Tests:**
-    - `DataViewModel`: 100% coverage (excluding cleanup warning).
-    - `TableStateManager`: 100% coverage.
-    - `ValidationStatusDelegate`: 100% coverage.
-    - `CorrectionDelegate`: 100% coverage. All tests passing.
-    - `ReadOnlyDelegate`: 100% coverage.
-    - `TextEditDelegate`: 100% coverage.
-    - `ValidationAdapter`: Core transformation logic tested with mocks.
-    - `CorrectionAdapter`: Core transformation logic tested with mocks.
-- **Integration Tests:**
-    - Basic `DataView` setup and model interaction: Passing.
-    - Sorting and filtering tests: Passing.
-    - Context Menu basic actions: Passing.
-    - Correction signal flow (delegate click -> signal emit): Tested and Passing.
-    - End-to-end validation/correction flow: **Pending** (requires service connection).
-- **Coverage:** Overall project coverage needs to be re-evaluated after integration tests are added.
-
-# ... existing code ...
+- **Correction Integration:**
+  - [x] Implemented base CorrectionAdapter structure
+  - [ ] Connecting CorrectionAdapter to the actual CorrectionService (removing mocks)
+  - [ ] Finalizing the signal flow from delegate to service for applying corrections
+  - [ ] Implementing integration tests for the full validation->correction workflow
+  - [ ] Refining correction preview and feedback mechanisms
 
 # Project Progress
 

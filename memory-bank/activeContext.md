@@ -1,34 +1,41 @@
 ---
 title: Active Context - ChestBuddy Application
-date: 2024-08-07
+date: 2024-08-09
 ---
 
 # Active Context: DataView Refactoring
 
-Last Updated: 2024-08-07
+Last Updated: 2024-08-09
 
-## Current Focus (2024-08-07)
+## Current Focus (2024-08-09)
 
-- **Task:** Reflecting recent progress in Memory Bank after updating the checklist.
-- **Goal:** Ensure documentation accurately shows the completion of the single-click correction UI via the delegate and defines the next steps.
-- **Context:** Updated `plans/dataview_refactor/checklist.md` to mark "Implement one-click correction application" and related integration test items as complete.
-- **Note on Import Functionality:** CSV import functionality is part of Phase 6 (Import/Export) which is not yet implemented. The existing import system from the original architecture continues to function through `FileOperationsController` and `DataManager`, but is not yet integrated with the refactored DataView components.
-- **Outcome:** Memory bank aligned with the latest development state.
+- **Task:** Connecting adapters to real services and integrating the correction UI components.
+- **Goal:** Complete the integration between correction UI components (delegate, dialogs) and the actual services to enable a fully functional correction workflow.
+- **Context:** The core UI components for correction are implemented (CorrectionDelegate, BatchCorrectionDialog), but they need to be connected to the real CorrectionService instead of mock implementations.
+- **Current Status:** We have successfully implemented the UI for visualizing corrections and applying them through one-click interface and batch correction dialogs. The next step is connecting these UI components to the actual services to complete the correction workflow.
 - **Plan:**
-  1. Update `progress.md` and `activeContext.md`.
-  2. Update `bugfixing.mdc` to mark the delegate test issues as resolved.
-  3. Define the next development focus, likely connecting adapters to real services and implementing the UI for applying corrections.
+  1. Connect CorrectionAdapter to the real CorrectionService
+  2. Finalize the signal flow from delegate interaction to service for applying corrections
+  3. Test the full validation->correction workflow
+  4. Refine correction preview and feedback mechanisms
 
 ## Key Objectives
 
-1. **Component Architecture**: Implement a modular component architecture that separates concerns between data models, views, delegates, and adapters
-2. **Enhanced Validation**: Improve visual feedback for data validation with clear status indicators
-3. **Correction Integration**: Seamlessly integrate the correction system with the DataView UI
-4. **Performance Optimization**: Ensure high performance with large datasets through optimized rendering
-5. **Comprehensive Testing**: Maintain high test coverage throughout the refactoring
+1. **Component Integration**: Connect the UI components to real services, removing mock implementations
+2. **Full Workflow Testing**: Implement and test the complete validation->correction->revalidation workflow
+3. **Batch Correction Refinement**: Finalize the batch correction dialog integration with services
+4. **Performance Verification**: Ensure correction operations perform well with large datasets
+5. **Integration Testing**: Complete comprehensive integration tests for the correction workflow
 
 ## Recent Changes
 
+- Updated documentation to reflect the current state of the DataView refactoring project.
+- Confirmed that both BatchCorrectionDialog implementations exist:
+  - `chestbuddy/ui/data/widgets/batch_correction_dialog.py`: For applying existing corrections to multiple cells
+  - `chestbuddy/ui/dialogs/batch_correction_dialog.py`: For creating new correction rules from selection
+- Verified that the CorrectionDelegate implementation is complete with one-click correction UI.
+- Updated the checklist to mark the batch correction UI implementation as partially complete.
+- Identified next steps: connecting UI components to real services and completing the integration tests.
 - Updated `plans/dataview_refactor/checklist.md` to reflect completion of single-click correction UI and related tests.
 - Added `pytest.mark.skip` to `tests/integration/test_correction_flow.py`.
 - Attempted various mocking strategies (`patch.object`, `@patch`) for `ValidationService.get_validation_status`, all failed with `AttributeError`.
@@ -48,26 +55,35 @@ Last Updated: 2024-08-07
 ### Phase 2: Delegate System (Completed)
 
 ### Phase 3: Adapter Integration (In Progress)
-- Refine Adapter transformation logic (connecting real services)
-- Connect Adapters to real ValidationService and CorrectionService
+- [x] Define Adapter interfaces
+- [x] Implement base adapter classes
+- [x] Add unit tests for adapters with mock services
+- [ ] Connect Adapters to real ValidationService and CorrectionService (Current Focus)
+- [ ] Test adapter integration with real services
 
 ### Phase 4: Context Menus and Actions (In Progress)
-- Implement selection-aware menu actions
-- Add validation during cell editing
+- [x] Implement selection-aware menu structure
+- [x] Add basic actions (copy, paste, etc.)
+- [x] Implement correction-related actions 
+- [ ] Refine action behavior with validation during cell editing
 
 ### Phase 5: Validation and Correction Integration (UI/Workflow Focus) (In Progress)
-- Add UI for applying corrections (via delegate interaction / menu action) - Delegate part done.
-- Implement correction preview
-- Implement one-click correction application - ✅ Completed (Delegate interaction)
-- Add batch correction UI
+- [x] Add UI for visualizing validation/correction states via delegates
+- [x] Implement one-click correction application via delegate interaction
+- [x] Create batch correction dialogs
+- [ ] Connect UI components to real services (Current Focus)
+- [ ] Implement correction preview mechanism
+- [ ] Test full validation->correction->revalidation workflow
 
 ### Phase 6: Import/Export and Advanced Features (Planned)
 
 ### Phase 7: Performance Optimization (Planned)
 
 ### Phase 8: Testing and Integration (Ongoing/Planned)
-- Develop key integration tests for full workflows (e.g., validate -> correct -> revalidate) and edge cases.
-- Implement UI Testing
+- [x] Implement unit tests for individual components
+- [x] Add basic integration tests for component interactions
+- [ ] Develop comprehensive integration tests for full workflows
+- [ ] Implement UI testing
 
 ## Active Decisions
 
@@ -101,13 +117,27 @@ We have completed the core implementation of the DataView refactoring (Models, V
 
 ## Open Questions/Decisions
 
-- How to resolve the `unittest.mock.patch` `AttributeError` for `ValidationService.get_validation_status`? (Still relevant for integration tests)
-- How should `DataViewModel` trigger state updates in `TableStateManager` when the source model changes? (Needs verification with real service updates)
-- What is causing the terminal output issues with pytest? (Ongoing observation)
-- When should the deferred `RuntimeWarning` cleanup in `DataViewModel` be addressed?
-- How should the `CorrectionService` (and other services) be made available to the `ActionContext`?
-- What are the exact categories for correction rules? Should they come from an Enum?
-- How should multi-cell selection be handled for "Add to Correction List"?
+- What is the best approach to connect the CorrectionDelegate's correction_selected signal to the CorrectionService?
+  - Option 1: Direct connection through CorrectionAdapter
+  - Option 2: Via DataViewModel and then to the service
+  - Option 3: Through a dedicated controller class
+  
+- How should we handle the two different BatchCorrectionDialog implementations?
+  - Option 1: Merge the functionality into a single dialog with different modes
+  - Option 2: Keep separate implementations for their distinct use cases
+  - Option 3: Create a common base class with specialized derived classes
+
+- How should we implement the correction preview mechanism?
+  - Option 1: Inline preview in the cell
+  - Option 2: Separate dialog showing before/after
+  - Option 3: Temporary overlay on the cell
+
+- How can we improve the mocking approach for integration tests to resolve the AttributeError issues?
+
+- How should handling of correction failures be implemented in the UI?
+  - Option 1: Silent failure with logging
+  - Option 2: User feedback via status bar
+  - Option 3: Error dialog for critical failures
 
 ## Relevant Documentation
 

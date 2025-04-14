@@ -352,5 +352,6 @@
   "tests/integration/test_dataview_integration.py::TestDataViewIntegration::test_apply_correction_workflow": true,
   "tests/integration/test_dataview_integration.py::TestDataViewIntegration::test_correction_indicator_click": true,
   "tests/integration/test_dataview_integration.py::TestDataViewIntegration::test_delegate_correction_selection_triggers_service": true,
-  "tests/integration/test_correction_flow.py::TestCorrectionFlowIntegration::test_delegate_signal_triggers_controller_slot": true
+  "tests/integration/test_correction_flow.py::TestCorrectionFlowIntegration::test_delegate_signal_triggers_controller_slot": true,
+  "tests/ui/data/actions/test_correction_actions.py": true
 }

@@ -137,7 +137,7 @@ For a complete overview of the project, see [overview.md](./overview.md).
 - [x] Implement inline correction suggestions (partially - visualization only)
   - [x] Add suggestion display (delegate draws indicator)
   - [x] Implement one-click correction application
-  - [ ] Add batch correction UI
+  - [x] Add batch correction UI (partially - dialog implemented but needs integration with real services)
   - [x] Add unit tests for inline correction suggestions (delegate tests completed)
 
 ## Phase 4: Import/Export and Advanced Features

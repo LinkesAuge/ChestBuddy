@@ -2780,3 +2780,526 @@ NameError: name 'ValidationAdapter' is not defined. Did you mean: 'CorrectionAda
 2025-04-13 16:27:37,471 - chestbuddy.ui.views.base_view - ERROR - Error disconnecting signals for CorrectionView: Internal C++ object (ChestDataModel) already deleted.
 2025-04-13 16:27:37,471 - chestbuddy.ui.views.base_view - ERROR - Error disconnecting signals for ChartView: Internal C++ object (ChestDataModel) already deleted.
 2025-04-13 16:27:37,471 - chestbuddy.ui.views.base_view - DEBUG - Disconnected signals for SettingsViewAdapter
+2025-04-13 16:51:16,079 - __main__ - INFO - Logging initialized with UTF-8 support in D:\Projekte\ChestBuddy\chestbuddy\logs\chestbuddy.log
+2025-04-13 16:51:16,080 - chestbuddy.utils.config - DEBUG - Saved configuration to: chestbuddy\config.ini
+2025-04-13 16:51:16,080 - chestbuddy.utils.config - INFO - Created new default configuration at: chestbuddy\config.ini
+2025-04-13 16:51:16,081 - chestbuddy.core.models.chest_data_model - DEBUG - Updated data hash to: 1d4f9f63b040166415e97d034fc84c19
+2025-04-13 16:51:16,081 - chestbuddy.core.state.data_state - DEBUG - DataState updated: 0 rows, 6 columns
+2025-04-13 16:51:16,081 - chestbuddy.core.table_state_manager - DEBUG - _create_headers_map: Checking model type: <class 'chestbuddy.core.models.chest_data_model.ChestDataModel'>
+2025-04-13 16:51:16,081 - chestbuddy.core.table_state_manager - DEBUG - _create_headers_map: has_model=True, has_col_count=False, has_header_data=False
+2025-04-13 16:51:16,081 - chestbuddy.core.table_state_manager - WARNING - Data model not suitable for creating headers map in TableStateManager
+2025-04-13 16:51:16,081 - chestbuddy.core.table_state_manager - DEBUG - TableStateManager initialized
+2025-04-13 16:51:16,081 - chestbuddy.utils.service_locator - DEBUG - Service 'table_state_manager' registered: TableStateManager
+2025-04-13 16:51:16,081 - __main__ - INFO - TableStateManager initialized and registered
+2025-04-13 16:51:16,081 - chestbuddy.core.controllers.base_controller - DEBUG - Initialized ErrorHandlingController with SignalManager
+2025-04-13 16:51:16,082 - chestbuddy.utils.config - DEBUG - Config get: Validation.case_sensitive = False
+2025-04-13 16:51:16,082 - chestbuddy.utils.config - DEBUG - Config get: Validation.validate_on_import = True
+2025-04-13 16:51:16,082 - chestbuddy.utils.config - DEBUG - Config get: Validation.auto_save = True
+2025-04-13 16:51:16,082 - chestbuddy.core.services.validation_service - INFO - Loading validation settings from config - case_sensitive: False, validate_on_import: True, auto_save: True
+2025-04-13 16:51:16,082 - chestbuddy.utils.config - DEBUG - Config get: Validation.validation_lists_dir = chestbuddy\validation_lists
+2025-04-13 16:51:16,082 - chestbuddy.utils.config - DEBUG - Config get: Validation.validation_lists_dir = chestbuddy\validation_lists
+2025-04-13 16:51:16,082 - chestbuddy.utils.config - DEBUG - Config get: Validation.validation_lists_dir = chestbuddy\validation_lists
+2025-04-13 16:51:16,082 - chestbuddy.core.models.validation_list_model - INFO - Created new validation file: chestbuddy\validation_lists\players.txt
+2025-04-13 16:51:16,087 - chestbuddy.core.models.validation_list_model - INFO - Initialized validation file from default: D:\Projekte\ChestBuddy\chestbuddy\data\validation\players.txt -> chestbuddy\validation_lists\players.txt
+2025-04-13 16:51:16,088 - chestbuddy.core.models.validation_list_model - DEBUG - Loaded 101 entries from chestbuddy\validation_lists\players.txt
+2025-04-13 16:51:16,088 - chestbuddy.core.models.validation_list_model - INFO - Initialized ValidationListModel with 101 entries from chestbuddy\validation_lists\players.txt
+2025-04-13 16:51:16,088 - chestbuddy.core.models.validation_list_model - INFO - Created new validation file: chestbuddy\validation_lists\chest_types.txt
+2025-04-13 16:51:16,089 - chestbuddy.core.models.validation_list_model - INFO - Initialized validation file from default: D:\Projekte\ChestBuddy\chestbuddy\data\validation\chest_types.txt -> chestbuddy\validation_lists\chest_types.txt
+2025-04-13 16:51:16,089 - chestbuddy.core.models.validation_list_model - DEBUG - Loaded 72 entries from chestbuddy\validation_lists\chest_types.txt
+2025-04-13 16:51:16,090 - chestbuddy.core.models.validation_list_model - INFO - Initialized ValidationListModel with 72 entries from chestbuddy\validation_lists\chest_types.txt
+2025-04-13 16:51:16,090 - chestbuddy.core.models.validation_list_model - INFO - Created new validation file: chestbuddy\validation_lists\sources.txt
+2025-04-13 16:51:16,091 - chestbuddy.core.models.validation_list_model - INFO - Initialized validation file from default: D:\Projekte\ChestBuddy\chestbuddy\data\validation\sources.txt -> chestbuddy\validation_lists\sources.txt
+2025-04-13 16:51:16,091 - chestbuddy.core.models.validation_list_model - DEBUG - Loaded 82 entries from chestbuddy\validation_lists\sources.txt
+2025-04-13 16:51:16,091 - chestbuddy.core.models.validation_list_model - INFO - Initialized ValidationListModel with 82 entries from chestbuddy\validation_lists\sources.txt
+2025-04-13 16:51:16,091 - chestbuddy.core.services.validation_service - INFO - Initialized validation lists: Players (101 entries), Chest Types (72 entries), Sources (82 entries)
+2025-04-13 16:51:16,092 - chestbuddy.utils.service_locator - DEBUG - Service 'validation_service' registered: ValidationService
+2025-04-13 16:51:16,092 - __main__ - INFO - ValidationService initialized and registered
+2025-04-13 16:51:16,092 - chestbuddy.utils.config - DEBUG - Config get: Corrections.rules_file_path = None
+2025-04-13 16:51:16,092 - chestbuddy.utils.config - DEBUG - Config get: Corrections.rules_file_path = None
+2025-04-13 16:51:16,092 - chestbuddy.utils.config - DEBUG - Config get: Corrections.case_sensitive = None
+2025-04-13 16:51:16,092 - chestbuddy.core.services.correction_service - INFO - Loaded correction case_sensitive setting: False
+2025-04-13 16:51:16,092 - chestbuddy.utils.service_locator - DEBUG - Service 'correction_service' registered: CorrectionService
+2025-04-13 16:51:16,092 - __main__ - INFO - CorrectionService initialized and registered
+2025-04-13 16:51:16,095 - chestbuddy.core.models.correction_rule_manager - INFO - Loaded 28 correction rules from data\corrections\default_corrections.csv
+2025-04-13 16:51:16,095 - __main__ - INFO - Correction rules loaded during startup
+2025-04-13 16:51:16,095 - __main__ - INFO - ValidationAdapter initialized and connected
+2025-04-13 16:51:16,095 - __main__ - INFO - CorrectionAdapter initialized and connected
+2025-04-13 16:51:16,095 - chestbuddy.core.controllers.base_controller - DEBUG - Initialized FileOperationsController with SignalManager
+2025-04-13 16:51:16,095 - chestbuddy.core.controllers.base_controller - DEBUG - FileOperationsController connected to model: DataManager
+2025-04-13 16:51:16,095 - chestbuddy.core.controllers.file_operations_controller - DEBUG - FileOperationsController connected to model: DataManager
+2025-04-13 16:51:16,095 - chestbuddy.utils.config - DEBUG - Config get: Files.recent_files = 
+2025-04-13 16:51:16,095 - chestbuddy.core.controllers.file_operations_controller - DEBUG - Loaded 0 recent files from config
+2025-04-13 16:51:16,096 - chestbuddy.core.controllers.base_controller - DEBUG - Initialized ProgressController with SignalManager
+2025-04-13 16:51:16,096 - chestbuddy.core.controllers.base_controller - DEBUG - Initialized ViewStateController with SignalManager
+2025-04-13 16:51:16,096 - chestbuddy.core.controllers.base_controller - DEBUG - ViewStateController connected to model: ChestDataModel
+2025-04-13 16:51:16,096 - chestbuddy.core.controllers.view_state_controller - DEBUG - ViewStateController connected to model: ChestDataModel
+2025-04-13 16:51:16,096 - chestbuddy.core.controllers.base_controller - DEBUG - Initialized UIStateController with SignalManager
+2025-04-13 16:51:16,096 - chestbuddy.utils.config - DEBUG - Config get: Validation.validate_on_import = True
+2025-04-13 16:51:16,096 - chestbuddy.core.controllers.ui_state_controller - INFO - UIStateController initialized
+2025-04-13 16:51:16,096 - chestbuddy.core.controllers.base_controller - DEBUG - Initialized DataViewController with SignalManager
+2025-04-13 16:51:16,096 - chestbuddy.core.controllers.base_controller - DEBUG - DataViewController connected to model: ChestDataModel
+2025-04-13 16:51:16,096 - chestbuddy.core.controllers.data_view_controller - DEBUG - DataViewController connected to model: ChestDataModel
+2025-04-13 16:51:16,096 - chestbuddy.core.controllers.data_view_controller - DEBUG - DataViewController connected to UIStateController
+2025-04-13 16:51:16,096 - chestbuddy.core.controllers.data_view_controller - DEBUG - DataViewController initialized
+2025-04-13 16:51:16,096 - chestbuddy.core.controllers.base_controller - DEBUG - Initialized CorrectionController with SignalManager
+2025-04-13 16:51:16,096 - chestbuddy.core.controllers.correction_controller - DEBUG - CorrectionController initialized
+2025-04-13 16:51:16,096 - chestbuddy.utils.service_locator - DEBUG - Service 'correction_controller' registered: CorrectionController
+2025-04-13 16:51:16,096 - __main__ - INFO - CorrectionController initialized and registered
+2025-04-13 16:51:16,096 - chestbuddy.utils.service_locator - DEBUG - Service '<class 'chestbuddy.ui.utils.update_manager.UpdateManager'>' registered: UpdateManager
+2025-04-13 16:51:16,096 - chestbuddy.utils.service_locator - DEBUG - Service 'update_manager' registered: UpdateManager
+2025-04-13 16:51:16,096 - __main__ - INFO - UpdateManager initialized and registered with ServiceLocator
+2025-04-13 16:51:16,096 - chestbuddy.core.controllers.view_state_controller - INFO - Data view controller set and signals connected
+2025-04-13 16:51:16,096 - root - INFO - Creating UI...
+2025-04-13 16:51:16,097 - chestbuddy.ui.main_window - DEBUG - MainWindow initialized with data_manager
+2025-04-13 16:51:16,309 - chestbuddy.ui.views.updatable_view - DEBUG - DashboardView populated
+2025-04-13 16:51:16,313 - chestbuddy.ui.main_window - DEBUG - === Creating DataViewAdapter in MainWindow ===
+2025-04-13 16:51:16,313 - chestbuddy.ui.views.data_view_adapter - DEBUG - Creating DataView instance
+2025-04-13 16:51:16,316 - chestbuddy.ui.data_view - INFO - Installed event filter on table view
+2025-04-13 16:51:16,316 - chestbuddy.ui.data_view - INFO - Registered Ctrl+C shortcut for copying
+2025-04-13 16:51:16,316 - chestbuddy.ui.data_view - INFO - Registered Ctrl+V shortcut for pasting
+2025-04-13 16:51:16,316 - chestbuddy.ui.data_view - DEBUG - Applying table styling in DataView
+2025-04-13 16:51:16,318 - chestbuddy.ui.data_view - DEBUG - Disabled alternating row colors to prevent highlighting issues
+2025-04-13 16:51:16,318 - chestbuddy.ui.data_view - DEBUG - Set default item foreground color to white
+2025-04-13 16:51:16,320 - chestbuddy.ui.data_view - DEBUG - Populated column selector with 6 columns
+2025-04-13 16:51:16,320 - chestbuddy.ui.data_view - WARNING - No data or columns available to populate table
+2025-04-13 16:51:16,320 - chestbuddy.ui.data_view - DEBUG - Status updated: No data available
+2025-04-13 16:51:16,321 - chestbuddy.ui.views.data_view_adapter - DEBUG - Created DataView instance with ID: 2342373702016
+2025-04-13 16:51:16,321 - chestbuddy.ui.views.data_view_adapter - DEBUG - Connecting UI signals for DataView ID: 2342373702016
+2025-04-13 16:51:16,321 - chestbuddy.ui.views.data_view_adapter - ERROR - Error connecting UI signals in DataViewAdapter: SignalManager.connect() missing 1 required positional argument: 'slot_name'
+2025-04-13 16:51:16,321 - chestbuddy.ui.views.data_view_adapter - DEBUG - Connected to validation_changed signal
+2025-04-13 16:51:16,321 - chestbuddy.ui.views.data_view_adapter - DEBUG - Connected to correction_applied signal
+2025-04-13 16:51:16,321 - chestbuddy.ui.views.data_view_adapter - DEBUG - Removing existing layout from content widget
+2025-04-13 16:51:16,321 - chestbuddy.ui.views.data_view_adapter - DEBUG - Setting up DataView (ID: 2342373702016) in adapter
+2025-04-13 16:51:16,378 - chestbuddy.ui.data_view - INFO - DataView auto-update disabled
+2025-04-13 16:51:16,378 - chestbuddy.ui.views.data_view_adapter - INFO - DataView auto-update disabled
+2025-04-13 16:51:16,378 - chestbuddy.ui.views.data_view_adapter - DEBUG - Added DataView to adapter's layout with stretch
+2025-04-13 16:51:16,378 - chestbuddy.ui.views.data_view_adapter - DEBUG - Layout has 1 widgets
+2025-04-13 16:51:16,378 - chestbuddy.ui.views.data_view_adapter - DEBUG - Widget 0 type: DataView, ID: 2342373702016
+2025-04-13 16:51:16,379 - chestbuddy.ui.views.data_view_adapter - DEBUG - Connecting UI signals for DataView ID: 2342373702016
+2025-04-13 16:51:16,379 - chestbuddy.ui.views.data_view_adapter - ERROR - Error connecting UI signals in DataViewAdapter: SignalManager.connect() missing 1 required positional argument: 'slot_name'
+2025-04-13 16:51:16,379 - chestbuddy.ui.views.data_view_adapter - DEBUG - Connected to validation_changed signal
+2025-04-13 16:51:16,379 - chestbuddy.ui.views.data_view_adapter - DEBUG - Connected to correction_applied signal
+2025-04-13 16:51:16,379 - chestbuddy.ui.views.data_view_adapter - DEBUG - Successfully retrieved update manager
+2025-04-13 16:51:16,379 - chestbuddy.ui.views.data_view_adapter - DEBUG - Connected to validation_changed signal
+2025-04-13 16:51:16,379 - chestbuddy.ui.views.data_view_adapter - DEBUG - Connected to correction_applied signal
+2025-04-13 16:51:16,379 - chestbuddy.ui.views.data_view_adapter - DEBUG - Connected to data model signals
+2025-04-13 16:51:16,379 - chestbuddy.ui.views.data_view_adapter - DEBUG - DataViewAdapter: Auto-update disabled
+2025-04-13 16:51:16,379 - chestbuddy.ui.views.data_view_adapter - DEBUG - DataViewAdapter: Auto-update enabled
+2025-04-13 16:51:16,379 - chestbuddy.ui.views.data_view_adapter - INFO - DataViewAdapter initialized successfully
+2025-04-13 16:51:16,379 - chestbuddy.ui.main_window - DEBUG - Created DataViewAdapter with ID: 2342373690496
+2025-04-13 16:51:16,379 - chestbuddy.ui.main_window - DEBUG - Internal DataView has ID: 2342373702016
+2025-04-13 16:51:16,379 - chestbuddy.ui.main_window - DEBUG - Setting TableStateManager on DataViewAdapter via adapter method
+2025-04-13 16:51:16,379 - chestbuddy.ui.data_view - DEBUG - ==== DataView.set_table_state_manager called ====
+2025-04-13 16:51:16,379 - chestbuddy.ui.data_view - DEBUG - TableStateManager reference set in DataView
+2025-04-13 16:51:16,380 - chestbuddy.ui.data_view - DEBUG - Connected to TableStateManager.state_changed signal successfully
+2025-04-13 16:51:16,380 - chestbuddy.ui.data_view - DEBUG - TableStateManager integration with DataView complete
+2025-04-13 16:51:16,380 - chestbuddy.ui.data_view - DEBUG - Current cell states: 0 invalid, 0 correctable, 0 corrected
+2025-04-13 16:51:16,380 - chestbuddy.ui.views.data_view_adapter - INFO - TableStateManager passed to wrapped DataView
+2025-04-13 16:51:16,380 - chestbuddy.ui.views.data_view_adapter - INFO - Connected to TableStateManager's state_changed signal
+2025-04-13 16:51:16,380 - chestbuddy.ui.main_window - INFO - TableStateManager set on DataViewAdapter
+2025-04-13 16:51:16,380 - chestbuddy.ui.main_window - DEBUG - Setting DataViewAdapter in DataViewController
+2025-04-13 16:51:16,380 - chestbuddy.core.controllers.data_view_controller - DEBUG - === DataViewController.set_view called with view of type: DataViewAdapter ===
+2025-04-13 16:51:16,380 - chestbuddy.core.controllers.data_view_controller - DEBUG - View instance ID: 2342373690496
+2025-04-13 16:51:16,380 - chestbuddy.core.controllers.data_view_controller - DEBUG - View contains internal DataView with ID: 2342373702016
+2025-04-13 16:51:16,380 - chestbuddy.core.controllers.data_view_controller - DEBUG - Internal DataView has TableStateManager: True, ID: 2342373623744
+2025-04-13 16:51:16,380 - chestbuddy.core.controllers.data_view_controller - DEBUG - View does not have _action_toolbar attribute
+2025-04-13 16:51:16,380 - chestbuddy.core.controllers.base_controller - DEBUG - DataViewController connected to view: DataViewAdapter
+2025-04-13 16:51:16,380 - chestbuddy.core.controllers.data_view_controller - DEBUG - DataViewController connected to view: DataViewAdapter
+2025-04-13 16:51:16,380 - chestbuddy.core.controllers.data_view_controller - DEBUG - Connected to view signals through connect_to_view method
+2025-04-13 16:51:16,380 - chestbuddy.ui.main_window - DEBUG - Added DataViewAdapter to content stack and views dictionary with key 'Data'
+2025-04-13 16:51:16,380 - chestbuddy.ui.main_window - WARNING - Could not connect CorrectionDelegate signal: TableView, Delegate, or Controller not found/valid.
+2025-04-13 16:51:16,381 - chestbuddy.utils.config - DEBUG - Config get: Validation.validation_lists_dir = chestbuddy\validation_lists
+2025-04-13 16:51:16,386 - chestbuddy.ui.views.validation_list_view - DEBUG - Populated list with 101 entries
+2025-04-13 16:51:16,386 - chestbuddy.ui.views.validation_list_view - INFO - Initialized ValidationListView 'Players' with 101 entries
+2025-04-13 16:51:16,396 - chestbuddy.utils.config - DEBUG - Config get: Validation.validation_lists_dir = chestbuddy\validation_lists
+2025-04-13 16:51:16,397 - chestbuddy.ui.views.validation_list_view - DEBUG - Populated list with 72 entries
+2025-04-13 16:51:16,397 - chestbuddy.ui.views.validation_list_view - INFO - Initialized ValidationListView 'Chest Types' with 72 entries
+2025-04-13 16:51:16,400 - chestbuddy.utils.config - DEBUG - Config get: Validation.validation_lists_dir = chestbuddy\validation_lists
+2025-04-13 16:51:16,402 - chestbuddy.ui.views.validation_list_view - DEBUG - Populated list with 82 entries
+2025-04-13 16:51:16,402 - chestbuddy.ui.views.validation_list_view - INFO - Initialized ValidationListView 'Sources' with 82 entries
+2025-04-13 16:51:16,420 - chestbuddy.utils.config - DEBUG - Config get: Validation.auto_save = True
+2025-04-13 16:51:16,421 - chestbuddy.ui.views.validation_tab_view - DEBUG - Status updated: Ready
+2025-04-13 16:51:16,422 - chestbuddy.ui.views.validation_tab_view - DEBUG - Disconnected existing validation_changed signal.
+2025-04-13 16:51:16,422 - chestbuddy.ui.views.validation_tab_view - DEBUG - Connected validation_changed signal to _on_validation_changed.
+2025-04-13 16:51:16,422 - chestbuddy.ui.views.validation_tab_view - DEBUG - Disconnected existing validation_preferences_changed signal.
+2025-04-13 16:51:16,422 - chestbuddy.ui.views.validation_tab_view - DEBUG - Connected validation_preferences_changed signal to _on_validation_preferences_changed.
+2025-04-13 16:51:16,423 - chestbuddy.ui.views.validation_tab_view - DEBUG - Connected entries_changed signal for 
+2025-04-13 16:51:16,423 - chestbuddy.ui.views.validation_tab_view - DEBUG - Connected entries_changed signal for 
+2025-04-13 16:51:16,423 - chestbuddy.ui.views.validation_tab_view - DEBUG - Connected entries_changed signal for 
+2025-04-13 16:51:16,423 - chestbuddy.ui.views.validation_tab_view - DEBUG - Set up ValidationTabView signal connections
+2025-04-13 16:51:16,423 - chestbuddy.ui.views.validation_tab_view - DEBUG - Connected import buttons: True, True, True
+2025-04-13 16:51:16,423 - chestbuddy.ui.views.validation_tab_view - INFO - Initialized ValidationTabView
+2025-04-13 16:51:16,430 - chestbuddy.ui.views.validation_view_adapter - INFO - ValidationViewAdapter: Controller set and signals connected
+2025-04-13 16:51:16,431 - chestbuddy.ui.views.correction_view - DEBUG - Connected data_model.data_changed to CorrectionView.request_update
+2025-04-13 16:51:16,432 - chestbuddy.ui.views.correction_view - DEBUG - CorrectionView placeholder initialized
+2025-04-13 16:51:16,432 - chestbuddy.ui.views.correction_view - INFO - CorrectionView: Controller set and signals connected
+2025-04-13 16:51:16,432 - chestbuddy.core.controllers.correction_controller - DEBUG - CorrectionController: View set
+2025-04-13 16:51:16,436 - chestbuddy.ui.views.correction_view - INFO - CorrectionView: Correction controller set and rule view created
+2025-04-13 16:51:16,438 - chestbuddy.ui.views.chart_view - DEBUG - Connected data_model.data_changed to ChartView.request_update
+2025-04-13 16:51:16,439 - chestbuddy.ui.views.chart_view - INFO - ChartView: Controller set and signals connected
+2025-04-13 16:51:16,440 - chestbuddy.ui.views.settings_tab_view - INFO - Retrieved ValidationService from ServiceLocator
+2025-04-13 16:51:16,464 - chestbuddy.utils.config - DEBUG - Config get: General.theme = Light
+2025-04-13 16:51:16,464 - chestbuddy.utils.config - DEBUG - Saved configuration to: chestbuddy\config.ini
+2025-04-13 16:51:16,464 - chestbuddy.utils.config - DEBUG - Saved configuration to: chestbuddy\config.ini
+2025-04-13 16:51:16,464 - chestbuddy.ui.views.settings_tab_view - DEBUG - Setting changed: [General] theme = Light
+2025-04-13 16:51:16,464 - chestbuddy.utils.config - DEBUG - Config get: General.language = English
+2025-04-13 16:51:16,464 - chestbuddy.utils.config - DEBUG - Config get: General.config_version = 1.0
+2025-04-13 16:51:16,464 - chestbuddy.utils.config - DEBUG - Config get: Validation.validate_on_import = True
+2025-04-13 16:51:16,465 - chestbuddy.utils.config - DEBUG - Saved configuration to: chestbuddy\config.ini
+2025-04-13 16:51:16,465 - chestbuddy.utils.config - DEBUG - Saved configuration to: chestbuddy\config.ini
+2025-04-13 16:51:16,465 - chestbuddy.core.services.validation_service - DEBUG - Setting validate_on_import from True to True
+2025-04-13 16:51:16,465 - chestbuddy.core.services.validation_service - DEBUG - validate_on_import already set to True, no change needed
+2025-04-13 16:51:16,465 - chestbuddy.ui.views.settings_tab_view - DEBUG - Updated ValidationService validate_on_import to True
+2025-04-13 16:51:16,465 - chestbuddy.ui.views.settings_tab_view - DEBUG - Setting changed: [Validation] validate_on_import = True
+2025-04-13 16:51:16,465 - chestbuddy.utils.config - DEBUG - Config get: Validation.case_sensitive = False
+2025-04-13 16:51:16,465 - chestbuddy.utils.config - DEBUG - Config get: Validation.auto_save = True
+2025-04-13 16:51:16,465 - chestbuddy.utils.config - DEBUG - Saved configuration to: chestbuddy\config.ini
+2025-04-13 16:51:16,465 - chestbuddy.utils.config - DEBUG - Saved configuration to: chestbuddy\config.ini
+2025-04-13 16:51:16,465 - chestbuddy.core.services.validation_service - DEBUG - Setting auto_save from True to True
+2025-04-13 16:51:16,465 - chestbuddy.core.services.validation_service - DEBUG - auto_save already set to True, no change needed
+2025-04-13 16:51:16,465 - chestbuddy.ui.views.settings_tab_view - DEBUG - Updated ValidationService auto_save to True
+2025-04-13 16:51:16,465 - chestbuddy.ui.views.settings_tab_view - DEBUG - Setting changed: [Validation] auto_save = True
+2025-04-13 16:51:16,465 - chestbuddy.utils.config - DEBUG - Config get: Validation.validation_lists_dir = chestbuddy\validation_lists
+2025-04-13 16:51:16,465 - chestbuddy.utils.config - DEBUG - Config get: Correction.auto_correct_on_validation = False
+2025-04-13 16:51:16,465 - chestbuddy.utils.config - DEBUG - Config get: Correction.auto_correct_on_import = False
+2025-04-13 16:51:16,466 - chestbuddy.utils.config - DEBUG - Saved configuration to: chestbuddy\config.ini
+2025-04-13 16:51:16,466 - chestbuddy.utils.config - DEBUG - Saved configuration to: chestbuddy\config.ini
+2025-04-13 16:51:16,466 - chestbuddy.ui.views.settings_tab_view - DEBUG - Setting changed: [UI] window_width = 1024
+2025-04-13 16:51:16,466 - chestbuddy.utils.config - DEBUG - Saved configuration to: chestbuddy\config.ini
+2025-04-13 16:51:16,466 - chestbuddy.utils.config - DEBUG - Saved configuration to: chestbuddy\config.ini
+2025-04-13 16:51:16,466 - chestbuddy.ui.views.settings_tab_view - DEBUG - Setting changed: [UI] window_height = 768
+2025-04-13 16:51:16,466 - chestbuddy.utils.config - DEBUG - Saved configuration to: chestbuddy\config.ini
+2025-04-13 16:51:16,467 - chestbuddy.utils.config - DEBUG - Saved configuration to: chestbuddy\config.ini
+2025-04-13 16:51:16,467 - chestbuddy.ui.views.settings_tab_view - DEBUG - Setting changed: [UI] table_page_size = 100
+2025-04-13 16:51:16,467 - chestbuddy.ui.views.settings_tab_view - DEBUG - Loaded settings into UI controls
+2025-04-13 16:51:16,467 - chestbuddy.ui.views.settings_tab_view - DEBUG - Disconnected existing validation_preferences_changed signal.
+2025-04-13 16:51:16,467 - chestbuddy.ui.views.settings_tab_view - DEBUG - Connected validation_preferences_changed signal to _on_validation_preferences_changed.
+2025-04-13 16:51:16,467 - chestbuddy.ui.views.settings_tab_view - INFO - Initialized SettingsTabView
+2025-04-13 16:51:16,467 - chestbuddy.ui.views.settings_view_adapter - INFO - Initialized SettingsViewAdapter
+2025-04-13 16:51:16,468 - chestbuddy.core.controllers.data_view_controller - DEBUG - Connected ValidationService signals to DataViewController
+2025-04-13 16:51:16,468 - chestbuddy.core.controllers.data_view_controller - DEBUG - CorrectionService connected to DataViewController
+2025-04-13 16:51:16,468 - chestbuddy.core.controllers.data_view_controller - INFO - Validation and correction services updated
+2025-04-13 16:51:16,468 - chestbuddy.ui.main_window - INFO - Services set in data view controller
+2025-04-13 16:51:16,468 - chestbuddy.core.controllers.base_controller - DEBUG - ViewStateController connected to view: SidebarNavigation
+2025-04-13 16:51:16,468 - chestbuddy.core.controllers.view_state_controller - INFO - Sidebar implements IUpdatable, populating it
+2025-04-13 16:51:16,468 - chestbuddy.ui.widgets.sidebar_navigation - DEBUG - SidebarNavigation populated
+2025-04-13 16:51:16,468 - chestbuddy.core.controllers.view_state_controller - INFO - Registering dependencies for view 'Validation': {'Data'}
+2025-04-13 16:51:16,469 - chestbuddy.ui.utils.update_manager - DEBUG - Update scheduled for SidebarNavigation
+2025-04-13 16:51:16,469 - chestbuddy.ui.widgets.sidebar_navigation - DEBUG - SidebarNavigation scheduled for update
+2025-04-13 16:51:16,469 - chestbuddy.core.controllers.view_state_controller - INFO - View availability changed: {'Validation': True, 'Correction': True, 'Charts': True, 'Settings': True}
+2025-04-13 16:51:16,469 - chestbuddy.core.controllers.view_state_controller - INFO - Registering dependencies for view 'Correction': {'Validation'}
+2025-04-13 16:51:16,469 - chestbuddy.core.controllers.view_state_controller - DEBUG - Skipping view availability update (throttled)
+2025-04-13 16:51:16,469 - chestbuddy.core.controllers.view_state_controller - INFO - Registering dependencies for view 'Charts': {'Data'}
+2025-04-13 16:51:16,470 - chestbuddy.core.controllers.view_state_controller - DEBUG - Skipping view availability update (throttled)
+2025-04-13 16:51:16,470 - chestbuddy.core.controllers.view_state_controller - INFO - Registered prerequisite check for view 'Validation'
+2025-04-13 16:51:16,470 - chestbuddy.core.controllers.view_state_controller - DEBUG - Skipping view availability update (throttled)
+2025-04-13 16:51:16,470 - chestbuddy.core.controllers.view_state_controller - INFO - Registered prerequisite check for view 'Correction'
+2025-04-13 16:51:16,470 - chestbuddy.core.controllers.view_state_controller - DEBUG - Skipping view availability update (throttled)
+2025-04-13 16:51:16,470 - chestbuddy.core.controllers.view_state_controller - INFO - Registered prerequisite check for view 'Charts'
+2025-04-13 16:51:16,470 - chestbuddy.core.controllers.view_state_controller - DEBUG - Skipping view availability update (throttled)
+2025-04-13 16:51:16,470 - chestbuddy.core.controllers.view_state_controller - DEBUG - Updating sidebar via IUpdatable interface
+2025-04-13 16:51:16,470 - chestbuddy.ui.widgets.sidebar_navigation - DEBUG - SidebarNavigation updated
+2025-04-13 16:51:16,470 - chestbuddy.core.controllers.view_state_controller - INFO - View changed from '' to 'Dashboard'
+2025-04-13 16:51:16,472 - chestbuddy.core.controllers.ui_state_controller - DEBUG - Status message updated: No data loaded
+2025-04-13 16:51:16,472 - chestbuddy.core.controllers.ui_state_controller - DEBUG - Updated data-dependent UI state: has_data=False
+2025-04-13 16:51:16,472 - chestbuddy.ui.main_window - DEBUG - Connecting Dashboard.import_requested to _on_import_requested handler
+2025-04-13 16:51:16,472 - chestbuddy.ui.main_window - DEBUG - Connecting Data.import_requested to _on_import_requested handler
+2025-04-13 16:51:16,486 - root - INFO - UI created successfully
+2025-04-13 16:51:16,486 - __main__ - DEBUG - Connecting ChestBuddyApp signals
+2025-04-13 16:51:16,486 - __main__ - INFO - Connected correction_selected signal from DataViewAdapter
+2025-04-13 16:51:16,486 - __main__ - DEBUG - ChestBuddyApp signals connected successfully
+2025-04-13 16:51:16,672 - __main__ - INFO - Application initialized successfully
+2025-04-13 16:51:16,686 - chestbuddy.core.controllers.view_state_controller - DEBUG - View transition to 'Dashboard' completed
+2025-04-13 16:51:16,687 - chestbuddy.ui.widgets.sidebar_navigation - DEBUG - SidebarNavigation skipping update (no change detected)
+2025-04-13 16:51:16,687 - chestbuddy.ui.utils.update_manager - DEBUG - Updated SidebarNavigation
+2025-04-13 16:54:05,843 - chestbuddy.ui.main_window - INFO - Cancelling any ongoing operations before closing
+2025-04-13 16:54:05,844 - chestbuddy.core.services.data_manager - INFO - DataManager.cancel_loading called
+2025-04-13 16:54:05,844 - chestbuddy.core.services.data_manager - DEBUG - Set cancellation flag to True
+2025-04-13 16:54:05,844 - chestbuddy.core.services.data_manager - DEBUG - No active task to cancel
+2025-04-13 16:54:05,844 - chestbuddy.core.services.data_manager - DEBUG - Loading operation cancelled successfully
+2025-04-13 16:54:05,958 - __main__ - INFO - Cleaning up application resources
+2025-04-13 16:54:05,958 - __main__ - DEBUG - Processing pending events before shutdown
+2025-04-13 16:54:05,959 - chestbuddy.utils.service_locator - DEBUG - All services and factories cleared
+2025-04-13 16:54:05,959 - chestbuddy.utils.config - DEBUG - Saved configuration to: chestbuddy\config.ini
+2025-04-13 16:54:05,959 - chestbuddy.utils.background_processing - DEBUG - Shutting down 1 background workers
+2025-04-13 16:54:05,959 - chestbuddy.utils.background_processing - DEBUG - All background workers shutdown completed
+2025-04-13 16:54:05,959 - __main__ - INFO - Application cleanup completed
+2025-04-13 16:54:05,959 - chestbuddy.core.controllers.base_controller - DEBUG - ErrorHandlingController disconnected all connections (0 total)
+2025-04-13 16:54:05,959 - chestbuddy.core.controllers.base_controller - DEBUG - ErrorHandlingController destroyed and connections cleaned up
+2025-04-13 16:54:05,965 - chestbuddy.core.controllers.base_controller - DEBUG - FileOperationsController disconnected from model: DataManager (0 connections)
+2025-04-13 16:54:05,965 - chestbuddy.core.controllers.base_controller - DEBUG - FileOperationsController disconnected all connections (0 total)
+2025-04-13 16:54:05,965 - chestbuddy.core.controllers.base_controller - DEBUG - FileOperationsController destroyed and connections cleaned up
+2025-04-13 16:54:05,965 - chestbuddy.utils.background_processing - DEBUG - Qt C++ object already deleted during thread cleanup
+2025-04-13 16:54:05,965 - chestbuddy.core.controllers.base_controller - DEBUG - ProgressController disconnected all connections (0 total)
+2025-04-13 16:54:05,965 - chestbuddy.core.controllers.base_controller - DEBUG - ProgressController destroyed and connections cleaned up
+2025-04-13 16:54:05,996 - chestbuddy.core.controllers.base_controller - DEBUG - ViewStateController disconnected from view: SidebarNavigation (0 connections)
+2025-04-13 16:54:05,997 - chestbuddy.core.controllers.base_controller - DEBUG - ViewStateController disconnected from model: ChestDataModel (0 connections)
+2025-04-13 16:54:05,997 - chestbuddy.core.controllers.base_controller - DEBUG - ViewStateController disconnected all connections (0 total)
+2025-04-13 16:54:05,997 - chestbuddy.core.controllers.base_controller - DEBUG - ViewStateController destroyed and connections cleaned up
+2025-04-13 16:54:05,997 - chestbuddy.core.controllers.base_controller - DEBUG - UIStateController disconnected all connections (0 total)
+2025-04-13 16:54:05,997 - chestbuddy.core.controllers.base_controller - DEBUG - UIStateController destroyed and connections cleaned up
+2025-04-13 16:54:05,997 - chestbuddy.core.controllers.base_controller - DEBUG - DataViewController disconnected from view: DataViewAdapter (0 connections)
+2025-04-13 16:54:05,997 - chestbuddy.core.controllers.base_controller - DEBUG - DataViewController disconnected from model: ChestDataModel (0 connections)
+2025-04-13 16:54:05,997 - chestbuddy.core.controllers.base_controller - DEBUG - DataViewController disconnected all connections (0 total)
+2025-04-13 16:54:05,997 - chestbuddy.core.controllers.base_controller - DEBUG - DataViewController destroyed and connections cleaned up
+2025-04-13 16:54:05,997 - chestbuddy.core.controllers.base_controller - DEBUG - CorrectionController disconnected all connections (0 total)
+2025-04-13 16:54:05,997 - chestbuddy.core.controllers.base_controller - DEBUG - CorrectionController destroyed and connections cleaned up
+2025-04-13 16:54:05,997 - chestbuddy.ui.utils.update_manager - DEBUG - All updates cancelled
+2025-04-13 16:54:05,997 - chestbuddy.ui.views.base_view - DEBUG - Disconnected signals for DashboardView
+2025-04-13 16:54:05,997 - chestbuddy.ui.views.base_view - ERROR - Error disconnecting signals for DataViewAdapter: Internal C++ object (ChestDataModel) already deleted.
+2025-04-13 16:54:05,997 - chestbuddy.ui.views.base_view - DEBUG - Disconnected signals for ValidationViewAdapter
+2025-04-13 16:54:05,997 - chestbuddy.ui.views.base_view - ERROR - Error disconnecting signals for CorrectionView: Internal C++ object (ChestDataModel) already deleted.
+2025-04-13 16:54:05,998 - chestbuddy.ui.views.base_view - ERROR - Error disconnecting signals for ChartView: Internal C++ object (ChestDataModel) already deleted.
+2025-04-13 16:54:05,998 - chestbuddy.ui.views.base_view - DEBUG - Disconnected signals for SettingsViewAdapter
+2025-04-13 17:02:37,272 - __main__ - INFO - Logging initialized with UTF-8 support in d:\Projekte\ChestBuddy\chestbuddy\logs\chestbuddy.log
+2025-04-13 17:02:37,273 - chestbuddy.utils.config - DEBUG - Loaded existing configuration from: chestbuddy\config.ini
+2025-04-13 17:02:37,273 - chestbuddy.utils.config - DEBUG - Config get: General.version = 1.1
+2025-04-13 17:02:37,275 - chestbuddy.core.models.chest_data_model - DEBUG - Updated data hash to: 1d4f9f63b040166415e97d034fc84c19
+2025-04-13 17:02:37,275 - chestbuddy.core.state.data_state - DEBUG - DataState updated: 0 rows, 6 columns
+2025-04-13 17:02:37,275 - chestbuddy.core.table_state_manager - DEBUG - _create_headers_map: Checking model type: <class 'chestbuddy.core.models.chest_data_model.ChestDataModel'>
+2025-04-13 17:02:37,275 - chestbuddy.core.table_state_manager - DEBUG - _create_headers_map: has_model=True, has_col_count=False, has_header_data=False
+2025-04-13 17:02:37,275 - chestbuddy.core.table_state_manager - WARNING - Data model not suitable for creating headers map in TableStateManager
+2025-04-13 17:02:37,276 - chestbuddy.core.table_state_manager - DEBUG - TableStateManager initialized
+2025-04-13 17:02:37,276 - chestbuddy.utils.service_locator - DEBUG - Service 'table_state_manager' registered: TableStateManager
+2025-04-13 17:02:37,276 - __main__ - INFO - TableStateManager initialized and registered
+2025-04-13 17:02:37,276 - chestbuddy.core.controllers.base_controller - DEBUG - Initialized ErrorHandlingController with SignalManager
+2025-04-13 17:02:37,276 - chestbuddy.utils.config - DEBUG - Config get: Validation.case_sensitive = False
+2025-04-13 17:02:37,276 - chestbuddy.utils.config - DEBUG - Config get: Validation.validate_on_import = False
+2025-04-13 17:02:37,276 - chestbuddy.utils.config - DEBUG - Config get: Validation.auto_save = False
+2025-04-13 17:02:37,276 - chestbuddy.core.services.validation_service - INFO - Loading validation settings from config - case_sensitive: False, validate_on_import: False, auto_save: False
+2025-04-13 17:02:37,276 - chestbuddy.utils.config - DEBUG - Config get: Validation.validation_lists_dir = D:/Projekte/ChestBuddy/chestbuddy/validation_lists
+2025-04-13 17:02:37,276 - chestbuddy.utils.config - DEBUG - Config get: Validation.validation_lists_dir = D:/Projekte/ChestBuddy/chestbuddy/validation_lists
+2025-04-13 17:02:37,276 - chestbuddy.utils.config - DEBUG - Config get: Validation.validation_lists_dir = D:/Projekte/ChestBuddy/chestbuddy/validation_lists
+2025-04-13 17:02:37,277 - chestbuddy.core.models.validation_list_model - DEBUG - Loaded 100 entries from D:\Projekte\ChestBuddy\chestbuddy\validation_lists\players.txt
+2025-04-13 17:02:37,277 - chestbuddy.core.models.validation_list_model - INFO - Initialized ValidationListModel with 100 entries from D:\Projekte\ChestBuddy\chestbuddy\validation_lists\players.txt
+2025-04-13 17:02:37,277 - chestbuddy.core.models.validation_list_model - DEBUG - Loaded 68 entries from D:\Projekte\ChestBuddy\chestbuddy\validation_lists\chest_types.txt
+2025-04-13 17:02:37,277 - chestbuddy.core.models.validation_list_model - INFO - Initialized ValidationListModel with 68 entries from D:\Projekte\ChestBuddy\chestbuddy\validation_lists\chest_types.txt
+2025-04-13 17:02:37,277 - chestbuddy.core.models.validation_list_model - DEBUG - Loaded 82 entries from D:\Projekte\ChestBuddy\chestbuddy\validation_lists\sources.txt
+2025-04-13 17:02:37,278 - chestbuddy.core.models.validation_list_model - INFO - Initialized ValidationListModel with 82 entries from D:\Projekte\ChestBuddy\chestbuddy\validation_lists\sources.txt
+2025-04-13 17:02:37,278 - chestbuddy.core.services.validation_service - INFO - Initialized validation lists: Players (100 entries), Chest Types (68 entries), Sources (82 entries)
+2025-04-13 17:02:37,278 - chestbuddy.utils.service_locator - DEBUG - Service 'validation_service' registered: ValidationService
+2025-04-13 17:02:37,278 - __main__ - INFO - ValidationService initialized and registered
+2025-04-13 17:02:37,278 - chestbuddy.utils.config - DEBUG - Config get: Corrections.rules_file_path = D:\Projekte\ChestBuddy\chestbuddy\data\corrections\test.csv
+2025-04-13 17:02:37,278 - chestbuddy.core.models.correction_rule_manager - INFO - Using custom corrections file path: D:\Projekte\ChestBuddy\chestbuddy\data\corrections\test.csv
+2025-04-13 17:02:37,278 - chestbuddy.utils.config - DEBUG - Config get: Corrections.rules_file_path = D:\Projekte\ChestBuddy\chestbuddy\data\corrections\test.csv
+2025-04-13 17:02:37,278 - chestbuddy.core.models.correction_rule_manager - INFO - Using custom corrections file path: D:\Projekte\ChestBuddy\chestbuddy\data\corrections\test.csv
+2025-04-13 17:02:37,278 - chestbuddy.utils.config - DEBUG - Config get: Corrections.case_sensitive = None
+2025-04-13 17:02:37,278 - chestbuddy.core.services.correction_service - INFO - Loaded correction case_sensitive setting: False
+2025-04-13 17:02:37,279 - chestbuddy.utils.service_locator - DEBUG - Service 'correction_service' registered: CorrectionService
+2025-04-13 17:02:37,279 - __main__ - INFO - CorrectionService initialized and registered
+2025-04-13 17:02:37,281 - chestbuddy.core.models.correction_rule_manager - INFO - Loaded 27 correction rules from D:\Projekte\ChestBuddy\chestbuddy\data\corrections\test.csv
+2025-04-13 17:02:37,281 - __main__ - INFO - Correction rules loaded during startup
+2025-04-13 17:02:37,281 - __main__ - INFO - ValidationAdapter initialized and connected
+2025-04-13 17:02:37,281 - __main__ - INFO - CorrectionAdapter initialized and connected
+2025-04-13 17:02:37,281 - chestbuddy.core.controllers.base_controller - DEBUG - Initialized FileOperationsController with SignalManager
+2025-04-13 17:02:37,281 - chestbuddy.core.controllers.base_controller - DEBUG - FileOperationsController connected to model: DataManager
+2025-04-13 17:02:37,281 - chestbuddy.core.controllers.file_operations_controller - DEBUG - FileOperationsController connected to model: DataManager
+2025-04-13 17:02:37,282 - chestbuddy.utils.config - DEBUG - Config get: Files.recent_files = ["D:/Projekte/ChestBuddy/chestbuddy/data/input/Chests_input_test.csv"]
+2025-04-13 17:02:37,282 - chestbuddy.core.controllers.file_operations_controller - DEBUG - Loaded 1 recent files from config
+2025-04-13 17:02:37,282 - chestbuddy.core.controllers.base_controller - DEBUG - Initialized ProgressController with SignalManager
+2025-04-13 17:02:37,282 - chestbuddy.core.controllers.base_controller - DEBUG - Initialized ViewStateController with SignalManager
+2025-04-13 17:02:37,282 - chestbuddy.core.controllers.base_controller - DEBUG - ViewStateController connected to model: ChestDataModel
+2025-04-13 17:02:37,282 - chestbuddy.core.controllers.view_state_controller - DEBUG - ViewStateController connected to model: ChestDataModel
+2025-04-13 17:02:37,282 - chestbuddy.core.controllers.base_controller - DEBUG - Initialized UIStateController with SignalManager
+2025-04-13 17:02:37,282 - chestbuddy.utils.config - DEBUG - Config get: Validation.validate_on_import = False
+2025-04-13 17:02:37,282 - chestbuddy.core.controllers.ui_state_controller - INFO - UIStateController initialized
+2025-04-13 17:02:37,282 - chestbuddy.core.controllers.base_controller - DEBUG - Initialized DataViewController with SignalManager
+2025-04-13 17:02:37,282 - chestbuddy.core.controllers.base_controller - DEBUG - DataViewController connected to model: ChestDataModel
+2025-04-13 17:02:37,282 - chestbuddy.core.controllers.data_view_controller - DEBUG - DataViewController connected to model: ChestDataModel
+2025-04-13 17:02:37,282 - chestbuddy.core.controllers.data_view_controller - DEBUG - DataViewController connected to UIStateController
+2025-04-13 17:02:37,282 - chestbuddy.core.controllers.data_view_controller - DEBUG - DataViewController initialized
+2025-04-13 17:02:37,282 - chestbuddy.core.controllers.base_controller - DEBUG - Initialized CorrectionController with SignalManager
+2025-04-13 17:02:37,282 - chestbuddy.core.controllers.correction_controller - DEBUG - CorrectionController initialized
+2025-04-13 17:02:37,283 - chestbuddy.utils.service_locator - DEBUG - Service 'correction_controller' registered: CorrectionController
+2025-04-13 17:02:37,283 - __main__ - INFO - CorrectionController initialized and registered
+2025-04-13 17:02:37,283 - chestbuddy.utils.service_locator - DEBUG - Service '<class 'chestbuddy.ui.utils.update_manager.UpdateManager'>' registered: UpdateManager
+2025-04-13 17:02:37,283 - chestbuddy.utils.service_locator - DEBUG - Service 'update_manager' registered: UpdateManager
+2025-04-13 17:02:37,283 - __main__ - INFO - UpdateManager initialized and registered with ServiceLocator
+2025-04-13 17:02:37,283 - chestbuddy.core.controllers.view_state_controller - INFO - Data view controller set and signals connected
+2025-04-13 17:02:37,283 - root - INFO - Creating UI...
+2025-04-13 17:02:37,283 - chestbuddy.ui.main_window - DEBUG - MainWindow initialized with data_manager
+2025-04-13 17:02:37,306 - chestbuddy.ui.views.updatable_view - DEBUG - DashboardView populated
+2025-04-13 17:02:37,309 - chestbuddy.ui.main_window - DEBUG - === Creating DataViewAdapter in MainWindow ===
+2025-04-13 17:02:37,309 - chestbuddy.ui.views.data_view_adapter - DEBUG - Creating DataView instance
+2025-04-13 17:02:37,311 - chestbuddy.ui.data_view - INFO - Installed event filter on table view
+2025-04-13 17:02:37,311 - chestbuddy.ui.data_view - INFO - Registered Ctrl+C shortcut for copying
+2025-04-13 17:02:37,312 - chestbuddy.ui.data_view - INFO - Registered Ctrl+V shortcut for pasting
+2025-04-13 17:02:37,312 - chestbuddy.ui.data_view - DEBUG - Applying table styling in DataView
+2025-04-13 17:02:37,313 - chestbuddy.ui.data_view - DEBUG - Disabled alternating row colors to prevent highlighting issues
+2025-04-13 17:02:37,313 - chestbuddy.ui.data_view - DEBUG - Set default item foreground color to white
+2025-04-13 17:02:37,316 - chestbuddy.ui.data_view - DEBUG - Populated column selector with 6 columns
+2025-04-13 17:02:37,316 - chestbuddy.ui.data_view - WARNING - No data or columns available to populate table
+2025-04-13 17:02:37,316 - chestbuddy.ui.data_view - DEBUG - Status updated: No data available
+2025-04-13 17:02:37,316 - chestbuddy.ui.views.data_view_adapter - DEBUG - Created DataView instance with ID: 1209471367744
+2025-04-13 17:02:37,317 - chestbuddy.ui.views.data_view_adapter - DEBUG - Connecting UI signals for DataView ID: 1209471367744
+2025-04-13 17:02:37,317 - chestbuddy.ui.views.data_view_adapter - ERROR - Error connecting UI signals in DataViewAdapter: SignalManager.connect() missing 1 required positional argument: 'slot_name'
+2025-04-13 17:02:37,317 - chestbuddy.ui.views.data_view_adapter - DEBUG - Connected to validation_changed signal
+2025-04-13 17:02:37,317 - chestbuddy.ui.views.data_view_adapter - DEBUG - Connected to correction_applied signal
+2025-04-13 17:02:37,317 - chestbuddy.ui.views.data_view_adapter - DEBUG - Removing existing layout from content widget
+2025-04-13 17:02:37,317 - chestbuddy.ui.views.data_view_adapter - DEBUG - Setting up DataView (ID: 1209471367744) in adapter
+2025-04-13 17:02:37,376 - chestbuddy.ui.data_view - INFO - DataView auto-update disabled
+2025-04-13 17:02:37,377 - chestbuddy.ui.views.data_view_adapter - INFO - DataView auto-update disabled
+2025-04-13 17:02:37,377 - chestbuddy.ui.views.data_view_adapter - DEBUG - Added DataView to adapter's layout with stretch
+2025-04-13 17:02:37,377 - chestbuddy.ui.views.data_view_adapter - DEBUG - Layout has 1 widgets
+2025-04-13 17:02:37,377 - chestbuddy.ui.views.data_view_adapter - DEBUG - Widget 0 type: DataView, ID: 1209471367744
+2025-04-13 17:02:37,377 - chestbuddy.ui.views.data_view_adapter - DEBUG - Connecting UI signals for DataView ID: 1209471367744
+2025-04-13 17:02:37,377 - chestbuddy.ui.views.data_view_adapter - ERROR - Error connecting UI signals in DataViewAdapter: SignalManager.connect() missing 1 required positional argument: 'slot_name'
+2025-04-13 17:02:37,378 - chestbuddy.ui.views.data_view_adapter - DEBUG - Connected to validation_changed signal
+2025-04-13 17:02:37,378 - chestbuddy.ui.views.data_view_adapter - DEBUG - Connected to correction_applied signal
+2025-04-13 17:02:37,378 - chestbuddy.ui.views.data_view_adapter - DEBUG - Successfully retrieved update manager
+2025-04-13 17:02:37,378 - chestbuddy.ui.views.data_view_adapter - DEBUG - Connected to validation_changed signal
+2025-04-13 17:02:37,378 - chestbuddy.ui.views.data_view_adapter - DEBUG - Connected to correction_applied signal
+2025-04-13 17:02:37,378 - chestbuddy.ui.views.data_view_adapter - DEBUG - Connected to data model signals
+2025-04-13 17:02:37,378 - chestbuddy.ui.views.data_view_adapter - DEBUG - DataViewAdapter: Auto-update disabled
+2025-04-13 17:02:37,378 - chestbuddy.ui.views.data_view_adapter - DEBUG - DataViewAdapter: Auto-update enabled
+2025-04-13 17:02:37,378 - chestbuddy.ui.views.data_view_adapter - INFO - DataViewAdapter initialized successfully
+2025-04-13 17:02:37,378 - chestbuddy.ui.main_window - DEBUG - Created DataViewAdapter with ID: 1209457178048
+2025-04-13 17:02:37,378 - chestbuddy.ui.main_window - DEBUG - Internal DataView has ID: 1209471367744
+2025-04-13 17:02:37,378 - chestbuddy.ui.main_window - DEBUG - Setting TableStateManager on DataViewAdapter via adapter method
+2025-04-13 17:02:37,378 - chestbuddy.ui.data_view - DEBUG - ==== DataView.set_table_state_manager called ====
+2025-04-13 17:02:37,378 - chestbuddy.ui.data_view - DEBUG - TableStateManager reference set in DataView
+2025-04-13 17:02:37,378 - chestbuddy.ui.data_view - DEBUG - Connected to TableStateManager.state_changed signal successfully
+2025-04-13 17:02:37,378 - chestbuddy.ui.data_view - DEBUG - TableStateManager integration with DataView complete
+2025-04-13 17:02:37,378 - chestbuddy.ui.data_view - DEBUG - Current cell states: 0 invalid, 0 correctable, 0 corrected
+2025-04-13 17:02:37,378 - chestbuddy.ui.views.data_view_adapter - INFO - TableStateManager passed to wrapped DataView
+2025-04-13 17:02:37,379 - chestbuddy.ui.views.data_view_adapter - INFO - Connected to TableStateManager's state_changed signal
+2025-04-13 17:02:37,379 - chestbuddy.ui.main_window - INFO - TableStateManager set on DataViewAdapter
+2025-04-13 17:02:37,379 - chestbuddy.ui.main_window - DEBUG - Setting DataViewAdapter in DataViewController
+2025-04-13 17:02:37,379 - chestbuddy.core.controllers.data_view_controller - DEBUG - === DataViewController.set_view called with view of type: DataViewAdapter ===
+2025-04-13 17:02:37,379 - chestbuddy.core.controllers.data_view_controller - DEBUG - View instance ID: 1209457178048
+2025-04-13 17:02:37,379 - chestbuddy.core.controllers.data_view_controller - DEBUG - View contains internal DataView with ID: 1209471367744
+2025-04-13 17:02:37,379 - chestbuddy.core.controllers.data_view_controller - DEBUG - Internal DataView has TableStateManager: True, ID: 1209471126976
+2025-04-13 17:02:37,379 - chestbuddy.core.controllers.data_view_controller - DEBUG - View does not have _action_toolbar attribute
+2025-04-13 17:02:37,379 - chestbuddy.core.controllers.base_controller - DEBUG - DataViewController connected to view: DataViewAdapter
+2025-04-13 17:02:37,379 - chestbuddy.core.controllers.data_view_controller - DEBUG - DataViewController connected to view: DataViewAdapter
+2025-04-13 17:02:37,379 - chestbuddy.core.controllers.data_view_controller - DEBUG - Connected to view signals through connect_to_view method
+2025-04-13 17:02:37,379 - chestbuddy.ui.main_window - DEBUG - Added DataViewAdapter to content stack and views dictionary with key 'Data'
+2025-04-13 17:02:37,379 - chestbuddy.ui.main_window - WARNING - Could not connect CorrectionDelegate signal: TableView, Delegate, or Controller not found/valid.
+2025-04-13 17:02:37,380 - chestbuddy.utils.config - DEBUG - Config get: Validation.validation_lists_dir = D:/Projekte/ChestBuddy/chestbuddy/validation_lists
+2025-04-13 17:02:37,384 - chestbuddy.ui.views.validation_list_view - DEBUG - Populated list with 100 entries
+2025-04-13 17:02:37,384 - chestbuddy.ui.views.validation_list_view - INFO - Initialized ValidationListView 'Players' with 100 entries
+2025-04-13 17:02:37,390 - chestbuddy.utils.config - DEBUG - Config get: Validation.validation_lists_dir = D:/Projekte/ChestBuddy/chestbuddy/validation_lists
+2025-04-13 17:02:37,392 - chestbuddy.ui.views.validation_list_view - DEBUG - Populated list with 68 entries
+2025-04-13 17:02:37,392 - chestbuddy.ui.views.validation_list_view - INFO - Initialized ValidationListView 'Chest Types' with 68 entries
+2025-04-13 17:02:37,396 - chestbuddy.utils.config - DEBUG - Config get: Validation.validation_lists_dir = D:/Projekte/ChestBuddy/chestbuddy/validation_lists
+2025-04-13 17:02:37,397 - chestbuddy.ui.views.validation_list_view - DEBUG - Populated list with 82 entries
+2025-04-13 17:02:37,397 - chestbuddy.ui.views.validation_list_view - INFO - Initialized ValidationListView 'Sources' with 82 entries
+2025-04-13 17:02:37,416 - chestbuddy.utils.config - DEBUG - Config get: Validation.auto_save = False
+2025-04-13 17:02:37,417 - chestbuddy.ui.views.validation_tab_view - DEBUG - Status updated: Ready
+2025-04-13 17:02:37,418 - chestbuddy.ui.views.validation_tab_view - DEBUG - Disconnected existing validation_changed signal.
+2025-04-13 17:02:37,418 - chestbuddy.ui.views.validation_tab_view - DEBUG - Connected validation_changed signal to _on_validation_changed.
+2025-04-13 17:02:37,418 - chestbuddy.ui.views.validation_tab_view - DEBUG - Disconnected existing validation_preferences_changed signal.
+2025-04-13 17:02:37,418 - chestbuddy.ui.views.validation_tab_view - DEBUG - Connected validation_preferences_changed signal to _on_validation_preferences_changed.
+2025-04-13 17:02:37,419 - chestbuddy.ui.views.validation_tab_view - DEBUG - Connected entries_changed signal for 
+2025-04-13 17:02:37,419 - chestbuddy.ui.views.validation_tab_view - DEBUG - Connected entries_changed signal for 
+2025-04-13 17:02:37,419 - chestbuddy.ui.views.validation_tab_view - DEBUG - Connected entries_changed signal for 
+2025-04-13 17:02:37,419 - chestbuddy.ui.views.validation_tab_view - DEBUG - Set up ValidationTabView signal connections
+2025-04-13 17:02:37,419 - chestbuddy.ui.views.validation_tab_view - DEBUG - Connected import buttons: True, True, True
+2025-04-13 17:02:37,419 - chestbuddy.ui.views.validation_tab_view - INFO - Initialized ValidationTabView
+2025-04-13 17:02:37,425 - chestbuddy.ui.views.validation_view_adapter - INFO - ValidationViewAdapter: Controller set and signals connected
+2025-04-13 17:02:37,426 - chestbuddy.ui.views.correction_view - DEBUG - Connected data_model.data_changed to CorrectionView.request_update
+2025-04-13 17:02:37,427 - chestbuddy.ui.views.correction_view - DEBUG - CorrectionView placeholder initialized
+2025-04-13 17:02:37,427 - chestbuddy.ui.views.correction_view - INFO - CorrectionView: Controller set and signals connected
+2025-04-13 17:02:37,427 - chestbuddy.core.controllers.correction_controller - DEBUG - CorrectionController: View set
+2025-04-13 17:02:37,432 - chestbuddy.ui.views.correction_view - INFO - CorrectionView: Correction controller set and rule view created
+2025-04-13 17:02:37,434 - chestbuddy.ui.views.chart_view - DEBUG - Connected data_model.data_changed to ChartView.request_update
+2025-04-13 17:02:37,435 - chestbuddy.ui.views.chart_view - INFO - ChartView: Controller set and signals connected
+2025-04-13 17:02:37,435 - chestbuddy.ui.views.settings_tab_view - INFO - Retrieved ValidationService from ServiceLocator
+2025-04-13 17:02:37,458 - chestbuddy.utils.config - DEBUG - Config get: General.theme = dark
+2025-04-13 17:02:37,459 - chestbuddy.utils.config - DEBUG - Config get: General.language = English
+2025-04-13 17:02:37,459 - chestbuddy.utils.config - DEBUG - Config get: General.config_version = 1.0
+2025-04-13 17:02:37,459 - chestbuddy.utils.config - DEBUG - Config get: Validation.validate_on_import = False
+2025-04-13 17:02:37,459 - chestbuddy.utils.config - DEBUG - Config get: Validation.case_sensitive = False
+2025-04-13 17:02:37,459 - chestbuddy.utils.config - DEBUG - Config get: Validation.auto_save = False
+2025-04-13 17:02:37,459 - chestbuddy.utils.config - DEBUG - Config get: Validation.validation_lists_dir = D:/Projekte/ChestBuddy/chestbuddy/validation_lists
+2025-04-13 17:02:37,459 - chestbuddy.utils.config - DEBUG - Config get: Correction.auto_correct_on_validation = False
+2025-04-13 17:02:37,459 - chestbuddy.utils.config - DEBUG - Config get: Correction.auto_correct_on_import = False
+2025-04-13 17:02:37,459 - chestbuddy.utils.config - DEBUG - Saved configuration to: chestbuddy\config.ini
+2025-04-13 17:02:37,459 - chestbuddy.utils.config - DEBUG - Saved configuration to: chestbuddy\config.ini
+2025-04-13 17:02:37,459 - chestbuddy.ui.views.settings_tab_view - DEBUG - Setting changed: [UI] window_width = 1024
+2025-04-13 17:02:37,460 - chestbuddy.utils.config - DEBUG - Saved configuration to: chestbuddy\config.ini
+2025-04-13 17:02:37,460 - chestbuddy.utils.config - DEBUG - Saved configuration to: chestbuddy\config.ini
+2025-04-13 17:02:37,460 - chestbuddy.ui.views.settings_tab_view - DEBUG - Setting changed: [UI] window_height = 768
+2025-04-13 17:02:37,460 - chestbuddy.utils.config - DEBUG - Saved configuration to: chestbuddy\config.ini
+2025-04-13 17:02:37,460 - chestbuddy.utils.config - DEBUG - Saved configuration to: chestbuddy\config.ini
+2025-04-13 17:02:37,460 - chestbuddy.ui.views.settings_tab_view - DEBUG - Setting changed: [UI] table_page_size = 100
+2025-04-13 17:02:37,460 - chestbuddy.ui.views.settings_tab_view - DEBUG - Loaded settings into UI controls
+2025-04-13 17:02:37,461 - chestbuddy.ui.views.settings_tab_view - DEBUG - Disconnected existing validation_preferences_changed signal.
+2025-04-13 17:02:37,461 - chestbuddy.ui.views.settings_tab_view - DEBUG - Connected validation_preferences_changed signal to _on_validation_preferences_changed.
+2025-04-13 17:02:37,461 - chestbuddy.ui.views.settings_tab_view - INFO - Initialized SettingsTabView
+2025-04-13 17:02:37,461 - chestbuddy.ui.views.settings_view_adapter - INFO - Initialized SettingsViewAdapter
+2025-04-13 17:02:37,462 - chestbuddy.core.controllers.data_view_controller - DEBUG - Connected ValidationService signals to DataViewController
+2025-04-13 17:02:37,462 - chestbuddy.core.controllers.data_view_controller - DEBUG - CorrectionService connected to DataViewController
+2025-04-13 17:02:37,462 - chestbuddy.core.controllers.data_view_controller - INFO - Validation and correction services updated
+2025-04-13 17:02:37,462 - chestbuddy.ui.main_window - INFO - Services set in data view controller
+2025-04-13 17:02:37,462 - chestbuddy.core.controllers.base_controller - DEBUG - ViewStateController connected to view: SidebarNavigation
+2025-04-13 17:02:37,462 - chestbuddy.core.controllers.view_state_controller - INFO - Sidebar implements IUpdatable, populating it
+2025-04-13 17:02:37,462 - chestbuddy.ui.widgets.sidebar_navigation - DEBUG - SidebarNavigation populated
+2025-04-13 17:02:37,462 - chestbuddy.core.controllers.view_state_controller - INFO - Registering dependencies for view 'Validation': {'Data'}
+2025-04-13 17:02:37,463 - chestbuddy.ui.utils.update_manager - DEBUG - Update scheduled for SidebarNavigation
+2025-04-13 17:02:37,463 - chestbuddy.ui.widgets.sidebar_navigation - DEBUG - SidebarNavigation scheduled for update
+2025-04-13 17:02:37,463 - chestbuddy.core.controllers.view_state_controller - INFO - View availability changed: {'Validation': True, 'Correction': True, 'Charts': True, 'Settings': True}
+2025-04-13 17:02:37,463 - chestbuddy.core.controllers.view_state_controller - INFO - Registering dependencies for view 'Correction': {'Validation'}
+2025-04-13 17:02:37,463 - chestbuddy.core.controllers.view_state_controller - DEBUG - Skipping view availability update (throttled)
+2025-04-13 17:02:37,463 - chestbuddy.core.controllers.view_state_controller - INFO - Registering dependencies for view 'Charts': {'Data'}
+2025-04-13 17:02:37,463 - chestbuddy.core.controllers.view_state_controller - DEBUG - Skipping view availability update (throttled)
+2025-04-13 17:02:37,463 - chestbuddy.core.controllers.view_state_controller - INFO - Registered prerequisite check for view 'Validation'
+2025-04-13 17:02:37,463 - chestbuddy.core.controllers.view_state_controller - DEBUG - Skipping view availability update (throttled)
+2025-04-13 17:02:37,463 - chestbuddy.core.controllers.view_state_controller - INFO - Registered prerequisite check for view 'Correction'
+2025-04-13 17:02:37,464 - chestbuddy.core.controllers.view_state_controller - DEBUG - Skipping view availability update (throttled)
+2025-04-13 17:02:37,464 - chestbuddy.core.controllers.view_state_controller - INFO - Registered prerequisite check for view 'Charts'
+2025-04-13 17:02:37,464 - chestbuddy.core.controllers.view_state_controller - DEBUG - Skipping view availability update (throttled)
+2025-04-13 17:02:37,464 - chestbuddy.core.controllers.view_state_controller - DEBUG - Updating sidebar via IUpdatable interface
+2025-04-13 17:02:37,464 - chestbuddy.ui.widgets.sidebar_navigation - DEBUG - SidebarNavigation updated
+2025-04-13 17:02:37,464 - chestbuddy.core.controllers.view_state_controller - INFO - View changed from '' to 'Dashboard'
+2025-04-13 17:02:37,465 - chestbuddy.core.controllers.ui_state_controller - DEBUG - Status message updated: No data loaded
+2025-04-13 17:02:37,465 - chestbuddy.core.controllers.ui_state_controller - DEBUG - Updated data-dependent UI state: has_data=False
+2025-04-13 17:02:37,466 - chestbuddy.ui.main_window - DEBUG - Connecting Dashboard.import_requested to _on_import_requested handler
+2025-04-13 17:02:37,466 - chestbuddy.ui.main_window - DEBUG - Connecting Data.import_requested to _on_import_requested handler
+2025-04-13 17:02:37,483 - root - INFO - UI created successfully
+2025-04-13 17:02:37,483 - __main__ - DEBUG - Connecting ChestBuddyApp signals
+2025-04-13 17:02:37,484 - __main__ - INFO - Connected correction_selected signal from DataViewAdapter
+2025-04-13 17:02:37,484 - __main__ - DEBUG - ChestBuddyApp signals connected successfully
+2025-04-13 17:02:37,715 - __main__ - INFO - Application initialized successfully
+2025-04-13 17:02:37,731 - chestbuddy.core.controllers.view_state_controller - DEBUG - View transition to 'Dashboard' completed
+2025-04-13 17:02:37,731 - chestbuddy.ui.widgets.sidebar_navigation - DEBUG - SidebarNavigation skipping update (no change detected)
+2025-04-13 17:02:37,731 - chestbuddy.ui.utils.update_manager - DEBUG - Updated SidebarNavigation
+2025-04-13 17:02:38,898 - chestbuddy.ui.main_window - INFO - Cancelling any ongoing operations before closing
+2025-04-13 17:02:38,898 - chestbuddy.core.services.data_manager - INFO - DataManager.cancel_loading called
+2025-04-13 17:02:38,898 - chestbuddy.core.services.data_manager - DEBUG - Set cancellation flag to True
+2025-04-13 17:02:38,898 - chestbuddy.core.services.data_manager - DEBUG - No active task to cancel
+2025-04-13 17:02:38,898 - chestbuddy.core.services.data_manager - DEBUG - Loading operation cancelled successfully
+2025-04-13 17:02:38,908 - __main__ - INFO - Cleaning up application resources
+2025-04-13 17:02:38,908 - __main__ - DEBUG - Processing pending events before shutdown
+2025-04-13 17:02:38,909 - chestbuddy.utils.service_locator - DEBUG - All services and factories cleared
+2025-04-13 17:02:38,909 - chestbuddy.utils.config - DEBUG - Saved configuration to: chestbuddy\config.ini
+2025-04-13 17:02:38,909 - chestbuddy.utils.background_processing - DEBUG - Shutting down 1 background workers
+2025-04-13 17:02:38,909 - chestbuddy.utils.background_processing - DEBUG - All background workers shutdown completed
+2025-04-13 17:02:38,909 - __main__ - INFO - Application cleanup completed
+2025-04-13 17:02:38,909 - chestbuddy.core.controllers.base_controller - DEBUG - ErrorHandlingController disconnected all connections (0 total)
+2025-04-13 17:02:38,909 - chestbuddy.core.controllers.base_controller - DEBUG - ErrorHandlingController destroyed and connections cleaned up
+2025-04-13 17:02:38,916 - chestbuddy.core.controllers.base_controller - DEBUG - FileOperationsController disconnected from model: DataManager (0 connections)
+2025-04-13 17:02:38,916 - chestbuddy.core.controllers.base_controller - DEBUG - FileOperationsController disconnected all connections (0 total)
+2025-04-13 17:02:38,916 - chestbuddy.core.controllers.base_controller - DEBUG - FileOperationsController destroyed and connections cleaned up
+2025-04-13 17:02:38,916 - chestbuddy.utils.background_processing - DEBUG - Qt C++ object already deleted during thread cleanup
+2025-04-13 17:02:38,916 - chestbuddy.core.controllers.base_controller - DEBUG - ProgressController disconnected all connections (0 total)
+2025-04-13 17:02:38,916 - chestbuddy.core.controllers.base_controller - DEBUG - ProgressController destroyed and connections cleaned up
+2025-04-13 17:02:38,938 - chestbuddy.core.controllers.base_controller - DEBUG - ViewStateController disconnected from view: SidebarNavigation (0 connections)
+2025-04-13 17:02:38,939 - chestbuddy.core.controllers.base_controller - DEBUG - ViewStateController disconnected from model: ChestDataModel (0 connections)
+2025-04-13 17:02:38,939 - chestbuddy.core.controllers.base_controller - DEBUG - ViewStateController disconnected all connections (0 total)
+2025-04-13 17:02:38,939 - chestbuddy.core.controllers.base_controller - DEBUG - ViewStateController destroyed and connections cleaned up
+2025-04-13 17:02:38,939 - chestbuddy.core.controllers.base_controller - DEBUG - UIStateController disconnected all connections (0 total)
+2025-04-13 17:02:38,939 - chestbuddy.core.controllers.base_controller - DEBUG - UIStateController destroyed and connections cleaned up
+2025-04-13 17:02:38,939 - chestbuddy.core.controllers.base_controller - DEBUG - DataViewController disconnected from view: DataViewAdapter (0 connections)
+2025-04-13 17:02:38,939 - chestbuddy.core.controllers.base_controller - DEBUG - DataViewController disconnected from model: ChestDataModel (0 connections)
+2025-04-13 17:02:38,939 - chestbuddy.core.controllers.base_controller - DEBUG - DataViewController disconnected all connections (0 total)
+2025-04-13 17:02:38,939 - chestbuddy.core.controllers.base_controller - DEBUG - DataViewController destroyed and connections cleaned up
+2025-04-13 17:02:38,939 - chestbuddy.core.controllers.base_controller - DEBUG - CorrectionController disconnected all connections (0 total)
+2025-04-13 17:02:38,939 - chestbuddy.core.controllers.base_controller - DEBUG - CorrectionController destroyed and connections cleaned up
+2025-04-13 17:02:38,939 - chestbuddy.ui.utils.update_manager - DEBUG - All updates cancelled
+2025-04-13 17:02:38,939 - chestbuddy.ui.views.base_view - DEBUG - Disconnected signals for DashboardView
+2025-04-13 17:02:38,939 - chestbuddy.ui.views.base_view - ERROR - Error disconnecting signals for DataViewAdapter: Internal C++ object (ChestDataModel) already deleted.
+2025-04-13 17:02:38,939 - chestbuddy.ui.views.base_view - DEBUG - Disconnected signals for ValidationViewAdapter
+2025-04-13 17:02:38,939 - chestbuddy.ui.views.base_view - ERROR - Error disconnecting signals for CorrectionView: Internal C++ object (ChestDataModel) already deleted.
+2025-04-13 17:02:38,939 - chestbuddy.ui.views.base_view - ERROR - Error disconnecting signals for ChartView: Internal C++ object (ChestDataModel) already deleted.
+2025-04-13 17:02:38,940 - chestbuddy.ui.views.base_view - DEBUG - Disconnected signals for SettingsViewAdapter

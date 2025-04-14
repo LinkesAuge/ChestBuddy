@@ -129,6 +129,10 @@ class DataTableView(QWidget):
         self.validate_action = QAction("Validate", self)
         self.correct_action = QAction("Correct", self)
 
+        # Add batch correction action
+        self.batch_correct_action = QAction("Batch Correct", self)
+        self.batch_correct_action.triggered.connect(self._show_batch_correction_dialog)
+
         self.toolbar.addAction(self.import_action)
         self.toolbar.addAction(self.export_action)
         self.toolbar.addSeparator()
@@ -138,6 +142,7 @@ class DataTableView(QWidget):
         self.toolbar.addSeparator()
         self.toolbar.addAction(self.validate_action)
         self.toolbar.addAction(self.correct_action)
+        self.toolbar.addAction(self.batch_correct_action)
 
     def _setup_table(self):
         """Set up the table view properties. This method seems incorrectly placed
@@ -510,3 +515,75 @@ class DataTableView(QWidget):
             logger.debug("CorrectionDelegate set on internal table view.")
         else:
             logger.error("Cannot set delegate: self.table_view is not initialized.")
+
+    def _show_batch_correction_dialog(self):
+        """Show the batch correction dialog for all correctable cells."""
+        # Import here to avoid circular import
+        from ..widgets.batch_correction_dialog import BatchCorrectionDialog, CorrectionItem
+
+        if not self._source_model:
+            logger.warning("No source model available for batch correction")
+            return
+
+        # Find all correctable cells
+        correctable_cells = []
+        for row in range(self._source_model.rowCount()):
+            for col in range(self._source_model.columnCount()):
+                source_index = self._source_model.index(row, col)
+                state = source_index.data(DataViewModel.ValidationStateRole)
+
+                if state == CellState.CORRECTABLE:
+                    suggestions = source_index.data(DataViewModel.CorrectionSuggestionsRole)
+                    if suggestions and len(suggestions) > 0:
+                        # Get the first suggestion
+                        suggestion = suggestions[0]
+                        original_value = source_index.data(Qt.DisplayRole)
+                        corrected_value = getattr(suggestion, "corrected_value", str(suggestion))
+                        column_name = self._source_model.headerData(
+                            col, Qt.Horizontal, Qt.DisplayRole
+                        )
+
+                        item = CorrectionItem(
+                            row=row,
+                            col=col,
+                            column_name=column_name,
+                            original=original_value,
+                            corrected=corrected_value,
+                            suggestion=suggestion,
+                        )
+                        correctable_cells.append(item)
+
+        if not correctable_cells:
+            from PySide6.QtWidgets import QMessageBox
+
+            QMessageBox.information(
+                self, "No Corrections Available", "No cells with available corrections were found."
+            )
+            return
+
+        # Show the dialog and process results
+        selected_items, accepted = BatchCorrectionDialog.show_dialog(correctable_cells, self)
+
+        if accepted and selected_items:
+            logger.info(f"Applying batch corrections to {len(selected_items)} cells")
+
+            # Apply corrections one by one
+            for item in selected_items:
+                if self._correction_service:
+                    row, col = item.row, item.col
+                    success = self._correction_service.apply_ui_correction(
+                        row, col, item.corrected_value
+                    )
+                    if not success:
+                        logger.warning(f"Failed to apply correction to ({row}, {col})")
+
+            # Inform the user
+            from PySide6.QtWidgets import QMessageBox
+
+            QMessageBox.information(
+                self, "Batch Correction", f"Applied {len(selected_items)} corrections."
+            )
+        elif accepted:
+            logger.info("Batch correction dialog accepted but no corrections selected")
+        else:
+            logger.info("Batch correction dialog cancelled")

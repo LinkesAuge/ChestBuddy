@@ -193,10 +193,29 @@ class CorrectionDelegate(ValidationDelegate):
             return
 
         menu = QMenu()
+        menu.setTitle("Apply Correction")
+
+        # Add header to make the menu more user-friendly
+        header_action = QAction("Available Corrections:", menu)
+        header_action.setEnabled(False)
+        # Apply bold font to header
+        font = header_action.font()
+        font.setBold(True)
+        header_action.setFont(font)
+        menu.addAction(header_action)
+        menu.addSeparator()
+
+        # Original value for reference
+        original_value = index.data(Qt.DisplayRole)
+        original_action = QAction(f'Original: "{original_value}"', menu)
+        original_action.setEnabled(False)
+        menu.addAction(original_action)
+        menu.addSeparator()
+
+        # Add correction suggestions with better formatting
         for suggestion in suggestions:
-            action_text = str(suggestion)
-            if hasattr(suggestion, "corrected_value"):
-                action_text = f'Apply: "{suggestion.corrected_value}"'
+            corrected_value = getattr(suggestion, "corrected_value", str(suggestion))
+            action_text = f'Change to: "{corrected_value}"'
 
             action = menu.addAction(action_text)
             # Store index and suggestion on the action itself for later retrieval
@@ -205,11 +224,35 @@ class CorrectionDelegate(ValidationDelegate):
             # Connect to a dedicated helper slot
             action.triggered.connect(self._handle_suggestion_action)
 
+        # Add option for custom correction if needed
+        menu.addSeparator()
+        custom_action = menu.addAction("Custom Correction...")
+        custom_action.triggered.connect(lambda: self._handle_custom_correction(index))
+
         if menu.isEmpty():
             print("Menu is empty, not showing.")  # Debug
             return
 
         menu.exec(global_pos)
+
+    def _handle_custom_correction(self, index: QModelIndex):
+        """Handle request for custom correction entry."""
+        from PySide6.QtWidgets import QInputDialog, QLineEdit
+
+        original_value = index.data(Qt.DisplayRole)
+        new_value, ok = QInputDialog.getText(
+            self.parent(),
+            "Custom Correction",
+            f'Enter correction for "{original_value}":',
+            QLineEdit.Normal,
+            original_value,
+        )
+
+        if ok and new_value != original_value:
+            # Create a custom suggestion object
+            suggestion = CorrectionSuggestion(original_value, new_value)
+            # Emit the correction selected signal
+            self.correction_selected.emit(index, suggestion)
 
     # --- New Helper Slot ---
     @Slot()
@@ -224,7 +267,7 @@ class CorrectionDelegate(ValidationDelegate):
             # Ensure retrieved data is valid before emitting
             if isinstance(index, QModelIndex) and index.isValid() and suggestion is not None:
                 print(
-                    f"Helper slot emitting for index ({index.row()},{index.column()}) and suggestion {suggestion}"
+                    f"Applying correction for cell ({index.row()},{index.column()}): {suggestion}"
                 )  # Debug
                 self.correction_selected.emit(index, suggestion)
             else:
@@ -245,18 +288,27 @@ class CorrectionDelegate(ValidationDelegate):
     ):
         """Handles tooltip events to show detailed correction suggestions."""
         if event.type() == QHelpEvent.Type.ToolTip and index.isValid():
-            suggestions = index.data(DataViewModel.CorrectionSuggestionsRole)
-            if suggestions:
-                # Ensure suggestions have 'corrected_value' or adapt as needed
-                # Corrected f-string formatting
-                suggestions_list = []
-                for s in suggestions:
-                    suggestion_str = getattr(s, "corrected_value", str(s))
-                    suggestions_list.append(f"- {suggestion_str}")
-                suggestions_text = "Suggestions:\n" + "\n".join(suggestions_list)
+            # Check if mouse is over the correction indicator
+            is_correctable = index.data(DataViewModel.ValidationStateRole) == CellState.CORRECTABLE
+            if is_correctable:
+                indicator_rect = self._get_indicator_rect(option.rect)
+                if indicator_rect.contains(event.pos()):
+                    suggestions = index.data(DataViewModel.CorrectionSuggestionsRole)
+                    if suggestions:
+                        # Format the tooltip for better readability
+                        original_value = index.data(Qt.DisplayRole)
+                        tooltip_text = f"<b>Correction Available</b><br>"
+                        tooltip_text += f'Original: "{original_value}"<br><br>'
+                        tooltip_text += f"<b>Suggestions:</b><br>"
 
-                QToolTip.showText(event.globalPos(), suggestions_text, view)
-                return True  # Event handled
+                        for s in suggestions:
+                            corrected_value = getattr(s, "corrected_value", str(s))
+                            tooltip_text += f'→ "{corrected_value}"<br>'
+
+                        tooltip_text += "<br><i>Click on the indicator to apply a correction</i>"
+
+                        QToolTip.showText(event.globalPos(), tooltip_text, view)
+                        return True  # Event handled
 
         # Call the base class (ValidationDelegate) helpEvent for its tooltip logic
         return super().helpEvent(event, view, option, index)

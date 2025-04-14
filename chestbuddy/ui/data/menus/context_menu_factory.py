@@ -30,7 +30,10 @@ from ..actions.edit_actions import (
 
 # Import future action classes here
 from ..actions.validation_actions import ViewErrorAction  # Import real action
-from ..actions.correction_actions import ApplyCorrectionAction  # Import real action
+from ..actions.correction_actions import (
+    ApplyCorrectionAction,
+    BatchApplyCorrectionAction,
+)  # Import real action
 
 # Import AddToCorrectionListAction from correct path
 from ..actions.correction_actions import AddToCorrectionListAction
@@ -81,6 +84,8 @@ class ContextMenuFactory:
         ApplyCorrectionAction,
         # Separator needed here
         AddToCorrectionListAction,
+        # Batch Actions
+        BatchApplyCorrectionAction,
     ]
 
     @staticmethod
@@ -220,5 +225,41 @@ class ContextMenuFactory:
                     menu.addAction(qaction)
                     created_qactions[action_instance.id] = qaction
                     needs_separator = True
+
+        # Add Batch Actions submenu or directly
+        batch_action_ids = {"batch_apply_correction"}
+        has_batch_actions = False
+
+        for action_instance in action_instances:
+            if action_instance.id in batch_action_ids:
+                if action_instance.is_applicable(info):
+                    has_batch_actions = True
+                    break
+
+        if has_batch_actions:
+            if needs_separator:
+                menu.addSeparator()
+                needs_separator = False
+
+            # Create batch actions section
+            batch_menu = QMenu("Batch Operations", menu)
+            for action_instance in action_instances:
+                if action_instance.id in batch_action_ids:
+                    if action_instance.is_applicable(info):
+                        qaction = QAction(
+                            action_instance.icon, action_instance.text, info.parent_widget
+                        )
+                        qaction.setShortcut(action_instance.shortcut or QKeySequence())
+                        qaction.setToolTip(action_instance.tooltip)
+                        qaction.setEnabled(action_instance.is_enabled(info))
+                        qaction.triggered.connect(
+                            lambda bound_action=action_instance: bound_action.execute(info)
+                        )
+                        batch_menu.addAction(qaction)
+                        created_qactions[action_instance.id] = qaction
+
+            # Only add the submenu if it has actions
+            if not batch_menu.isEmpty():
+                menu.addMenu(batch_menu)
 
         return menu, created_qactions
