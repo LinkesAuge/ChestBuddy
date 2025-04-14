@@ -1,124 +1,84 @@
 ---
-title: Active Context - ChestBuddy Application
-date: 2024-08-07
+title: Active Context - ChestBuddy Project
+date: 2024-08-06
 ---
 
-# Active Context: DataView Refactoring
+# Active Context
 
-Last Updated: 2024-08-07
+Last updated: 2024-08-10
 
-## Current Focus (2024-08-07)
+## Overview
+This document captures the current state of the ChestBuddy project, focusing on the ongoing DataView refactoring effort.
 
-- **Task:** Reflecting recent progress in Memory Bank after updating the checklist.
-- **Goal:** Ensure documentation accurately shows the completion of the single-click correction UI via the delegate and defines the next steps.
-- **Context:** Updated `plans/dataview_refactor/checklist.md` to mark "Implement one-click correction application" and related integration test items as complete.
-- **Note on Import Functionality:** CSV import functionality is part of Phase 6 (Import/Export) which is not yet implemented. The existing import system from the original architecture continues to function through `FileOperationsController` and `DataManager`, but is not yet integrated with the refactored DataView components.
-- **Outcome:** Memory bank aligned with the latest development state.
-- **Plan:**
-  1. Update `progress.md` and `activeContext.md`.
-  2. Update `bugfixing.mdc` to mark the delegate test issues as resolved.
-  3. Define the next development focus, likely connecting adapters to real services and implementing the UI for applying corrections.
+## Recent Activities
+- **Code Review Integration:** Incorporating feedback from the recent code review into the refactoring plan. Key areas addressed: potential confusion from coexisting old/new implementations, data model handling inefficiencies, and optimization of update logic.
+- **Memory Bank Updates:** Updated `projectbrief.md`, `techContext.md`, `systemPatterns.md`, and `progress.md` to align with the adjusted plan and reflect current understanding.
+- **Integration Testing:** Completed initial integration tests for core correction flow (suggestion -> state update) and UI trigger -> service call.
+- **Correction Action Flow:** Implemented the basic trigger flow from `CorrectionDelegate` click -> `DataTableView` signal -> `DataViewController` slot -> `CorrectionService.apply_ui_correction`.
+- **Completed Correction Rule Preview Feature:** Successfully implemented the "Preview Rule" action in the `CorrectionRuleView`, including the context menu entry, controller logic, preview dialog, and comprehensive unit tests for all involved components.
 
-## Key Objectives
+## Current Focus
+- **Testing and Integration (Phase 8):** Verifying the full correction application cycle, including the state update propagation back to the view. Adding unit tests for `CorrectionService.get_correction_preview`.
+- **Architecture Refinement (Phase 5):** Analyzing the state update flow post-correction and planning signal decoupling.
+- **Advanced Context Menu Features (Phase 4):** Planning implementation for remaining cell-type specific actions and validation during edit.
 
-1. **Component Architecture**: Implement a modular component architecture that separates concerns between data models, views, delegates, and adapters
-2. **Enhanced Validation**: Improve visual feedback for data validation with clear status indicators
-3. **Correction Integration**: Seamlessly integrate the correction system with the DataView UI
-4. **Performance Optimization**: Ensure high performance with large datasets through optimized rendering
-5. **Comprehensive Testing**: Maintain high test coverage throughout the refactoring
+## Key Objectives (DataView Refactor)
+- Implement a modular component architecture (Model, View, Controller, Delegates, Adapters, StateManager).
+- Enhance validation status display and interaction.
+- Integrate correction suggestions and application seamlessly.
+- Improve context menu functionality and extensibility.
+- Optimize performance for large datasets.
+- Maintain high test coverage (>=95%).
 
 ## Recent Changes
+- Updated `memory-bank/progress.md` with detailed completion status for Correction Rule Preview feature and tests.
+- Updated `memory-bank/activeContext.md` to reflect completion of Correction Rule Preview and shift focus.
+- Completed unit tests for `CorrectionRuleView`, `CorrectionController`, and `CorrectionPreviewDialog` related to the preview feature.
+- Fixed various test setup issues and errors encountered during preview feature implementation.
 
-- Updated `plans/dataview_refactor/checklist.md` to reflect completion of single-click correction UI and related tests.
-- Added `pytest.mark.skip` to `tests/integration/test_correction_flow.py`.
-- Attempted various mocking strategies (`patch.object`, `@patch`) for `ValidationService.get_validation_status`, all failed with `AttributeError`.
-- Investigated `CorrectionService`, `TableStateManager`, and `DataViewModel` signal handling.
-- Confirmed `CorrectionService` uses `ValidationService.get_validation_status`.
-- Confirmed `TableStateManager` does not connect directly to `ChestDataModel.data_changed`.
-- Confirmed `DataViewModel._on_source_data_changed` resets the model but doesn't update `TableStateManager` state.
-- Disabled signal throttling in `ChestDataModel` within the test fixture.
-- Reverted `test_correction_suggestion_updates_state` to remove failed mocking attempts (test is currently non-functional).
-- Fixed `RuntimeError` Crash: Modified `SignalManager.disconnect_receiver` to handle potential `RuntimeError` when disconnecting signals from already deleted C++ objects during test teardown.
-- Fixed all unit tests for `CorrectionDelegate` (10/10).
-- Fixed `TypeError` in `test_context_menu_factory.py`, ensuring context menu unit tests pass.
+## Implementation Plan (High-Level Phases)
+1.  **Phase 1:** Core DataViewModel and DataTableView implementation. (✅ Completed)
+2.  **Phase 2:** Delegate system and basic Context Menu structure. (✅ Completed)
+3.  **Phase 3:** Adapter integration (Validation & Correction). (✅ Completed)
+4.  **Phase 4:** Advanced Context Menu Features (Correction Preview done, others in progress/planned).
+5.  **Phase 5:** Architecture Refinement (In Progress).
+6.  **Phase 6:** Import/Export and other Advanced Features (Planned).
+7.  **Phase 7:** Performance Optimization (Planned).
+8.  **Phase 8:** Testing and Integration (In Progress - core integration tests done, full cycle and service tests pending).
+9.  **Phase 9:** Documentation and Cleanup (Planned).
 
-## Implementation Plan
+## Active Decisions & Considerations
+- **State Management:** Reinforcing the `TableStateManager` as the single source of truth for view state, updated via Adapters and read by `DataViewModel`.
+- **Signal Decoupling:** Planning to reduce direct signal connections between low-level delegates and high-level controllers. Views should emit higher-level signals.
+- **Testing Strategy:** Continue TDD approach. Focus on integration tests for service interactions and full data flow cycles. Plan UI testing approach (e.g., `pytest-qt`).
+- **Old Code Removal:** Plan for the eventual removal of `ui/data_view.py` and related adapters once the new implementation is fully integrated and verified (Phase 9).
 
-### Phase 1: Core Models and Views (Completed)
+## Technical Constraints & Dependencies
+- Python 3.10+
+- PySide6
+- Pandas
+- UV for environment management
+- pytest for testing
 
-### Phase 2: Delegate System (Completed)
+## Current Status Summary
+- The core DataView refactoring (Phases 1-3) is largely complete, with fundamental display, interaction, and state management components implemented and unit-tested.
+- Integration tests cover basic validation and correction suggestion flows, plus the UI trigger for correction application.
+- The "Preview Rule" feature within the separate `CorrectionRuleView` is complete and fully unit-tested.
+- Focus is now shifting towards:
+    1.  Testing the `CorrectionService`'s preview method.
+    2.  Verifying the *complete* correction cycle in integration tests (including state updates back to the view).
+    3.  Refining the architecture based on recent learnings and review feedback.
+    4.  Implementing the remaining advanced context menu features.
 
-### Phase 3: Adapter Integration (In Progress)
-- Refine Adapter transformation logic (connecting real services)
-- Connect Adapters to real ValidationService and CorrectionService
+## Next Steps (Prioritized)
+1.  **Add Unit Tests for `CorrectionService.get_correction_preview`:** Ensure the service method itself is tested.
+2.  **Implement Full Correction Cycle Integration Test:** Verify the `CorrectionService.apply_ui_correction` call leads to correct updates in `TableStateManager`, `DataViewModel`, and ultimately the view delegates.
+3.  **Analyze Post-Correction State Flow:** Trace the state updates after a correction is applied to ensure the flow aligns with the intended architecture (`StateManager` -> `ViewModel` -> `Delegate`).
+4.  **Plan Advanced Context Menu Features:** Detail the implementation for cell-type specific actions and validation-during-edit.
+5.  **Plan Signal Decoupling Strategy:** Define how delegate signals will be replaced/managed by higher-level view signals.
+6.  **Continue Architecture Refinement:** Address any identified issues in state flow or component interaction.
 
-### Phase 4: Context Menus and Actions (In Progress)
-- Implement selection-aware menu actions
-- Add validation during cell editing
-
-### Phase 5: Validation and Correction Integration (UI/Workflow Focus) (In Progress)
-- Add UI for applying corrections (via delegate interaction / menu action) - Delegate part done.
-- Implement correction preview
-- Implement one-click correction application - ✅ Completed (Delegate interaction)
-- Add batch correction UI
-
-### Phase 6: Import/Export and Advanced Features (Planned)
-
-### Phase 7: Performance Optimization (Planned)
-
-### Phase 8: Testing and Integration (Ongoing/Planned)
-- Develop key integration tests for full workflows (e.g., validate -> correct -> revalidate) and edge cases.
-- Implement UI Testing
-
-## Active Decisions
-
-1. **Component Granularity**: Fine-grained components for maintainability.
-2. **Adapter Pattern**: Used to connect UI layer with domain services.
-3. **Delegate Approach**: Used for cell rendering and interaction.
-4. **Qt Model Roles**: Custom roles for specialized data (ValidationState, CorrectionState).
-5. **Context Menu Strategy**: Dynamic menus based on selection/state.
-6. **State Management**: Adapters update a central `TableStateManager`.
-7. **Deferred Fix:** Decided to postpone fixing the `RuntimeWarning: Failed to disconnect...` messages during `DataViewModel` cleanup.
-8. **Signal Testing Strategy:** Use `qtbot.waitSignal` with `blocker.args` for verifying signal emissions and arguments, ensuring mock signals have necessary methods (`connect`, `emit`).
-
-## Technical Constraints
-1. **Qt Framework**: PySide6/Qt6.
-2. **Performance**: Handle 10,000+ rows efficiently.
-3. **Backward Compatibility**: Maintain API compatibility where possible.
-4. **Cross-Platform**: Windows, macOS, Linux.
-
-#### Current Status
-
-We have completed the core implementation of the DataView refactoring (Models, Views, Delegates, Adapters bases, Context Menu Actions). All unit tests for these individual components, including the `CorrectionDelegate`, are passing. The basic UI mechanism for applying a single correction via a click on the delegate indicator is implemented and its signal flow is tested.
-
-#### Next Steps
-
-1.  **Connect Adapters to Services:** Replace mock service interactions in `ValidationAdapter` and `CorrectionAdapter` with connections to the actual `ValidationService` and `CorrectionService`. This is the primary focus.
-2.  **Implement Correction Application Logic:** Connect the `correction_selected` signal (emitted by the delegate) to the `CorrectionAdapter` to actually trigger the `CorrectionService`.
-3.  **Refine State Flow:** Ensure that state changes originating from real service responses correctly update the `TableStateManager`, `DataViewModel`, and are reflected in the UI via delegates.
-4.  **Develop Integration Tests:** Create tests that cover the full workflow (e.g., load data -> validate -> view state -> apply correction -> revalidate -> view updated state).
-5.  **Complete Context Menu:** Implement remaining context menu features (selection-aware actions, validation during edit).
-6.  *(Deferred)* Address `RuntimeWarning: Failed to disconnect...` in `DataViewModel` cleanup.
-
-## Open Questions/Decisions
-
-- How to resolve the `unittest.mock.patch` `AttributeError` for `ValidationService.get_validation_status`? (Still relevant for integration tests)
-- How should `DataViewModel` trigger state updates in `TableStateManager` when the source model changes? (Needs verification with real service updates)
-- What is causing the terminal output issues with pytest? (Ongoing observation)
-- When should the deferred `RuntimeWarning` cleanup in `DataViewModel` be addressed?
-- How should the `CorrectionService` (and other services) be made available to the `ActionContext`?
-- What are the exact categories for correction rules? Should they come from an Enum?
-- How should multi-cell selection be handled for "Add to Correction List"?
-
-## Relevant Documentation
-
-- [Qt Model/View Programming](https://doc.qt.io/qt-6/model-view-programming.html)
-- [Qt Delegate Documentation](https://doc.qt.io/qt-6/qstyleditemdelegate.html)
-- [pytest-qt Documentation](https://pytest-qt.readthedocs.io/en/latest/)
-- [ChestBuddy Validation Service API](link_to_internal_docs)
-- [ChestBuddy Correction Service API](link_to_internal_docs)
-
-# Active Development Context
+# Active Development Context (Legacy)
 
 ## Active Context - August 5, 2024
 
@@ -209,3 +169,36 @@ The implementation will follow a phased approach:
 #### Current Status
 
 We are actively working on the DataView refactoring. Key components like the `DataViewModel`, `
+
+## Current Focus: DataView Refactoring (Phase 8 - Testing & Phase 5 - Refinement)
+
+We are currently focused on Phase 8 (Testing and Integration) and Phase 5 (Architecture Refinement).
+
+### Recent Activities:
+- **Code Review Integration:** Incorporated feedback.
+- **`ValidationAdapter` Integration:** Completed and tested.
+- **`CorrectionAdapter` Integration:** Verified connection and fixed/passed integration tests for the suggestion flow.
+- **UI Correction Action Trigger:** Implemented Delegate -> View -> Controller signal flow.
+- **Correction Action Trigger Test:** Added and passed integration test verifying Controller calls Service method.
+
+### Immediate Goals (Next 1-3 days):
+1.  **Implement Full Cycle Correction Test:** Complete `test_correction_application_updates_state` implementation (verifying Model/ViewModel updates, acknowledging signal spy flakiness).
+2.  **Analyze Post-Correction State Flow:** Add logging/trace the `TableStateManager -> DataViewModel -> Delegate` update path after a correction is applied via the service.
+
+### Broader Context & Upcoming Steps:
+- **Phase 5 Refinement:** Continue active review of the state management flow, plan signal decoupling.
+- **Phase 4:** Address remaining Context Menu / Advanced UI features after Phase 5/8 progress.
+- **Phase 8:** Plan UI tests.
+
+### Key Decisions/Patterns Used Recently:
+- **Service -> Adapter -> Manager:** Confirmed pattern.
+- **Adapter Responsibility:** Transform service output for `TableStateManager`.
+- **Integration Testing:** Using `patch.object(wraps=...)` for spying.
+- **State Merging:** Using `dataclasses.asdict` and dictionary updates.
+
+### Open Questions/Risks:
+- **Performance:** Monitor performance.
+- **State Synchronization:** Ensure perfect sync.
+- **Performance:** Monitor performance as more complex state updates and painting occur, especially with larger datasets.
+- **State Synchronization:** Ensuring perfect synchronization between the source model, `TableStateManager`, and the view, especially during rapid updates or model resets.
+- **Complexity:** Managing the interactions between multiple components (ViewModel, StateManager, Adapters, Delegates, Services) requires careful testing and clear architecture.

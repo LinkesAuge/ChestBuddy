@@ -5,6 +5,8 @@
 ### Overview
 The DataView refactoring project is a comprehensive overhaul of the core data display component of the ChestBuddy application. This section details the technical aspects of this refactoring effort.
 
+**Note on Migration (Updated: 2024-08-08):** The project is actively migrating away from an older implementation (`ui/data_view.py` relying on `QStandardItemModel`) towards the refactored structure (`ui/data/` using `QAbstractTableModel`). A `DataViewAdapter` currently bridges these, but its complexity and the dual structure are recognized risks. The goal is full consolidation onto the new architecture.
+
 ### Technology Stack
 The refactored DataView uses these key technologies:
 
@@ -20,113 +22,58 @@ The refactored DataView follows this directory structure:
 ```
 chestbuddy/
 ├── ui/
-│   ├── data/                       # DataView-specific components
-│   │   ├── models/                 # Data models
-│   │   │   ├── __init__.py
-│   │   │   ├── data_view_model.py  # Main ViewModel for DataView
-│   │   │   └── filter_model.py     # Filter proxy model
-│   │   ├── views/                  # View components
-│   │   │   ├── __init__.py
-│   │   │   ├── data_table_view.py  # Main DataView component
-│   │   │   └── header_view.py      # Custom header view
+│   ├── data/                       # Refactored DataView-specific components
+│   │   ├── models/                 # Data models (DataViewModel, FilterModel)
+│   │   ├── views/                  # View components (DataTableView, HeaderView)
 │   │   ├── delegates/              # Cell rendering delegates
-│   │   │   ├── __init__.py
-│   │   │   ├── cell_delegate.py    # Base cell delegate
-│   │   │   ├── validation_delegate.py  # Validation visualization delegate
-│   │   │   └── correction_delegate.py  # Correction visualization delegate
-│   │   ├── adapters/               # Adapter components
-│   │   │   ├── __init__.py
-│   │   │   ├── validation_adapter.py   # Validation system adapter
-│   │   │   └── correction_adapter.py   # Correction system adapter
+│   │   ├── adapters/               # Integration adapters (ValidationAdapter, CorrectionAdapter)
 │   │   ├── menus/                  # Context menus
-│   │   │   ├── __init__.py
-│   │   │   ├── context_menu.py     # Main context menu
-│   │   │   └── correction_menu.py  # Correction-specific menu items
 │   │   ├── widgets/                # Supporting UI widgets
-│   │   │   ├── __init__.py
-│   │   │   ├── filter_widget.py    # Data filtering widget
-│   │   │   └── toolbar_widget.py   # DataView toolbar
-│   │   ├── __init__.py
-│   │   └── data_view.py            # Composite view combining components
-├── tests/
-    ├── ui/
-    │   ├── data/                   # Tests for DataView components
+│   │   └── ...
+│   ├── data_view.py            # <<< OLD Implementation (to be deprecated)
+│   ├── views/
+│   │   ├── data_view_adapter.py  # <<< Adapter wrapping OLD view (to be deprecated)
+│   │   └── ...
+...
 ```
 
 ### Key Components
+*(Descriptions focus on the refactored components in `ui/data/`)*
 
 #### Models
 
 - **DataViewModel** (`data_view_model.py`): 
-  - Core view model adapting ChestDataModel for display
-  - Implements Qt's QAbstractTableModel
-  - Handles data access, modification, and event propagation
-  - Manages row/column mapping and data transformation
+  - Core view model adapting ChestDataModel for display.
+  - Implements `QAbstractTableModel` for efficiency.
+  - Handles data access, modification signals (`dataChanged`), sorting.
+  - Integrates with `TableStateManager` to provide state roles to delegates.
 
 - **FilterModel** (`filter_model.py`):
-  - Implements Qt's QSortFilterProxyModel
-  - Provides sorting and filtering capabilities
-  - Manages column visibility and custom sorting logic
+  - Implements `QSortFilterProxyModel` for standard filtering/sorting.
 
 #### Views
 
 - **DataTableView** (`data_table_view.py`):
-  - Main table view component extending QTableView
-  - Handles mouse/keyboard interaction
-  - Manages selection behavior and context menu integration
-  - Connects with delegates for cell rendering
-
-- **HeaderView** (`header_view.py`):
-  - Custom header implementation extending QHeaderView
-  - Provides enhanced column operations
-  - Supports drag-and-drop column reordering
-  - Includes column-specific context menu
+  - Main table view component extending `QTableView`.
+  - Connects with delegates for cell rendering.
 
 #### Delegates
 
-- **CellDelegate** (`cell_delegate.py`):
-  - Base delegate for all cell rendering extending QStyledItemDelegate
-  - Provides common rendering functionality
-  - Handles editor creation and data committal
-
-- **ValidationDelegate** (`validation_delegate.py`):
-  - Visualizes validation status (valid, invalid, correctable)
-  - Renders status indicators and background colors
-  - Provides tooltips with validation information
-
-- **CorrectionDelegate** (`correction_delegate.py`):
-  - Visualizes correction options
-  - Provides UI for applying corrections
-  - Renders correction indicators and dropdown controls
-
-#### Menus
-
-- **ContextMenu** (`context_menu.py`):
-  - Dynamic context menu with selection-aware content
-  - Supports standard and specialized actions
-  - Integrates with validation and correction workflows
+- **ValidationDelegate**, **CorrectionDelegate**, etc.:
+  - Visualize state based on data roles provided by `DataViewModel`.
 
 #### Adapters
 
-- **ValidationAdapter** (`validation_adapter.py`):
-  - Connects ValidationService to the UI layer
-  - Transforms validation results for UI consumption
-  - Manages validation state updates
-
-- **CorrectionAdapter** (`correction_adapter.py`):
-  - Connects CorrectionService to the UI layer
-  - Manages correction application and state tracking
-  - Provides UI-friendly correction suggestions
+- **ValidationAdapter**, **CorrectionAdapter**:
+  - Connect Services (`ValidationService`, `CorrectionService`) to `TableStateManager`.
 
 ### Technical Implementation Details
 
-#### Data Flow
-The data flow in the refactored DataView follows this pattern:
-
-1. **Data Source** → **DataViewModel** → **FilterModel** → **DataTableView**
-2. **ValidationService** → **ValidationAdapter** → **ValidationStates** → **ValidationDelegate**
-3. **CorrectionService** → **CorrectionAdapter** → **CorrectionStates** → **CorrectionDelegate**
-4. **User Interaction** → **ContextMenu** → **Actions** → **Services**
+#### Data Flow (Intended Refactored Flow)
+1.  **Data Source** (`ChestDataModel`) → **DataViewModel** → **FilterModel** → **DataTableView**
+2.  **Service** (`ValidationService`) → **Adapter** (`ValidationAdapter`) → **StateManager** (`TableStateManager`) → **DataViewModel** (`dataChanged` signal) → **Delegate** (`ValidationDelegate` painting based on role)
+3.  (Similar flow for Correction)
+4.  **User Interaction** → **View** (`DataTableView` emitting higher-level signals) → **Controller** → **Service**
 
 #### Qt Model Roles
 Custom data roles are defined for specialized data access:
@@ -159,6 +106,7 @@ Several techniques are used to optimize performance:
 3. **Cached State**: Cache validation and correction states
 4. **Background Processing**: Process validation in background threads
 5. **Chunked Updates**: Update UI in chunks to maintain responsiveness
+- **Chunked Updates Note (Updated: 2024-08-08):** Code review suggested using `QTimer.singleShot(0, ...)` instead of `QApplication.processEvents()` for chunked processing to better manage the event loop. This should be considered if optimizing the old view or implementing chunking in the new one.
 
 ### Testing Strategy
 The DataView refactoring includes a comprehensive testing strategy:
@@ -306,7 +254,7 @@ The project follows a clear, modular structure with these key directories:
 
 10. **Testing Approach**: Adopted a comprehensive testing strategy with unit, integration, and end-to-end tests.
 
-11. **Chunked Processing**: Implemented a chunked processing approach for UI-intensive operations to maintain responsiveness. This technique breaks large operations (like table population) into smaller chunks of work (200 rows at a time) and yields control back to the Qt event loop between processing chunks using QTimer.singleShot(). This prevents UI freezing during heavy operations while providing opportunities for progress feedback.
+11. **Chunked Processing (Updated: 2024-08-08):** While the old view uses `processEvents`, the recommended approach for future/refactored chunking is `QTimer.singleShot`.
 
 ## Technical Implementation Challenges and Solutions
 

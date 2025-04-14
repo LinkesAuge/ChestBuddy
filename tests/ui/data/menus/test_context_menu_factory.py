@@ -20,11 +20,13 @@ from chestbuddy.ui.data.models.data_view_model import DataViewModel
 class MockModel:
     """Mock DataViewModel for testing."""
 
-    def __init__(self, is_editable=True, validation_state=None):
+    def __init__(self, is_editable=True, validation_state=None, cell_data_types=None):
         self._is_editable = is_editable
         self._validation_state = validation_state
-        # Simple data store
+        # Simple data store - can be overridden by cell_data_types
         self._data = {(r, c): f"Data({r},{c})" for r in range(2) for c in range(2)}
+        # Store specific data/types for cells if provided
+        self._cell_data = cell_data_types if cell_data_types else {}
 
     def index(self, row, col, parent=QModelIndex()):
         # Return a valid MagicMock for QModelIndex
@@ -34,14 +36,30 @@ class MockModel:
         mock_index.isValid.return_value = True  # Ensure it's valid
         # Add mock parent() if needed, returning QModelIndex() for top-level
         mock_index.parent.return_value = QModelIndex()
+        # --- FIX: Make mock index call the real model's data method --- #
+        mock_index.data.side_effect = lambda role: self.data(mock_index, role)
+        # ------------------------------------------------------------ #
         return mock_index
 
     def data(self, index, role):
         if not index or not index.isValid():
             return None
+
+        # Check if specific data/type is set for this cell
+        cell_key = (index.row(), index.column())
+        if cell_key in self._cell_data:
+            specific_data = self._cell_data[cell_key]
+            # Return specific data for EditRole or DisplayRole if requested
+            if role in [Qt.EditRole, Qt.DisplayRole]:
+                return specific_data
+            # Fall through for other roles if needed, or return None
+
+        # Default role handling
         if role == DataViewModel.ValidationStateRole:
             return self._validation_state
-        return f"Data({index.row()},{index.column()})"  # Return something for data role
+        if role in [Qt.EditRole, Qt.DisplayRole]:  # Default data if not overridden
+            return self._data.get(cell_key, f"Default({index.row()},{index.column()})")
+        return None  # Default for other roles
 
     def flags(self, index):
         flags = Qt.ItemIsEnabled | Qt.ItemIsSelectable
@@ -285,3 +303,146 @@ class TestContextMenuFactory:
         assert "apply_correction" in actions_map
         assert actions_map["apply_correction"].isEnabled()
         assert "view_error" not in actions_map
+
+    def test_menu_numeric_cell(self, mock_qwidget, mock_table_state_manager):
+        """Test menu includes numeric placeholder action for numeric cell."""
+        numeric_data = {(0, 1): 123.45}  # Cell (0,1) has a float
+        mock_model_numeric = MockModel(cell_data_types=numeric_data)
+        index = mock_model_numeric.index(0, 1)
+        info = ActionContext(
+            clicked_index=index,
+            selection=[index],
+            model=mock_model_numeric,
+            parent_widget=mock_qwidget,
+            state_manager=mock_table_state_manager,
+        )
+        menu, _ = ContextMenuFactory.create_context_menu(info)
+        actions = get_actions_dict(menu)
+
+        # Check for the numeric placeholder action
+        # Find action that starts with "Numeric Options for..."
+        found_numeric_action = None
+        for text, action in actions.items():
+            if text.startswith("Numeric Options for"):
+                found_numeric_action = action
+                break
+
+        assert found_numeric_action is not None, "Numeric placeholder action not found in menu"
+        assert not found_numeric_action.isEnabled()  # Should be disabled placeholder
+
+        # numeric_action_key = "Numeric Options for 'Header 1'..." # Assumes header is 'Header 1'
+        # assert numeric_action_key in actions
+        # assert not actions[numeric_action_key].isEnabled() # Should be disabled placeholder
+        # Check other type placeholders are NOT present
+
+    def test_menu_string_cell(self, mock_qwidget, mock_table_state_manager):
+        """Test menu includes string placeholder action for string cell."""
+        string_data = {(0, 0): "Some Text"}  # Cell (0,0) has a string
+        mock_model_string = MockModel(cell_data_types=string_data)
+        index = mock_model_string.index(0, 0)
+        info = ActionContext(
+            clicked_index=index,
+            selection=[index],
+            model=mock_model_string,
+            parent_widget=mock_qwidget,
+            state_manager=mock_table_state_manager,
+        )
+        menu, _ = ContextMenuFactory.create_context_menu(info)
+        actions = get_actions_dict(menu)
+
+        # Check for the string placeholder action
+        string_action_key = "Text Options for 'Header 0'..."  # Assumes header is 'Header 0'
+        assert string_action_key in actions
+        assert not actions[string_action_key].isEnabled()
+        # Check other type placeholders are NOT present
+        assert "Numeric Options for" not in " ".join(actions.keys())
+        assert "Date Options for" not in " ".join(actions.keys())
+
+    def test_menu_date_column_cell(self, mock_qwidget, mock_table_state_manager):
+        """Test menu includes date placeholder action based on column name."""
+
+        # Mock headerData to return 'DATE' for column 1
+        class MockModelWithDateHeader(MockModel):
+            def headerData(self, section, orientation, role=Qt.DisplayRole):
+                if role == Qt.DisplayRole:
+                    return "DATE" if section == 1 else f"Header {section}"
+                return None
+
+        date_data = {(0, 1): "2024-01-01"}  # Cell (0,1) has string data, but header suggests date
+        mock_model_date = MockModelWithDateHeader(cell_data_types=date_data)
+        index = mock_model_date.index(0, 1)
+        info = ActionContext(
+            clicked_index=index,
+            selection=[index],
+            model=mock_model_date,
+            parent_widget=mock_qwidget,
+            state_manager=mock_table_state_manager,
+        )
+        menu, _ = ContextMenuFactory.create_context_menu(info)
+        actions = get_actions_dict(menu)
+
+        # Check for the date placeholder action
+        date_action_key = "Date Options for 'DATE'..."
+        assert date_action_key in actions
+        assert not actions[date_action_key].isEnabled()
+        # Check other type placeholders are NOT present
+        assert "Numeric Options for" not in " ".join(actions.keys())
+        assert "Text Options for" not in " ".join(actions.keys())
+
+    def test_create_menu_numeric_column_shows_format_action(self, factory_setup):
+        """Test that 'Format Number...' appears for a numeric column."""
+        model, state_manager, index = factory_setup
+        context = ActionContext(
+            clicked_index=index,
+            selection=[index],
+            model=model,
+            state_manager=state_manager,
+            parent_widget=None,
+            column_name="Amount",  # Simulate clicking on a numeric column
+        )
+
+        menu, created_actions = ContextMenuFactory.create_context_menu(context)
+
+        assert "format_number" in created_actions
+        assert "parse_date" not in created_actions
+        # Check other expected/unexpected actions as needed
+        action = created_actions["format_number"]
+        assert action.text() == "Format Number..."
+        assert action.isEnabled()  # Assuming it's enabled by default
+
+    def test_create_menu_date_column_shows_parse_action(self, factory_setup):
+        """Test that 'Parse Date...' appears for a date column."""
+        model, state_manager, index = factory_setup
+        context = ActionContext(
+            clicked_index=index,
+            selection=[index],
+            model=model,
+            state_manager=state_manager,
+            parent_widget=None,
+            column_name="Date",  # Simulate clicking on a date column
+        )
+
+        menu, created_actions = ContextMenuFactory.create_context_menu(context)
+
+        assert "parse_date" in created_actions
+        assert "format_number" not in created_actions
+        action = created_actions["parse_date"]
+        assert action.text() == "Parse Date..."
+        assert action.isEnabled()
+
+    def test_create_menu_other_column_hides_type_specific_actions(self, factory_setup):
+        """Test that type-specific actions don't appear for other columns."""
+        model, state_manager, index = factory_setup
+        context = ActionContext(
+            clicked_index=index,
+            selection=[index],
+            model=model,
+            state_manager=state_manager,
+            parent_widget=None,
+            column_name="PlayerName",  # Simulate clicking on a generic text column
+        )
+
+        menu, created_actions = ContextMenuFactory.create_context_menu(context)
+
+        assert "parse_date" not in created_actions
+        assert "format_number" not in created_actions

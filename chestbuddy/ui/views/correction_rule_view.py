@@ -5,10 +5,11 @@ This module implements the main UI view for managing correction rules in the Che
 It provides a UI for viewing, filtering, and managing correction rules.
 """
 
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple, Callable
 import logging
 
-from PySide6.QtCore import Qt, Signal, Slot
+from PySide6.QtCore import Qt, Signal, Slot, QPoint
+from PySide6.QtGui import QAction, QIcon
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -28,17 +29,25 @@ from PySide6.QtWidgets import (
     QStatusBar,
     QApplication,
     QMenu,
+    QFrame,
+    QSizePolicy,
 )
 
-from chestbuddy.core.controllers.correction_controller import CorrectionController
+from chestbuddy.core.controllers import CorrectionController
 from chestbuddy.core.models.correction_rule import CorrectionRule
-from chestbuddy.ui.dialogs.add_edit_rule_dialog import AddEditRuleDialog
+from chestbuddy.ui.dialogs import AddEditRuleDialog
 from chestbuddy.ui.dialogs.batch_correction_dialog import BatchCorrectionDialog
 from chestbuddy.ui.dialogs.import_export_dialog import ImportExportDialog
 from chestbuddy.ui.models.correction_rule_table_model import CorrectionRuleTableModel
+from chestbuddy.ui.utils import IconProvider
+from chestbuddy.utils.config import ConfigManager
+from chestbuddy.ui.views.base_view import BaseView
+
+# Set up logger
+logger = logging.getLogger(__name__)
 
 
-class CorrectionRuleView(QWidget):
+class CorrectionRuleView(BaseView):
     """
     Widget that displays and manages correction rules.
 
@@ -51,6 +60,7 @@ class CorrectionRuleView(QWidget):
         rule_added (CorrectionRule): Signal emitted when a new rule is added.
         rule_edited (CorrectionRule): Signal emitted when a rule is edited.
         rule_deleted (int): Signal emitted when a rule is deleted, with the rule ID.
+        preview_rule_requested (CorrectionRule): Signal emitted when a rule is requested for preview.
     """
 
     # Signals for view-controller communication
@@ -58,6 +68,7 @@ class CorrectionRuleView(QWidget):
     rule_added = Signal(object)
     rule_edited = Signal(object)
     rule_deleted = Signal(int)
+    preview_rule_requested = Signal(CorrectionRule)
 
     def __init__(self, controller, parent=None):
         """
@@ -327,49 +338,104 @@ class CorrectionRuleView(QWidget):
         search = self._current_filter["search"]
 
         # Get the rules from the controller with filter parameters
+        # We need the full unfiltered list first to get correct original indices
+        all_rules = self._controller.get_rules()
+        rule_to_index = {rule: idx for idx, rule in enumerate(all_rules)}
+
         filtered_rules = self._controller.get_rules(
             category=category, status=status, search_term=search
         )
 
-        # Get all rules for index mapping
-        all_rules = self._controller.get_rules()
-
-        # Create a mapping from rule to full index
-        rule_to_index = {}
-        for idx, rule in enumerate(all_rules):
-            # Create a unique key for the rule
-            key = (rule.from_value, rule.to_value, rule.category)
-            rule_to_index[key] = idx
-
-        # Clear table
+        # Clear table but preserve headers
         self._rule_table.setRowCount(0)
+        self._rule_table.setColumnCount(4)  # Ensure columns are set
+        headers = ["From", "To", "Category", "Status"]
+        self._rule_table.setHorizontalHeaderLabels(headers)
 
         # Populate table
         for i, rule in enumerate(filtered_rules):
             row = self._rule_table.rowCount()
             self._rule_table.insertRow(row)
 
-            # Add items in the order of the headers
-            self._rule_table.setItem(row, 0, QTableWidgetItem(rule.from_value))
-            self._rule_table.setItem(row, 1, QTableWidgetItem(rule.to_value))
-            self._rule_table.setItem(row, 2, QTableWidgetItem(rule.category))
-            self._rule_table.setItem(row, 3, QTableWidgetItem(rule.status))
+            # Create items
+            item_from = QTableWidgetItem(rule.from_value)
+            item_to = QTableWidgetItem(rule.to_value)
+            item_category = QTableWidgetItem(rule.category)
+            item_status = QTableWidgetItem(rule.status)
 
-            # Find the rule's index in the full list
-            rule_key = (rule.from_value, rule.to_value, rule.category)
-            full_index = rule_to_index.get(rule_key, i)  # Fall back to filtered index if not found
+            # Find the rule's original index in the full list
+            # We need a reliable way to map the filtered rule back to the original list
+            # Using the rule object itself as key assumes __hash__ and __eq__ are defined correctly
+            original_index = rule_to_index.get(
+                rule, -1
+            )  # Default to -1 if not found (shouldn't happen)
+            if original_index == -1:
+                logger.warning(f"Could not find original index for rule: {rule}")
+                # Fallback: Try matching based on content? This is less reliable.
+                # For now, we'll store -1, _get_selected_rule_id should handle None return.
 
-            # Set row data for identifying the rule (store full list index)
-            for col in range(4):
-                item = self._rule_table.item(row, col)
-                if item:
-                    item.setData(Qt.UserRole, full_index)
+            # Store the original index in UserRole for *each* item in the row
+            item_from.setData(Qt.UserRole, original_index)
+            item_to.setData(Qt.UserRole, original_index)
+            item_category.setData(Qt.UserRole, original_index)
+            item_status.setData(Qt.UserRole, original_index)
+
+            # Add items to the table
+            self._rule_table.setItem(row, 0, item_from)
+            self._rule_table.setItem(row, 1, item_to)
+            self._rule_table.setItem(row, 2, item_category)
+            self._rule_table.setItem(row, 3, item_status)
+
+        # Restore column widths if needed (or set initially)
+        header = self._rule_table.horizontalHeader()
+        if not header.isSortIndicatorShown():  # Avoid resetting size if user sorted
+            header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+            header.setSectionResizeMode(
+                3, QHeaderView.ResizeMode.ResizeToContents
+            )  # Status column size
 
         # Update button states after refreshing
         self._update_button_states()
 
-        # Update status bar with the current rules (avoiding another controller call)
-        self._update_status_bar(filtered_rules)
+        # Update status bar with the count of *all* rules
+        self._update_status_bar(all_rules)
+
+    def _get_selected_rule_id(self) -> Optional[int]:
+        """Get the ID (original index in the full list) of the selected rule."""
+        current_row = self._rule_table.currentRow()  # Use currentRow for single selection
+        if current_row < 0:
+            # Check selectedItems as a fallback, useful if selection mode changes
+            selected_items = self._rule_table.selectedItems()
+            if not selected_items:
+                logger.debug("_get_selected_rule_id: No selection.")
+                return None
+            # Use the row of the first selected item
+            current_row = selected_items[0].row()
+            logger.debug(f"_get_selected_rule_id: Using selectedItems[0].row() = {current_row}")
+        else:
+            logger.debug(f"_get_selected_rule_id: Using currentRow() = {current_row}")
+
+        # Get the item from the *first column* of the selected row
+        id_item = self._rule_table.item(current_row, 0)
+        if not id_item:
+            logger.warning(f"_get_selected_rule_id: No item found at row {current_row}, col 0.")
+            return None
+
+        id_data = id_item.data(Qt.UserRole)
+        logger.debug(
+            f"_get_selected_rule_id: Data from item({current_row}, 0) UserRole: {id_data} (Type: {type(id_data)})"
+        )
+
+        if id_data is not None and isinstance(id_data, int) and id_data >= 0:
+            try:
+                return int(id_data)
+            except (ValueError, TypeError) as e:
+                logger.error(f"Could not convert rule ID from item data: {id_data}. Error: {e}")
+                return None
+        logger.warning(
+            f"Selected item ({current_row}, 0) does not contain valid rule ID in UserRole data. Data: {id_data}"
+        )
+        return None
 
     def _update_categories_filter(self):
         """Update the category filter with available categories."""
@@ -427,16 +493,6 @@ class CorrectionRuleView(QWidget):
         self._move_down_button.setEnabled(has_selection)
         self._move_top_button.setEnabled(has_selection)
         self._move_bottom_button.setEnabled(has_selection)
-
-    def _get_selected_rule_id(self):
-        """Get the ID of the selected rule, or None if no rule is selected."""
-        selected_rows = self._rule_table.selectedItems()
-        if not selected_rows:
-            return None
-
-        # Get the first selected item and extract the rule ID from user data
-        # This is now the index in the full list, not just the filtered list
-        return selected_rows[0].data(Qt.UserRole)
 
     def _on_filter_changed(self):
         """Handle filter changes."""
@@ -687,50 +743,138 @@ class CorrectionRuleView(QWidget):
                     self._refresh_rule_table()
                     self._update_categories_filter()
 
-    def _show_context_menu(self, position):
-        """Show context menu for rule table."""
-        # Get selected item
-        if not self._rule_table.selectedItems():
-            return
+    def _show_context_menu(self, position: QPoint, menu: Optional[QMenu] = None):
+        """Show context menu for the rule table."""
+        if not menu:
+            menu = QMenu(self)
 
-        # Create menu
-        menu = QMenu()
+        # Step 1: Get the ID of the selected rule
+        selected_rule_id = self._get_selected_rule_id()
+        selected_rule = None
 
-        # Add actions
-        edit_action = menu.addAction("Edit")
-        delete_action = menu.addAction("Delete")
-        menu.addSeparator()
+        # Step 2: If an ID was found, fetch the full rule object from the controller
+        if selected_rule_id is not None:
+            try:
+                selected_rule = self._controller.get_rule(selected_rule_id)
+                if not selected_rule:
+                    logger.warning(
+                        f"Controller returned None for rule ID {selected_rule_id} when building context menu."
+                    )
+            except Exception as e:
+                logger.error(
+                    f"Error calling controller.get_rule({selected_rule_id}) in _show_context_menu: {e}",
+                    exc_info=True,
+                )
+                selected_rule = None  # Ensure rule is None if controller fails
 
-        move_menu = menu.addMenu("Move")
-        move_up_action = move_menu.addAction("Move Up")
-        move_down_action = move_menu.addAction("Move Down")
-        move_top_action = move_menu.addAction("Move to Top")
-        move_bottom_action = move_menu.addAction("Move to Bottom")
+        selected_items = self._rule_table.selectedItems()
+        num_selected_rows = len(set(item.row() for item in selected_items))
 
-        menu.addSeparator()
-        toggle_action = menu.addAction("Enable/Disable")
-        apply_single_action = menu.addAction("Apply This Rule Only")
+        # Step 3: Build the menu based on whether a rule object was successfully fetched
+        if selected_rule:
+            # Actions requiring a valid rule object
+            edit_action = QAction(IconProvider.get_icon("edit"), "Edit Rule", self)
+            edit_action.triggered.connect(self._on_edit_rule)
+            menu.addAction(edit_action)
 
-        # Show menu and handle action
-        action = menu.exec_(self._rule_table.viewport().mapToGlobal(position))
+            delete_action = QAction(IconProvider.get_icon("delete"), "Delete Rule", self)
+            delete_action.triggered.connect(self._on_delete_rule)
+            menu.addAction(delete_action)
 
-        # Connect actions to handlers
-        if action == edit_action:
-            self._on_edit_rule()
-        elif action == delete_action:
-            self._on_delete_rule()
-        elif action == move_up_action:
-            self._on_move_rule_up()
-        elif action == move_down_action:
-            self._on_move_rule_down()
-        elif action == move_top_action:
-            self._on_move_rule_to_top()
-        elif action == move_bottom_action:
-            self._on_move_rule_to_bottom()
-        elif action == toggle_action:
-            self._on_toggle_status()
-        elif action == apply_single_action:
-            self._on_apply_single_rule()
+            toggle_action = QAction(
+                IconProvider.get_icon(
+                    "toggle_on" if selected_rule.status == "disabled" else "toggle_off"
+                ),
+                f"Toggle Status (currently {selected_rule.status})",
+                self,
+            )
+            toggle_action.triggered.connect(self._on_toggle_status)
+            menu.addAction(toggle_action)
+
+            menu.addSeparator()
+
+            # Preview Action - enabled only if exactly one row is selected
+            preview_action = QAction(
+                IconProvider.get_icon("preview", fallback="system-search"), "Preview Rule", self
+            )
+            preview_action.setEnabled(num_selected_rows == 1)
+            preview_action.triggered.connect(self._on_preview_rule)
+            menu.addAction(preview_action)
+
+            # Move actions - only relevant if there's more than one rule total
+            if self._rule_table.rowCount() > 1:
+                menu.addSeparator()
+                move_top_action = QAction(
+                    IconProvider.get_icon("move_top", fallback="go-top"), "Move to Top", self
+                )
+                move_top_action.setEnabled(selected_rule_id > 0)  # Can't move top if already at top
+                move_top_action.triggered.connect(self._on_move_rule_to_top)
+                menu.addAction(move_top_action)
+
+                move_up_action = QAction(
+                    IconProvider.get_icon("arrow_up", fallback="go-up"), "Move Up", self
+                )
+                move_up_action.setEnabled(selected_rule_id > 0)  # Can't move up if already at top
+                move_up_action.triggered.connect(self._on_move_rule_up)
+                menu.addAction(move_up_action)
+
+                move_down_action = QAction(
+                    IconProvider.get_icon("arrow_down", fallback="go-down"), "Move Down", self
+                )
+                move_down_action.setEnabled(
+                    selected_rule_id < self._controller.get_rule_count() - 1
+                )  # Can't move down if already at bottom
+                move_down_action.triggered.connect(self._on_move_rule_down)
+                menu.addAction(move_down_action)
+
+                move_bottom_action = QAction(
+                    IconProvider.get_icon("move_bottom", fallback="go-bottom"),
+                    "Move to Bottom",
+                    self,
+                )
+                move_bottom_action.setEnabled(
+                    selected_rule_id < self._controller.get_rule_count() - 1
+                )  # Can't move bottom if already at bottom
+                move_bottom_action.triggered.connect(self._on_move_rule_to_bottom)
+                menu.addAction(move_bottom_action)
+
+        # Always show the menu if any actions were added
+        if menu.actions():
+            # Ensure the position is valid within the viewport
+            viewport_pos = self._rule_table.viewport().mapFromGlobal(position)
+            menu.exec(self._rule_table.viewport().mapToGlobal(viewport_pos))
+        else:
+            logger.debug("Context menu not shown because no actions were applicable.")
+
+    @Slot()
+    def _on_preview_rule(self):
+        """Handle the Preview Rule action trigger."""
+        logger.debug(f"_on_preview_rule called. Controller instance: {id(self._controller)}")
+        # Correctly get the selected rule ID first
+        selected_rule_id = self._get_selected_rule_id()
+        logger.debug(f"_on_preview_rule: Got selected ID: {selected_rule_id}")
+        selected_rule = None
+        if selected_rule_id is not None:
+            # Use the controller to get the rule object by ID
+            try:
+                selected_rule = self._controller.get_rule(selected_rule_id)
+                logger.debug(
+                    f"_on_preview_rule: Controller get_rule({selected_rule_id}) returned: {repr(selected_rule)}"
+                )
+            except Exception as e:
+                logger.error(
+                    f"Error calling controller.get_rule({selected_rule_id}): {e}", exc_info=True
+                )
+                selected_rule = None
+
+        if selected_rule:
+            # Log the actual rule details for clarity
+            logger.info(f"Preview requested via context menu for rule: {repr(selected_rule)}")
+            self.preview_rule_requested.emit(selected_rule)
+        else:
+            logger.warning(
+                f"Preview rule action triggered but no rule selected or found (ID: {selected_rule_id})."
+            )
 
     def _on_apply_single_rule(self):
         """Apply a single selected rule."""

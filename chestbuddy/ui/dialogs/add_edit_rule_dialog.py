@@ -214,7 +214,7 @@ class AddEditRuleDialog(QDialog):
             self._category_combo.setCurrentText(self._rule.category)
 
         # Set order
-        self._order.setValue(self._rule.order)
+        # self._order.setValue(self._rule.order) # Order is managed by the RuleManager, not the rule itself
 
         # Set status
         self.set_status(self._rule.status)

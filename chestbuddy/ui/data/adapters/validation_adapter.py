@@ -8,6 +8,7 @@ from PySide6.QtCore import QObject, Slot
 import pandas as pd
 import typing
 import logging
+import dataclasses
 
 # Updated import
 from chestbuddy.core.services import ValidationService
@@ -50,26 +51,24 @@ class ValidationAdapter(QObject):
 
     def _connect_signals(self):
         """Connect signals from the ValidationService."""
-        # Assuming ValidationService has a 'validation_changed' signal
+        # Assuming ValidationService has a 'validation_complete' signal
         # that emits validation results (e.g., a DataFrame)
         try:
             # Connect to the correct signal name
-            self._validation_service.validation_changed.connect(self._on_validation_complete)
-            print("Successfully connected validation_changed signal.")  # Debug print
+            self._validation_service.validation_complete.connect(self._on_validation_complete)
         except AttributeError:
-            print(
-                f"Error: ValidationService object has no signal 'validation_changed'"
-            )  # Debug print
-            # Handle error or log appropriately
+            logger.error(
+                f"Error connecting signal: ValidationService object has no signal 'validation_complete'"
+            )
         except Exception as e:
-            print(f"Error connecting validation_changed signal: {e}")  # Debug print
+            logger.error(f"Error connecting validation_complete signal: {e}")
 
     @Slot(object)
     def _on_validation_complete(self, validation_results: pd.DataFrame) -> None:
         """
-        Slot to handle the validation_changed signal from ValidationService.
+        Slot to handle the validation_complete signal from ValidationService.
 
-        Processes the validation results DataFrame and updates the TableStateManager.
+        Processes the validation results DataFrame (status_df) and updates the TableStateManager.
         """
         if not isinstance(validation_results, pd.DataFrame):
             logger.error(
@@ -78,14 +77,13 @@ class ValidationAdapter(QObject):
             )
             return
 
-        logger.info(f"ValidationAdapter received validation_changed: {type(validation_results)}")
+        status_df = validation_results
+        logger.info(f"ValidationAdapter received validation_complete: Rows={len(status_df)}")
 
         try:
-            logger.debug(
-                "Incoming validation_results DataFrame:\n%s", validation_results.to_string()
-            )
+            logger.debug("Incoming validation status DataFrame:\n%s", status_df.to_string())
 
-            # Ensure headers map is available
+            # Ensure headers map is available from the state manager
             self._headers_map = self._table_state_manager.headers_map
             if not self._headers_map:
                 logger.warning(
@@ -94,141 +92,85 @@ class ValidationAdapter(QObject):
                 )
                 return
 
-            new_states = {}  # Initialize here
-            initial_new_states_count = len(new_states)  # Now safe to access
-            logger.debug(f"Initial new_states count: {initial_new_states_count}")
+            new_states: typing.Dict[typing.Tuple[int, int], CellFullState] = {}
 
-            # Iterate through validation results (rows = data rows, columns = validation details)
-            for row_idx, row_data in validation_results.iterrows():
-                # Iterate through columns involved in validation (e.g., 'PLAYER_valid', 'PLAYER_status', etc.)
-                # We need to group status and message by the original column name
-                original_columns = set(self._headers_map.keys())  # Get actual data column names
-
-                for base_col_name in original_columns:
+            # Iterate through the rows (index) of the status DataFrame
+            for row_idx in status_df.index:
+                # Iterate through the original data columns using the headers map
+                for base_col_name, col_idx in self._headers_map.items():
                     status_col = f"{base_col_name}_status"
                     message_col = f"{base_col_name}_message"
-                    valid_col = (
-                        f"{base_col_name}_valid"  # Optional, for simple valid/invalid checks
-                    )
 
-                    if status_col in row_data.index and message_col in row_data.index:
-                        status_value = row_data[status_col]
-                        message_value = row_data[message_col]
+                    # Check if status and message columns exist for this base column
+                    if status_col in status_df.columns and message_col in status_df.columns:
+                        status_value = status_df.at[row_idx, status_col]
+                        message_value = status_df.at[row_idx, message_col]
 
-                        # Map DataFrame status (e.g., ValidationStatus.INVALID) to CellState
-                        try:
-                            # Attempt direct mapping if ValidationStatus enum is used
-                            if isinstance(status_value, ValidationStatus):
-                                cell_state_status = CellState(status_value.value)  # Map enum value
-                            elif isinstance(status_value, CellState):
-                                cell_state_status = status_value  # Already CellState
-                            elif (
-                                isinstance(status_value, str)
-                                and status_value in CellState.__members__
-                            ):
-                                # Handle string representation if needed
-                                cell_state_status = CellState[status_value]
-                            elif pd.isna(status_value):
-                                # If status is NaN/None, assume NOT_VALIDATED or derive from context
-                                cell_state_status = CellState.NOT_VALIDATED  # Default assumption
-                                # Check if _valid column indicates VALID
-                                if valid_col in row_data.index and row_data[valid_col] is True:
-                                    cell_state_status = CellState.VALID
-                            else:
-                                # Fallback or error for unexpected status types
-                                logger.warning(
-                                    f"Unexpected status type for {base_col_name} at row {row_idx}: {type(status_value)}, value: {status_value}. Setting to NOT_VALIDATED."
-                                )
-                                cell_state_status = CellState.NOT_VALIDATED
-
-                        except (ValueError, KeyError) as e:
-                            logger.error(
-                                f"Error mapping validation status '{status_value}' to CellState for {base_col_name} at row {row_idx}: {e}"
+                        # --- Map ValidationStatus to CellState ---
+                        cell_state_status = CellState.NORMAL  # Default state is NORMAL
+                        if isinstance(status_value, ValidationStatus):
+                            if status_value == ValidationStatus.VALID:
+                                cell_state_status = CellState.VALID
+                            elif status_value == ValidationStatus.INVALID:
+                                cell_state_status = CellState.INVALID
+                            elif status_value == ValidationStatus.CORRECTABLE:
+                                cell_state_status = CellState.CORRECTABLE
+                            elif status_value == ValidationStatus.NOT_VALIDATED:
+                                cell_state_status = CellState.NORMAL
+                            elif status_value == ValidationStatus.INVALID_ROW:
+                                cell_state_status = CellState.INVALID
+                        elif not pd.isna(status_value):
+                            # Handle cases where status might be non-enum but not NaN (e.g., old format?)
+                            logger.warning(
+                                f"Unexpected status type {type(status_value)} for {base_col_name} at row {row_idx}. Value: {status_value}. Setting to NORMAL."
                             )
-                            cell_state_status = CellState.NOT_VALIDATED  # Default on error
+                            cell_state_status = CellState.NORMAL
+                        # --- End Mapping ---
 
                         error_details = str(message_value) if pd.notna(message_value) else ""
 
-                        # Get the corresponding column index in the data model
-                        if base_col_name in self._headers_map:
-                            col_idx = self._headers_map[base_col_name]
+                        # --- Create Full State, Preserving Suggestions --- #
+                        # Get current state ONLY to retrieve existing suggestions
+                        current_state = self._table_state_manager.get_full_cell_state(
+                            row_idx, col_idx
+                        )
+                        existing_suggestions = (
+                            current_state.correction_suggestions if current_state else []
+                        )
 
-                            # Get current state to compare
-                            current_full_state = self._table_state_manager.get_full_cell_state(
-                                row_idx, col_idx
-                            )
-
-                            # --- Start Debug Logging for specific cell (1, 2) ---
-                            # if row_idx == 1 and col_idx == 2: # Example: Check cell (1, 'SOURCE')
-                            #    logger.debug(f"[Debug Cell (1, 2)] Incoming Status: {cell_state_status}, Msg: '{error_details}'")
-                            #    logger.debug(f"[Debug Cell (1, 2)] Current Full State: {current_full_state}")
-                            # --- End Debug Logging ---
-
-                            # Determine if an update is needed
-                            needs_update = False
-                            partial_update = {}
-
-                            if current_full_state.validation_status != cell_state_status:
-                                needs_update = True
-                                partial_update["validation_status"] = cell_state_status
-                            # Only update error_details if the status indicates an error state
-                            # and the message is different or wasn't set previously.
-                            # Don't overwrite existing details if the new status is VALID/NOT_VALIDATED
-                            # unless the new message is explicitly empty for a valid state.
-                            if cell_state_status in [CellState.INVALID, CellState.CORRECTABLE]:
-                                if current_full_state.error_details != error_details:
-                                    needs_update = True
-                                    partial_update["error_details"] = error_details
-                            elif (
-                                cell_state_status == CellState.VALID
-                                and current_full_state.error_details
-                            ):
-                                # Clear error message if state becomes valid
-                                needs_update = True
-                                partial_update["error_details"] = ""  # Clear message
-
-                            # --- Start Debug Logging for specific cell (1, 2) ---
-                            # if row_idx == 1 and col_idx == 2:
-                            #     logger.debug(f"[Debug Cell (1, 2)] Needs Update: {needs_update}")
-                            #     logger.debug(f"[Debug Cell (1, 2)] Partial Update: {partial_update}")
-                            # --- End Debug Logging ---
-
-                            if needs_update:
-                                # If starting from default, create full state, otherwise update existing
-                                # We use partial_update to merge into the existing state or a default one
-                                merged_state_dict = current_full_state._asdict()
-                                merged_state_dict.update(partial_update)
-                                # Crucially, preserve existing correction suggestions unless overwritten
-                                # (Validation typically doesn't generate suggestions, so preserve)
-                                if "correction_suggestions" not in partial_update:
-                                    merged_state_dict["correction_suggestions"] = (
-                                        current_full_state.correction_suggestions
-                                    )
-
-                                new_cell_state = CellFullState(**merged_state_dict)
-
-                                new_states[(row_idx, col_idx)] = new_cell_state
-                                # --- Start Debug Logging for specific cell (1, 2) ---
-                                # if row_idx == 1 and col_idx == 2:
-                                #     logger.debug(f"[Debug Cell (1, 2)] Added to new_states: {new_cell_state}")
-                                # --- End Debug Logging ---
-
-                        else:
-                            logger.warning(f"Column '{base_col_name}' not found in headers map.")
+                        # Create the new full state based ONLY on validation results + existing suggestions
+                        new_cell_state = CellFullState(
+                            validation_status=cell_state_status,
+                            error_details=error_details,
+                            correction_suggestions=existing_suggestions,  # Preserve suggestions
+                        )
+                        new_states[(row_idx, col_idx)] = new_cell_state
+                        # --- End State Creation ---
 
             final_new_states_count = len(new_states)
             logger.debug(
-                f"Processed validation results. Initial states: {initial_new_states_count}, Final states to update: {final_new_states_count}"
+                f"Processed validation results. Final states to update: {final_new_states_count}"
             )
 
-            # Update the TableStateManager only if there are changes
+            # Update the TableStateManager with ALL processed states
+            # Let the state manager determine actual changes and emit signals
             if new_states:
+                logger.info(
+                    f"---> ValidationAdapter: Calling update_states with {len(new_states)} states."
+                )  # DEBUG
+                # DEBUG: Log a sample state
+                if new_states:
+                    sample_key = next(iter(new_states))
+                    logger.debug(
+                        f"---> ValidationAdapter: Sample state for {sample_key}: {new_states[sample_key]}"
+                    )
+                # --- END DEBUG ---
                 self._table_state_manager.update_states(new_states)
                 logger.info(
-                    f"Updated TableStateManager with {len(new_states)} validation state changes."
-                )
+                    f"<--- ValidationAdapter: update_states call finished. Sent {len(new_states)} states to TableStateManager."
+                )  # DEBUG
             else:
-                logger.info("No validation state changes detected after processing results.")
+                logger.info("No validation states generated to send to TableStateManager.")
 
         except Exception as e:
             logger.error(
@@ -239,13 +181,14 @@ class ValidationAdapter(QObject):
         """Disconnect signals to prevent issues during cleanup."""
         try:
             # Disconnect from the correct signal name
-            self._validation_service.validation_changed.disconnect(self._on_validation_complete)
-            print("Successfully disconnected validation_changed signal.")  # Debug print
+            self._validation_service.validation_complete.disconnect(self._on_validation_complete)
         except RuntimeError:
-            print("Signal already disconnected or connection failed initially.")  # Debug print
+            # Signal already disconnected or connection failed initially.
+            logger.debug("Signal validation_complete already disconnected or connection failed.")
         except AttributeError:
-            print(
-                f"Error disconnecting: ValidationService object has no signal 'validation_changed'"
-            )  # Debug print
+            # Error disconnecting: ValidationService object has no signal 'validation_complete'
+            logger.error(
+                "Error disconnecting: ValidationService has no signal 'validation_complete'"
+            )
         except Exception as e:
-            print(f"Error disconnecting validation_changed signal: {e}")  # Debug print
+            logger.error(f"Error disconnecting validation_complete signal: {e}")

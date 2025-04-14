@@ -33,7 +33,7 @@ class ValidationService(QObject):
 
     Signals:
         validation_preferences_changed (Signal): Emitted when validation preferences change
-        validation_changed (Signal): Emitted when validation status changes with the status DataFrame
+        validation_complete (Signal): Emitted when validation status changes with the status DataFrame
         status_message_changed (Signal): Emitted when a general status update message changes
 
     Implementation Notes:
@@ -45,7 +45,9 @@ class ValidationService(QObject):
 
     # Define signals
     validation_preferences_changed = Signal(dict)  # Dict of preferences
-    validation_changed = Signal(object)  # Validation status DataFrame
+    validation_complete = Signal(
+        object
+    )  # Validation status DataFrame, Renamed from validation_changed
     status_message_changed = Signal(str)  # For general status updates
 
     # Define column names for validation
@@ -1069,13 +1071,13 @@ class ValidationService(QObject):
 
             # Emit the signal with the final status DataFrame
             logger.info(
-                f"ValidationService emitting validation_changed with status_df:\n{status_df}"
+                f"ValidationService emitting validation_complete with status_df:\n{status_df}"
             )
             try:
-                self.validation_changed.emit(status_df)
-                logger.info("ValidationService validation_changed signal emitted successfully.")
+                self.validation_complete.emit(status_df)
+                logger.info("ValidationService validation_complete signal emitted successfully.")
             except Exception as e:
-                logger.error(f"Error emitting validation_changed signal: {e}")
+                logger.error(f"Error emitting validation_complete signal: {e}")
 
         except Exception as e:
             logger.error(f"Error updating validation status: {e}")
@@ -1137,10 +1139,10 @@ class ValidationService(QObject):
         data_df = self._data_model.data
         status_df = pd.DataFrame(index=data_df.index)
 
-        # Add validation status columns for each data column
+        # Add validation status columns for each data column, defaulting to NOT_VALIDATED
         for col in data_df.columns:
-            status_df[f"{col}_valid"] = True
-            status_df[f"{col}_status"] = ValidationStatus.VALID
+            status_df[f"{col}_valid"] = False  # Default to False (reflecting NOT_VALIDATED)
+            status_df[f"{col}_status"] = ValidationStatus.NOT_VALIDATED
             status_df[f"{col}_message"] = ""
 
         return status_df
@@ -1184,7 +1186,7 @@ class ValidationService(QObject):
         self._data_model.set_validation_status(status_df)
 
         # Emit the validation changed signal
-        self.validation_changed.emit(status_df)
+        self.validation_complete.emit(status_df)
 
         logger.info(f"Updated validation status with {len(correctable_cells)} correctable cells")
 
@@ -1472,3 +1474,34 @@ class ValidationService(QObject):
                 self._auto_save = config_value
 
         return self._auto_save
+
+    def validate_single_entry(self, column_name: str, value: str) -> Tuple[ValidationStatus, str]:
+        """
+        Validate a single value against the appropriate validation list.
+
+        Args:
+            column_name: The name of the column (determines which list to use).
+            value: The value to validate.
+
+        Returns:
+            A tuple containing the ValidationStatus and a message (empty if valid).
+        """
+        logger.debug(f"Validating single entry for column '{column_name}', value: '{value}'")
+        list_model = self._get_validation_list_model(column_name)
+
+        if list_model is None:
+            logger.warning(f"No validation list model found for column: {column_name}")
+            # If no list exists for the column, treat as valid or handle as per requirements
+            return ValidationStatus.VALID, ""
+
+        try:
+            status, message = list_model.validate(value, column_name)
+            logger.debug(f"Validation result: Status={status}, Message='{message}'")
+            return status, message
+        except Exception as e:
+            logger.error(f"Error during single entry validation for column {column_name}: {e}")
+            # Return INVALID status in case of error during validation
+            return ValidationStatus.INVALID, f"Error during validation: {e}"
+
+    def set_correction_service(self, correction_service: "CorrectionService") -> None:
+        """Set the correction service instance."""

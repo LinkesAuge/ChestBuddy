@@ -12,10 +12,13 @@ import logging
 import hashlib
 from typing import Dict, List, Any, Optional, Tuple, Callable
 from PySide6.QtCore import Signal, QObject, QThread, Slot, QModelIndex
+from PySide6.QtWidgets import QMessageBox
 
 from chestbuddy.core.controllers.base_controller import BaseController
 from chestbuddy.core.models.correction_rule import CorrectionRule
 from chestbuddy.utils.background_processing import BackgroundWorker
+from chestbuddy.core.services import CorrectionService, ValidationService
+from chestbuddy.ui.dialogs import CorrectionPreviewDialog
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -1043,3 +1046,60 @@ class CorrectionController(BaseController):
         except Exception as e:
             logger.error(f"Error applying correction: {e}")
             self.correction_error.emit(f"Failed to apply correction: {e}")
+
+    def connect_view(self, view: "CorrectionRuleView"):
+        """Connect signals from the CorrectionRuleView."""
+        self._view = view
+        # Connect existing signals
+        view.apply_corrections_requested.connect(self._on_apply_corrections_requested)
+        view.rule_added.connect(self._on_rule_added)
+        view.rule_edited.connect(self._on_rule_edited)
+        view.rule_deleted.connect(self._on_rule_deleted)
+
+        # Connect NEW preview signal
+        if hasattr(view, "preview_rule_requested"):
+            view.preview_rule_requested.connect(self._on_preview_rule_requested)
+        else:
+            log = getattr(self, "_logger", logger)
+            log.warning("CorrectionRuleView does not have preview_rule_requested signal.")
+
+        # ... (other connections like filter changes, etc.) ...
+
+    @Slot(CorrectionRule)
+    def _on_preview_rule_requested(self, rule: CorrectionRule):
+        """Handle request to preview a specific correction rule."""
+        log = getattr(self, "_logger", logger)
+
+        if not rule:
+            log.warning("Preview requested for invalid rule.")
+            return
+
+        log.info(
+            f"Preview requested for rule ID: {rule.id} ('{rule.from_value}' -> '{rule.to_value}')"
+        )
+
+        try:
+            # Assuming get_correction_preview returns List[Tuple[int, str, Any, Any]]
+            preview_data = self._correction_service.get_correction_preview(rule)
+            log.debug(f"Preview generated {len(preview_data)} potential changes.")
+
+            if not preview_data:
+                msg_box = QMessageBox(self._view)
+                msg_box.setIcon(QMessageBox.Icon.Information)
+                msg_box.setWindowTitle("Rule Preview")
+                msg_box.setText("This rule currently does not affect any data.")
+                msg_box.exec()
+                return
+
+            # --- Show Preview Dialog ---
+            log.info("Showing Correction Preview Dialog.")
+            preview_dialog = CorrectionPreviewDialog(preview_data, self._view)
+            preview_dialog.exec()
+
+        except Exception as e:
+            log.error(f"Error generating correction preview for rule {rule.id}: {e}", exc_info=True)
+            error_box = QMessageBox(self._view)
+            error_box.setIcon(QMessageBox.Icon.Critical)
+            error_box.setWindowTitle("Preview Error")
+            error_box.setText(f"Could not generate preview for rule.\nError: {e}")
+            error_box.exec()

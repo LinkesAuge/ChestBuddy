@@ -41,7 +41,7 @@ For a complete overview of the project, see [overview.md](./overview.md).
   - [x] Define UI test strategy [testing/ui_tests.md](./testing/ui_tests.md)
   - [x] Define performance test strategy [testing/performance_tests.md](./testing/performance_tests.md)
 
-## Phase 1: Core DataView Implementation
+## Phase 1: Core DataView Implementation (✅ Completed)
 
 ### Folder Structure and Base Classes
 - [x] Create new folder structure
@@ -82,7 +82,7 @@ For a complete overview of the project, see [overview.md](./overview.md).
   - [x] Add keyboard navigation
   - [x] Add unit tests for UI controls
 
-## Phase 2: Context Menu Implementation
+## Phase 2: Context Menu Implementation (✅ Completed)
 
 ### Core Context Menu Structure
 - [x] Design context menu architecture
@@ -101,7 +101,7 @@ For a complete overview of the project, see [overview.md](./overview.md).
 - [x] Implement selection-aware menu customization
   - [x] Add dynamic menu content based on selection (structure supports)
   - [x] Implement single vs. multi-selection menu variants (structure supports)
-  - [x] Add cell-type specific actions
+  - [ ] Add cell-type specific actions # <-- Still Pending
   - [x] Add unit tests for selection-aware menu
 - [x] Implement correction list integration
   - [x] Add actions for adding to correction list
@@ -111,13 +111,13 @@ For a complete overview of the project, see [overview.md](./overview.md).
 - [x] Implement cell editing
   - [x] Add direct edit action
   - [x] Implement edit dialog for complex edits
-  - [x] Add validation during editing
+  - [ ] Add validation during editing # <-- Still Pending
   - [x] Add unit tests for cell editing
 
-## Phase 3: Validation and Correction Integration
+## Phase 3: Validation and Correction Integration (✅ Completed)
 
 ### Validation Status Display
-- [x] Implement validation status integration (partially - adapters defined)
+- [x] Implement validation status integration
   - [x] Connect to ValidationService
   - [x] Implement status update mechanism (adapter -> state manager -> model)
   - [x] Add visual indicators for validation status (delegate done)
@@ -129,18 +129,25 @@ For a complete overview of the project, see [overview.md](./overview.md).
   - [x] Add unit tests for cell state visualization (delegate tests done)
 
 ### Correction System Integration
-- [x] Implement correction workflow (partially - adapters defined, UI signal flow tested)
+- [x] Implement correction workflow
   - [x] Connect to CorrectionService
-  - [x] Add UI for applying corrections (partially - single click delegate)
-  - [ ] Implement correction preview
+  - [x] Add UI for applying corrections (single click delegate + controller connection)
+  - [x] Implement correction preview action (from old Phase 3) # <-- Marked as Done (CorrectionRuleView)
   - [x] Add unit tests for correction workflow (adapter tests updated)
-- [x] Implement inline correction suggestions (partially - visualization only)
+- [x] Implement inline correction suggestions
   - [x] Add suggestion display (delegate draws indicator)
-  - [x] Implement one-click correction application
-  - [ ] Add batch correction UI
+  - [x] Implement one-click correction application (delegate signal + controller connection)
+  - [ ] Add batch correction UI # <-- Still Pending
   - [x] Add unit tests for inline correction suggestions (delegate tests completed)
 
-## Phase 4: Import/Export and Advanced Features
+## Phase 4: Advanced UI/Features (🔄 In Progress / Partially Pending)
+*(Previously combined Phase 4/6/7)*
+
+### Context Menu Refinements
+- [ ] Add cell-type specific context menu actions (from old Phase 2)
+- [ ] Add validation during cell editing (from old Phase 2)
+- [x] Implement correction preview action (from old Phase 3) # <-- Marked as Done (CorrectionRuleView)
+- [ ] Add batch correction UI action (from old Phase 3)
 
 ### Import/Export Integration
 - [ ] Implement import functionality
@@ -152,7 +159,7 @@ For a complete overview of the project, see [overview.md](./overview.md).
   - [ ] Add export action
   - [ ] Implement export format selection
   - [ ] Add export configuration options
-  - [ ] Add unit tests for export functionality
+  - [x] Add unit tests for export functionality
 
 ### Advanced Features
 - [ ] Implement search and filter
@@ -164,25 +171,64 @@ For a complete overview of the project, see [overview.md](./overview.md).
   - [ ] Add conditional formatting
   - [ ] Implement data grouping
   - [ ] Add custom cell renderers
-  - [ ] Add unit tests for visualization enhancements
-- [ ] Implement performance optimizations
-  - [ ] Add data virtualization
-  - [ ] Implement lazy loading
-  - [ ] Add caching mechanisms
-  - [ ] Add performance tests
+  - [x] Add unit tests for visualization enhancements
 
-## Testing and Quality Assurance
+## Phase 5: Architecture Refinement (🔄 In Progress)
+*(Based on Code Review)*
+- [ ] Refine State Management Flow
+  - [ ] Ensure state updates strictly via `TableStateManager -> DataViewModel -> Delegate`
+  - [ ] Remove any direct UI manipulation for state visualization from view classes
+- [ ] Optimize Update Logic
+  - [ ] Refactor `DataViewModel` update methods (e.g., `_on_source_data_changed`)
+  - [ ] Use granular `dataChanged` signals based on `DataState` where possible
+  - [ ] Minimize full model resets
+- [ ] Decouple Delegate Signals
+  - [ ] Review signal connections (e.g., `CorrectionDelegate.correction_selected`)
+  - [ ] Implement higher-level signals in `DataTableView` (or adapter) where appropriate
+  - [ ] Update `MainWindow` (or `App`) to connect view signals to controllers
+- [ ] Verify Controller Integration
+  - [ ] Ensure `DataViewController` interacts correctly with new `DataViewModel`, `FilterModel`
+  - [x] Test controller methods (filtering, sorting) with the refactored components
+
+## Phase 6: Performance Optimization (⏳ Planned)
+*(Tasks moved from old Phase 4)*
+- [ ] Add data virtualization
+- [ ] Implement lazy loading
+- [ ] Add caching mechanisms
+- [ ] Add performance tests
+
+## Phase 7: Documentation (⏳ Planned)
+*(Renamed from "Documentation and Cleanup")*
+
+### Code Documentation
+- [ ] Complete inline documentation
+  - [ ] Add docstrings to all classes
+  - [ ] Add docstrings to all methods
+  - [ ] Document complex algorithms
+  - [ ] Add type hints
+- [ ] Update external documentation
+  - [ ] Update user documentation
+  - [ ] Update developer documentation
+  - [ ] Add examples
+  - [ ] Document API
+
+## Phase 8: Testing and Quality Assurance (🔄 In Progress)
+*(Consolidated Testing Section)*
 
 ### Automated Testing
 - [x] Complete unit testing
-  - [ ] Achieve 95% code coverage
+  - [ ] Achieve 95% code coverage # <-- Still Pending
   - [x] Test all edge cases
-  - [ ] Add performance tests
+  - [ ] Add performance tests # <-- Moved to Phase 6
   - [x] Document all tests
-- [x] Implement integration testing (partially - core + correction flow tested)
+  - [x] Add unit tests for `CorrectionRuleView` (Preview Action) # <-- Added and marked done
+  - [x] Add unit tests for `CorrectionController` (`_on_preview_rule_requested` slot) # <-- Added and marked done
+  - [x] Add unit tests for `CorrectionPreviewDialog` # <-- Added and marked done
+- [x] Implement integration testing
   - [x] Test component interactions (Model/View/Delegate/StateManager/Adapters)
-  - [x] Test signal-slot connections (core + correction flow)
+  - [x] Test signal-slot connections (core + full correction flow)
   - [x] Test data flow (validation/correction state)
+  - [ ] Test full correction application cycle (Model/State updates) # <-- Pending Test Implementation
 - [ ] Implement UI testing
   - [ ] Test user workflows
   - [ ] Test keyboard navigation
@@ -201,22 +247,9 @@ For a complete overview of the project, see [overview.md](./overview.md).
   - [ ] Implement improvements
   - [ ] Document usability enhancements
 
-## Documentation and Cleanup
-
-### Code Documentation
-- [ ] Complete inline documentation
-  - [ ] Add docstrings to all classes
-  - [ ] Add docstrings to all methods
-  - [ ] Document complex algorithms
-  - [ ] Add type hints
-- [ ] Update external documentation
-  - [ ] Update user documentation
-  - [ ] Update developer documentation
-  - [ ] Add examples
-  - [ ] Document API
-
-### Clean-up and Finalization
-- [ ] Remove deprecated code
+## Phase 9: Cleanup and Finalization (⏳ Planned)
+*(Renamed from "Documentation and Cleanup")*
+- [ ] Remove deprecated code (Old DataView / Adapter)
   - [ ] Identify all deprecated components
   - [ ] Remove unused code
   - [ ] Update import statements

@@ -7,7 +7,11 @@ date: 2024-08-05
 
 ## DataView Refactoring Architecture
 
+**(Updated: 2024-08-08 - Added notes based on code review)**
+
 The DataView refactoring implements several key architectural patterns to create a more robust, maintainable, and feature-rich component. This section outlines the specific patterns being applied in this refactoring effort.
+
+**Note on Migration:** The project is currently migrating from an older `ui/data_view.py` implementation to the new structure described below (`ui/data/`). A `DataViewAdapter` is temporarily used to bridge the gap. The goal is to fully consolidate onto the new architecture.
 
 ### Core Architectural Principles
 
@@ -21,17 +25,17 @@ The refactored DataView follows these architectural principles:
 
 ### Component Architecture
 
-The DataView is structured around these key component types:
+The refactored DataView (`ui/data/`) is structured around these key component types:
 
 #### Data Layer Components
-- **DataViewModel**: Adapts the ChestDataModel for display in the UI
-- **FilterModel**: Provides sorting and filtering capabilities
-- **SelectionModel**: Manages selection state and operations
+- **DataViewModel**: Adapts the ChestDataModel for display in the UI (Inherits `QAbstractTableModel`)
+- **FilterModel**: Provides sorting and filtering capabilities (Inherits `QSortFilterProxyModel`)
+- **SelectionModel**: Manages selection state and operations (Often standard Qt implementation)
 
 #### Presentation Layer Components
-- **DataTableView**: Core table view component
-- **DataHeaderView**: Custom header for advanced column operations
-- **CellDelegate**: Base rendering delegate for cells
+- **DataTableView**: Core table view component (Inherits `QTableView`)
+- **DataHeaderView**: Custom header for advanced column operations (Inherits `QHeaderView`)
+- **CellDelegate**: Base rendering delegate for cells (Inherits `QStyledItemDelegate`)
 
 #### Specialized Delegates
 - **ValidationDelegate**: Specialized rendering for validation status
@@ -44,8 +48,11 @@ The DataView is structured around these key component types:
 - **ActionProviders**: Supply actions based on selection context
 
 #### Integration Adapters
-- **ValidationAdapter**: Connects ValidationService to UI
-- **CorrectionAdapter**: Connects CorrectionService to UI
+- **ValidationAdapter**: Connects `ValidationService` to `TableStateManager`
+- **CorrectionAdapter**: Connects `CorrectionService` to `TableStateManager`
+
+#### State Management
+- **TableStateManager**: Central manager for visual cell states (validation, correction). Crucial for ensuring consistent state visualization.
 
 ### Key Design Patterns in DataView Refactoring
 
@@ -86,6 +93,8 @@ class DataView:
 #### 2. Delegate Pattern
 The DataView uses the Delegate pattern extensively for customized cell rendering and interaction. Delegates (`ValidationDelegate`, `CorrectionDelegate`) are responsible for visualizing cell state managed by `TableStateManager`.
 
+**State Flow Note:** The *intended and correct* flow is for delegates to read state information (validation, correction) from the `DataViewModel` (via custom roles populated from `TableStateManager`) during the `paint` method. Direct manipulation of item properties (like background color) *within the view* for state visualization should be avoided to maintain consistency through the `TableStateManager`.
+
 ```python
 class CellDelegate(QtWidgets.QStyledItemDelegate):
     """Base delegate for all cell rendering."""
@@ -104,8 +113,8 @@ class ValidationDelegate(CellDelegate):
     
     def paint(self, painter, option, index):
         """Paint the cell with validation status indicators."""
-        # Get validation status
-        status = index.data(ValidationRole)
+        # Get validation status from the model (populated by TableStateManager)
+        status = index.data(DataViewModel.ValidationStateRole)
         
         # Apply background color based on status
         if status == ValidationStatus.INVALID:
@@ -121,61 +130,120 @@ class ValidationDelegate(CellDelegate):
             self._draw_status_icon(painter, option, status)
 ```
 
-**Integration Note**: Integration tests confirm that `ValidationDelegate` and `CorrectionDelegate` correctly receive state information propagated from `TableStateManager` and execute their paint logic without error.
-
 #### 3. Adapter Pattern
-The DataView uses the Adapter pattern to connect core services (`ValidationService`, `CorrectionService`) with UI components. Adapters (`ValidationAdapter`, `CorrectionAdapter`) transform service results into UI-friendly state updates managed by `TableStateManager`.
+The DataView uses the Adapter pattern to connect core services (`ValidationService`, `CorrectionService`) with the `TableStateManager`. Adapters (`ValidationAdapter`, `CorrectionAdapter`) transform service results into state updates for the manager.
+
+- **Responsibility:** Listen for service signals (e.g., `validation_complete`), receive data (often DataFrames), map service-specific statuses (e.g., `ValidationStatus`) to UI cell states (`CellState`), create a dictionary of `(row, col): CellFullState` updates, and call `TableStateManager.update_states()`.
+- **`ValidationAdapter` Example:**
+    - Connects to `ValidationService.validation_complete` signal.
+    - Receives the `status_df` (DataFrame).
+    - Iterates through `status_df` and the `TableStateManager.headers_map`.
+    - Maps `ValidationStatus` enum values from `status_df` to `CellState` enum values.
+    - Constructs `CellFullState` objects for changed cells.
+    - Calls `TableStateManager.update_states()` with the constructed dictionary.
 
 ```python
-class ValidationAdapter:
-    """Adapts ValidationService for UI integration."""
-    
-    def __init__(self, validation_service):
-        self._validation_service = validation_service
-        self._connect_signals()
-        
-    def _connect_signals(self):
-        self._validation_service.validation_completed.connect(
-            self._on_validation_completed)
-            
-    def _on_validation_completed(self, results):
-        """Transform validation results for UI consumption."""
-        ui_friendly_results = self._transform_results(results)
-        self.validation_results_available.emit(ui_friendly_results)
-        
-    def _transform_results(self, results):
-        """Convert service results to UI-friendly format."""
-        # Implementation...
-```
+# Example: ValidationAdapter._on_validation_complete
+def _on_validation_complete(self, validation_results: pd.DataFrame) -> None:
+    status_df = validation_results
+    self._headers_map = self._table_state_manager.headers_map # Get current header map
+    new_states = {}
+    for row_idx in status_df.index:
+        for base_col_name, col_idx in self._headers_map.items():
+            status_col = f"{base_col_name}_status"
+            message_col = f"{base_col_name}_message"
+            if status_col in status_df.columns:
+                status_value = status_df.at[row_idx, status_col]
+                message_value = status_df.at[row_idx, message_col]
 
-**Integration Note**: Integration tests verify that adapters successfully receive signals from services, process the data, and trigger state updates in `TableStateManager`, which then correctly propagate to `DataViewModel` via signals.
+                # Map ValidationStatus -> CellState
+                cell_state_status = self._map_validation_status_to_cell_state(status_value)
+                error_details = str(message_value) if pd.notna(message_value) else ""
+
+                # Get current state for comparison
+                current_full_state = self._table_state_manager.get_full_cell_state(row_idx, col_idx)
+                if current_full_state is None:
+                    current_full_state = CellFullState()
+
+                # Determine if update is needed and build partial update dict
+                needs_update, partial_update = self._determine_update(current_full_state, cell_state_status, error_details)
+
+                if needs_update:
+                    # Merge changes and store
+                    merged_state_dict = dataclasses.asdict(current_full_state)
+                    merged_state_dict.update(partial_update)
+                    # Preserve existing correction suggestions
+                    if "correction_suggestions" not in partial_update:
+                         merged_state_dict.setdefault("correction_suggestions", current_full_state.correction_suggestions or [])
+                    new_states[(row_idx, col_idx)] = CellFullState(**merged_state_dict)
+
+    if new_states:
+        self._table_state_manager.update_states(new_states)
+```
 
 #### 4. Factory Pattern
 The DataView uses the Factory pattern for creating context-specific menu items:
 
 ```python
-class MenuFactory:
+class ContextMenuFactory:
     """Factory for creating context-specific menu items."""
-    
+    REGISTERED_ACTION_CLASSES = [CopyAction, PasteAction, ...]
+
     @staticmethod
-    def create_menu(selection, parent=None):
-        """Create a context menu based on selection."""
-        menu = ContextMenu(parent)
+    def create_context_menu(info: ActionContext) -> typing.Tuple[QMenu, typing.Dict[str, QAction]]:
+        """Create a context menu based on selection and cell state."""
+        menu = QMenu(info.parent_widget)
+        created_qactions = {}
+        action_instances = [ActionClass() for ActionClass in ContextMenuFactory.REGISTERED_ACTION_CLASSES]
+
+        # Add actions based on applicability and enabled state
+        for action_instance in action_instances:
+            if action_instance.is_applicable(info):
+                qaction = QAction(action_instance.icon, action_instance.text, menu)
+                qaction.setEnabled(action_instance.is_enabled(info))
+                qaction.triggered.connect(lambda checked=False, bound_action=action_instance: bound_action.execute(info))
+                menu.addAction(qaction)
+                created_qactions[action_instance.id] = qaction
         
-        # Add standard edit actions
-        menu.add_action(CopyAction(selection))
-        menu.add_action(PasteAction(selection))
-        menu.add_action(DeleteAction(selection))
+        # Add separators and cell-type specific placeholders
+        # ... logic to add separators and placeholders ...
         
-        # Add selection-specific actions
-        if selection.has_invalid_cells():
-            menu.add_action(ValidationErrorAction(selection))
-            
-        if selection.has_correctable_cells():
-            menu.add_action(ApplyCorrectionAction(selection))
-            
-        return menu
+        return menu, created_qactions
+
+class ActionContext:
+    """Dataclass holding context for menu creation/action execution."""
+    clicked_index: QModelIndex
+    selection: typing.List[QModelIndex]
+    model: DataViewModel
+    parent_widget: QWidget
+    state_manager: TableStateManager
+    clipboard_text: str # Added for paste action
+
+class AbstractContextAction:
+    """Base class for all context menu actions."""
+    @property
+    def id(self) -> str:
+        raise NotImplementedError
+
+    @property
+    def text(self) -> str:
+        raise NotImplementedError
+
+    # ... other properties like icon, shortcut, tooltip ...
+
+    def is_applicable(self, context: ActionContext) -> bool:
+        """Is this action generally relevant given the context?"""
+        return True
+
+    def is_enabled(self, context: ActionContext) -> bool:
+        """Is this action currently allowed given the context?"""
+        return True
+
+    def execute(self, context: ActionContext) -> None:
+        """Perform the action."""
+        raise NotImplementedError
 ```
+This pattern uses a factory (`ContextMenuFactory`) to instantiate registered action classes (`AbstractContextAction` subclasses) and build a `QMenu`. Each action determines its own applicability and enabled state based on the provided `ActionContext`, allowing for flexible and context-aware menus.
 
 #### 5. Strategy Pattern
 The DataView uses the Strategy pattern for different rendering strategies:
@@ -203,37 +271,53 @@ class CorrectionRenderingStrategy(CellRenderingStrategy):
         # Implementation...
 ```
 
-#### 6. Observer Pattern
-The DataView uses the Observer pattern extensively through Qt's signal-slot mechanism. Signals (`validation_state_changed`, `correction_state_changed`) from `TableStateManager` and `DataViewModel` notify dependent components of changes.
+#### 6. Observer Pattern (Signal/Slot)
+The DataView uses Qt's signal-slot mechanism. 
+- `TableStateManager` emits signals (e.g., `cell_states_changed`) when state updates.
+- `DataViewModel` connects to these signals and emits `dataChanged` for the relevant cells/roles to notify the view.
+- Views/Controllers connect to model/service signals.
+
+**Decoupling Note:** For actions triggered by UI elements (like delegates or context menus), prefer emitting higher-level signals from the main view component (`DataTableView` or its direct adapter) rather than connecting delegate/menu signals directly in external components like `MainWindow`. This improves component reusability.
 
 ```python
+# Example in DataViewModel
 class DataViewModel(QtCore.QAbstractTableModel):
-    """Model for DataView."""
+    # ...
+    def connect_state_manager(self, state_manager):
+        state_manager.cell_states_changed.connect(self._on_state_manager_state_changed)
+        
+    @Slot(set)
+    def _on_state_manager_state_changed(self, changed_indices: set):
+        # Determine minimal bounding box or individual indices
+        # Emit dataChanged for affected indices and relevant roles
+        # (e.g., Qt.BackgroundRole, Qt.ToolTipRole, ValidationStateRole)
+        # Avoid full model reset if possible
+        pass 
+
+# Example in DataTableView (Conceptual)
+class DataTableView(QTableView):
+    correction_action_triggered = Signal(object, object) # e.g., index, correction_data
     
-    # Define signals
-    validation_state_changed = Signal(object)
-    correction_state_changed = Signal(object)
-    selection_changed = Signal(object)
-    
-    def update_validation_state(self, new_state):
-        """Update validation state and notify observers."""
-        self._validation_state = new_state
-        self.validation_state_changed.emit(new_state)
-        self.dataChanged.emit(QModelIndex(), QModelIndex())
+    def _setup_delegates(self):
+        # ... create correction_delegate ...
+        # Connect internal delegate signal to emit a higher-level view signal
+        correction_delegate.correction_selected.connect(self._handle_delegate_correction)
+        
+    def _handle_delegate_correction(self, index, correction_data):
+        # Emit the view-level signal
+        self.correction_action_triggered.emit(index, correction_data)
 ```
 
-**Integration Note**: Integration tests confirm that signals like `TableStateManager.cell_states_changed` and `DataViewModel.dataChanged` are emitted correctly upon state updates, allowing the view and delegates to react appropriately.
+### Component Interactions (Refined State Flow)
 
-### Component Interactions
+The intended state flow for validation/correction visualization is:
+1. **Service**: Performs validation/correction check (`ValidationService`, `CorrectionService`), emits results (often a DataFrame) via a signal (e.g., `validation_complete`).
+2. **Adapter**: Listens for the service signal (`ValidationAdapter`, `CorrectionAdapter`), receives the results DataFrame, maps service-specific statuses/data to `CellState` and `CellFullState` components.
+3. **StateManager**: Adapter calls `TableStateManager.update_states()` with a dictionary of `(row, col): CellFullState` updates. The `TableStateManager` merges these changes with existing states and emits `state_changed` with the set of affected cell coordinates.
+4. **ViewModel**: `DataViewModel` listens for `TableStateManager.state_changed`, determines the minimal bounding box or individual indices affected, and emits `dataChanged` for those indices and the relevant custom data roles (e.g., `ValidationStateRole`, `CorrectionStateRole`, `Qt.ToolTipRole`).
+5. **View/Delegate**: `DataTableView` receives `dataChanged`. During repaint, `ValidationDelegate`/`CorrectionDelegate` reads the updated state roles from the `DataViewModel` via the `index` and paints the cell background, icons, or tooltips accordingly.
 
-The components interact primarily through these mechanisms:
-
-1. **Signal/Slot**: Using Qt's signal/slot for loose coupling
-2. **Event Propagation**: Propagating events up the widget hierarchy
-3. **Model/View Updates**: Using standard Qt model/view mechanisms
-4. **Delegate Rendering**: Custom rendering through the delegate system
-
-This architecture provides a robust foundation for the DataView, addressing the key requirements while maintaining clear separation of concerns and high testability.
+This ensures the `TableStateManager` is the single source of truth for visual cell state, promoting consistency.
 
 ## Final Architecture Overview
 
@@ -577,16 +661,20 @@ The implementation uses Qt's timer system (specifically `QTimer.singleShot()`) t
 
 **Key Components**:
 1. **TableStateManager**:
-   - Manages cell states and validation history
-   - Handles batch processing operations
-   - Tracks corrections and errors
-   - Provides correction summaries
+   - Manages cell states (`_cell_states`: `Dict[Tuple[int, int], CellFullState]`) and validation history.
+   - Handles batch processing operations.
+   - Tracks corrections and errors.
+   - Provides correction summaries.
+   - **`update_states(changes)` Method:** Merges incoming `CellFullState` updates with existing states, only storing/emitting changes. Uses `dataclasses.asdict` for robust merging.
+   - **`headers_map` Property:** Provides a public property `headers_map: Dict[str, int]` mapping column names to indices, created/updated via `_create_headers_map` / `update_headers_map`.
+   - **`get_full_cell_state(row, col)` Method:** Returns the complete `CellFullState` object for a cell, or `None` if no specific state is stored (implying default `NORMAL` state).
+   - Emits `state_changed(set)` signal with coordinates of affected cells.
 
 2. **Progress Reporting**:
-   - Non-blocking batch operations
-   - Progress visualization
-   - Correction logging
-   - Error aggregation
+   - Non-blocking batch operations.
+   - Progress visualization.
+   - Correction logging.
+   - Error aggregation.
 
 **Example Implementation**:
 ```python

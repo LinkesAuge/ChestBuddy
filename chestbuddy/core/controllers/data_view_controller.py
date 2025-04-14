@@ -141,6 +141,16 @@ class DataViewController(BaseController):
         if hasattr(view, "data_corrected"):
             self._signal_manager.connect(view, "data_corrected", self, "_on_data_corrected")
 
+        # --- Connect New Signal --- #
+        if hasattr(view, "correction_action_triggered"):
+            self._signal_manager.connect(
+                view,
+                "correction_action_triggered",
+                self,
+                "_handle_correction_action_triggered",
+            )
+        # ------------------------ #
+
         logger.debug(f"DataViewController connected to view: {view.__class__.__name__}")
 
     def set_view(self, view):
@@ -1440,3 +1450,76 @@ class DataViewController(BaseController):
         except Exception as e:
             logger.error(f"Error applying correction to cell ({row}, {col}): {e}", exc_info=True)
             self.operation_error.emit(f"Failed to apply correction: {e}")
+
+    # --- New Slot for Correction Action --- #
+    @Slot(QModelIndex, object)
+    def _handle_correction_action_triggered(
+        self, source_index: QModelIndex, suggestion: object
+    ) -> None:
+        """Handles the correction_action_triggered signal from the view.
+
+        Extracts necessary information and calls the CorrectionService to apply the correction.
+        """
+        if not source_index.isValid():
+            logger.warning("Received invalid source index in _handle_correction_action_triggered.")
+            return
+
+        row = source_index.row()
+        col = source_index.column()
+
+        # Extract corrected value from suggestion (assuming 'corrected_value' attribute)
+        if hasattr(suggestion, "corrected_value"):
+            corrected_value = suggestion.corrected_value
+        else:
+            logger.warning(
+                f"Suggestion object missing 'corrected_value' attribute for cell ({row}, {col}). Suggestion: {suggestion}"
+            )
+            # Optionally: Emit an error signal or show a message
+            self.operation_error.emit(
+                f"Invalid correction suggestion format for cell ({row}, {col})."
+            )
+            return
+
+        logger.info(
+            f"Controller handling correction action for cell ({row}, {col}) -> '{corrected_value}'"
+        )
+
+        # Get CorrectionService (assuming it's set via set_services or similar)
+        if not hasattr(self, "_correction_service") or not self._correction_service:
+            logger.error(
+                "CorrectionService not available in DataViewController. Cannot apply correction."
+            )
+            self.operation_error.emit("Correction service unavailable.")
+            return
+
+        try:
+            # Call the service method to apply the correction
+            # Ensure the service method signature matches
+            success = self._correction_service.apply_ui_correction(row, col, corrected_value)
+
+            if success:
+                logger.info(
+                    f"Controller successfully triggered CorrectionService for ({row}, {col})."
+                )
+                self.status_message_changed.emit(
+                    f"Correction applied to cell ({row + 1}, {col + 1})."
+                )  # User-friendly 1-based index
+                # Optionally trigger re-validation if needed
+                # self.validate_data() # Be careful of infinite loops
+            else:
+                logger.warning(
+                    f"CorrectionService failed to apply correction for cell ({row}, {col})."
+                )
+                self.operation_error.emit(f"Failed to apply correction to cell ({row}, {col}).")
+
+        except AttributeError as ae:
+            logger.error(f"CorrectionService is missing the expected method: {ae}")
+            self.operation_error.emit("Correction service method error.")
+        except Exception as e:
+            logger.error(
+                f"Error applying correction via controller for cell ({row}, {col}): {e}",
+                exc_info=True,
+            )
+            self.operation_error.emit(f"An unexpected error occurred during correction.")
+
+    # --- End New Slot --- #

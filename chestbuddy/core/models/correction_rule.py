@@ -71,6 +71,10 @@ class CorrectionRule:
             and self.category == other.category
         )
 
+    def __hash__(self):
+        """Provide a hash based on the attributes used for equality."""
+        return hash((self.to_value, self.from_value, self.category))
+
     def __repr__(self) -> str:
         """
         String representation for debugging.

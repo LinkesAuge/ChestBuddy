@@ -38,6 +38,13 @@ from chestbuddy.ui.data.delegates.correction_delegate import (
     CorrectionSuggestion,
 )  # Add Delegate
 from chestbuddy.core.controllers.correction_controller import CorrectionController  # Add Controller
+from chestbuddy.core.controllers.data_view_controller import (
+    DataViewController,
+)  # Add DataViewController
+from chestbuddy.core.services.correction_service import CorrectionService
+from chestbuddy.core.controllers.base_controller import BaseController
+from chestbuddy.utils.service_locator import ServiceLocator
+from chestbuddy.utils.signal_manager import SignalManager  # Import SignalManager
 
 # Setup logging for tests
 logger = logging.getLogger(__name__)
@@ -111,6 +118,17 @@ def integration_system_fixture(qapp):  # Renamed and simplified data source
     validation_adapter = ValidationAdapter(validation_service, state_manager)
     correction_adapter = CorrectionAdapter(correction_service, state_manager)
 
+    # 8. DataViewController (Create and configure)
+    mock_signal_manager = MagicMock(spec=SignalManager)
+    data_view_controller = DataViewController(
+        data_model=data_model, signal_manager=mock_signal_manager
+    )
+    # Set services on the controller
+    data_view_controller.set_services(
+        validation_service=validation_service, correction_service=correction_service
+    )
+    logger.info("Created and configured DataViewController.")
+
     # Return all components
     system = {
         "config_manager": config_manager,
@@ -121,17 +139,18 @@ def integration_system_fixture(qapp):  # Renamed and simplified data source
         "data_view_model": data_view_model,
         "validation_adapter": validation_adapter,
         "correction_adapter": correction_adapter,
+        "data_view_controller": data_view_controller,
         "logger": logger,
     }
 
     # Connect signals *after* all components are created
     try:
         # Validation Flow Connections
-        validation_service.validation_changed.connect(validation_adapter._on_validation_complete)
+        validation_service.validation_complete.connect(validation_adapter._on_validation_complete)
         state_manager.state_changed.connect(data_view_model._on_state_manager_state_changed)
         # Correction Flow Connections
         correction_service.correction_suggestions_available.connect(
-            correction_adapter._on_correction_available
+            correction_adapter._on_corrections_available
         )
         # Data Model Connection (if needed by adapters directly, otherwise handled by view model)
         # data_model.data_changed.connect(...)
@@ -160,10 +179,7 @@ def integration_system_fixture(qapp):  # Renamed and simplified data source
 class TestCorrectionFlowIntegration:
     """Tests the integration of the data correction flow."""
 
-    @patch("chestbuddy.core.services.validation_service.ValidationService.get_validation_status")
-    def test_correction_suggestion_updates_state(
-        self, mock_get_validation_status, integration_system_fixture, qtbot
-    ):
+    def test_correction_suggestion_updates_state(self, integration_system_fixture, qtbot):
         """
         Test that emitting correction_available from CorrectionService updates
         the TableStateManager and DataViewModel correctly.
@@ -190,29 +206,18 @@ class TestCorrectionFlowIntegration:
         assert state_change_spy.isValid()
         assert model_data_changed_spy.isValid()
 
-        # Configure the mock passed by the decorator
-        mock_status_df = pd.DataFrame(
-            {
-                "Player": [ValidationStatus.VALID, ValidationStatus.CORRECTABLE],
-                "Chest": [ValidationStatus.VALID, ValidationStatus.CORRECTABLE],
-                "Score": [
-                    ValidationStatus.VALID,
-                    ValidationStatus.VALID,
-                ],  # Assuming Score is valid
-            }
-        )
-        mock_status_df.index = data_model.get_data().index[: len(mock_status_df)]
-        mock_get_validation_status.return_value = mock_status_df
-
         # Act:
-        # 1. Run validation first - This is still useful to set initial state for other checks
+        # 1. Run validation first - Let the real validation run to set initial state
         logger.info("Running validation service to set initial state...")
-        _ = validation_service.validate_data()  # Result not needed here, just run it
+        validation_results = (
+            validation_service.validate_data()
+        )  # Result not needed here, just run it
+        logger.info(f"Validation results (for context): {validation_results}")
 
         # ... (Keep assertions checking initial validation results if desired, or remove) ...
 
-        # 2. Call the method that uses the mocked get_validation_status
-        logger.info("Calling find_and_emit_suggestions (should use mocked status)...")
+        # 2. Call the method that finds suggestions based on the actual validation state
+        logger.info("Calling find_and_emit_suggestions (will use actual validation status)...")
         correction_service.find_and_emit_suggestions()
 
         # Assert: Wait for signals
@@ -248,6 +253,7 @@ class TestCorrectionFlowIntegration:
         state_manager = integration_system_fixture["state_manager"]
         view_model = integration_system_fixture["data_view_model"]
         data_model = integration_system_fixture["data_model"]
+        validation_service = integration_system_fixture["validation_service"]
 
         # Cell to correct: Row 1, Col 0 ('JohnSmiht')
         test_row, test_col = 1, 0
@@ -255,30 +261,65 @@ class TestCorrectionFlowIntegration:
         original_value = "JohnSmiht"
         corrected_value = "John Smith"
 
-        # Pre-assert original value
-        assert data_model.get_cell_value(test_row, target_column) == original_value
+        # --- Optional: Mark cell as correctable first for a more realistic scenario ---
+        # 1. Add a rule that would trigger a suggestion for this cell
+        # (Rule setup remains the same)
+        rule_manager = getattr(correction_service, "_rule_manager", None)
+        assert rule_manager is not None
+        rule = CorrectionRule(
+            from_value=original_value, to_value=corrected_value, category="player", status="enabled"
+        )
+        rule_manager.add_rule(rule)
 
-        # Create a mock rule to apply
-        mock_rule = MagicMock(spec=CorrectionRule)
-        mock_rule.from_value = original_value
-        mock_rule.to_value = corrected_value
-        # Category might need to be uppercase if service logic expects it, but usually lowercase
-        mock_rule.category = target_column.lower()  # Use lowercase for category consistency
-        mock_rule.status = "enabled"
-        # Add other necessary attributes if CorrectionService uses them
+        # 2. Run Validation first to populate initial state
+        logger.info("Running validation to populate initial state...")
+        state_change_spy_validation = QSignalSpy(
+            state_manager.state_changed
+        )  # Spy for validation update
+        validation_service.validate_data()
+        # --- Add processEvents to try and fix spy --- #
+        qtbot.processEvents()
+        # -------------------------------------------- #
+        # Explicitly check the return value of wait()
+        validation_signal_received = state_change_spy_validation.wait(2000)  # Increased timeout
+        assert validation_signal_received, (
+            "State manager state_changed signal NOT received after validation"
+        )
+        logger.info("Initial validation ran and state_changed signal received from state manager.")
 
-        # Optional: Ensure the cell is marked as correctable first?
-        # This might require running find_and_emit_suggestions or manually setting state.
-        # For simplicity, let's assume apply_single_rule works even if not explicitly marked.
+        # 3. Run suggestion finding to update state manager
+        logger.info("Finding suggestions to mark cell as correctable...")
+        # Spy for the state change specifically from suggestion finding
+        state_change_spy_suggestion = QSignalSpy(state_manager.state_changed)
+        correction_service.find_and_emit_suggestions()
+        # Wait for the state_changed signal resulting from suggestions
+        assert state_change_spy_suggestion.wait(1000), (
+            "State manager not updated after suggestion finding"
+        )
+        # Now check if the cell is correctable
+        assert state_manager.get_cell_state(test_row, test_col) == ValidationStatus.CORRECTABLE, (
+            "Cell not marked as correctable before test act phase"
+        )
+        logger.info("Cell successfully marked as CORRECTABLE.")
+        # -------------------------------------------------------------------------
 
-        # Spies
-        state_change_spy = QSignalSpy(state_manager.state_changed)
+        # Spies for state changes AFTER the correction action
+        state_change_spy_correction = QSignalSpy(
+            state_manager.state_changed
+        )  # New spy for correction update
         model_data_changed_spy = QSignalSpy(view_model.dataChanged)
+        assert state_change_spy_correction.isValid()  # Check validity of the new spy
+        assert model_data_changed_spy.isValid()
+
+        # Prepare for ACT phase: Create index and suggestion object
+        test_index = view_model.index(test_row, test_col)
+        assert test_index.isValid()
+        test_suggestion = CorrectionSuggestion(original_value, corrected_value)
 
         # Act: Apply the correction using the service directly
         # Option 1: Use apply_single_rule (if appropriate)
-        logger.info(f"Applying mock rule: {mock_rule.from_value} -> {mock_rule.to_value}")
-        correction_stats = correction_service.apply_single_rule(mock_rule, only_invalid=False)
+        logger.info(f"Applying mock rule: {rule.from_value} -> {rule.to_value}")
+        correction_stats = correction_service.apply_single_rule(rule, only_invalid=False)
         logger.info(f"Correction stats: {correction_stats}")
 
         # Option 2: Call a method on CorrectionAdapter if it exists and is intended for this?
@@ -295,11 +336,11 @@ class TestCorrectionFlowIntegration:
 
         # 2. TableStateManager State Updated
         # Check if state_changed signal was emitted for the corrected cell
-        assert state_change_spy.wait(1000), (
+        assert state_change_spy_correction.wait(1000), (
             "TableStateManager did not emit state_changed after correction"
         )
         emitted_indices = set().union(
-            *[args[0] for args in state_change_spy]
+            *[args[0] for args in state_change_spy_correction]
         )  # Combine all emitted sets
         assert (test_row, test_col) in emitted_indices, (
             "state_changed signal did not include the corrected cell"
@@ -554,6 +595,54 @@ class TestCorrectionFlowIntegration:
         assert service_col == target_col, "Service called with wrong column"
         assert service_value == expected_corrected_value, "Service called with wrong value"
         logger.info("Mocked service method apply_ui_correction received correct arguments.")
+
+    # --- New Test for Correction Application Trigger --- #
+    def test_correction_action_triggers_service_call(self, integration_system_fixture, qtbot):
+        """
+        Test that the view's correction_action_triggered signal (simulated by calling the
+        controller's slot) results in a call to CorrectionService.apply_ui_correction.
+        """
+        # Arrange
+        controller = integration_system_fixture["data_view_controller"]
+        correction_service = integration_system_fixture["correction_service"]
+        view_model = integration_system_fixture["data_view_model"]
+        logger = integration_system_fixture["logger"]
+
+        # Ensure services are set on the controller (redundant if fixture guarantees it, but safe)
+        if not hasattr(controller, "_correction_service") or not controller._correction_service:
+            controller.set_services(correction_service=correction_service)
+
+        # Mock the target service method
+        with patch.object(
+            correction_service, "apply_ui_correction", return_value=True
+        ) as mock_apply_correction:
+            # Create a valid source model index
+            # Use row 1, col 0 ('JohnSmiht' in the fixture data)
+            test_row, test_col = 1, 0
+            source_index = view_model.index(test_row, test_col)
+            assert source_index.isValid()
+
+            # Create a sample suggestion object (mimic what delegate provides)
+            test_corrected_value = "John Smith"
+            # Use the structure expected by the delegate/adapter if known,
+            # otherwise ensure it has 'corrected_value'
+            suggestion = type("MockSuggestion", (), {"corrected_value": test_corrected_value})()
+
+            logger.info(
+                f"Simulating correction action trigger for index ({test_row}, {test_col}) -> '{test_corrected_value}'"
+            )
+
+            # Act: Call the controller's slot directly, simulating the signal connection
+            controller._handle_correction_action_triggered(source_index, suggestion)
+
+            # Assert: Check if the mocked service method was called correctly
+            logger.info("Checking if CorrectionService.apply_ui_correction was called...")
+            mock_apply_correction.assert_called_once_with(test_row, test_col, test_corrected_value)
+            logger.info("Assertion passed: apply_ui_correction called correctly.")
+
+    # ----------------------------------------------------- #
+
+    # TODO: Add test_correction_application_updates_state
 
 
 # Ensure the file ends without trailing syntax errors

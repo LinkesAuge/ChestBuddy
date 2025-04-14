@@ -89,6 +89,11 @@ class TableStateManager(QObject):
         self._headers_map = self._create_headers_map()
         logger.debug("TableStateManager initialized")
 
+    @property
+    def headers_map(self) -> Dict[str, int]:
+        """Public property to access the headers map."""
+        return self._headers_map
+
     def _create_headers_map(self) -> Dict[str, int]:
         """Create a mapping from column names to column indices."""
         headers_map = {}
@@ -229,6 +234,14 @@ class TableStateManager(QObject):
 
         if affected_cells:
             logger.debug(f"Updated state for {len(affected_cells)} cells.")
+            # DEBUG: Log the state dictionary and affected cells
+            print(f"DEBUG [TableStateManager]: _cell_states = {self._cell_states}")
+            print(f"DEBUG [TableStateManager]: affected_cells = {affected_cells}")
+            # --- Add explicit print before emit --- #
+            print(
+                f"---> TableStateManager: Emitting state_changed with {len(affected_cells)} affected cells."
+            )
+            # ---------------------------------------- #
             self.state_changed.emit(affected_cells)
         else:
             logger.debug("No state changes detected in update_states call.")

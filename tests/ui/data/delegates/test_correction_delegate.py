@@ -11,8 +11,9 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QMenu,
     QTableView,
+    QToolTip,
 )
-from PySide6.QtGui import QPainter, QIcon, QColor, QMouseEvent, QAction
+from PySide6.QtGui import QPainter, QIcon, QColor, QMouseEvent, QAction, QHelpEvent
 from PySide6.QtTest import QSignalSpy
 
 from chestbuddy.ui.data.delegates.correction_delegate import (
@@ -418,5 +419,78 @@ class TestCorrectionDelegate:
         delegate._show_correction_menu(mock_index.model(), mock_index, QPoint(10, 10))
 
         mock_exec.assert_not_called()
+
+    @patch("PySide6.QtWidgets.QToolTip.showText")  # Mock QToolTip
+    def test_helpEvent_shows_tooltip_for_suggestions(self, mock_showText, delegate, qtbot):
+        """Test helpEvent shows a tooltip with suggestions when available."""
+        # Arrange
+        correction_delegate = delegate  # Use the provided 'delegate' fixture
+        # Remove mock_model as it's not directly used when mocking index.data
+        mock_index = MagicMock(spec=QModelIndex)
+        mock_index.isValid.return_value = True
+        mock_option = MagicMock(spec=QStyleOptionViewItem)
+        mock_view = MagicMock(spec=QAbstractItemView)  # Mock the view argument
+
+        # Mock model data directly on the index mock
+        suggestions = [
+            {"corrected_value": "Suggestion1"},
+            type("obj", (object,), {"corrected_value": "Suggestion2"})(),  # Mock object with attr
+            "Suggestion3",  # String fallback
+        ]
+        # Assign a callable (lambda) to the 'data' attribute of the mock index
+        mock_index.data = MagicMock(
+            side_effect=lambda role: suggestions
+            if role == DataViewModel.CorrectionSuggestionsRole
+            else None
+        )
+
+        # Create a QHelpEvent (ToolTip type)
+        event_pos = QPoint(10, 10)
+        global_pos = QPoint(100, 100)
+        mock_view.mapToGlobal.return_value = global_pos  # Mock view's mapToGlobal
+        help_event = QHelpEvent(QHelpEvent.Type.ToolTip, event_pos, global_pos)
+
+        # Act
+        handled = correction_delegate.helpEvent(help_event, mock_view, mock_option, mock_index)
+
+        # Assert
+        assert handled is True  # Event should be handled
+        # Use raw string or double backslashes for literal newlines in expected string
+        expected_tooltip = "Suggestions:\n- Suggestion1\n- Suggestion2\n- Suggestion3"
+        mock_showText.assert_called_once()
+        call_args = mock_showText.call_args[0]
+        assert call_args[0] == global_pos
+        assert call_args[1] == expected_tooltip
+        assert call_args[2] == mock_view  # Check the view context
+
+    @patch("PySide6.QtWidgets.QToolTip.hideText")  # Mock QToolTip
+    @patch("PySide6.QtWidgets.QToolTip.showText")
+    def test_helpEvent_no_suggestions_hides_tooltip(
+        self, mock_showText, mock_hideText, delegate, qtbot
+    ):
+        """Test helpEvent hides tooltip if no suggestions are available."""
+        # Arrange
+        correction_delegate = delegate  # Use the provided 'delegate' fixture
+        # Remove mock_model
+        mock_index = MagicMock(spec=QModelIndex)
+        mock_index.isValid.return_value = True
+        mock_option = MagicMock(spec=QStyleOptionViewItem)
+        mock_view = MagicMock(spec=QAbstractItemView)
+
+        # Mock model data to return no suggestions directly on index mock
+        mock_index.data = MagicMock(return_value=None)  # Mock the 'data' attribute
+
+        event_pos = QPoint(10, 10)
+        global_pos = QPoint(100, 100)
+        mock_view.mapToGlobal.return_value = global_pos
+        help_event = QHelpEvent(QHelpEvent.Type.ToolTip, event_pos, global_pos)
+
+        # Act
+        handled = correction_delegate.helpEvent(help_event, mock_view, mock_option, mock_index)
+
+        # Assert
+        assert handled is False  # Event should not be handled by suggestion logic
+        mock_showText.assert_not_called()
+        mock_hideText.assert_called_once()
 
     # TODO: Add tests for other overridden methods if implemented (e.g., createEditor)

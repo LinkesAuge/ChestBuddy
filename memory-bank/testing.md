@@ -829,3 +829,147 @@ The DataView refactoring will follow a test-driven development approach:
     - Uses `pytest-qt` and `QSignalSpy` to verify signal emissions and state changes.
     - Fixtures set up integrated components (services, adapters, models, state manager).
     - Currently experiencing a terminal output issue where explicit PASS/FAIL status is not displayed for `pytest-qt` tests run via the assistant's terminal tool. Test success is presumed based on absence of errors after debugging.
+
+# Testing Strategy
+
+Last Updated: 2024-08-10
+
+This document outlines the testing strategy for the ChestBuddy application, focusing on maintaining high code quality, reliability, and robustness.
+
+## 1. Test Directory Structure
+
+All tests reside within the `tests/` directory at the project root.
+
+```
+tests/
+├── __init__.py
+├── conftest.py          # Global fixtures and configuration
+├── fixtures/            # Complex fixture data (e.g., sample JSON, CSV)
+│   └── sample_data.csv
+├── integration/         # Tests involving multiple components or services
+│   ├── __init__.py
+│   ├── test_data_pipeline.py
+│   └── test_validation_integration.py # Verifies ValidationService -> Adapter -> StateManager
+├── unit/                # Tests for individual modules or classes
+│   ├── __init__.py
+│   ├── core/              # Tests for core application logic
+│   │   ├── __init__.py
+│   │   └── test_config_manager.py
+│   ├── services/          # Tests for application services
+│   │   ├── __init__.py
+│   │   └── test_validation_service.py
+│   └── ui/                # Tests for UI components (ViewModel, Delegates, etc.)
+│       ├── __init__.py
+│       ├── test_data_view_model.py
+│       └── data/
+│           ├── __init__.py
+│           ├── delegates/
+│           │   ├── __init__.py
+│           │   └── test_validation_delegate.py
+│           ├── models/
+│           │   ├── __init__.py
+│           │   └── test_column_model.py
+│           └── adapters/
+│               ├── __init__.py
+│               └── test_validation_adapter.py # Unit tests for ValidationAdapter transformation
+└── utils/               # Utility functions for testing
+    ├── __init__.py
+    └── helpers.py
+```
+
+## 2. Test Types
+
+We employ a multi-layered testing approach:
+
+-   **Unit Tests (`tests/unit/`)**: Focus on isolating and testing individual classes or functions. Dependencies are mocked using `unittest.mock`.
+-   **Integration Tests (`tests/integration/`)**: Verify the interactions between multiple components or modules, including interactions with mocked or simplified external services (like databases or APIs) or actual internal services.
+    -   **Example:** Testing the flow from `ValidationService` signal emission through the `ValidationAdapter` transformation to the `TableStateManager` update.
+-   **UI Tests (Planned)**: Will test the graphical user interface interactions and visual state using frameworks like `pytest-qt`. These will likely reside in `tests/ui/` or `tests/integration/ui/`.
+-   **End-to-End (E2E) Tests (Future)**: May be considered for testing complete application workflows.
+
+## 3. Running Tests
+
+Tests are run using `pytest` from the project root directory:
+
+```bash
+# Run all tests
+uv run pytest
+
+# Run tests in a specific directory
+uv run pytest tests/unit/ui/delegates
+
+# Run tests in a specific file
+uv run pytest tests/unit/ui/adapters/test_validation_adapter.py
+
+# Run a specific test function
+uv run pytest tests/unit/ui/adapters/test_validation_adapter.py::test_validation_mapping
+
+# Run tests with coverage report
+uv run pytest --cov=src --cov-report=html
+```
+
+## 4. Key Testing Tools & Frameworks
+
+-   **`pytest`**: The primary test runner.
+-   **`pytest-cov`**: For measuring code coverage.
+-   **`pytest-qt`**: For testing Qt (PySide6) applications, providing fixtures for UI interaction and event loop management.
+-   **`unittest.mock`**: Python's built-in library for mocking objects and dependencies in unit tests.
+-   **`pandas`**: Used for creating and manipulating DataFrame fixtures for testing data-related components.
+
+## 5. Special Test Features
+
+-   **Fixtures (`conftest.py`, `fixtures/`)**: Reusable setup code and data defined using `pytest` fixtures. Global fixtures are in `tests/conftest.py`. Larger data sets might be loaded from `tests/fixtures/`.
+-   **Markers (`@pytest.mark`)**: Used to categorize tests (e.g., `@pytest.mark.slow`, `@pytest.mark.integration`) or parametrize tests.
+
+## 6. Common Test Fixtures (`conftest.py`)
+
+-   `qtbot`: Provided by `pytest-qt` for interacting with Qt widgets and event loop.
+-   `mock_qsettings`: Provides a mocked `QSettings` object for testing config interactions.
+-   `sample_dataframe`: Provides a basic Pandas DataFrame for tests.
+-   `mock_validation_service`, `mock_correction_service`: Mocked service instances.
+-   `table_state_manager`: A fixture providing a pre-configured `TableStateManager`.
+-   `data_view_model`: A fixture providing a `DataViewModel` linked to a `TableStateManager` and a sample model.
+
+## 7. Test Patterns
+
+-   **Arrange-Act-Assert (AAA)**: Standard structure for test functions.
+-   **Dependency Injection/Mocking**: Injecting mocks for external dependencies in unit tests.
+-   **Parametrization (`@pytest.mark.parametrize`)**: Running the same test logic with different inputs and expected outputs.
+-   **Factory Fixtures**: Fixtures that return functions to create configured objects on demand.
+
+## 8. Specialized Test Cases
+
+-   **Delegate Painting**: Using `qtbot.captureExceptions` and asserting painter calls (`assert_called_with`) on mocked `QPainter` objects.
+-   **Signal Emission**: Using `qtbot.waitSignal` to test if Qt signals are emitted correctly with the expected arguments.
+-   **State Transformation (Adapters)**: Providing input DataFrames to adapter methods and asserting the structure and content of the state dictionary passed to the mocked `TableStateManager.update_states` method.
+-   **Integration State Flow**: Using `unittest.mock.patch.object(wraps=...)` to spy on method calls between real components (e.g., checking if `ValidationAdapter._on_validation_complete` calls `TableStateManager.update_states` with the correct arguments after the `ValidationService` emits its signal).
+
+## 9. Common Test Scenarios
+
+-   **Data Model Interaction**: Testing `rowCount`, `columnCount`, `data`, `setData`, `headerData` methods of models.
+-   **Delegate Behavior**: Testing `createEditor`, `setEditorData`, `setModelData`, `paint`, `sizeHint`.
+-   **Service Logic**: Testing core business logic within services.
+-   **Adapter Transformation**: Testing the mapping of service data to `TableStateManager` state.
+-   **ViewModel State Propagation**: Testing if changes in the source model or `TableStateManager` correctly trigger `dataChanged` signals with appropriate roles.
+-   **Configuration Loading/Saving**: Testing `ConfigManager` interactions.
+
+## 10. Best Practices
+
+-   **Readability**: Write clear and concise test names and assertions.
+-   **Isolation**: Ensure unit tests do not have external dependencies (network, filesystem, database) unless explicitly testing integration.
+-   **Coverage**: Aim for high test coverage (target >95%), particularly for critical logic.
+-   **Maintainability**: Keep tests updated as the codebase evolves. Refactor tests when necessary.
+-   **Speed**: Keep unit tests fast. Mark slower integration tests appropriately (`@pytest.mark.slow`).
+-   **Mocking Fixes**: Be mindful of mocking Qt objects, especially complex ones like `QModelIndex`. Sometimes direct delegation (e.g., using `side_effect`) is needed instead of just mocking return values, as seen in `tests/ui/data/menus/test_context_menu_factory.py`.
+
+## DataView Refactoring - Specific Test Notes (Aug 10, 2024)
+
+- **ContextMenuFactory Tests:**
+    - Tests in `tests/ui/data/menus/test_context_menu_factory.py` are passing after fixing the mocking of `QModelIndex.data`.
+    - The fix involved using `mock_index.data.side_effect = lambda role: self.data(mock_index, role)` to ensure the mock index's `data()` call correctly delegates back to the mock model's `data()` method.
+    - Current tests cover basic menu creation, action enablement/disablement based on selection and editability, and presence of placeholders for context/type-specific actions.
+    - **Future Tests:** Need to add tests for the actual logic of cell-type specific actions and validation during edit once implemented.
+
+- **Correction Flow Integration Tests:**
+    - Tests for suggestion flow and UI action trigger are passing.
+    - Test for full correction application cycle (`test_correction_application_updates_state`) is implemented but potentially flaky due to Qt event loop/signal timing issues in the test environment. Logic seems correct based on logs.

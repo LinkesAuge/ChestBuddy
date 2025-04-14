@@ -431,5 +431,21 @@
   "tests/ui/data/context_menu/test_context_menu_factory.py::TestContextMenuFactoryIntegration::test_create_context_menu_date_column": true,
   "tests/ui/data/context_menu/test_context_menu_factory.py::TestContextMenuFactoryIntegration::test_create_context_menu_score_column": true,
   "tests/ui/data/context_menu/test_context_menu_factory.py::TestContextMenuFactoryIntegration::test_create_context_menu_no_model": true,
-  "tests/ui/test_main_window_controller_interaction.py": true
+  "tests/ui/test_main_window_controller_interaction.py": true,
+  "tests/ui/data/menus/test_context_menu_factory.py::TestContextMenuFactory::test_create_menu_numeric_column_shows_format_action": true,
+  "tests/ui/data/menus/test_context_menu_factory.py::TestContextMenuFactory::test_create_menu_date_column_shows_parse_action": true,
+  "tests/ui/data/menus/test_context_menu_factory.py::TestContextMenuFactory::test_create_menu_other_column_hides_type_specific_actions": true,
+  "tests/integration/test_edit_validation_flow.py": true,
+  "tests/ui/data/delegates/test_correction_delegate.py::TestCorrectionDelegate::test_helpEvent_shows_tooltip_for_suggestions": true,
+  "tests/ui/data/delegates/test_correction_delegate.py::TestCorrectionDelegate::test_helpEvent_no_suggestions_hides_tooltip": true,
+  "tests/unit/ui/views/test_correction_rule_view.py::TestCorrectionRuleView::test_edit_rule": true,
+  "tests/unit/ui/views/test_correction_rule_view.py::TestCorrectionRuleView::test_delete_rule": true,
+  "tests/unit/ui/views/test_correction_rule_view.py::TestCorrectionRuleView::test_reorder_rule": true,
+  "tests/unit/ui/views/test_correction_rule_view.py::TestCorrectionRuleView::test_toggle_rule_status": true,
+  "tests/unit/ui/views/test_correction_rule_view.py::TestCorrectionRuleView::test_settings_panel": true,
+  "tests/unit/ui/views/test_correction_rule_view.py::TestCorrectionRuleView::test_context_menu": true,
+  "tests/unit/core/controllers/test_correction_controller.py::TestCorrectionController::test_on_preview_rule_requested_shows_dialog": true,
+  "tests/unit/core/controllers/test_correction_controller.py::TestCorrectionController::test_on_preview_rule_requested_no_results": true,
+  "tests/unit/core/controllers/test_correction_controller.py::TestCorrectionController::test_on_preview_rule_requested_service_error": true,
+  "tests/unit/core/controllers/test_correction_controller.py::TestCorrectionController::test_on_preview_rule_requested_invalid_rule": true
 }

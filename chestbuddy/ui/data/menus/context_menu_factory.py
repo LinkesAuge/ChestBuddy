@@ -167,30 +167,71 @@ class ContextMenuFactory:
             menu.addSeparator()
             needs_separator = False
 
-        # Add cell-type specific actions (only if single cell selected)
+        # --- Add Cell-Type Specific Actions (Refined) --- #
+        # Add these actions only if a single cell is clicked/selected
         if info.clicked_index.isValid() and len(info.selection) <= 1:
+            # Try getting data with DisplayRole as fallback if EditRole is None
+            clicked_data = info.clicked_index.data(Qt.EditRole)
+            if clicked_data is None:
+                clicked_data = info.clicked_index.data(Qt.DisplayRole)
+
             col_index = info.clicked_index.column()
-            column_name = str(info.model.headerData(col_index, Qt.Horizontal))
+            # Ensure model and headerData are valid before calling
+            column_name = "Unknown Column"
+            if info.model and hasattr(info.model, "headerData"):
+                header_result = info.model.headerData(col_index, Qt.Horizontal, Qt.DisplayRole)
+                if header_result is not None:
+                    column_name = str(header_result)
 
-            if "date" in column_name.lower():
-                # Placeholder for Date formatting actions
-                date_format_action = QAction(f"Format Date ({column_name})...", info.parent_widget)
-                date_format_action.setEnabled(False)  # Placeholder - not implemented
-                menu.addAction(date_format_action)
-                needs_separator = True
+            data_type_detected = False
 
-            if "score" in column_name.lower() or "value" in column_name.lower():  # Example check
-                # Placeholder for Number formatting actions
-                number_format_action = QAction(
-                    f"Number Format ({column_name})...", info.parent_widget
+            # --- DEBUG --- #
+            print(
+                f"ContextMenuFactory: Clicked Data='{clicked_data}', Type={type(clicked_data)}, ColName='{column_name}'"
+            )
+            # ------------- #
+
+            # 1. Check for Numeric Types
+            if isinstance(clicked_data, (int, float)):
+                numeric_action = QAction(
+                    f"Numeric Options for '{column_name}'...", info.parent_widget
                 )
-                number_format_action.setEnabled(False)  # Placeholder - not implemented
-                menu.addAction(number_format_action)
+                numeric_action.setToolTip(
+                    "Actions specific to numeric cells (e.g., formatting, range check) - Not Implemented"
+                )
+                numeric_action.setEnabled(False)
+                menu.addAction(numeric_action)
                 needs_separator = True
+                data_type_detected = True
 
-        if needs_separator:
-            menu.addSeparator()
-            needs_separator = False
+            # 2. Check for potential Date/Time (heuristic based on column name for now)
+            # TODO: Improve date detection (check type if data model uses QDateTime/datetime)
+            elif "date" in column_name.lower():
+                date_action = QAction(f"Date Options for '{column_name}'...", info.parent_widget)
+                date_action.setToolTip(
+                    "Actions specific to date cells (e.g., formatting, calendar popup) - Not Implemented"
+                )
+                date_action.setEnabled(False)
+                menu.addAction(date_action)
+                needs_separator = True
+                data_type_detected = True
+
+            # 3. Default to String Type Actions (or add more specific checks)
+            elif isinstance(clicked_data, str) or not data_type_detected:
+                string_action = QAction(f"Text Options for '{column_name}'...", info.parent_widget)
+                string_action.setToolTip(
+                    "Actions specific to text cells (e.g., case change, length check) - Not Implemented"
+                )
+                string_action.setEnabled(False)
+                menu.addAction(string_action)
+                needs_separator = True
+                data_type_detected = True  # Assume string if nothing else matches
+
+            # Add separator if type-specific actions were added
+            if needs_separator:
+                menu.addSeparator()
+                needs_separator = False
+        # --- End Cell-Type Specific Actions --- #
 
         # Add context-specific actions (Validation/Correction)
         # Applicability might depend on single cell state

@@ -10,6 +10,9 @@ from unittest.mock import MagicMock, patch, call
 import pandas as pd
 from typing import Dict, List, Any, Tuple
 from PySide6.QtCore import QObject, Signal
+from PySide6.QtWidgets import QMessageBox
+from chestbuddy.ui.dialogs import CorrectionPreviewDialog
+from chestbuddy.ui.views import CorrectionRuleView
 
 from chestbuddy.core.controllers.correction_controller import CorrectionController
 from chestbuddy.core.models.correction_rule import CorrectionRule
@@ -99,8 +102,14 @@ def mock_validation_service():
 
 @pytest.fixture
 def mock_view():
-    """Fixture providing a mock view."""
-    view = MagicMock()
+    """Fixture providing a mock view with necessary signals."""
+    view = MagicMock(spec=CorrectionRuleView)  # Specify the class for better mocking
+    # Define the signals needed for connect_view
+    view.apply_corrections_requested = Signal(bool, bool)
+    view.rule_added = Signal(object)
+    view.rule_edited = Signal(object)
+    view.rule_deleted = Signal(int)
+    view.preview_rule_requested = Signal(CorrectionRule)
     view.refresh = MagicMock()
     view.update_rule_list = MagicMock()
     return view
@@ -108,12 +117,21 @@ def mock_view():
 
 @pytest.fixture
 def controller(
-    mock_correction_service, mock_rule_manager, mock_config_manager, mock_validation_service
+    mock_correction_service,
+    mock_rule_manager,
+    mock_config_manager,
+    mock_validation_service,
+    mock_view,  # Add mock_view fixture dependency
 ):
-    """Create a correction controller for testing."""
+    """Create a correction controller for testing and connect the mock view."""
     controller = CorrectionController(
-        mock_correction_service, mock_rule_manager, mock_config_manager, mock_validation_service
+        correction_service=mock_correction_service,
+        rule_manager=mock_rule_manager,
+        config_manager=mock_config_manager,
+        validation_service=mock_validation_service,
     )
+    # Connect the view within the fixture
+    controller.connect_view(mock_view)
     return controller
 
 
@@ -146,17 +164,6 @@ class TestCorrectionController:
         assert controller._view is None
         assert controller._worker is None
         assert controller._worker_thread is None
-
-    def test_set_view(self, controller, mock_view):
-        """Test setting the view."""
-        # Initially no view
-        assert controller._view is None
-
-        # Set the view
-        controller.set_view(mock_view)
-
-        # View should be set
-        assert controller._view == mock_view
 
     def test_add_rule(self, controller, mock_rule_manager, mock_view):
         """Test adding a rule."""
@@ -615,3 +622,137 @@ class TestCorrectionController:
             controller.auto_correct_on_import()
             # Verify apply_corrections was called (args might differ based on exact logic)
             mock_apply.assert_called_once_with(only_invalid=False, recursive=True)
+
+    def test_on_preview_rule_requested_shows_dialog(self, controller, mock_correction_service):
+        """Test _on_preview_rule_requested calls service and shows dialog on success."""
+        rule_to_preview = CorrectionRule(from_value="test", to_value="preview", category="general")
+        preview_results = [(1, "colA", "test", "preview"), (5, "colB", "other", "new")]
+        mock_correction_service.get_correction_preview.return_value = preview_results
+
+        # Patch the dialog and message box - use the controller's module path
+        with (
+            patch(
+                "chestbuddy.core.controllers.correction_controller.CorrectionPreviewDialog"
+            ) as MockPreviewDialog,
+            patch(
+                "chestbuddy.core.controllers.correction_controller.QMessageBox"
+            ) as MockMessageBox,
+        ):
+            mock_dialog_instance = MockPreviewDialog.return_value
+            mock_msg_box_instance = MockMessageBox.return_value  # Instance for MessageBox
+
+            # Call the slot directly (simulating signal emission from view)
+            controller._on_preview_rule_requested(rule_to_preview)
+
+            # Verify service was called
+            mock_correction_service.get_correction_preview.assert_called_once_with(rule_to_preview)
+
+            # Verify dialog was created with correct data and parent, then shown
+            MockPreviewDialog.assert_called_once_with(preview_results, controller._view)
+            mock_dialog_instance.exec.assert_called_once()
+
+            # Verify message box was NOT shown
+            MockMessageBox.assert_not_called()
+            mock_msg_box_instance.exec.assert_not_called()
+
+    def test_on_preview_rule_requested_no_results(self, controller, mock_correction_service):
+        """Test _on_preview_rule_requested shows info message box when service returns no results."""
+        rule_to_preview = CorrectionRule(from_value="none", to_value="nothing", category="general")
+        preview_results = []  # Empty results
+        mock_correction_service.get_correction_preview.return_value = preview_results
+
+        # Patch the dialog and message box - use the controller's module path
+        with (
+            patch(
+                "chestbuddy.core.controllers.correction_controller.CorrectionPreviewDialog"
+            ) as MockPreviewDialog,
+            patch(
+                "chestbuddy.core.controllers.correction_controller.QMessageBox"
+            ) as MockMessageBox,
+        ):
+            mock_dialog_instance = MockPreviewDialog.return_value
+            mock_msg_box_instance = MockMessageBox.return_value
+
+            # Call the slot
+            controller._on_preview_rule_requested(rule_to_preview)
+
+            # Verify service was called
+            mock_correction_service.get_correction_preview.assert_called_once_with(rule_to_preview)
+
+            # Verify dialog was NOT created or shown
+            MockPreviewDialog.assert_not_called()
+            mock_dialog_instance.exec.assert_not_called()
+
+            # Verify info message box was shown
+            MockMessageBox.assert_called_once_with(controller._view)  # Check parent
+            mock_msg_box_instance.setIcon.assert_called_once_with(QMessageBox.Icon.Information)
+            mock_msg_box_instance.setWindowTitle.assert_called_once_with("Rule Preview")
+            mock_msg_box_instance.setText.assert_called_once_with(
+                "This rule currently does not affect any data."
+            )
+            mock_msg_box_instance.exec.assert_called_once()
+
+    def test_on_preview_rule_requested_service_error(self, controller, mock_correction_service):
+        """Test _on_preview_rule_requested shows error message box on service exception."""
+        rule_to_preview = CorrectionRule(from_value="err", to_value="error", category="general")
+        error_message = "Service unavailable"
+        mock_correction_service.get_correction_preview.side_effect = Exception(error_message)
+
+        # Patch the dialog and message box - use the controller's module path
+        with (
+            patch(
+                "chestbuddy.core.controllers.correction_controller.CorrectionPreviewDialog"
+            ) as MockPreviewDialog,
+            patch(
+                "chestbuddy.core.controllers.correction_controller.QMessageBox"
+            ) as MockMessageBox,
+        ):
+            mock_dialog_instance = MockPreviewDialog.return_value
+            mock_msg_box_instance = MockMessageBox.return_value
+
+            # Call the slot
+            controller._on_preview_rule_requested(rule_to_preview)
+
+            # Verify service was called
+            mock_correction_service.get_correction_preview.assert_called_once_with(rule_to_preview)
+
+            # Verify dialog was NOT created or shown
+            MockPreviewDialog.assert_not_called()
+            mock_dialog_instance.exec.assert_not_called()
+
+            # Verify error message box was shown
+            MockMessageBox.assert_called_once_with(controller._view)
+            mock_msg_box_instance.setIcon.assert_called_once_with(QMessageBox.Icon.Critical)
+            mock_msg_box_instance.setWindowTitle.assert_called_once_with("Preview Error")
+            # Check that the error message from the exception is included in the text
+            expected_text = f"Could not generate preview for rule.\nError: {error_message}"
+            mock_msg_box_instance.setText.assert_called_once_with(expected_text)
+            mock_msg_box_instance.exec.assert_called_once()
+
+    def test_on_preview_rule_requested_invalid_rule(self, controller, mock_correction_service):
+        """Test that _on_preview_rule_requested handles None rule input gracefully."""
+        mock_correction_service.get_correction_preview.reset_mock()  # Reset mock calls
+
+        # Patch the dialog and message box (though they shouldn't be called)
+        with (
+            patch(
+                "chestbuddy.core.controllers.correction_controller.CorrectionPreviewDialog"
+            ) as MockPreviewDialog,
+            patch(
+                "chestbuddy.core.controllers.correction_controller.QMessageBox"
+            ) as MockMessageBox,
+        ):
+            mock_dialog_instance = MockPreviewDialog.return_value
+            mock_msg_box_instance = MockMessageBox.return_value
+
+            # Call the slot with None
+            controller._on_preview_rule_requested(None)
+
+            # Verify service was NOT called
+            mock_correction_service.get_correction_preview.assert_not_called()
+            # Verify dialog was NOT created or shown
+            MockPreviewDialog.assert_not_called()
+            mock_dialog_instance.exec.assert_not_called()
+            # Verify message box was NOT shown
+            MockMessageBox.assert_not_called()
+            mock_msg_box_instance.exec.assert_not_called()

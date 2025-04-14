@@ -196,3 +196,70 @@ class TestValidationService:
 
         # Preferences should be updated in the model
         assert validation_service._player_list_model.is_case_sensitive() is True
+
+    def test_validate_single_entry_valid(self, validation_service_fixture):
+        """Test validate_single_entry with a valid value."""
+        service, mock_data_model, mock_player_list, mock_chest_list, mock_source_list = (
+            validation_service_fixture
+        )
+        mock_player_list.validate.return_value = (ValidationStatus.VALID, "")
+
+        status, message = service.validate_single_entry(
+            ValidationService.PLAYER_COLUMN, "ValidPlayer"
+        )
+
+        mock_player_list.validate.assert_called_once_with(
+            "ValidPlayer", ValidationService.PLAYER_COLUMN
+        )
+        assert status == ValidationStatus.VALID
+        assert message == ""
+
+    def test_validate_single_entry_invalid(self, validation_service_fixture):
+        """Test validate_single_entry with an invalid value."""
+        service, mock_data_model, mock_player_list, mock_chest_list, mock_source_list = (
+            validation_service_fixture
+        )
+        mock_player_list.validate.return_value = (ValidationStatus.INVALID, "Invalid player name")
+
+        status, message = service.validate_single_entry(
+            ValidationService.PLAYER_COLUMN, "InvalidPlayer"
+        )
+
+        mock_player_list.validate.assert_called_once_with(
+            "InvalidPlayer", ValidationService.PLAYER_COLUMN
+        )
+        assert status == ValidationStatus.INVALID
+        assert message == "Invalid player name"
+
+    def test_validate_single_entry_unknown_column(self, validation_service_fixture):
+        """Test validate_single_entry for a column without a validation list."""
+        service, mock_data_model, mock_player_list, mock_chest_list, mock_source_list = (
+            validation_service_fixture
+        )
+
+        # Ensure _get_validation_list_model returns None for this column
+        with patch.object(
+            service, "_get_validation_list_model", return_value=None
+        ) as mock_get_model:
+            status, message = service.validate_single_entry("UnknownColumn", "SomeValue")
+
+            mock_get_model.assert_called_once_with("UnknownColumn")
+            assert status == ValidationStatus.VALID  # Default behaviour is VALID if no list
+            assert message == ""
+
+    def test_validate_single_entry_list_model_error(self, validation_service_fixture):
+        """Test validate_single_entry when the list model validation raises an error."""
+        service, mock_data_model, mock_player_list, mock_chest_list, mock_source_list = (
+            validation_service_fixture
+        )
+        mock_chest_list.validate.side_effect = Exception("List Model Error")
+
+        status, message = service.validate_single_entry(ValidationService.CHEST_COLUMN, "SomeChest")
+
+        mock_chest_list.validate.assert_called_once_with(
+            "SomeChest", ValidationService.CHEST_COLUMN
+        )
+        assert status == ValidationStatus.INVALID
+        assert "Error during validation: List Model Error" in message
+
+    # Add more tests? E.g., for case sensitivity if mock models support it.
